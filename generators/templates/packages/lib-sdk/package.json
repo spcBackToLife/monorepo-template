@@ -1,5 +1,5 @@
 {
-  "name": "@globallink/lib-sdk-demo",
+  "name": "@jarvis/lib-sdk-demo",
   "version": "0.0.0",
   "private": false,
   "type": "module",
@@ -13,8 +13,19 @@
     }
   },
   "scripts": {
-    "build": "tsup"
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --ext .ts src"
   },
   "sideEffects": false,
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "eslint": "^9.14.0",
+    "@eslint/js": "^9.14.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3"
+  }
 }

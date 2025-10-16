@@ -1,5 +1,5 @@
 {
-  "name": "@jarvis/feature-template",
+  "name": "@jarvis/tools",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,17 +15,20 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --ext .ts src"
+    "lint": "eslint --ext .ts src",
+    "prepare": "husky"
   },
   "sideEffects": false,
-  "dependencies": {},
+  "dependencies": {
+    "axios": "^1.7.7"
+  },
   "devDependencies": {
-    "typescript": "^5.6.3",
-    "eslint": "^9.14.0",
-    "@eslint/js": "^9.14.0",
-    "@typescript-eslint/parser": "^8.13.0",
-    "@typescript-eslint/eslint-plugin": "^8.13.0",
-    "eslint-config-prettier": "^9.1.0",
-    "prettier": "^3.3.3"
+    "@eslint/js": "^9.37.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "tsup": "^8.2.4",
+    "typescript": "^5.6.3"
   }
 }

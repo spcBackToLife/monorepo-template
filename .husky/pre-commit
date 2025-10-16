@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Block commit on lint or type errors across workspaces
+# 1) TypeScript typecheck for all workspaces（仅在包中存在该脚本时执行）
+pnpm -r --workspace-concurrency=1 run --if-present typecheck || exit 1
+
+# 2) ESLint（仅在包中存在该脚本时执行）
+pnpm -r --workspace-concurrency=1 run --if-present lint || exit 1
+
+echo "✔ pre-commit checks passed"
+
+
+pnpm -r lint
+pnpm -r typecheck

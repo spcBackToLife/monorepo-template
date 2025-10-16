@@ -75,6 +75,128 @@ function copyDir(src, dest) {
   }
 }
 
+/**
+ * Ensure root-level Husky pre-commit exists and includes workspace checks.
+ * Idempotent: merges commands if file already exists.
+ */
+function ensureRootHuskyPreCommit(rootDir) {
+  const gitDir = path.join(rootDir, '.git');
+  if (!fs.existsSync(gitDir)) {
+    // Not a git repo root; skip silently
+    return;
+  }
+
+  const huskyDir = path.join(rootDir, '.husky');
+  ensureDir(huskyDir);
+
+  const preCommitPath = path.join(huskyDir, 'pre-commit');
+  const header = '#!/usr/bin/env sh\n. "$(dirname "$0")/_/husky.sh"\n\n';
+  const requiredLines = ['pnpm -r lint', 'pnpm -r typecheck'];
+
+  let content = '';
+  if (fs.existsSync(preCommitPath)) {
+    try {
+      content = fs.readFileSync(preCommitPath, 'utf8');
+    } catch (_) {
+      content = '';
+    }
+  } else {
+    content = header;
+  }
+
+  let changed = false;
+  if (!content.startsWith('#!/')) {
+    content = header + content;
+    changed = true;
+  } else if (!content.includes('husky.sh')) {
+    // ensure husky header present for consistency
+    content = header + content;
+    changed = true;
+  }
+
+  for (const line of requiredLines) {
+    const hasLine = content.split(/\r?\n/).some((l) => l.trim() === line);
+    if (!hasLine) {
+      content += (content.endsWith('\n') ? '' : '\n') + line + '\n';
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    fs.writeFileSync(preCommitPath, content, 'utf8');
+    try {
+      fs.chmodSync(preCommitPath, 0o755);
+    } catch (_) {}
+    console.log('已更新根级 .husky/pre-commit 钩子');
+  }
+}
+
+function readJsonSafe(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeJsonPretty(p, obj) {
+  fs.writeFileSync(p, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+}
+
+/**
+ * 根据环境写入 eslint.config.cjs（flat）
+ * @param {string} destDir 目标目录
+ * @param {('browser'|'node')} env
+ */
+function writeEslintConfigForEnv(destDir, env) {
+  const file =
+    `// ESLint v9 flat config for TypeScript library\n` +
+    `const tseslint = require('@typescript-eslint/eslint-plugin');\n` +
+    `const tsparser = require('@typescript-eslint/parser');\n` +
+    `const js = require('@eslint/js');\n` +
+    `const globals = require('globals');\n\n` +
+    `module.exports = [\n` +
+    `  js.configs.recommended,\n` +
+    `  {\n` +
+    `    files: ['src/**/*.ts'],\n` +
+    `    languageOptions: {\n` +
+    `      parser: tsparser,\n` +
+    `      ecmaVersion: 'latest',\n` +
+    `      sourceType: 'module',\n` +
+    `      globals: { ...(globals.${env}) },\n` +
+    `    },\n` +
+    `    plugins: { '@typescript-eslint': tseslint },\n` +
+    `    rules: {\n` +
+    `      'no-unused-vars': 'off',\n` +
+    `      'no-undef': 'off',\n` +
+    `      '@typescript-eslint/no-explicit-any': 'error',\n` +
+    `      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],\n` +
+    `    },\n` +
+    `  },\n` +
+    `  { ignores: ['dist', 'node_modules'] },\n` +
+    `];\n`;
+  fs.writeFileSync(path.join(destDir, 'eslint.config.cjs'), file, 'utf8');
+}
+
+/**
+ * 根据环境覆写 tsconfig.json 的 lib（browser: 含 DOM，node: 不含 DOM）
+ * @param {string} destDir
+ * @param {('browser'|'node')} env
+ */
+function rewriteTsconfigLibForEnv(destDir, env) {
+  const tsconfigPath = path.join(destDir, 'tsconfig.json');
+  const data = readJsonSafe(tsconfigPath);
+  if (!data) return;
+  data.compilerOptions = data.compilerOptions || {};
+  if (env === 'browser') {
+    data.compilerOptions.lib = ['ES2021', 'DOM', 'DOM.Iterable'];
+  } else {
+    data.compilerOptions.lib = ['ES2021'];
+  }
+  // 保留其他现有设置
+  writeJsonPretty(tsconfigPath, data);
+}
+
 function isDirEmpty(dir) {
   const list = readDirSafe(dir).filter((x) => !shouldSkip(x.name));
   return list.length === 0;
@@ -192,6 +314,7 @@ async function main() {
     process.exit(1);
   }
 
+  // 仅收集信息，不创建任何文件，直到用户确认全部选项
   const destDir = resolveDest(kind, targetName);
   if (fs.existsSync(destDir)) {
     const confirm = await askConfirm(`目录已存在: ${destDir}，是否覆盖?`);
@@ -201,6 +324,16 @@ async function main() {
     }
   }
 
+  // 若为 lib-sdk，先询问运行环境，但不落盘
+  let libEnv = null;
+  if (tpl === 'lib-sdk') {
+    libEnv = await askSelect('选择运行环境（lib-sdk）', [
+      { name: 'browser', message: 'browser — 浏览器环境（含 DOM）' },
+      { name: 'node', message: 'node — Node.js 环境' },
+    ]);
+  }
+
+  // 到此为止仍未写入任何文件，下面一次性创建
   const srcDir = path.join(templatesRoot, kind, tpl);
   ensureDir(destDir);
   copyDir(srcDir, destDir);
@@ -220,6 +353,39 @@ async function main() {
     desiredPrivate = true; // features 默认不发布
   }
   rewritePackageJson(destDir, pkgName, desiredPrivate);
+
+  // 若为 lib-sdk，询问运行环境并应用对应的 ESLint/TSConfig
+  if (tpl === 'lib-sdk') {
+    try {
+      const env = await askSelect('选择运行环境（lib-sdk）', [
+        { name: 'browser', message: 'browser — 浏览器环境（含 DOM）' },
+        { name: 'node', message: 'node — Node.js 环境' },
+      ]);
+      writeEslintConfigForEnv(destDir, env);
+      rewriteTsconfigLibForEnv(destDir, env);
+      console.log('已应用 lib-sdk 环境配置：', env);
+    } catch (e) {
+      console.warn('应用 lib-sdk 环境配置失败（已跳过）：', e && e.message);
+    }
+  }
+
+  // 若为 lib-sdk，应用环境配置（此时目录已创建）
+  if (tpl === 'lib-sdk' && libEnv) {
+    try {
+      writeEslintConfigForEnv(destDir, libEnv);
+      rewriteTsconfigLibForEnv(destDir, libEnv);
+      console.log('已应用 lib-sdk 环境配置：', libEnv);
+    } catch (e) {
+      console.warn('应用 lib-sdk 环境配置失败（已跳过）：', e && e.message);
+    }
+  }
+
+  // 初始化/合并仓库根级 Husky pre-commit（monorepo 顶层）——放在创建成功之后
+  try {
+    ensureRootHuskyPreCommit(repoRoot);
+  } catch (e) {
+    console.warn('初始化 Husky pre-commit 失败（已跳过）：', e && e.message);
+  }
 
   console.log('创建完成于:', destDir);
 }

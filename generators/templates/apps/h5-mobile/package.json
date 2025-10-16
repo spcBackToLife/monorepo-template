@@ -1,5 +1,5 @@
 {
-  "name": "@globallink/h5-mobile",
+  "name": "@jarvis/h5-mobile",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -17,15 +17,19 @@
     "mobx": "^6.13.3",
     "mobx-react-lite": "^4.0.7",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@sass/ui-sdk-demo": "workspace:*",
-    "@globallink/some-feature": "workspace:*"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
+    "eslint": "^9.14.0",
+    "@eslint/js": "^9.14.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
     "less": "^4.2.0",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.13",

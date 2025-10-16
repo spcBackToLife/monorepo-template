@@ -1,5 +1,5 @@
 {
-  "name": "@sass/ui-sdk-demo",
+  "name": "@jarvis/ui-sdk-demo",
   "version": "4.16.7",
   "description": "UI SDK Demo",
   "main": "dist/ui-sdk-demo.umd.js",
@@ -11,7 +11,9 @@
     "watch": "vite build --watch",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --ext .ts,.tsx src"
   },
   "exports": {
     ".": {
@@ -73,7 +75,13 @@
     "tailwindcss": "^3.3.2",
     "typescript": "^5.4.2",
     "vite": "^6.2.1",
-    "vite-plugin-dts": "^4.5.4"
+    "vite-plugin-dts": "^4.5.4",
+    "eslint": "^9.14.0",
+    "@eslint/js": "^9.14.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3"
   },
   "dependencies": {
     "classnames": "^2.5.1",
