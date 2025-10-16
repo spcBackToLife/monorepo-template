@@ -1,5 +1,5 @@
 {
-  "name": "@globallink/lib-sdk-demo",
+  "name": "@globallink/globallink-tools",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,5 +16,8 @@
     "build": "tsup"
   },
   "sideEffects": false,
-  "dependencies": {}
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
 }

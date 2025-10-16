@@ -1,0 +1,29 @@
+/* 应用主题变量；配合 antd-mobile 通过 adm-theme 切换 */
+
+/* 亮色主题（默认） */
+:root {
+  color-scheme: light;
+  --app-bg: #ffffff;
+  --app-fg: #1f2937; // gray-800
+  --app-muted: #6b7280; // gray-500
+}
+
+/* 暗色主题 */
+.theme-dark {
+  color-scheme: dark;
+  --app-bg: #0b0f14;
+  --app-fg: #e5e7eb; // gray-200
+  --app-muted: #9ca3af; // gray-400
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-fg);
+}

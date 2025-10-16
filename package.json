@@ -24,13 +24,17 @@
     "release": "pnpm prerelease && pnpm release:only && pnpm postrelease",
     "release:only": "changeset publish",
     "release:jarvis": "bash scripts/release-jarvis.sh",
-    "release:jarvis-dev": "bash scripts/release-jarvis-dev.sh"
+    "release:jarvis-dev": "bash scripts/release-jarvis-dev.sh",
+    "new": "node generators/new.js"
   },
   "devDependencies": {
     "@changesets/cli": "^2.28.1",
+    "concurrently": "^9.1.0",
     "extract-zip": "^2.0.1",
     "husky": "^9.1.6",
-    "tsup": "^8.3.0",
-    "concurrently": "^9.1.0"
+    "tsup": "^8.3.0"
+  },
+  "dependencies": {
+    "enquirer": "2.4.1"
   }
 }
