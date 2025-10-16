@@ -1,0 +1,32 @@
+{
+  "name": "@sass/sass-monorepo-repo",
+  "version": "0.0.0",
+  "description": "Ai Agent Monorepo",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "clean": "git clean -xdf node_modules",
+    "clean:workspaces": "bun --filter '*' clean",
+    "dev:ui": "bun --filter ai-agent-ui dev",
+    "build": "pnpm --filter './packages/*' build",
+    "build:jarvis": "pnpm --filter '@waimai/zspt-ai-jarvis' build",
+    "dev": "pnpm --filter '@globallink/h5-mobile' dev",
+    "test": "bun --filter '*' test",
+    "format": "pnpm --filter '@globallink/h5-mobile' format",
+    "typecheck": "pnpm --filter '@globallink/h5-mobile' typecheck",
+    "prepare": "husky",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "prerelease": "node -e \"require('./scripts/handle-workspace-deps.js').replaceWorkspaceDeps()\"",
+    "postrelease": "node -e \"require('./scripts/handle-workspace-deps.js').restoreWorkspaceDeps()\"",
+    "release": "pnpm prerelease && pnpm release:only && pnpm postrelease",
+    "release:only": "changeset publish",
+    "release:jarvis": "bash scripts/release-jarvis.sh",
+    "release:jarvis-dev": "bash scripts/release-jarvis-dev.sh"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.28.1",
+    "extract-zip": "^2.0.1",
+    "husky": "^9.1.6"
+  }
+}

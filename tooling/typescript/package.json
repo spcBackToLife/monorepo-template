@@ -1,0 +1,11 @@
+{
+  "name": "@waimai/zspt-ai-typescript",
+  "description": "The Zspt TypeScript Configuration",
+  "version": "0.0.2",
+  "private": true,
+  "exports": {
+    "./react-library.json": "./react-library.json",
+    "./vite-react.json": "./vite-react.json",
+    "./base.json": "./base.json"
+  }
+}

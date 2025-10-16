@@ -1,0 +1,27 @@
+module.exports = {
+  root: true,
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+  },
+  ignorePatterns: [
+    'node_modules/',
+    '**/dist/**',
+    '**/build/**',
+    '*.d.ts',
+    '**/*.test.ts',
+    '**/*.test.tsx',
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/build/**',
+    '*.d.ts',
+    'build/',
+    '*.d.ts',
+    '**/*.test.ts',
+    '**/*.test.tsx',
+  ],
+};
