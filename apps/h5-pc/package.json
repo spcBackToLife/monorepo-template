@@ -1,5 +1,5 @@
 {
-  "name": "@globallink/h5-mobile",
+  "name": "@globallink/h5-pc",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "antd-mobile": "^5.37.0",
+    "antd": "^5.24.1",
     "classnames": "^2.5.1",
     "mobx": "^6.13.3",
     "mobx-react-lite": "^4.0.7",
