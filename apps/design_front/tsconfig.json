@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tooling/typescript/vite-react.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/api/*": ["src/api/*"],
+      "@/components/*": ["src/components/*"],
+      "@/pages/*": ["src/pages/*"],
+      "@/services/*": ["src/services/*"],
+      "@/stores/*": ["src/stores/*"],
+      "@/styles/*": ["src/styles/*"],
+      "@/views/*": ["src/views/*"]
+    },
+    "noImplicitAny": true
+  },
+  "include": ["src", "vite-env.d.ts"],
+  "exclude": ["dist", "node_modules"]
+}

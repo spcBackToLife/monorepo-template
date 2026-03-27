@@ -8,6 +8,7 @@
     "clean": "git clean -xdf node_modules",
     "clean:workspaces": "bun --filter '*' clean",
     "dev:ui": "bun --filter ai-agent-ui dev",
+    "dev:api": "pnpm --filter '@globallink/design-api' dev",
     "dev:features": "pnpm -r --filter './features/*' run build --watch",
     "dev:stack": "concurrently -k \"pnpm dev:features\" \"pnpm --filter '@jarvis/h5-mobile' dev\"",
     "build": "pnpm -r build",

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "design-mcp": {
+      "command": "node",
+      "args": ["apps/design-mcp/dist/index.js"],
+      "env": {
+        "DESIGN_API_URL": "http://localhost:3001"
+      }
+    }
+  }
+}

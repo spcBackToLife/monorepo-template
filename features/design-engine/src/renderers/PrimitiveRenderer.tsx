@@ -1,0 +1,137 @@
+import React from 'react';
+import type { ComponentNode } from '@globallink/design-schema';
+
+export interface PrimitiveRendererProps {
+  /** The ComponentNode to render */
+  node: ComponentNode;
+  /** Resolved React CSS styles */
+  style: React.CSSProperties;
+  /** Resolved props (from state merge) */
+  resolvedProps: Record<string, unknown>;
+  /** Rendered children */
+  children: React.ReactNode;
+}
+
+/**
+ * Renders a primitive node type as its corresponding HTML element.
+ *
+ * Maps the node's `type` (div, button, img, etc.) to a real HTML element,
+ * applies the resolved styles and props, and injects `data-node-id` for
+ * the overlay coordinate mapping system.
+ */
+export function PrimitiveRenderer({
+  node,
+  style,
+  resolvedProps,
+  children,
+}: PrimitiveRendererProps) {
+  const commonProps = {
+    'data-node-id': node.id,
+    'data-node-type': node.type,
+    style,
+  };
+
+  switch (node.type) {
+    // --- Self-closing / void elements ---
+    case 'img':
+      return (
+        <img
+          {...commonProps}
+          src={resolvedProps.src as string}
+          alt={resolvedProps.alt as string ?? ''}
+          loading={(resolvedProps.loading as 'lazy' | 'eager') ?? 'lazy'}
+        />
+      );
+
+    case 'input':
+      return (
+        <input
+          {...commonProps}
+          placeholder={resolvedProps.placeholder as string}
+          type={(resolvedProps.type as string) ?? 'text'}
+          value={resolvedProps.value as string}
+          disabled={resolvedProps.disabled as boolean}
+          readOnly
+        />
+      );
+
+    case 'textarea':
+      return (
+        <textarea
+          {...commonProps}
+          placeholder={resolvedProps.placeholder as string}
+          rows={resolvedProps.rows as number}
+          disabled={resolvedProps.disabled as boolean}
+          readOnly
+          value={resolvedProps.value as string}
+        />
+      );
+
+    case 'select':
+      return (
+        <select
+          {...commonProps}
+          disabled={resolvedProps.disabled as boolean}
+          value={resolvedProps.value as string}
+        >
+          {children}
+        </select>
+      );
+
+    // --- Text elements ---
+    case 'h1':
+      return <h1 {...commonProps}>{resolvedProps.text as string ?? children}</h1>;
+    case 'h2':
+      return <h2 {...commonProps}>{resolvedProps.text as string ?? children}</h2>;
+    case 'h3':
+      return <h3 {...commonProps}>{resolvedProps.text as string ?? children}</h3>;
+    case 'p':
+      return <p {...commonProps}>{resolvedProps.text as string ?? children}</p>;
+    case 'span':
+      return <span {...commonProps}>{resolvedProps.text as string ?? children}</span>;
+    case 'a':
+      return (
+        <a
+          {...commonProps}
+          href={resolvedProps.href as string}
+          target={resolvedProps.target as string}
+          rel={resolvedProps.rel as string}
+          onClick={(e) => e.preventDefault()}
+        >
+          {resolvedProps.text as string ?? children}
+        </a>
+      );
+
+    // --- Container / structural elements ---
+    case 'button':
+      return (
+        <button
+          {...commonProps}
+          disabled={resolvedProps.disabled as boolean}
+          type="button"
+        >
+          {resolvedProps.text as string ?? children}
+        </button>
+      );
+    case 'nav':
+      return <nav {...commonProps}>{children}</nav>;
+    case 'header':
+      return <header {...commonProps}>{children}</header>;
+    case 'footer':
+      return <footer {...commonProps}>{children}</footer>;
+    case 'section':
+      return <section {...commonProps}>{children}</section>;
+    case 'main':
+      return <main {...commonProps}>{children}</main>;
+    case 'ul':
+      return <ul {...commonProps}>{children}</ul>;
+    case 'ol':
+      return <ol {...commonProps}>{children}</ol>;
+    case 'li':
+      return <li {...commonProps}>{resolvedProps.text as string ?? children}</li>;
+
+    // --- Default: div ---
+    default:
+      return <div {...commonProps}>{children}</div>;
+  }
+}

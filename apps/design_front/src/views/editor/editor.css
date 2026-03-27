@@ -1,0 +1,35 @@
+.editor-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.editor-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-canvas-area {
+  flex: 1;
+  position: relative;
+  background: #f0f2f5;
+  overflow: auto;
+}
+
+.editor-right-panel {
+  width: 320px;
+  border-left: 1px solid #f0f0f0;
+  background: #fff;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.editor-screen-bar {
+  width: 180px;
+  border-right: 1px solid #f0f0f0;
+  background: #fafafa;
+  overflow-y: auto;
+  flex-shrink: 0;
+}

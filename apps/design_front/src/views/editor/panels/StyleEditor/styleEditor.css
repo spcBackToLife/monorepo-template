@@ -1,0 +1,18 @@
+.style-group {
+  margin-bottom: 12px;
+}
+
+.style-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.style-label {
+  width: 72px;
+  font-size: 11px;
+  color: #8c8c8c;
+  flex-shrink: 0;
+  text-align: right;
+}

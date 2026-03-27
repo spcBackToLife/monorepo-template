@@ -1,0 +1,90 @@
+import { Input, Select, Collapse, Empty, ColorPicker } from 'antd';
+import { observer } from 'mobx-react-lite';
+import { editorStore } from '@/stores/editor';
+import { findNodeInScreens } from '@globallink/design-operations';
+import { STYLE_GROUPS, type StyleGroup } from './styleGroups';
+import './styleEditor.css';
+
+export const StyleEditorPanel = observer(function StyleEditorPanel() {
+  const nodeId = editorStore.selectedNodeIds[0];
+  const screens = editorStore.screens;
+
+  if (!nodeId) {
+    return <Empty description="请先选中一个元素" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+  }
+
+  const node = findNodeInScreens(screens, nodeId);
+  if (!node) {
+    return <Empty description="节点未找到" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
+  }
+
+  const styles = node.styles as Record<string, unknown>;
+
+  const handleChange = (key: string, value: string) => {
+    editorStore.execute({
+      type: 'updateStyle',
+      params: { nodeId, styles: { [key]: value || undefined } },
+    });
+  };
+
+  return (
+    <Collapse
+      ghost
+      size="small"
+      defaultActiveKey={STYLE_GROUPS.map((g) => g.key)}
+      items={STYLE_GROUPS.map((group) => ({
+        key: group.key,
+        label: group.label,
+        children: <GroupFields group={group} styles={styles} onChange={handleChange} />,
+      }))}
+    />
+  );
+});
+
+interface GroupFieldsProps {
+  group: StyleGroup;
+  styles: Record<string, unknown>;
+  onChange: (key: string, value: string) => void;
+}
+
+function GroupFields({ group, styles, onChange }: GroupFieldsProps) {
+  return (
+    <div className="style-group">
+      {group.properties.map((prop) => {
+        const value = styles[prop.key];
+        const strVal = value !== undefined && value !== null ? String(value) : '';
+
+        return (
+          <div className="style-row" key={prop.key}>
+            <span className="style-label">{prop.label}</span>
+            {prop.type === 'select' ? (
+              <Select
+                size="small"
+                style={{ flex: 1 }}
+                value={strVal || undefined}
+                allowClear
+                onChange={(v) => onChange(prop.key, v ?? '')}
+                options={prop.options?.map((o) => ({ label: o, value: o }))}
+              />
+            ) : prop.type === 'color' ? (
+              <ColorPicker
+                size="small"
+                value={strVal || undefined}
+                onChange={(_, hex) => onChange(prop.key, hex)}
+              />
+            ) : (
+              <Input
+                size="small"
+                style={{ flex: 1 }}
+                value={strVal}
+                placeholder={prop.key}
+                onBlur={(e) => onChange(prop.key, e.target.value)}
+                onPressEnter={(e) => onChange(prop.key, (e.target as HTMLInputElement).value)}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
