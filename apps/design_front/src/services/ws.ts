@@ -1,12 +1,21 @@
 import type { Operation } from '@globallink/design-operations';
+import { io, type Socket } from 'socket.io-client';
 
 export type WsMessageHandler = (op: Operation) => void;
 
-const WS_BASE = import.meta.env.VITE_WS_BASE ?? 'ws://127.0.0.1:3001';
+const WS_BASE = import.meta.env.VITE_WS_BASE ?? 'http://127.0.0.1:3002';
 
-/** Reconnecting WebSocket wrapper for operation sync */
+type OperationEventPayload = {
+  projectId: string;
+  operation: Operation;
+  seq: number;
+  author?: string;
+  timestamp: string;
+};
+
+/** Reconnecting Socket.IO wrapper for operation sync */
 export class WsService {
-  private ws: WebSocket | null = null;
+  private socket: Socket | null = null;
   private projectId: string | null = null;
   private handlers: Set<WsMessageHandler> = new Set();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -31,39 +40,44 @@ export class WsService {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.close();
-      this.ws = null;
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
     }
     this.projectId = null;
   }
 
   get connected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return Boolean(this.socket?.connected);
   }
 
   private open(): void {
     if (!this.projectId) return;
-    const url = `${WS_BASE}/operations?projectId=${this.projectId}`;
-    this.ws = new WebSocket(url);
 
-    this.ws.onmessage = (event) => {
-      try {
-        const op = JSON.parse(event.data as string) as Operation;
-        this.handlers.forEach((h) => h(op));
-      } catch {
-        // Ignore malformed messages
-      }
-    };
+    this.socket = io(`${WS_BASE}/ws`, {
+      transports: ['websocket'],
+      timeout: 5000,
+      reconnection: false,
+    });
 
-    this.ws.onclose = () => {
+    this.socket.on('connect', () => {
+      this.socket?.emit('subscribe', { projectId: this.projectId });
+    });
+
+    this.socket.on('operation', (payload: OperationEventPayload) => {
+      if (!payload?.operation) return;
+      this.handlers.forEach((h) => h(payload.operation));
+    });
+
+    this.socket.on('disconnect', () => {
       this.scheduleReconnect();
-    };
+    });
 
-    this.ws.onerror = () => {
-      this.ws?.close();
-    };
+    this.socket.on('connect_error', () => {
+      this.socket?.disconnect();
+      this.scheduleReconnect();
+    });
   }
 
   private scheduleReconnect(): void {

@@ -27,7 +27,7 @@ const AuthSpin = observer(function AuthSpin() {
             minHeight: '100vh',
           }}
         >
-          <Spin size="large" tip="加载会话…" />
+          <Spin size="large" />
         </div>
       </AntdApp>
     </ConfigProvider>

@@ -8,8 +8,10 @@ import {
   type DesignProject,
   type Screen,
   type Viewport,
+  MOBILE_VIEWPORTS,
+  TABLET_VIEWPORTS,
+  DESKTOP_VIEWPORTS,
   getDefaultViewport,
-  getViewportsByPlatform,
   generateScreenId,
   generateNodeId,
 } from '@globallink/design-schema';
@@ -53,11 +55,24 @@ interface OperationRow {
 export class ProjectsService {
   constructor(private readonly db: DatabaseService) {}
 
+  private viewportToId(v: Viewport): string {
+    return `${v.platform}:${v.name}`;
+  }
+
+  private getViewportCandidates(platform: 'pc' | 'mobile'): Viewport[] {
+    return platform === 'mobile'
+      ? [...MOBILE_VIEWPORTS, ...TABLET_VIEWPORTS]
+      : DESKTOP_VIEWPORTS;
+  }
+
   /** 创建项目（含初始 Screen + V0 快照） */
   async create(dto: CreateProjectDto): Promise<DesignProject> {
     const pool = this.db.getPool();
-    const viewport = getDefaultViewport(dto.platform);
-    const presets = getViewportsByPlatform(dto.platform);
+    const presets = this.getViewportCandidates(dto.platform);
+    const viewport =
+      (dto.viewportId
+        ? presets.find((v) => this.viewportToId(v) === dto.viewportId)
+        : undefined) ?? getDefaultViewport(dto.platform);
     const now = new Date().toISOString();
 
     // 构建初始空 Screen

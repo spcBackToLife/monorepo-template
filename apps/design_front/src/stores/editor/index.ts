@@ -1,4 +1,4 @@
-import { makeAutoObservable, runInAction } from 'mobx';
+import { makeAutoObservable, runInAction, toJS } from 'mobx';
 import type { DesignProject, Screen, Viewport } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
 import { OperationExecutor } from '@globallink/design-operations';
@@ -13,6 +13,8 @@ export class EditorStore {
   selectedNodeIds: string[] = [];
   /** Currently hovered node ID */
   hoveredNodeId: string | null = null;
+  /** Canvas zoom scale */
+  canvasScale = 1;
 
   constructor() {
     makeAutoObservable(this);
@@ -52,7 +54,8 @@ export class EditorStore {
 
   /** Initialize the editor with a project */
   initProject(project: DesignProject): void {
-    this.executor = new OperationExecutor(project);
+    // Project data from MobX stores may be observable proxies. Convert to plain JS first.
+    this.executor = new OperationExecutor(toJS(project) as DesignProject);
     this.activeScreenId = project.screens[0]?.id ?? null;
     this.selectedNodeIds = [];
     this.hoveredNodeId = null;
@@ -104,6 +107,10 @@ export class EditorStore {
     this.hoveredNodeId = nodeId;
   }
 
+  setCanvasScale(scale: number): void {
+    this.canvasScale = Math.min(2, Math.max(0.3, scale));
+  }
+
   /** Screen switching */
   setActiveScreen(screenId: string): void {
     this.activeScreenId = screenId;
@@ -117,6 +124,7 @@ export class EditorStore {
     this.activeScreenId = null;
     this.selectedNodeIds = [];
     this.hoveredNodeId = null;
+    this.canvasScale = 1;
   }
 }
 

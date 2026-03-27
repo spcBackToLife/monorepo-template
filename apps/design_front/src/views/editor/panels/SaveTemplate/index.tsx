@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Modal, Form, Input, Select, message } from 'antd';
+import { App as AntdApp, Button, Modal, Form, Input, Select } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
@@ -14,6 +14,7 @@ const CATEGORY_OPTIONS = [
 ];
 
 export const SaveTemplateButton = observer(function SaveTemplateButton() {
+  const { message } = AntdApp.useApp();
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm<{ name: string; category: string }>();
   const nodeId = editorStore.selectedNodeIds[0];
@@ -47,7 +48,7 @@ export const SaveTemplateButton = observer(function SaveTemplateButton() {
         open={open}
         onCancel={() => setOpen(false)}
         onOk={handleSave}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" initialValues={{ category: '其他' }}>
           <Form.Item name="name" label="组件名称" rules={[{ required: true, message: '请输入名称' }]}>

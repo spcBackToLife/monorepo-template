@@ -28,6 +28,8 @@ export const AddElementPanel = observer(function AddElementPanel() {
       params: { parentId, tag: tag as never },
     });
     if (result.success) {
+      const createdNodeId = result.affectedNodeIds[0] ?? null;
+      editorStore.select(createdNodeId);
       message.success(`已添加 ${tag}`);
     }
   };
@@ -86,7 +88,11 @@ const ComponentAssetList = observer(function ComponentAssetList() {
       type: 'instantiateTemplate',
       params: { templateId, parentId: screen.rootNode.id },
     });
-    if (result.success) message.success('已添加组件');
+    if (result.success) {
+      const createdNodeId = result.affectedNodeIds[0] ?? null;
+      editorStore.select(createdNodeId);
+      message.success('已添加组件');
+    }
   };
 
   // Group by category

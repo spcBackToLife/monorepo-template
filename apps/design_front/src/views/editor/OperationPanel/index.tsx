@@ -1,24 +1,16 @@
 import { Tabs } from 'antd';
 import {
-  PlusSquareOutlined,
   FormatPainterOutlined,
   ThunderboltOutlined,
   SwitcherOutlined,
 } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
-import { AddElementPanel } from '../panels/AddElement';
 import { StyleEditorPanel } from '../panels/StyleEditor';
 import { EventEditorPanel } from '../panels/EventEditor';
 import { StateEditorPanel } from '../panels/StateEditor';
 import './panel.css';
 
 const items = [
-  {
-    key: 'add',
-    label: '添加',
-    icon: <PlusSquareOutlined />,
-    children: <AddElementPanel />,
-  },
   {
     key: 'style',
     label: '样式',

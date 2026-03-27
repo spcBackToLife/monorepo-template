@@ -13,7 +13,7 @@ export interface ProjectSummary {
 export interface CreateProjectParams {
   name: string;
   platform: 'pc' | 'mobile';
-  viewportName: string;
+  viewportId?: string;
 }
 
 /** Full project data returned by API */

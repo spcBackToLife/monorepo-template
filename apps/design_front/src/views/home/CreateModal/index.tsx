@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Form, Input, Radio, Select, message } from 'antd';
+import { App as AntdApp, Modal, Form, Input, Radio, Select } from 'antd';
 import {
   MOBILE_VIEWPORTS,
   DESKTOP_VIEWPORTS,
@@ -21,8 +21,13 @@ const viewportOptions: Record<Platform, Viewport[]> = {
   pc: DESKTOP_VIEWPORTS,
 };
 
+function viewportToId(v: Viewport): string {
+  return `${v.platform}:${v.name}`;
+}
+
 export function CreateModal({ open, onCancel, onCreated }: CreateModalProps) {
-  const [form] = Form.useForm<{ name: string; platform: Platform; viewportName: string }>();
+  const { message } = AntdApp.useApp();
+  const [form] = Form.useForm<{ name: string; platform: Platform; viewportId: string }>();
   const [platform, setPlatform] = useState<Platform>('mobile');
   const [loading, setLoading] = useState(false);
 
@@ -46,7 +51,7 @@ export function CreateModal({ open, onCancel, onCreated }: CreateModalProps) {
   const handlePlatformChange = (p: Platform) => {
     setPlatform(p);
     const first = viewportOptions[p][0];
-    form.setFieldValue('viewportName', first?.name);
+    form.setFieldValue('viewportId', first ? viewportToId(first) : undefined);
   };
 
   return (
@@ -56,12 +61,12 @@ export function CreateModal({ open, onCancel, onCreated }: CreateModalProps) {
       onCancel={onCancel}
       onOk={handleOk}
       confirmLoading={loading}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}
         layout="vertical"
-        initialValues={{ platform: 'mobile', viewportName: MOBILE_VIEWPORTS[0]?.name }}
+        initialValues={{ platform: 'mobile', viewportId: MOBILE_VIEWPORTS[0] ? viewportToId(MOBILE_VIEWPORTS[0]) : undefined }}
       >
         <Form.Item name="name" label="项目名称" rules={[{ required: true, message: '请输入名称' }]}>
           <Input placeholder="例如：我的 App" />
@@ -74,11 +79,11 @@ export function CreateModal({ open, onCancel, onCreated }: CreateModalProps) {
           </Radio.Group>
         </Form.Item>
 
-        <Form.Item name="viewportName" label="设备预设" rules={[{ required: true }]}>
+        <Form.Item name="viewportId" label="设备预设" rules={[{ required: true }]}>
           <Select
             options={presets.map((v) => ({
               label: `${v.name}  (${v.width}×${v.height})`,
-              value: v.name,
+              value: viewportToId(v),
             }))}
           />
         </Form.Item>

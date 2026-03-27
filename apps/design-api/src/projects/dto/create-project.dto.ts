@@ -1,4 +1,4 @@
-import { IsString, IsIn } from 'class-validator';
+import { IsString, IsIn, IsOptional } from 'class-validator';
 
 export class CreateProjectDto {
   @IsString()
@@ -6,4 +6,8 @@ export class CreateProjectDto {
 
   @IsIn(['pc', 'mobile'])
   platform: 'pc' | 'mobile';
+
+  @IsOptional()
+  @IsString()
+  viewportId?: string;
 }

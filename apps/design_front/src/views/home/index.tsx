@@ -23,7 +23,7 @@ export const HomePage = observer(function HomePage() {
   if (projectStore.loading && projectStore.projects.length === 0) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 120 }}>
-        <Spin size="large" tip="加载中…" />
+        <Spin size="large" />
       </div>
     );
   }
