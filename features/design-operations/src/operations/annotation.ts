@@ -62,7 +62,6 @@ export function executeAddAnnotation(
     states: [],
     activeState: 'default',
     events: [],
-    globalStateBindings: [],
     locked: false,
     visible: true,
   };

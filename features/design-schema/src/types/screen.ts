@@ -1,6 +1,6 @@
 import type { ComponentNode } from './node';
-import type { GlobalStateVariable } from './state';
-import type { DataSet } from './data';
+import type { DomainStateVariable } from './domainState';
+import type { DataSource } from './dataSource';
 
 /** A single screen/page in the design project */
 export interface Screen {
@@ -12,10 +12,8 @@ export interface Screen {
   rootNode: ComponentNode;
   /** Background color (CSS color value) */
   backgroundColor?: string;
-  /** Screen-level global state variable definitions */
-  globalStates: GlobalStateVariable[];
-  /** Mock data sets for data-driven design */
-  dataSets: DataSet[];
-  /** Currently active data set ID */
-  activeDataSetId: string;
+  /** Screen-level domain state variable definitions */
+  domainStates: DomainStateVariable[];
+  /** Data sources for data-driven design */
+  dataSources: DataSource[];
 }

@@ -1,6 +1,8 @@
 import type { CSSProperties } from './css';
-import type { ComponentState, GlobalStateBinding } from './state';
+import type { ComponentState } from './state';
 import type { ComponentEvent } from './event';
+import type { DomainStateVariable, DomainStateBinding } from './domainState';
+import type { EnvironmentStateBinding } from './environment';
 
 // ===== Node Types =====
 
@@ -82,13 +84,23 @@ export interface ComponentNode {
   templateRef?: TemplateRef;
   /** Whether the node is locked (prevents editing via canvas interactions) */
   locked: boolean;
-  /** Whether the node is visible in the canvas (hidden nodes are skipped during rendering) */
+  /** Whether the node is visible in the canvas */
   visible: boolean;
   /**
-   * When set, the node is shown only if globalStates[variableName] === equals.
-   * Evaluated after globalStateBindings; if the condition fails, the node is hidden.
+   * Optional: node is shown only when the named state variable equals `equals`
+   * (evaluated against runtime domain/environment maps in preview).
    */
-  visibilityWhen?: { variableName: string; equals: string };
-  /** Bindings to global state variables — override styles/props/visible based on global state */
-  globalStateBindings: GlobalStateBinding[];
+  visibilityWhen?: {
+    variableName: string;
+    equals: string;
+  };
+
+  // ----- Five-layer state system -----
+
+  /** Domain state variables defined on this container node (scoped to descendants) */
+  domainStates?: DomainStateVariable[];
+  /** Bindings that define how this node responds to domain state variable values */
+  domainStateBindings?: DomainStateBinding[];
+  /** Bindings that define how this node responds to environment variable values */
+  environmentBindings?: EnvironmentStateBinding[];
 }

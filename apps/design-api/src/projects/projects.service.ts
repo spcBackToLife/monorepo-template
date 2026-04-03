@@ -96,12 +96,10 @@ export class ProjectsService {
         events: [],
         locked: false,
         visible: true,
-        globalStateBindings: [],
       },
       backgroundColor: '#ffffff',
-      globalStates: [],
-      dataSets: [],
-      activeDataSetId: '',
+      domainStates: [],
+      dataSources: [],
     };
 
     // INSERT project
@@ -123,6 +121,7 @@ export class ProjectsService {
       viewportPresets: presets,
       screens: [initialScreen],
       componentAssets: [],
+      environmentStates: [],
       createdAt: now,
       updatedAt: now,
     };

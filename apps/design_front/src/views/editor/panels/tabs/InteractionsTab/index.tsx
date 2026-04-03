@@ -18,7 +18,7 @@ const TRIGGER_OPTIONS = [
 const ACTION_TYPES = [
   { value: 'navigate', label: '跳转页面' },
   { value: 'setState', label: '设置状态' },
-  { value: 'setGlobalState', label: '设置全局状态' },
+  { value: 'setDomainState', label: '设置全局状态' },
   { value: 'toggleVisible', label: '切换可见性' },
   { value: 'openUrl', label: '打开链接' },
   { value: 'delay', label: '延时' },
@@ -274,7 +274,7 @@ function ActionBadge({ action }: { action: { type: string; [key: string]: unknow
       summary = parts.length ? ` → ${parts.join(' ')}` : '';
       break;
     }
-    case 'setGlobalState':
+    case 'setDomainState':
       summary = action.variableName ? ` → ${String(action.variableName)}` : '';
       break;
     case 'toggleVisible': {
@@ -344,7 +344,7 @@ const AddEventForm = observer(function AddEventForm({
     setActionConfig({ type: 'navigate' });
     setPickTargetMode(false);
     setConditionEnabled(false);
-    setConditionType('globalState');
+    setConditionType('domainState');
     setConditionVar('');
     setConditionVal('');
     setConditionExpr('');
@@ -362,7 +362,7 @@ const AddEventForm = observer(function AddEventForm({
   };
 
   const [conditionEnabled, setConditionEnabled] = useState(false);
-  const [conditionType, setConditionType] = useState<'globalState' | 'expression'>('globalState');
+  const [conditionType, setConditionType] = useState<'domainState' | 'expression'>('domainState');
   const [conditionVar, setConditionVar] = useState('');
   const [conditionVal, setConditionVal] = useState('');
   const [conditionExpr, setConditionExpr] = useState('');
@@ -381,7 +381,7 @@ const AddEventForm = observer(function AddEventForm({
         action.stateName = actionConfig.stateName;
         action.state = actionConfig.stateName;
         break;
-      case 'setGlobalState':
+      case 'setDomainState':
         action.variableName = actionConfig.variableName;
         action.value = actionConfig.value;
         break;
@@ -403,8 +403,8 @@ const AddEventForm = observer(function AddEventForm({
 
     const eventPayload: Record<string, unknown> = { trigger, actions: [action] };
     if (conditionEnabled) {
-      if (conditionType === 'globalState' && conditionVar) {
-        eventPayload.condition = { type: 'globalState', variableName: conditionVar, value: conditionVal };
+      if (conditionType === 'domainState' && conditionVar) {
+        eventPayload.condition = { type: 'domainState', variableName: conditionVar, value: conditionVal };
       } else if (conditionType === 'expression' && conditionExpr) {
         eventPayload.condition = { type: 'expression', expression: conditionExpr };
       }
@@ -559,7 +559,7 @@ const AddEventForm = observer(function AddEventForm({
             </>
           )}
 
-          {actionConfig.type === 'setGlobalState' && (
+          {actionConfig.type === 'setDomainState' && (
             <>
               <div className="flex items-center gap-1">
                 <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">变量名:</span>
@@ -569,7 +569,7 @@ const AddEventForm = observer(function AddEventForm({
                   onChange={(e) => setActionConfig({ ...actionConfig, variableName: e.target.value, value: '' })}
                 >
                   <option value="">选择变量</option>
-                  {(activeScreen?.globalStates ?? []).map((gs) => (
+                  {(activeScreen?.domainStates ?? []).map((gs) => (
                     <option key={gs.name} value={gs.name}>{gs.name}</option>
                   ))}
                 </select>
@@ -577,7 +577,7 @@ const AddEventForm = observer(function AddEventForm({
               <div className="flex items-center gap-1">
                 <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">值:</span>
                 {(() => {
-                  const gsVar = (activeScreen?.globalStates ?? []).find((g) => g.name === actionConfig.variableName);
+                  const gsVar = (activeScreen?.domainStates ?? []).find((g) => g.name === actionConfig.variableName);
                   if (gsVar) {
                     return (
                       <select
@@ -587,7 +587,7 @@ const AddEventForm = observer(function AddEventForm({
                       >
                         <option value="">选择值</option>
                         {gsVar.values.map((v) => (
-                          <option key={v} value={v}>{v}</option>
+                          <option key={v.value} value={v.value}>{v.label}</option>
                         ))}
                       </select>
                     );
@@ -710,12 +710,12 @@ const AddEventForm = observer(function AddEventForm({
               <select
                 className="h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
                 value={conditionType}
-                onChange={(e) => setConditionType(e.target.value as 'globalState' | 'expression')}
+                onChange={(e) => setConditionType(e.target.value as 'domainState' | 'expression')}
               >
-                <option value="globalState">全局状态匹配</option>
+                <option value="domainState">全局状态匹配</option>
                 <option value="expression">自定义表达式</option>
               </select>
-              {conditionType === 'globalState' && (
+              {conditionType === 'domainState' && (
                 <div className="flex items-center gap-1">
                   <select
                     className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
@@ -723,13 +723,13 @@ const AddEventForm = observer(function AddEventForm({
                     onChange={(e) => setConditionVar(e.target.value)}
                   >
                     <option value="">选择变量</option>
-                    {(activeScreen?.globalStates ?? []).map((gs) => (
+                    {(activeScreen?.domainStates ?? []).map((gs) => (
                       <option key={gs.name} value={gs.name}>{gs.name}</option>
                     ))}
                   </select>
                   <span className="text-gray-400 text-[10px]">=</span>
                   {(() => {
-                    const gs = (activeScreen?.globalStates ?? []).find((g) => g.name === conditionVar);
+                    const gs = (activeScreen?.domainStates ?? []).find((g) => g.name === conditionVar);
                     if (gs) {
                       return (
                         <select
@@ -738,7 +738,7 @@ const AddEventForm = observer(function AddEventForm({
                           onChange={(e) => setConditionVal(e.target.value)}
                         >
                           <option value="">选择值</option>
-                          {gs.values.map((v) => <option key={v} value={v}>{v}</option>)}
+                          {gs.values.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
                         </select>
                       );
                     }

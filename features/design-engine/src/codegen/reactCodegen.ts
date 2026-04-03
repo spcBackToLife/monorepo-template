@@ -226,8 +226,11 @@ function generateEventHandlerBody(evt: ComponentEvent, stateNodes: Map<string, s
         }
         break;
       }
-      case 'setGlobalState':
-        parts.push(`/* setGlobalState: ${action.variableName} = ${action.value} */`);
+      case 'setDomainState':
+        parts.push(`/* setDomainState: ${action.variableName} = ${action.value} */`);
+        break;
+      case 'setEnvironmentState':
+        parts.push(`/* setEnvironmentState: ${action.variableName} = ${action.value} */`);
         break;
       case 'openUrl':
         parts.push(`window.open('${action.url ?? ''}', '_blank')`);
@@ -254,8 +257,10 @@ function actionSummary(a: EventAction): string {
       return `setState:${a.targetId}.${a.state}`;
     case 'openUrl':
       return `openUrl:${a.url}`;
-    case 'setGlobalState':
-      return `setGlobalState:${a.variableName}=${a.value}`;
+    case 'setDomainState':
+      return `setDomainState:${a.variableName}=${a.value}`;
+    case 'setEnvironmentState':
+      return `setEnvironmentState:${a.variableName}=${a.value}`;
     case 'toggleVisible':
       return `toggleVisible:${a.targetId}`;
     case 'delay':

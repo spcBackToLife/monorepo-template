@@ -7,7 +7,24 @@ export type {
   TemplateRef,
   ComponentNode,
 } from './node';
-export type { ComponentState, GlobalStateVariable, GlobalStateBinding } from './state';
+export type { ComponentState } from './state';
+export type {
+  DomainStateValue,
+  DomainStateVariable,
+  DomainStateBinding,
+} from './domainState';
+export type {
+  EnvironmentVariable,
+  EnvironmentStateBinding,
+} from './environment';
+export type {
+  DataField,
+  DataSchema,
+  DataSourcePhase,
+  DataScenario,
+  DataSource,
+} from './dataSource';
+export { API_DATA_SOURCE_PHASES } from './dataSource';
 export type {
   EventTrigger,
   TransitionAnimation,
@@ -16,7 +33,8 @@ export type {
   OpenUrlAction,
   DelayAction,
   CustomAction,
-  SetGlobalStateAction,
+  SetDomainStateAction,
+  SetEnvironmentStateAction,
   ToggleVisibleAction,
   EventAction,
   EventCondition,
@@ -24,7 +42,6 @@ export type {
 } from './event';
 export type { Platform, Viewport } from './viewport';
 export type { Screen } from './screen';
-export type { DataSet } from './data';
 export type { TemplateScope, TemplateKind, ComponentTemplate } from './template';
 export type { PropType, ComponentPropDefinition, PropBinding } from './props';
 export type { DesignProject } from './project';

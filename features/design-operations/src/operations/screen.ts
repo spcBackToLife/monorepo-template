@@ -37,11 +37,9 @@ export function executeAddScreen(
       events: [],
       locked: false,
       visible: true,
-      globalStateBindings: [],
     },
-    globalStates: [],
-    dataSets: [],
-    activeDataSetId: '',
+    domainStates: [],
+    dataSources: [],
   };
   newProject.updatedAt = new Date().toISOString();
 

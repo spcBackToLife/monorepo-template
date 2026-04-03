@@ -186,11 +186,9 @@ export function executeAddNavigation(
         events: [],
         locked: false,
         visible: true,
-        globalStateBindings: [],
       },
-      globalStates: [],
-      dataSets: [],
-      activeDataSetId: '',
+      domainStates: [],
+      dataSources: [],
     };
     targetScreenId = newScreen.id;
     affectedIds.push(newScreen.id);

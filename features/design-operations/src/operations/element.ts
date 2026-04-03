@@ -44,7 +44,6 @@ function createNode(
     events: [],
     locked: false,
     visible: true,
-    globalStateBindings: [],
   };
 }
 

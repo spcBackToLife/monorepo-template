@@ -40,9 +40,16 @@ export interface CustomAction {
   handler: string;
 }
 
-/** Set a global state variable value */
-export interface SetGlobalStateAction {
-  type: 'setGlobalState';
+/** Set a domain state variable value */
+export interface SetDomainStateAction {
+  type: 'setDomainState';
+  variableName: string;
+  value: string;
+}
+
+/** Set an environment state variable value */
+export interface SetEnvironmentStateAction {
+  type: 'setEnvironmentState';
   variableName: string;
   value: string;
 }
@@ -60,12 +67,13 @@ export type EventAction =
   | OpenUrlAction
   | DelayAction
   | CustomAction
-  | SetGlobalStateAction
+  | SetDomainStateAction
+  | SetEnvironmentStateAction
   | ToggleVisibleAction;
 
 /** Condition for conditional event execution */
 export interface EventCondition {
-  type: 'globalState';
+  type: 'domainState' | 'environmentState' | 'dataBinding' | 'propValue';
   variableName: string;
   value: string;
 }

@@ -7,6 +7,7 @@ import type {
   PrimitiveNodeType,
   TemplateScope,
   PropBinding,
+  DomainStateValue,
 } from '@globallink/design-schema';
 
 // ===== Operation Result =====
@@ -40,7 +41,6 @@ export interface AddElementOp {
   params: {
     parentId: string;
     tag: PrimitiveNodeType;
-    /** 若指定，新建节点使用该 id（客户端与 batch 重放必须一致）；省略则每次随机生成 */
     elementId?: string;
     styles?: CSSProperties;
     props?: Record<string, unknown>;
@@ -71,12 +71,10 @@ export interface DuplicateElementOp {
   };
 }
 
-/** 插入序列化的子树（粘贴）；所有节点 id 会重新生成 */
 export interface InsertSubtreeOp {
   type: 'insertSubtree';
   params: {
     parentId: string;
-    /** 完整 ComponentNode 子树（来自复制/剪贴板） */
     subtree: ComponentNode;
     position?: number;
   };
@@ -215,6 +213,14 @@ export interface RenameScreenOp {
   };
 }
 
+export interface ReorderScreenOp {
+  type: 'reorderScreen';
+  params: {
+    screenId: string;
+    newIndex: number;
+  };
+}
+
 // -- Viewport Operations --
 
 export interface SwitchViewportOp {
@@ -269,7 +275,7 @@ export interface SyncInstanceOp {
   };
 }
 
-// -- Element Operations (new) --
+// -- Element Operations (extended) --
 
 export interface WrapInContainerOp {
   type: 'wrapInContainer';
@@ -311,16 +317,6 @@ export interface ChangeElementTypeOp {
   };
 }
 
-/** Set or clear conditional visibility (global state equality); see ComponentNode.visibilityWhen */
-export interface SetNodeVisibilityWhenOp {
-  type: 'setNodeVisibilityWhen';
-  params: {
-    nodeId: string;
-    visibilityWhen: { variableName: string; equals: string } | null;
-  };
-}
-
-/** 编辑器画布锁定（与 ComponentNode.locked 对齐，W7-023） */
 export interface SetNodeLockedOp {
   type: 'setNodeLocked';
   params: {
@@ -329,7 +325,6 @@ export interface SetNodeLockedOp {
   };
 }
 
-/** 编辑器画布显隐（ComponentNode.visible，非 CSS） */
 export interface SetNodeVisibleOp {
   type: 'setNodeVisible';
   params: {
@@ -338,42 +333,149 @@ export interface SetNodeVisibleOp {
   };
 }
 
-// -- Global State Operations --
-
-export interface SetGlobalStateOp {
-  type: 'setGlobalState';
+export interface SetNodeVisibilityWhenOp {
+  type: 'setNodeVisibilityWhen';
   params: {
-    screenId: string;
+    nodeId: string;
+    visibilityWhen: { variableName: string; equals: string } | null;
+  };
+}
+
+// -- Domain State Operations --
+
+export interface AddDomainStateOp {
+  type: 'addDomainState';
+  params: {
+    /** Screen ID or container node ID where the domain state is defined */
+    ownerId: string;
+    /** 'screen' or 'node' */
+    ownerType: 'screen' | 'node';
+    name: string;
+    label: string;
+    values: DomainStateValue[];
+    defaultValue: string;
+  };
+}
+
+export interface RemoveDomainStateOp {
+  type: 'removeDomainState';
+  params: {
+    ownerId: string;
+    ownerType: 'screen' | 'node';
+    variableName: string;
+  };
+}
+
+export interface UpdateDomainStateOp {
+  type: 'updateDomainState';
+  params: {
+    ownerId: string;
+    ownerType: 'screen' | 'node';
+    variableName: string;
+    patch: {
+      label?: string;
+      values?: DomainStateValue[];
+      defaultValue?: string;
+    };
+  };
+}
+
+export interface SetDomainStatePreviewOp {
+  type: 'setDomainStatePreview';
+  params: {
+    ownerId: string;
+    ownerType: 'screen' | 'node';
     variableName: string;
     value: string;
   };
 }
 
-export interface AddGlobalStateVariableOp {
-  type: 'addGlobalStateVariable';
+export interface AddDomainStateBindingOp {
+  type: 'addDomainStateBinding';
   params: {
-    screenId: string;
-    name: string;
-    values: string[];
-    defaultValue: string;
-    description?: string;
+    nodeId: string;
+    binding: {
+      variableName: string;
+      ownerNodeId?: string;
+      value: string;
+      styles?: Partial<CSSProperties>;
+      props?: Record<string, unknown>;
+      visible?: boolean;
+      childrenVisibility?: Record<string, boolean>;
+      disabledEvents?: string[];
+    };
   };
 }
 
-export interface RemoveGlobalStateVariableOp {
-  type: 'removeGlobalStateVariable';
+export interface UpdateDomainStateBindingOp {
+  type: 'updateDomainStateBinding';
   params: {
-    screenId: string;
+    nodeId: string;
+    variableName: string;
+    value: string;
+    patch: {
+      styles?: Partial<CSSProperties>;
+      props?: Record<string, unknown>;
+      visible?: boolean;
+      childrenVisibility?: Record<string, boolean>;
+      disabledEvents?: string[];
+    };
+  };
+}
+
+export interface RemoveDomainStateBindingOp {
+  type: 'removeDomainStateBinding';
+  params: {
+    nodeId: string;
+    variableName: string;
+    value: string;
+  };
+}
+
+// -- Environment State Operations --
+
+export interface AddEnvironmentStateOp {
+  type: 'addEnvironmentState';
+  params: {
+    name: string;
+    label: string;
+    values: { value: string; label: string }[];
+    defaultValue: string;
+  };
+}
+
+export interface RemoveEnvironmentStateOp {
+  type: 'removeEnvironmentState';
+  params: {
     variableName: string;
   };
 }
 
-export interface AddGlobalStateBindingOp {
-  type: 'addGlobalStateBinding';
+export interface UpdateEnvironmentStateOp {
+  type: 'updateEnvironmentState';
+  params: {
+    variableName: string;
+    patch: {
+      label?: string;
+      values?: { value: string; label: string }[];
+      defaultValue?: string;
+    };
+  };
+}
+
+export interface SetEnvironmentPreviewOp {
+  type: 'setEnvironmentPreview';
+  params: {
+    variableName: string;
+    value: string;
+  };
+}
+
+export interface AddEnvironmentBindingOp {
+  type: 'addEnvironmentBinding';
   params: {
     nodeId: string;
     binding: {
-      id: string;
       variableName: string;
       value: string;
       styles?: Partial<CSSProperties>;
@@ -383,24 +485,123 @@ export interface AddGlobalStateBindingOp {
   };
 }
 
-export interface RemoveGlobalStateBindingOp {
-  type: 'removeGlobalStateBinding';
+export interface UpdateEnvironmentBindingOp {
+  type: 'updateEnvironmentBinding';
   params: {
     nodeId: string;
-    bindingId: string;
-  };
-}
-
-export interface UpdateGlobalStateBindingOp {
-  type: 'updateGlobalStateBinding';
-  params: {
-    nodeId: string;
-    bindingId: string;
+    variableName: string;
+    value: string;
     patch: {
       styles?: Partial<CSSProperties>;
       props?: Record<string, unknown>;
       visible?: boolean;
     };
+  };
+}
+
+export interface RemoveEnvironmentBindingOp {
+  type: 'removeEnvironmentBinding';
+  params: {
+    nodeId: string;
+    variableName: string;
+    value: string;
+  };
+}
+
+// -- Data Source Operations --
+
+export interface AddDataSourceOp {
+  type: 'addDataSource';
+  params: {
+    screenId: string;
+    dataSource: {
+      id: string;
+      name: string;
+      lifecycle: 'api' | 'static';
+      description?: string;
+    };
+  };
+}
+
+export interface RemoveDataSourceOp {
+  type: 'removeDataSource';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+  };
+}
+
+export interface UpdateDataSourceOp {
+  type: 'updateDataSource';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    name?: string;
+    description?: string;
+  };
+}
+
+export interface SwitchDataSourcePhaseOp {
+  type: 'switchDataSourcePhase';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    phase: string;
+  };
+}
+
+export interface AddDataScenarioOp {
+  type: 'addDataScenario';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    scenario: {
+      id: string;
+      name: string;
+      data: Record<string, unknown>;
+      description?: string;
+      isDefault?: boolean;
+    };
+  };
+}
+
+export interface UpdateDataScenarioOp {
+  type: 'updateDataScenario';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    scenarioId: string;
+    data?: Record<string, unknown>;
+    name?: string;
+    description?: string;
+  };
+}
+
+export interface RemoveDataScenarioOp {
+  type: 'removeDataScenario';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    scenarioId: string;
+  };
+}
+
+export interface SwitchDataScenarioOp {
+  type: 'switchDataScenario';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    scenarioId: string;
+  };
+}
+
+/** Bind a data expression to a node prop */
+export interface BindDataOp {
+  type: 'bindData';
+  params: {
+    nodeId: string;
+    propKey: string;
+    expression: string;
   };
 }
 
@@ -439,16 +640,6 @@ export interface RemovePropDefinitionOp {
   };
 }
 
-// -- Screen Operations (new) --
-
-export interface ReorderScreenOp {
-  type: 'reorderScreen';
-  params: {
-    screenId: string;
-    newIndex: number;
-  };
-}
-
 // -- Template Operations --
 
 export interface UpdateTemplateOp {
@@ -460,9 +651,7 @@ export interface UpdateTemplateOp {
       category?: string;
       tags?: string[];
       description?: string;
-      /** 缩略图：URL、base64 或 asset:// 引用（W6-062） */
       thumbnail?: string;
-      /** 覆盖模板的 prop → 内部节点字段映射（W6-061） */
       propBindings?: PropBinding[];
     };
   };
@@ -503,60 +692,6 @@ export interface RemoveAnnotationOp {
   };
 }
 
-// -- Data Operations --
-
-export interface AddDataSetOp {
-  type: 'addDataSet';
-  params: {
-    screenId: string;
-    dataSet: {
-      id: string;
-      name: string;
-      data: Record<string, unknown>;
-      description?: string;
-    };
-  };
-}
-
-export interface RemoveDataSetOp {
-  type: 'removeDataSet';
-  params: {
-    screenId: string;
-    dataSetId: string;
-  };
-}
-
-export interface UpdateDataSetOp {
-  type: 'updateDataSet';
-  params: {
-    screenId: string;
-    dataSetId: string;
-    /** 替换 data；省略则不改 */
-    data?: Record<string, unknown>;
-    /** 显示名称；省略则不改 */
-    name?: string;
-    /** 说明；省略则不改 */
-    description?: string;
-  };
-}
-
-export interface SwitchDataSetOp {
-  type: 'switchDataSet';
-  params: {
-    screenId: string;
-    dataSetId: string;
-  };
-}
-
-export interface BindDataOp {
-  type: 'bindData';
-  params: {
-    nodeId: string;
-    propKey: string;
-    expression: string;
-  };
-}
-
 // ===== Union Type =====
 
 /** All possible operations */
@@ -581,6 +716,7 @@ export type Operation =
   | RemoveScreenOp
   | SetActiveScreenOp
   | RenameScreenOp
+  | ReorderScreenOp
   | SwitchViewportOp
   | AddViewportPresetOp
   | InstantiateTemplateOp
@@ -592,24 +728,35 @@ export type Operation =
   | ReorderElementOp
   | BatchUpdateStyleOp
   | ChangeElementTypeOp
-  | SetNodeVisibilityWhenOp
   | SetNodeLockedOp
   | SetNodeVisibleOp
-  | ReorderScreenOp
-  | SetGlobalStateOp
-  | AddGlobalStateVariableOp
-  | RemoveGlobalStateVariableOp
-  | AddGlobalStateBindingOp
-  | RemoveGlobalStateBindingOp
-  | UpdateGlobalStateBindingOp
+  | SetNodeVisibilityWhenOp
+  | AddDomainStateOp
+  | RemoveDomainStateOp
+  | UpdateDomainStateOp
+  | SetDomainStatePreviewOp
+  | AddDomainStateBindingOp
+  | UpdateDomainStateBindingOp
+  | RemoveDomainStateBindingOp
+  | AddEnvironmentStateOp
+  | RemoveEnvironmentStateOp
+  | UpdateEnvironmentStateOp
+  | SetEnvironmentPreviewOp
+  | AddEnvironmentBindingOp
+  | UpdateEnvironmentBindingOp
+  | RemoveEnvironmentBindingOp
+  | AddDataSourceOp
+  | RemoveDataSourceOp
+  | UpdateDataSourceOp
+  | SwitchDataSourcePhaseOp
+  | AddDataScenarioOp
+  | UpdateDataScenarioOp
+  | RemoveDataScenarioOp
+  | SwitchDataScenarioOp
+  | BindDataOp
   | UpdateComponentPropsOp
   | AddPropDefinitionOp
   | RemovePropDefinitionOp
-  | AddDataSetOp
-  | RemoveDataSetOp
-  | UpdateDataSetOp
-  | SwitchDataSetOp
-  | BindDataOp
   | UpdateTemplateOp
   | DeleteTemplateOp
   | DuplicateTemplateOp

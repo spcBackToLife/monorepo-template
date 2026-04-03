@@ -3,7 +3,7 @@ import { App as AntdApp, Empty, Popconfirm, Button } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { generateId } from '@globallink/design-schema';
-import type { DataSet } from '@globallink/design-schema';
+import type { DataSource } from '@globallink/design-schema';
 import { ApiError, getErrorMessage } from '@/api/client';
 import { getSnapshotJob, postGenerateSnapshots } from '@/api/snapshots';
 
@@ -52,34 +52,36 @@ const DATA_PRESETS: { key: string; label: string; description: string; data: Rec
  */
 export const DataTab = observer(function DataTab() {
   const screen = editorStore.activeScreen;
+  const [selectedDsId, setSelectedDsId] = useState<string>('');
 
   if (!screen) {
     return <Empty description="暂无活动页面" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
-  const dataSets = screen.dataSets ?? [];
-  const activeDataSetId = screen.activeDataSetId ?? '';
-  const activeDataSet = dataSets.find((ds) => ds.id === activeDataSetId);
+  const dataSources = screen.dataSources ?? [];
+  const activeDsId = selectedDsId || dataSources[0]?.id || '';
+  const activeDs = dataSources.find((ds) => ds.id === activeDsId);
 
   return (
     <div className="flex flex-col gap-0.5 p-2 text-xs">
-      <DataSetSelector
+      <DataSourceSelector
         screenId={screen.id}
-        dataSets={dataSets}
-        activeDataSetId={activeDataSetId}
+        dataSources={dataSources}
+        activeDsId={activeDsId}
+        onSelect={setSelectedDsId}
       />
 
-      {activeDataSet ? (
+      {activeDs ? (
         <>
-          <DataPresetSection screenId={screen.id} dataSet={activeDataSet} />
+          <DataPresetSection screenId={screen.id} dataSource={activeDs} />
           <JsonEditorSection
             screenId={screen.id}
-            dataSet={activeDataSet}
+            dataSource={activeDs}
           />
         </>
-      ) : dataSets.length === 0 ? (
+      ) : dataSources.length === 0 ? (
         <div className="flex items-center justify-center h-20 text-gray-400 text-[10px] px-2 text-center">
-          暂无数据集，请在上方「添加数据集」中新建。
+          暂无数据源，请在上方「添加数据源」中新建。
         </div>
       ) : null}
 
@@ -90,80 +92,63 @@ export const DataTab = observer(function DataTab() {
 });
 
 // ===================================================================
-// Section 1: Dataset Selector
+// Section 1: DataSource Selector
 // ===================================================================
 
-interface DataSetSelectorProps {
-  screenId: string;
-  dataSets: DataSet[];
-  activeDataSetId: string;
+function getActiveScenarioData(ds: DataSource): Record<string, unknown> {
+  return ds.scenarios.find((s) => s.id === ds.activeScenarioId)?.data ?? {};
 }
 
-const DataSetSelector = observer(function DataSetSelector({
+interface DataSourceSelectorProps {
+  screenId: string;
+  dataSources: DataSource[];
+  activeDsId: string;
+  onSelect: (id: string) => void;
+}
+
+const DataSourceSelector = observer(function DataSourceSelector({
   screenId,
-  dataSets,
-  activeDataSetId,
-}: DataSetSelectorProps) {
+  dataSources,
+  activeDsId,
+  onSelect,
+}: DataSourceSelectorProps) {
   const [open, setOpen] = useState(true);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState('');
 
   const handleAdd = () => {
-    const name = newName.trim() || `数据集 ${dataSets.length + 1}`;
+    const name = newName.trim() || `数据源 ${dataSources.length + 1}`;
     const id = generateId();
     editorStore.execute({
-      type: 'addDataSet',
+      type: 'addDataSource',
       params: {
         screenId,
-        dataSet: { id, name, data: {}, description: '' },
+        dataSource: { id, name, lifecycle: 'static' as const, description: '' },
       },
     });
-    // Auto-switch to the new dataset
-    if (dataSets.length === 0) {
-      editorStore.execute({
-        type: 'switchDataSet',
-        params: { screenId, dataSetId: id },
-      });
-    }
+    onSelect(id);
     setAdding(false);
     setNewName('');
   };
 
-  const handleSwitch = (dataSetId: string) => {
-    if (dataSetId === activeDataSetId) return;
-    editorStore.execute({
-      type: 'switchDataSet',
-      params: { screenId, dataSetId },
-    });
+  const handleSwitch = (dsId: string) => {
+    if (dsId === activeDsId) return;
+    onSelect(dsId);
   };
 
-  const handleDelete = (dataSetId: string) => {
+  const handleDelete = (dataSourceId: string) => {
     editorStore.execute({
-      type: 'removeDataSet',
-      params: { screenId, dataSetId },
+      type: 'removeDataSource',
+      params: { screenId, dataSourceId },
     });
-  };
-
-  const commitRename = (dataSetId: string) => {
-    const next = renameDraft.trim();
-    setRenamingId(null);
-    if (!next) return;
-    const ds = dataSets.find((d) => d.id === dataSetId);
-    if (ds && next !== ds.name) {
-      editorStore.execute({
-        type: 'updateDataSet',
-        params: { screenId, dataSetId, name: next },
-      });
-    }
   };
 
   return (
-    <CollapsibleSection title="数据集" open={open} onToggle={() => setOpen(!open)}>
+    <CollapsibleSection title="数据源" open={open} onToggle={() => setOpen(!open)}>
       <div className="flex flex-col gap-1">
-        {dataSets.map((ds) => {
-          const isActive = ds.id === activeDataSetId;
+        {dataSources.map((ds) => {
+          const isActive = ds.id === activeDsId;
+          const scenarioData = getActiveScenarioData(ds);
           return (
             <div
               key={ds.id}
@@ -174,62 +159,21 @@ const DataSetSelector = observer(function DataSetSelector({
               }`}
               onClick={() => handleSwitch(ds.id)}
             >
-              {renamingId === ds.id ? (
-                <input
-                  type="text"
-                  className="flex-1 min-w-0 h-5 px-1 border border-blue-300 rounded text-[11px] outline-none"
-                  value={renameDraft}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setRenameDraft(e.target.value)}
-                  onBlur={() => commitRename(ds.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.target as HTMLInputElement).blur();
-                    }
-                    if (e.key === 'Escape') {
-                      setRenamingId(null);
-                    }
-                  }}
-                  autoFocus
-                />
-              ) : (
-                <span
-                  className={`flex-1 truncate ${isActive ? 'text-blue-600 font-medium' : 'text-gray-700'}`}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    setRenamingId(ds.id);
-                    setRenameDraft(ds.name);
-                  }}
-                  title="双击重命名"
-                >
-                  {ds.name}
-                </span>
-              )}
-              {isActive && renamingId !== ds.id && (
+              <span
+                className={`flex-1 truncate ${isActive ? 'text-blue-600 font-medium' : 'text-gray-700'}`}
+              >
+                {ds.name}
+              </span>
+              {isActive && (
                 <span className="text-[10px] text-blue-500 bg-blue-100 px-1 rounded flex-shrink-0">
                   当前
                 </span>
               )}
               <span className="text-[10px] text-gray-400 flex-shrink-0">
-                {Object.keys(ds.data).length} 项
+                {Object.keys(scenarioData).length} 项
               </span>
-              <button
-                type="button"
-                className="text-gray-400 hover:text-blue-500 p-0.5 flex-shrink-0"
-                title="重命名"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRenamingId(ds.id);
-                  setRenameDraft(ds.name);
-                }}
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
               <Popconfirm
-                title="确定删除该数据集？"
+                title="确定删除该数据源？"
                 onConfirm={(e) => {
                   e?.stopPropagation();
                   handleDelete(ds.id);
@@ -257,7 +201,7 @@ const DataSetSelector = observer(function DataSetSelector({
             <input
               type="text"
               className="flex-1 h-6 px-1.5 border border-blue-300 rounded text-xs outline-none focus:border-blue-500"
-              placeholder="数据集名称"
+              placeholder="数据源名称"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
@@ -293,7 +237,7 @@ const DataSetSelector = observer(function DataSetSelector({
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          添加数据集
+          添加数据源
         </button>
       )}
     </CollapsibleSection>
@@ -306,18 +250,20 @@ const DataSetSelector = observer(function DataSetSelector({
 
 const DataPresetSection = observer(function DataPresetSection({
   screenId,
-  dataSet,
+  dataSource,
 }: {
   screenId: string;
-  dataSet: DataSet;
+  dataSource: DataSource;
 }) {
   const { message } = AntdApp.useApp();
   const [open, setOpen] = useState(true);
 
   const apply = (data: Record<string, unknown>) => {
+    const scenarioId = dataSource.activeScenarioId;
+    if (!scenarioId) return;
     editorStore.execute({
-      type: 'updateDataSet',
-      params: { screenId, dataSetId: dataSet.id, data },
+      type: 'updateDataScenario',
+      params: { screenId, dataSourceId: dataSource.id, scenarioId, data },
     });
     message.success('已应用模板');
   };
@@ -483,26 +429,28 @@ function JsonTreeEditor({
 
 interface JsonEditorSectionProps {
   screenId: string;
-  dataSet: DataSet;
+  dataSource: DataSource;
 }
 
 type DataEditorView = 'tree' | 'json';
 
-function JsonEditorSection({ screenId, dataSet }: JsonEditorSectionProps) {
+function JsonEditorSection({ screenId, dataSource }: JsonEditorSectionProps) {
   const { message } = AntdApp.useApp();
   const [open, setOpen] = useState(true);
   const [view, setView] = useState<DataEditorView>('tree');
-  const [jsonText, setJsonText] = useState(() => JSON.stringify(dataSet.data, null, 2));
+  const activeData = getActiveScenarioData(dataSource);
+  const scenarioId = dataSource.activeScenarioId;
+  const [jsonText, setJsonText] = useState(() => JSON.stringify(activeData, null, 2));
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const jsonFocusedRef = useRef(false);
-  const dataFingerprint = JSON.stringify(dataSet.data);
+  const dataFingerprint = JSON.stringify(activeData);
 
   useEffect(() => {
     if (jsonFocusedRef.current) return;
-    setJsonText(JSON.stringify(dataSet.data, null, 2));
+    setJsonText(JSON.stringify(activeData, null, 2));
     setError(null);
-  }, [dataSet.id, dataFingerprint]);
+  }, [dataSource.id, scenarioId, dataFingerprint]);
 
   const handleChange = useCallback(
     (value: string) => {
@@ -517,26 +465,28 @@ function JsonEditorSection({ screenId, dataSet }: JsonEditorSectionProps) {
             return;
           }
           setError(null);
+          if (!scenarioId) return;
           editorStore.execute({
-            type: 'updateDataSet',
-            params: { screenId, dataSetId: dataSet.id, data: parsed },
+            type: 'updateDataScenario',
+            params: { screenId, dataSourceId: dataSource.id, scenarioId, data: parsed },
           });
         } catch (e) {
           setError((e as Error).message);
         }
       }, 500);
     },
-    [screenId, dataSet.id],
+    [screenId, dataSource.id, scenarioId],
   );
 
   const commitTreeData = useCallback(
     (newData: Record<string, unknown>) => {
+      if (!scenarioId) return;
       editorStore.execute({
-        type: 'updateDataSet',
-        params: { screenId, dataSetId: dataSet.id, data: newData },
+        type: 'updateDataScenario',
+        params: { screenId, dataSourceId: dataSource.id, scenarioId, data: newData },
       });
     },
-    [screenId, dataSet.id],
+    [screenId, dataSource.id, scenarioId],
   );
 
   const formatJson = useCallback(() => {
@@ -568,14 +518,14 @@ function JsonEditorSection({ screenId, dataSet }: JsonEditorSectionProps) {
   }, [jsonText, message]);
 
   const copyJson = useCallback(async () => {
-    const text = view === 'json' ? jsonText : JSON.stringify(dataSet.data, null, 2);
+    const text = view === 'json' ? jsonText : JSON.stringify(activeData, null, 2);
     try {
       await navigator.clipboard.writeText(text);
       message.success('已复制到剪贴板');
     } catch {
       message.error('复制失败');
     }
-  }, [jsonText, message, view, dataSet.data]);
+  }, [jsonText, message, view, activeData]);
 
   return (
     <CollapsibleSection title="数据编辑" open={open} onToggle={() => setOpen(!open)}>
@@ -624,7 +574,7 @@ function JsonEditorSection({ screenId, dataSet }: JsonEditorSectionProps) {
       </div>
       {view === 'tree' ? (
         <div className="max-h-60 overflow-y-auto border border-gray-100 rounded px-0.5 py-1 bg-white">
-          <JsonTreeEditor data={dataSet.data} onChange={commitTreeData} />
+          <JsonTreeEditor data={activeData} onChange={commitTreeData} />
         </div>
       ) : (
         <textarea
@@ -720,7 +670,7 @@ const GlobalStatesReferenceSection = observer(function GlobalStatesReferenceSect
   const [open, setOpen] = useState(false);
 
   if (!screen) return null;
-  const globalStates = screen.globalStates ?? [];
+  const globalStates = screen.domainStates ?? [];
 
   if (globalStates.length === 0) return null;
 

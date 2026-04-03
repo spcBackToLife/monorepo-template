@@ -1,4 +1,12 @@
-import type { DesignProject, ComponentNode, ComponentState } from '@globallink/design-schema';
+import type {
+  DesignProject,
+  ComponentNode,
+  ComponentState,
+  DomainStateVariable,
+  EnvironmentVariable,
+  DataSource,
+  DataScenario,
+} from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type { Operation, OperationResult, InverseData, OperationDescription } from '../types';
 import { ProjectState } from './state';
@@ -56,23 +64,37 @@ import {
   executeSyncInstance,
 } from '../operations/asset';
 import {
-  executeAddGlobalStateVariable,
-  executeRemoveGlobalStateVariable,
-  executeSetGlobalState,
-  executeAddGlobalStateBinding,
-  executeRemoveGlobalStateBinding,
-  executeUpdateGlobalStateBinding,
-} from '../operations/global-state';
+  executeAddDomainState,
+  executeRemoveDomainState,
+  executeUpdateDomainState,
+  executeSetDomainStatePreview,
+  executeAddDomainStateBinding,
+  executeRemoveDomainStateBinding,
+  executeUpdateDomainStateBinding,
+} from '../operations/domain-state';
+import {
+  executeAddEnvironmentState,
+  executeRemoveEnvironmentState,
+  executeUpdateEnvironmentState,
+  executeSetEnvironmentPreview,
+  executeAddEnvironmentBinding,
+  executeUpdateEnvironmentBinding,
+  executeRemoveEnvironmentBinding,
+} from '../operations/environment';
 import {
   executeUpdateComponentProps,
   executeAddPropDefinition,
   executeRemovePropDefinition,
 } from '../operations/component-props';
 import {
-  executeAddDataSet,
-  executeRemoveDataSet,
-  executeUpdateDataSet,
-  executeSwitchDataSet,
+  executeAddDataSource,
+  executeRemoveDataSource,
+  executeUpdateDataSource,
+  executeSwitchDataSourcePhase,
+  executeAddDataScenario,
+  executeUpdateDataScenario,
+  executeRemoveDataScenario,
+  executeSwitchDataScenario,
   executeBindData,
 } from '../operations/data';
 import {
@@ -328,19 +350,37 @@ export class OperationExecutor {
       case 'syncInstance':
         return executeSyncInstance(project, op.params);
 
-      // Global state operations
-      case 'setGlobalState':
-        return executeSetGlobalState(project, op.params);
-      case 'addGlobalStateVariable':
-        return executeAddGlobalStateVariable(project, op.params);
-      case 'removeGlobalStateVariable':
-        return executeRemoveGlobalStateVariable(project, op.params);
-      case 'addGlobalStateBinding':
-        return executeAddGlobalStateBinding(project, op.params);
-      case 'removeGlobalStateBinding':
-        return executeRemoveGlobalStateBinding(project, op.params);
-      case 'updateGlobalStateBinding':
-        return executeUpdateGlobalStateBinding(project, op.params);
+      // Domain state operations
+      case 'addDomainState':
+        return executeAddDomainState(project, op.params);
+      case 'removeDomainState':
+        return executeRemoveDomainState(project, op.params);
+      case 'updateDomainState':
+        return executeUpdateDomainState(project, op.params);
+      case 'setDomainStatePreview':
+        return executeSetDomainStatePreview(project, op.params);
+      case 'addDomainStateBinding':
+        return executeAddDomainStateBinding(project, op.params);
+      case 'removeDomainStateBinding':
+        return executeRemoveDomainStateBinding(project, op.params);
+      case 'updateDomainStateBinding':
+        return executeUpdateDomainStateBinding(project, op.params);
+
+      // Environment state operations
+      case 'addEnvironmentState':
+        return executeAddEnvironmentState(project, op.params);
+      case 'removeEnvironmentState':
+        return executeRemoveEnvironmentState(project, op.params);
+      case 'updateEnvironmentState':
+        return executeUpdateEnvironmentState(project, op.params);
+      case 'setEnvironmentPreview':
+        return executeSetEnvironmentPreview(project, op.params);
+      case 'addEnvironmentBinding':
+        return executeAddEnvironmentBinding(project, op.params);
+      case 'updateEnvironmentBinding':
+        return executeUpdateEnvironmentBinding(project, op.params);
+      case 'removeEnvironmentBinding':
+        return executeRemoveEnvironmentBinding(project, op.params);
 
       // Component props operations
       case 'updateComponentProps':
@@ -351,14 +391,22 @@ export class OperationExecutor {
         return executeRemovePropDefinition(project, op.params);
 
       // Data operations
-      case 'addDataSet':
-        return executeAddDataSet(project, op.params);
-      case 'removeDataSet':
-        return executeRemoveDataSet(project, op.params);
-      case 'updateDataSet':
-        return executeUpdateDataSet(project, op.params);
-      case 'switchDataSet':
-        return executeSwitchDataSet(project, op.params);
+      case 'addDataSource':
+        return executeAddDataSource(project, op.params);
+      case 'removeDataSource':
+        return executeRemoveDataSource(project, op.params);
+      case 'updateDataSource':
+        return executeUpdateDataSource(project, op.params);
+      case 'switchDataSourcePhase':
+        return executeSwitchDataSourcePhase(project, op.params);
+      case 'addDataScenario':
+        return executeAddDataScenario(project, op.params);
+      case 'updateDataScenario':
+        return executeUpdateDataScenario(project, op.params);
+      case 'removeDataScenario':
+        return executeRemoveDataScenario(project, op.params);
+      case 'switchDataScenario':
+        return executeSwitchDataScenario(project, op.params);
       case 'bindData':
         return executeBindData(project, op.params);
 
@@ -429,14 +477,26 @@ export class OperationExecutor {
       case '_restoreTemplateRefMode':
         return this.restoreTemplateRefMode(project, inv.params as any);
 
-      case '_restoreGlobalStateVariable':
-        return this.restoreGlobalStateVariable(project, inv.params as any);
+      case '_restoreDomainState':
+        return this.restoreDomainState(project, inv.params as any);
+
+      case '_restoreDomainStatePreview':
+        return this.restoreDomainStatePreview(project, inv.params as any);
+
+      case '_restoreEnvironmentState':
+        return this.restoreEnvironmentState(project, inv.params as any);
+
+      case '_restoreEnvironmentPreview':
+        return this.restoreEnvironmentPreview(project, inv.params as any);
 
       case '_restorePropDefinition':
         return this.restorePropDefinition(project, inv.params as any);
 
-      case '_restoreDataSet':
-        return this.restoreDataSet(project, inv.params as any);
+      case '_restoreDataSource':
+        return this.restoreDataSource(project, inv.params as any);
+
+      case '_restoreDataScenario':
+        return this.restoreDataScenario(project, inv.params as any);
 
       case '_restoreNode':
         return this.restoreNode(project, inv.params as any);
@@ -754,9 +814,9 @@ export class OperationExecutor {
     };
   }
 
-  private restoreDataSet(
+  private restoreDataSource(
     project: DesignProject,
-    params: { screenId: string; dataSet: any; position: number },
+    params: { screenId: string; dataSource: DataSource; position: number },
   ) {
     const newProject = deepClone(project);
     const screen = newProject.screens.find((s) => s.id === params.screenId);
@@ -764,43 +824,275 @@ export class OperationExecutor {
     if (!screen) {
       return {
         project,
-        result: { success: false, description: `Cannot restore data set: screen ${params.screenId} not found`, affectedNodeIds: [] },
+        result: { success: false, description: `Cannot restore data source: screen ${params.screenId} not found`, affectedNodeIds: [] },
         inverse: { type: 'noop', params: {} } as InverseData,
       };
     }
 
-    screen.dataSets.splice(params.position, 0, params.dataSet);
+    screen.dataSources.splice(params.position, 0, params.dataSource);
     newProject.updatedAt = new Date().toISOString();
 
     return {
       project: newProject,
-      result: { success: true, description: `Restored data set "${params.dataSet.name}"`, affectedNodeIds: [params.screenId] },
-      inverse: { type: 'removeDataSet', params: { screenId: params.screenId, dataSetId: params.dataSet.id } } as InverseData,
+      result: { success: true, description: `Restored data source "${params.dataSource.name}"`, affectedNodeIds: [params.screenId] },
+      inverse: { type: 'removeDataSource', params: { screenId: params.screenId, dataSourceId: params.dataSource.id } } as InverseData,
     };
   }
 
-  private restoreGlobalStateVariable(
+  private restoreDataScenario(
     project: DesignProject,
-    params: { screenId: string; variable: any; position: number },
+    params: {
+      screenId: string;
+      dataSourceId: string;
+      scenario: DataScenario;
+      position: number;
+      previousActiveScenarioId: string;
+    },
   ) {
     const newProject = deepClone(project);
     const screen = newProject.screens.find((s) => s.id === params.screenId);
+    const dataSource = screen?.dataSources.find((ds) => ds.id === params.dataSourceId);
 
-    if (!screen) {
+    if (!screen || !dataSource) {
       return {
         project,
-        result: { success: false, description: `Cannot restore global state variable: screen ${params.screenId} not found`, affectedNodeIds: [] },
+        result: { success: false, description: `Cannot restore scenario: screen or data source not found`, affectedNodeIds: [] },
         inverse: { type: 'noop', params: {} } as InverseData,
       };
     }
 
-    screen.globalStates.splice(params.position, 0, params.variable);
+    dataSource.scenarios.splice(params.position, 0, params.scenario);
+    dataSource.activeScenarioId = params.previousActiveScenarioId;
     newProject.updatedAt = new Date().toISOString();
 
     return {
       project: newProject,
-      result: { success: true, description: `Restored global state variable "${params.variable.name}"`, affectedNodeIds: [params.screenId] },
-      inverse: { type: 'removeGlobalStateVariable', params: { screenId: params.screenId, variableName: params.variable.name } } as InverseData,
+      result: { success: true, description: `Restored scenario "${params.scenario.name}"`, affectedNodeIds: [params.screenId] },
+      inverse: {
+        type: 'removeDataScenario',
+        params: { screenId: params.screenId, dataSourceId: params.dataSourceId, scenarioId: params.scenario.id },
+      } as InverseData,
+    };
+  }
+
+  private restoreDomainState(
+    project: DesignProject,
+    params: {
+      ownerId: string;
+      ownerType: 'screen' | 'node';
+      variable: DomainStateVariable;
+      position: number;
+    },
+  ) {
+    const newProject = deepClone(project);
+
+    if (params.ownerType === 'screen') {
+      const screen = newProject.screens.find((s) => s.id === params.ownerId);
+      if (!screen) {
+        return {
+          project,
+          result: {
+            success: false,
+            description: `Cannot restore domain state: screen ${params.ownerId} not found`,
+            affectedNodeIds: [],
+          },
+          inverse: { type: 'noop', params: {} } as InverseData,
+        };
+      }
+      screen.domainStates.splice(params.position, 0, params.variable);
+    } else {
+      let node: ComponentNode | undefined;
+      for (const screen of newProject.screens) {
+        node = findNodeById(screen.rootNode, params.ownerId);
+        if (node) break;
+      }
+      if (!node) {
+        return {
+          project,
+          result: {
+            success: false,
+            description: `Cannot restore domain state: node ${params.ownerId} not found`,
+            affectedNodeIds: [],
+          },
+          inverse: { type: 'noop', params: {} } as InverseData,
+        };
+      }
+      if (!node.domainStates) {
+        node.domainStates = [];
+      }
+      node.domainStates.splice(params.position, 0, params.variable);
+    }
+
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: {
+        success: true,
+        description: `Restored domain state variable "${params.variable.name}"`,
+        affectedNodeIds: [params.ownerId],
+      },
+      inverse: {
+        type: 'removeDomainState',
+        params: {
+          ownerId: params.ownerId,
+          ownerType: params.ownerType,
+          variableName: params.variable.name,
+        },
+      } as InverseData,
+    };
+  }
+
+  private restoreDomainStatePreview(
+    project: DesignProject,
+    params: {
+      ownerId: string;
+      ownerType: 'screen' | 'node';
+      variableName: string;
+      previousValue: string | undefined;
+      replacedWith: string;
+    },
+  ) {
+    const newProject = deepClone(project);
+
+    let list: DomainStateVariable[] | undefined;
+    if (params.ownerType === 'screen') {
+      const screen = newProject.screens.find((s) => s.id === params.ownerId);
+      if (!screen) {
+        return {
+          project,
+          result: {
+            success: false,
+            description: `Cannot restore domain state preview: screen ${params.ownerId} not found`,
+            affectedNodeIds: [],
+          },
+          inverse: { type: 'noop', params: {} } as InverseData,
+        };
+      }
+      list = screen.domainStates;
+    } else {
+      let node: ComponentNode | undefined;
+      for (const screen of newProject.screens) {
+        node = findNodeById(screen.rootNode, params.ownerId);
+        if (node) break;
+      }
+      if (!node) {
+        return {
+          project,
+          result: {
+            success: false,
+            description: `Cannot restore domain state preview: node ${params.ownerId} not found`,
+            affectedNodeIds: [],
+          },
+          inverse: { type: 'noop', params: {} } as InverseData,
+        };
+      }
+      list = node.domainStates;
+    }
+
+    const variable = list?.find((v) => v.name === params.variableName);
+    if (!variable) {
+      return {
+        project,
+        result: {
+          success: false,
+          description: `Cannot restore domain state preview: variable "${params.variableName}" not found`,
+          affectedNodeIds: [],
+        },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    if (params.previousValue === undefined) {
+      delete variable.currentPreviewValue;
+    } else {
+      variable.currentPreviewValue = params.previousValue;
+    }
+
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: {
+        success: true,
+        description: `Restored domain state preview for "${params.variableName}"`,
+        affectedNodeIds: [params.ownerId],
+      },
+      inverse: {
+        type: 'setDomainStatePreview',
+        params: {
+          ownerId: params.ownerId,
+          ownerType: params.ownerType,
+          variableName: params.variableName,
+          value: params.replacedWith,
+        },
+      } as InverseData,
+    };
+  }
+
+  private restoreEnvironmentState(
+    project: DesignProject,
+    params: { variable: EnvironmentVariable; position: number },
+  ) {
+    const newProject = deepClone(project);
+    if (!newProject.environmentStates) {
+      newProject.environmentStates = [];
+    }
+
+    newProject.environmentStates.splice(params.position, 0, params.variable);
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: {
+        success: true,
+        description: `Restored environment variable "${params.variable.name}"`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'removeEnvironmentState', params: { variableName: params.variable.name } } as InverseData,
+    };
+  }
+
+  private restoreEnvironmentPreview(
+    project: DesignProject,
+    params: { variableName: string; previousPreview: string | undefined; redoValue: string },
+  ) {
+    const newProject = deepClone(project);
+    if (!newProject.environmentStates) {
+      newProject.environmentStates = [];
+    }
+
+    const variable = newProject.environmentStates.find((v) => v.name === params.variableName);
+    if (!variable) {
+      return {
+        project,
+        result: {
+          success: false,
+          description: `Cannot restore environment preview: variable "${params.variableName}" not found`,
+          affectedNodeIds: [],
+        },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    if (params.previousPreview === undefined) {
+      delete variable.currentPreviewValue;
+    } else {
+      variable.currentPreviewValue = params.previousPreview;
+    }
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: {
+        success: true,
+        description: `Restored environment preview for "${params.variableName}"`,
+        affectedNodeIds: [],
+      },
+      inverse: {
+        type: 'setEnvironmentPreview',
+        params: { variableName: params.variableName, value: params.redoValue },
+      } as InverseData,
     };
   }
 

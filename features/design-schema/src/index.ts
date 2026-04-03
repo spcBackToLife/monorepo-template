@@ -1,5 +1,5 @@
 // ===== Version =====
-export const DESIGN_SCHEMA_VERSION = '0.1.0';
+export const DESIGN_SCHEMA_VERSION = '0.2.0';
 
 // ===== Types =====
 export type {
@@ -11,8 +11,16 @@ export type {
   TemplateRef,
   ComponentNode,
   ComponentState,
-  GlobalStateVariable,
-  GlobalStateBinding,
+  DomainStateValue,
+  DomainStateVariable,
+  DomainStateBinding,
+  EnvironmentVariable,
+  EnvironmentStateBinding,
+  DataField,
+  DataSchema,
+  DataSourcePhase,
+  DataScenario,
+  DataSource,
   EventTrigger,
   TransitionAnimation,
   NavigateAction,
@@ -20,13 +28,15 @@ export type {
   OpenUrlAction,
   DelayAction,
   CustomAction,
+  SetDomainStateAction,
+  SetEnvironmentStateAction,
+  ToggleVisibleAction,
   EventAction,
   EventCondition,
   ComponentEvent,
   Platform,
   Viewport,
   Screen,
-  DataSet,
   TemplateScope,
   TemplateKind,
   ComponentTemplate,
@@ -36,6 +46,8 @@ export type {
   DesignProject,
   OperationEnvelope,
 } from './types';
+
+export { API_DATA_SOURCE_PHASES } from './types';
 
 // ===== Viewport Presets =====
 export {
@@ -111,14 +123,22 @@ export {
 } from './validators';
 
 export {
-  GlobalStateVariableSchema,
-  GlobalStateBindingSchema,
+  DomainStateVariableSchema,
+  DomainStateBindingSchema,
+  EnvironmentVariableSchema,
+  EnvironmentStateBindingSchema,
   ComponentPropDefinitionSchema,
   PropBindingSchema,
   PropTypeSchema,
 } from './validators/props';
 
-export { DataSetSchema } from './validators/data';
+export {
+  DataSourceSchema,
+  DataScenarioSchema,
+  DataSourcePhaseSchema,
+  DataFieldSchema,
+  DataSchemaSchema,
+} from './validators/data';
 
 export { OperationEnvelopeSchema } from './validators/envelope';
 

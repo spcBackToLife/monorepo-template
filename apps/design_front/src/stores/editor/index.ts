@@ -605,7 +605,7 @@ export class EditorStore {
     const screen = this.activeScreen;
     if (!screen) return;
     const states: Record<string, string> = {};
-    for (const gs of screen.globalStates ?? []) {
+    for (const gs of screen.domainStates ?? []) {
       states[gs.name] = gs.defaultValue;
     }
     this.currentGlobalStates = states;

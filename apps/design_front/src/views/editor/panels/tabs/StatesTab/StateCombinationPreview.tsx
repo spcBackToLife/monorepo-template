@@ -27,15 +27,15 @@ function cartesianProduct<T>(arrays: T[][]): T[][] {
  */
 export const StateCombinationPreview = observer(function StateCombinationPreview() {
   const screen = editorStore.activeScreen;
-  const globalVars = screen?.globalStates ?? [];
-  const dataSets = screen?.dataSets ?? [];
+  const globalVars = screen?.domainStates ?? [];
+  const dataSources = screen?.dataSources ?? [];
   const [matrixOpen, setMatrixOpen] = useState(true);
 
   const { rows, totalProduct, truncated } = useMemo(() => {
     if (globalVars.length === 0) {
       return { rows: [] as string[][], totalProduct: 1, truncated: false };
     }
-    const valueArrays = globalVars.map((g) => g.values);
+    const valueArrays = globalVars.map((g) => g.values.map((v) => v.value));
     const totalProduct = valueArrays.reduce((m, a) => m * Math.max(1, a.length), 1);
     const full = cartesianProduct(valueArrays);
     const truncated = full.length > MAX_MATRIX_ROWS;
@@ -56,7 +56,7 @@ export const StateCombinationPreview = observer(function StateCombinationPreview
 
   const comboCount =
     globalVars.length > 0
-      ? `${dataSets.length || 1} 数据集 × ${totalProduct} 组全局状态 × 视口（工具栏切换）`
+      ? `${dataSources.length || 1} 数据源 × ${totalProduct} 组全局状态 × 视口（工具栏切换）`
       : '';
 
   return (

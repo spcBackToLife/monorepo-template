@@ -76,7 +76,15 @@ export const Canvas = observer(function Canvas() {
 
   const screen = editorStore.activeScreen;
   const viewport = editorStore.currentViewport;
-  const activeDsForLayout = screen?.dataSets?.find((d) => d.id === screen.activeDataSetId);
+  const activeDsForLayout = (() => {
+    if (!screen) return undefined;
+    for (const ds of screen.dataSources ?? []) {
+      if (ds.activePhase !== 'loaded') continue;
+      const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
+      if (sc) return sc;
+    }
+    return undefined;
+  })();
   const layoutDatasetFingerprint = JSON.stringify(activeDsForLayout?.data ?? {});
 
   /** W7-022：视口内节点包围盒是否超出设备框（与 buildCoordinateMap 同源） */
@@ -86,13 +94,18 @@ export const Canvas = observer(function Canvas() {
   const schemaLayoutMap = useMemo(() => {
     if (!screen || !viewport) return null;
     if (!editorStore.canvasVirtualizeOutsideDeviceFrame) return null;
-    const activeDs = screen.dataSets?.find((d) => d.id === screen.activeDataSetId);
+    const mergedData: Record<string, unknown> = {};
+    for (const ds of screen.dataSources ?? []) {
+      if (ds.activePhase !== 'loaded') continue;
+      const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
+      if (sc) Object.assign(mergedData, sc.data);
+    }
     return buildSchemaLayoutMap(screen, {
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       globalStates: editorStore.currentGlobalStates,
       assets: editorStore.project?.componentAssets ?? [],
-      dataContext: { data: activeDs?.data ?? {} },
+      dataContext: { data: mergedData },
       interactionPreview:
         editorStore.selectedNodeIds.length === 1 &&
         editorStore.previewInteractionState &&
@@ -562,7 +575,7 @@ export const Canvas = observer(function Canvas() {
                   screen={screen}
                   assets={editorStore.project?.componentAssets ?? []}
                   globalStates={editorStore.currentGlobalStates}
-                  currentDataSet={screen.activeDataSetId}
+                  currentDataSet={undefined}
                   onNavigate={handlePreviewNavigate}
                   embedded
                 />

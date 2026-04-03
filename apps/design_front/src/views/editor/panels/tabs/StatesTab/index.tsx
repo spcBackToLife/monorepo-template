@@ -3,7 +3,7 @@ import { Empty, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
-import { generateId, type GlobalStateVariable } from '@globallink/design-schema';
+import { generateId, type DomainStateVariable, type DomainStateValue } from '@globallink/design-schema';
 import { StateCombinationPreview } from './StateCombinationPreview';
 
 // ===== Interaction state presets =====
@@ -37,9 +37,8 @@ export const StatesTab = observer(function StatesTab() {
 
   const states = node.states ?? [];
   const activeState = node.activeState ?? 'default';
-  const globalStateBindings = node.globalStateBindings ?? [];
-  const screenGlobalStates = screen?.globalStates ?? [];
-  const visibilityWhen = node.visibilityWhen;
+  const domainStateBindings = node.domainStateBindings ?? [];
+  const screenGlobalStates = screen?.domainStates ?? [];
 
   return (
     <div className="flex flex-col gap-0.5 p-2 text-xs">
@@ -57,17 +56,11 @@ export const StatesTab = observer(function StatesTab() {
         activeState={activeState}
       />
 
-      {/* Section 3: Global State Bindings */}
-      <GlobalStateBindingsSection
+      {/* Section 3: Domain State Bindings */}
+      <DomainStateBindingsSection
         nodeId={nodeId}
-        bindings={globalStateBindings}
-        screenGlobalStates={screenGlobalStates}
-      />
-
-      <VisibilityWhenSection
-        nodeId={nodeId}
-        rule={visibilityWhen}
-        screenGlobalStates={screenGlobalStates}
+        bindings={domainStateBindings}
+        screenDomainStates={screenGlobalStates}
       />
 
       {/* Section 4: Global State Variable Management */}
@@ -311,44 +304,42 @@ const BusinessStatesSection = observer(function BusinessStatesSection({
 });
 
 // ===================================================================
-// Section 3: Global State Bindings (Task 2.4.4)
+// Section 3: Domain State Bindings (Task 2.4.4)
 // ===================================================================
 
-interface GlobalStateBindingsSectionProps {
+interface DomainStateBindingsSectionProps {
   nodeId: string;
   bindings: Array<{
-    id: string;
     variableName: string;
+    ownerNodeId?: string;
     value: string;
     styles?: Record<string, unknown>;
     props?: Record<string, unknown>;
     visible?: boolean;
   }>;
-  screenGlobalStates: Array<{ name: string; values: string[]; defaultValue: string }>;
+  screenDomainStates: DomainStateVariable[];
 }
 
-const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection({
+const DomainStateBindingsSection = observer(function DomainStateBindingsSection({
   nodeId,
   bindings,
-  screenGlobalStates,
-}: GlobalStateBindingsSectionProps) {
+  screenDomainStates,
+}: DomainStateBindingsSectionProps) {
   const [open, setOpen] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newVarName, setNewVarName] = useState('');
   const [newVarValue, setNewVarValue] = useState('');
 
-  const selectedVar = screenGlobalStates.find((v) => v.name === newVarName);
+  const selectedVar = screenDomainStates.find((v) => v.name === newVarName);
 
   const handleAddBinding = () => {
     if (!newVarName || !newVarValue) return;
-    const id = generateId();
     editorStore.execute({
-      type: 'addGlobalStateBinding',
+      type: 'addDomainStateBinding',
       params: {
         nodeId,
         binding: {
-          id,
           variableName: newVarName,
           value: newVarValue,
         },
@@ -359,41 +350,45 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
     setNewVarValue('');
   };
 
-  const handleDeleteBinding = (bindingId: string) => {
+  const handleDeleteBinding = (variableName: string, value: string) => {
     editorStore.execute({
-      type: 'removeGlobalStateBinding',
-      params: { nodeId, bindingId },
+      type: 'removeDomainStateBinding',
+      params: { nodeId, variableName, value },
     });
   };
 
-  const handleUpdateVisibility = (bindingId: string, visible: boolean | undefined) => {
+  const handleUpdateVisibility = (variableName: string, value: string, visible: boolean | undefined) => {
     editorStore.execute({
-      type: 'updateGlobalStateBinding',
+      type: 'updateDomainStateBinding',
       params: {
         nodeId,
-        bindingId,
+        variableName,
+        value,
         patch: { visible },
       },
     });
   };
 
+  const bindingKey = (b: { variableName: string; value: string }) => `${b.variableName}::${b.value}`;
+
   return (
     <CollapsibleSection title="全局状态绑定" open={open} onToggle={() => setOpen(!open)}>
-      {screenGlobalStates.length === 0 && (
+      {screenDomainStates.length === 0 && (
         <div className="text-gray-400 text-[10px] py-1">
           当前屏幕没有全局状态变量，请先添加
         </div>
       )}
 
-      {bindings.length === 0 && screenGlobalStates.length > 0 && !adding && (
+      {bindings.length === 0 && screenDomainStates.length > 0 && !adding && (
         <div className="text-gray-400 text-[10px] py-1">暂无绑定</div>
       )}
 
       <div className="flex flex-col gap-1">
         {bindings.map((binding) => {
-          const isEditing = editingId === binding.id;
+          const bk = bindingKey(binding);
+          const isEditing = editingKey === bk;
           return (
-            <div key={binding.id} className="border border-gray-200 rounded bg-white">
+            <div key={bk} className="border border-gray-200 rounded bg-white">
               <div className="flex items-center gap-1.5 px-2 py-1.5">
                 <code className="text-[10px] text-purple-600 bg-purple-50 px-1 rounded font-mono">
                   {binding.variableName}
@@ -409,7 +404,7 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
                   className={`text-gray-400 hover:text-blue-500 transition-colors p-0.5 ${
                     isEditing ? 'text-blue-500' : ''
                   }`}
-                  onClick={() => setEditingId(isEditing ? null : binding.id)}
+                  onClick={() => setEditingKey(isEditing ? null : bk)}
                   title="编辑覆盖"
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -419,7 +414,7 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
 
                 <Popconfirm
                   title="确定删除此绑定？"
-                  onConfirm={() => handleDeleteBinding(binding.id)}
+                  onConfirm={() => handleDeleteBinding(binding.variableName, binding.value)}
                   okText="删除"
                   cancelText="取消"
                 >
@@ -434,7 +429,6 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
                 </Popconfirm>
               </div>
 
-              {/* Inline edit for overrides */}
               {isEditing && (
                 <div className="border-t border-gray-100 px-2 py-1.5 bg-gray-50/50">
                   <div className="flex items-center gap-2 text-[10px]">
@@ -444,7 +438,7 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
                       value={binding.visible === undefined ? '' : String(binding.visible)}
                       onChange={(e) => {
                         const val = e.target.value === '' ? undefined : e.target.value === 'true';
-                        handleUpdateVisibility(binding.id, val);
+                        handleUpdateVisibility(binding.variableName, binding.value, val);
                       }}
                     >
                       <option value="">不覆盖</option>
@@ -478,7 +472,7 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
                 onChange={(e) => { setNewVarName(e.target.value); setNewVarValue(''); }}
               >
                 <option value="">选择变量</option>
-                {screenGlobalStates.map((gs) => (
+                {screenDomainStates.map((gs) => (
                   <option key={gs.name} value={gs.name}>{gs.name}</option>
                 ))}
               </select>
@@ -493,7 +487,7 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
               >
                 <option value="">选择值</option>
                 {selectedVar?.values.map((v) => (
-                  <option key={v} value={v}>{v}</option>
+                  <option key={v.value} value={v.value}>{v.label}</option>
                 ))}
               </select>
             </div>
@@ -518,7 +512,7 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
         )}
       </div>
 
-      {!adding && screenGlobalStates.length > 0 && (
+      {!adding && screenDomainStates.length > 0 && (
         <button
           type="button"
           className="mt-1 w-full flex items-center justify-center gap-1 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors"
@@ -530,93 +524,6 @@ const GlobalStateBindingsSection = observer(function GlobalStateBindingsSection(
           添加绑定
         </button>
       )}
-    </CollapsibleSection>
-  );
-});
-
-// ===================================================================
-// Section 3.5: visibilityWhen（条件可见性，W6-041）
-// ===================================================================
-
-const VisibilityWhenSection = observer(function VisibilityWhenSection({
-  nodeId,
-  rule,
-  screenGlobalStates,
-}: {
-  nodeId: string;
-  rule?: { variableName: string; equals: string };
-  screenGlobalStates: GlobalStateVariable[];
-}) {
-  const [open, setOpen] = useState(true);
-
-  const handleVarChange = (variableName: string) => {
-    const gs = screenGlobalStates.find((g) => g.name === variableName);
-    const equals = gs?.values[0] ?? '';
-    editorStore.execute({
-      type: 'setNodeVisibilityWhen',
-      params: { nodeId, visibilityWhen: { variableName, equals } },
-    });
-  };
-
-  const handleEqualsChange = (equals: string) => {
-    if (!rule) return;
-    editorStore.execute({
-      type: 'setNodeVisibilityWhen',
-      params: { nodeId, visibilityWhen: { variableName: rule.variableName, equals } },
-    });
-  };
-
-  const handleClear = () => {
-    editorStore.execute({
-      type: 'setNodeVisibilityWhen',
-      params: { nodeId, visibilityWhen: null },
-    });
-  };
-
-  if (screenGlobalStates.length === 0) {
-    return null;
-  }
-
-  const selectedVar = screenGlobalStates.find((g) => g.name === rule?.variableName);
-
-  return (
-    <CollapsibleSection title="条件可见性" open={open} onToggle={() => setOpen(!open)}>
-      <p className="text-[10px] text-gray-500 mb-1.5 leading-snug">
-        仅当全局变量等于下方取值时显示该节点（在绑定叠加之后判定）。
-      </p>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-1">
-          <span className="text-gray-500 text-[10px] w-12 flex-shrink-0">变量</span>
-          <select
-            className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
-            value={rule?.variableName ?? ''}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v) handleVarChange(v);
-              else handleClear();
-            }}
-          >
-            <option value="">（无规则）</option>
-            {screenGlobalStates.map((gs) => (
-              <option key={gs.name} value={gs.name}>{gs.name}</option>
-            ))}
-          </select>
-        </div>
-        {rule && selectedVar && (
-          <div className="flex items-center gap-1">
-            <span className="text-gray-500 text-[10px] w-12 flex-shrink-0">等于</span>
-            <select
-              className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
-              value={rule.equals}
-              onChange={(e) => handleEqualsChange(e.target.value)}
-            >
-              {selectedVar.values.map((v) => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
     </CollapsibleSection>
   );
 });
@@ -635,24 +542,26 @@ const GlobalStateVariableManager = observer(function GlobalStateVariableManager(
 
   if (!screen) return null;
 
-  const globalStates = screen.globalStates ?? [];
+  const globalStates = screen.domainStates ?? [];
 
   const handleAdd = () => {
     const name = newName.trim();
-    const values = newValues
+    const valuesRaw = newValues
       .split(',')
       .map((v) => v.trim())
       .filter(Boolean);
-    const defaultValue = newDefault.trim() || values[0] || '';
-    if (!name || values.length === 0) return;
-    // Check duplicate
+    const defaultValue = newDefault.trim() || valuesRaw[0] || '';
+    if (!name || valuesRaw.length === 0) return;
     if (globalStates.some((gs) => gs.name === name)) return;
 
+    const values: DomainStateValue[] = valuesRaw.map((v) => ({ value: v, label: v }));
     editorStore.execute({
-      type: 'addGlobalStateVariable',
+      type: 'addDomainState',
       params: {
-        screenId: screen.id,
+        ownerId: screen.id,
+        ownerType: 'screen',
         name,
+        label: name,
         values,
         defaultValue,
       },
@@ -667,8 +576,8 @@ const GlobalStateVariableManager = observer(function GlobalStateVariableManager(
 
   const handleDelete = (varName: string) => {
     editorStore.execute({
-      type: 'removeGlobalStateVariable',
-      params: { screenId: screen.id, variableName: varName },
+      type: 'removeDomainState',
+      params: { ownerId: screen.id, ownerType: 'screen', variableName: varName },
     });
     // Clean up runtime
     const next = { ...editorStore.currentGlobalStates };
@@ -718,12 +627,12 @@ const GlobalStateVariableManager = observer(function GlobalStateVariableManager(
                 onChange={(e) => handleRuntimeChange(gs.name, e.target.value)}
               >
                 {gs.values.map((v) => (
-                  <option key={v} value={v}>{v}{v === gs.defaultValue ? ' (默认)' : ''}</option>
+                  <option key={v.value} value={v.value}>{v.label}{v.value === gs.defaultValue ? ' (默认)' : ''}</option>
                 ))}
               </select>
             </div>
             <div className="mt-0.5 text-[10px] text-gray-400">
-              可选值: {gs.values.join(', ')}
+              可选值: {gs.values.map((v) => v.label).join(', ')}
             </div>
           </div>
         ))}

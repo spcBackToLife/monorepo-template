@@ -32,7 +32,7 @@ export const PropertyPanel = observer(function PropertyPanel() {
   const hasStatesIndicator = (() => {
     if (!node) return false;
     const customStates = (node.states ?? []).filter((s) => s.name !== 'default');
-    const hasBindings = (node.globalStateBindings ?? []).length > 0;
+    const hasBindings = (node.domainStateBindings ?? []).length > 0;
     return customStates.length > 0 || hasBindings;
   })();
 
@@ -48,7 +48,7 @@ export const PropertyPanel = observer(function PropertyPanel() {
   const hasDataIndicator = (() => {
     const screen = editorStore.activeScreen;
     if (!screen) return false;
-    const hasDataSets = (screen.dataSets ?? []).length > 0;
+    const hasDataSets = (screen.dataSources ?? []).length > 0;
     // Check if any node has bound expressions (props starting with __bind:)
     if (node) {
       const props = (node.props ?? {}) as Record<string, unknown>;

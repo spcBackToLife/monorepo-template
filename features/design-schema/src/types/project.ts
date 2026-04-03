@@ -1,6 +1,7 @@
 import type { Screen } from './screen';
 import type { Viewport } from './viewport';
 import type { ComponentTemplate } from './template';
+import type { EnvironmentVariable } from './environment';
 
 /** Top-level design project — aggregates all screens, viewports, and assets */
 export interface DesignProject {
@@ -20,6 +21,8 @@ export interface DesignProject {
   screens: Screen[];
   /** Project-level reusable component assets */
   componentAssets: ComponentTemplate[];
+  /** Project-level environment state variables (theme, locale, etc.) */
+  environmentStates: EnvironmentVariable[];
   /** ISO timestamp */
   createdAt: string;
   /** ISO timestamp */

@@ -25,9 +25,8 @@ const VIEWPORT_PRESETS: ViewportPreset[] = [
  */
 export const PreviewBar = observer(function PreviewBar() {
   const screen = editorStore.activeScreen;
-  const globalStates = screen?.globalStates ?? [];
-  const dataSets = screen?.dataSets ?? [];
-  const activeDataSetId = screen?.activeDataSetId;
+  const globalStates = screen?.domainStates ?? [];
+  const dataSources = screen?.dataSources ?? [];
   const viewport = editorStore.currentViewport;
   const [dataSetFlash, setDataSetFlash] = useState(false);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -44,10 +43,11 @@ export const PreviewBar = observer(function PreviewBar() {
     editorStore.setCurrentGlobalState(variableName, value);
   };
 
-  const handleDatasetSwitch = (dataSetId: string) => {
+  const handleScenarioSwitch = (dataSourceId: string, scenarioId: string) => {
     if (!screen) return;
     runInAction(() => {
-      if (screen) screen.activeDataSetId = dataSetId;
+      const ds = screen.dataSources?.find(d => d.id === dataSourceId);
+      if (ds) ds.activeScenarioId = scenarioId;
     });
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     setDataSetFlash(true);
@@ -167,28 +167,34 @@ export const PreviewBar = observer(function PreviewBar() {
             onChange={(e) => handleGlobalStateChange(gs.name, e.target.value)}
           >
             {gs.values.map((v) => (
-              <option key={v} value={v}>{v}</option>
+              <option key={v.value} value={v.value}>{v.label}</option>
             ))}
           </select>
         </div>
       ))}
 
-      {/* Dataset dropdown */}
-      {dataSets.length > 0 && (
+      {/* DataSource scenario dropdown */}
+      {dataSources.length > 0 && (
         <div
           className={`flex items-center gap-1 rounded px-0.5 py-0.5 transition-shadow duration-300 ${
             dataSetFlash ? 'ring-2 ring-cyan-400/70 shadow-[0_0_12px_rgba(34,211,238,0.35)]' : ''
           }`}
         >
-          <span className="text-gray-400 text-[10px]">数据集:</span>
+          <span className="text-gray-400 text-[10px]">数据源:</span>
           <select
             className="h-6 px-1 bg-gray-700 border border-gray-600 rounded text-[10px] text-white outline-none"
-            value={activeDataSetId ?? ''}
-            onChange={(e) => handleDatasetSwitch(e.target.value)}
+            value={dataSources[0]?.activeScenarioId ?? ''}
+            onChange={(e) => {
+              const scenarioId = e.target.value;
+              const ds = dataSources.find(d => d.scenarios.some(s => s.id === scenarioId));
+              if (ds) handleScenarioSwitch(ds.id, scenarioId);
+            }}
           >
-            {dataSets.map((ds) => (
-              <option key={ds.id} value={ds.id}>{ds.name}</option>
-            ))}
+            {dataSources.flatMap((ds) =>
+              ds.scenarios.map((sc) => (
+                <option key={sc.id} value={sc.id}>{ds.name} / {sc.name}</option>
+              ))
+            )}
           </select>
         </div>
       )}

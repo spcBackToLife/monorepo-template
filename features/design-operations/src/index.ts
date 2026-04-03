@@ -38,19 +38,31 @@ export type {
   BatchUpdateStyleOp,
   ChangeElementTypeOp,
   ReorderScreenOp,
-  SetGlobalStateOp,
-  AddGlobalStateVariableOp,
-  RemoveGlobalStateVariableOp,
-  AddGlobalStateBindingOp,
-  RemoveGlobalStateBindingOp,
-  UpdateGlobalStateBindingOp,
+  AddDomainStateOp,
+  RemoveDomainStateOp,
+  UpdateDomainStateOp,
+  SetDomainStatePreviewOp,
+  AddDomainStateBindingOp,
+  UpdateDomainStateBindingOp,
+  RemoveDomainStateBindingOp,
+  AddEnvironmentStateOp,
+  RemoveEnvironmentStateOp,
+  UpdateEnvironmentStateOp,
+  SetEnvironmentPreviewOp,
+  AddEnvironmentBindingOp,
+  UpdateEnvironmentBindingOp,
+  RemoveEnvironmentBindingOp,
   UpdateComponentPropsOp,
   AddPropDefinitionOp,
   RemovePropDefinitionOp,
-  AddDataSetOp,
-  RemoveDataSetOp,
-  UpdateDataSetOp,
-  SwitchDataSetOp,
+  AddDataSourceOp,
+  RemoveDataSourceOp,
+  UpdateDataSourceOp,
+  SwitchDataSourcePhaseOp,
+  AddDataScenarioOp,
+  UpdateDataScenarioOp,
+  RemoveDataScenarioOp,
+  SwitchDataScenarioOp,
   BindDataOp,
   UpdateTemplateOp,
   DeleteTemplateOp,
@@ -141,13 +153,24 @@ export {
 } from './operations/asset';
 
 export {
-  executeAddGlobalStateVariable,
-  executeRemoveGlobalStateVariable,
-  executeSetGlobalState,
-  executeAddGlobalStateBinding,
-  executeRemoveGlobalStateBinding,
-  executeUpdateGlobalStateBinding,
-} from './operations/global-state';
+  executeAddDomainState,
+  executeRemoveDomainState,
+  executeUpdateDomainState,
+  executeSetDomainStatePreview,
+  executeAddDomainStateBinding,
+  executeRemoveDomainStateBinding,
+  executeUpdateDomainStateBinding,
+} from './operations/domain-state';
+
+export {
+  executeAddEnvironmentState,
+  executeRemoveEnvironmentState,
+  executeUpdateEnvironmentState,
+  executeSetEnvironmentPreview,
+  executeAddEnvironmentBinding,
+  executeUpdateEnvironmentBinding,
+  executeRemoveEnvironmentBinding,
+} from './operations/environment';
 
 export {
   executeUpdateComponentProps,
@@ -156,10 +179,14 @@ export {
 } from './operations/component-props';
 
 export {
-  executeAddDataSet,
-  executeRemoveDataSet,
-  executeUpdateDataSet,
-  executeSwitchDataSet,
+  executeAddDataSource,
+  executeRemoveDataSource,
+  executeUpdateDataSource,
+  executeSwitchDataSourcePhase,
+  executeAddDataScenario,
+  executeUpdateDataScenario,
+  executeRemoveDataScenario,
+  executeSwitchDataScenario,
   executeBindData,
 } from './operations/data';
 

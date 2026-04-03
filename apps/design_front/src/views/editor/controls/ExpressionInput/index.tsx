@@ -32,9 +32,14 @@ export const ExpressionInput = observer(function ExpressionInput({
   const screen = editorStore.activeScreen;
   const activeDataSet = useMemo(() => {
     if (!screen) return null;
-    const ds = (screen.dataSets ?? []).find((d) => d.id === screen.activeDataSetId);
-    return ds ?? null;
-  }, [screen?.dataSets, screen?.activeDataSetId]);
+    const merged: Record<string, unknown> = {};
+    for (const ds of screen.dataSources ?? []) {
+      if (ds.activePhase !== 'loaded') continue;
+      const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
+      if (sc) Object.assign(merged, sc.data);
+    }
+    return Object.keys(merged).length > 0 ? { data: merged } : null;
+  }, [screen?.dataSources]);
 
   const dataKeys = useMemo(() => {
     if (!activeDataSet) return [];

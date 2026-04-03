@@ -27,9 +27,24 @@ export function resolveNodeProps(
   let mergedProps: Record<string, unknown> = { ...node.props };
   let visible = node.visible !== false;
 
-  // Layer 2: global state bindings
-  if (node.globalStateBindings?.length) {
-    for (const binding of node.globalStateBindings) {
+  // Layer 2: domain state bindings
+  if (node.domainStateBindings?.length) {
+    for (const binding of node.domainStateBindings) {
+      const currentValue = globalStates[binding.variableName];
+      if (currentValue === binding.value) {
+        if (binding.props) {
+          mergedProps = { ...mergedProps, ...binding.props };
+        }
+        if (binding.visible !== undefined) {
+          visible = binding.visible;
+        }
+      }
+    }
+  }
+
+  // Layer 2b: environment state bindings
+  if (node.environmentBindings?.length) {
+    for (const binding of node.environmentBindings) {
       const currentValue = globalStates[binding.variableName];
       if (currentValue === binding.value) {
         if (binding.props) {
@@ -62,13 +77,5 @@ export function resolveNodeProps(
     }
   }
 
-  let outVisible = visible !== false;
-  if (node.visibilityWhen) {
-    const { variableName, equals } = node.visibilityWhen;
-    if (globalStates[variableName] !== equals) {
-      outVisible = false;
-    }
-  }
-
-  return { props: mergedProps, visible: outVisible };
+  return { props: mergedProps, visible: visible !== false };
 }

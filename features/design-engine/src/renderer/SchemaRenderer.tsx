@@ -187,12 +187,22 @@ export function SchemaRenderer({
   );
 }
 
-/** Build a DataContext from the screen's active dataset */
+/** Build a DataContext：合并各数据源活跃场景数据（替代旧 dataSets / activeDataSetId） */
+function getActiveData(screen: Screen): Record<string, unknown> {
+  const mergedData: Record<string, unknown> = {};
+  for (const ds of screen.dataSources ?? []) {
+    if (ds.activePhase !== 'loaded') continue;
+    const scenario = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
+    if (scenario) {
+      Object.assign(mergedData, scenario.data);
+    }
+  }
+  return mergedData;
+}
+
 function buildDataContextFromScreen(screen: Screen): DataContext {
-  const dataSets = screen.dataSets ?? [];
-  const activeDataSet = dataSets.find((ds) => ds.id === screen.activeDataSetId);
   return {
-    data: activeDataSet?.data ?? {},
+    data: getActiveData(screen),
   };
 }
 

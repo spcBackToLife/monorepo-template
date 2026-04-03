@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import {
-  GlobalStateVariableSchema,
-  GlobalStateBindingSchema,
+  DomainStateVariableSchema,
+  DomainStateBindingSchema,
+  EnvironmentVariableSchema,
+  EnvironmentStateBindingSchema,
   ComponentPropDefinitionSchema,
   PropBindingSchema,
 } from './props';
-import { DataSetSchema } from './data';
+import { DataSourceSchema } from './data';
 
 // ===== Component State Schema =====
 
@@ -20,6 +22,8 @@ const ComponentStateSchema = z.object({
       properties: z.array(z.string()).optional(),
     })
     .optional(),
+  childrenVisibility: z.record(z.string(), z.boolean()).optional(),
+  disabledEvents: z.array(z.string()).optional(),
 });
 
 // ===== Transition Animation Schema =====
@@ -59,8 +63,14 @@ const CustomActionSchema = z.object({
   handler: z.string().min(1),
 });
 
-const SetGlobalStateActionSchema = z.object({
-  type: z.literal('setGlobalState'),
+const SetDomainStateActionSchema = z.object({
+  type: z.literal('setDomainState'),
+  variableName: z.string().min(1),
+  value: z.string().min(1),
+});
+
+const SetEnvironmentStateActionSchema = z.object({
+  type: z.literal('setEnvironmentState'),
   variableName: z.string().min(1),
   value: z.string().min(1),
 });
@@ -76,19 +86,15 @@ const EventActionSchema = z.discriminatedUnion('type', [
   OpenUrlActionSchema,
   DelayActionSchema,
   CustomActionSchema,
-  SetGlobalStateActionSchema,
+  SetDomainStateActionSchema,
+  SetEnvironmentStateActionSchema,
   ToggleVisibleActionSchema,
 ]);
 
 const EventConditionSchema = z.object({
-  type: z.literal('globalState'),
+  type: z.enum(['domainState', 'environmentState', 'dataBinding', 'propValue']),
   variableName: z.string().min(1),
   value: z.string().min(1),
-});
-
-const VisibilityWhenSchema = z.object({
-  variableName: z.string().min(1),
-  equals: z.string().min(1),
 });
 
 // ===== Component Event Schema =====
@@ -150,8 +156,9 @@ const BaseComponentNodeSchema = z.object({
   templateRef: TemplateRefSchema,
   locked: z.boolean().default(false),
   visible: z.boolean().default(true),
-  globalStateBindings: z.array(GlobalStateBindingSchema).default([]),
-  visibilityWhen: VisibilityWhenSchema.optional(),
+  domainStates: z.array(DomainStateVariableSchema).optional(),
+  domainStateBindings: z.array(DomainStateBindingSchema).optional(),
+  environmentBindings: z.array(EnvironmentStateBindingSchema).optional(),
 });
 
 type ComponentNodeInput = z.input<typeof BaseComponentNodeSchema> & {
@@ -169,9 +176,8 @@ export const ScreenSchema = z.object({
   name: z.string().min(1),
   rootNode: ComponentNodeSchema,
   backgroundColor: z.string().optional(),
-  globalStates: z.array(GlobalStateVariableSchema).default([]),
-  dataSets: z.array(DataSetSchema).default([]),
-  activeDataSetId: z.string().default(''),
+  domainStates: z.array(DomainStateVariableSchema).default([]),
+  dataSources: z.array(DataSourceSchema).default([]),
 });
 
 // ===== Viewport Schema =====
@@ -214,6 +220,7 @@ export const DesignProjectSchema = z.object({
   viewportPresets: z.array(ViewportSchema).default([]),
   screens: z.array(ScreenSchema).min(1),
   componentAssets: z.array(ComponentTemplateSchema).default([]),
+  environmentStates: z.array(EnvironmentVariableSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

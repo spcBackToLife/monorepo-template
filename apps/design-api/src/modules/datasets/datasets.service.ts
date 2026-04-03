@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ProjectsService } from '../../projects/projects.service';
 import { OperationsService } from '../../operations/operations.service';
 import type { Operation } from '@globallink/design-operations';
-import type { DataSet } from '@globallink/design-schema';
+import type { DataSource } from '@globallink/design-schema';
 
 /**
  * Task 3.5 — Datasets Service
@@ -21,10 +21,10 @@ export class DatasetsService {
   async listDataSets(
     projectId: string,
     screenId: string,
-  ): Promise<DataSet[]> {
+  ): Promise<DataSource[]> {
     const project = await this.projects.findOne(projectId);
     const screen = project.screens.find((s) => s.id === screenId);
-    return screen?.dataSets ?? [];
+    return screen?.dataSources ?? [];
   }
 
   /** Get a specific dataset */
@@ -32,7 +32,7 @@ export class DatasetsService {
     projectId: string,
     screenId: string,
     dataSetId: string,
-  ): Promise<DataSet | null> {
+  ): Promise<DataSource | null> {
     const dataSets = await this.listDataSets(projectId, screenId);
     return dataSets.find((ds) => ds.id === dataSetId) ?? null;
   }
@@ -41,12 +41,17 @@ export class DatasetsService {
   async addDataSet(
     projectId: string,
     screenId: string,
-    dataSet: DataSet,
+    dataSource: {
+      id: string;
+      name: string;
+      lifecycle: 'api' | 'static';
+      description?: string;
+    },
     author?: string,
   ) {
     const op: Operation = {
-      type: 'addDataSet',
-      params: { screenId, dataSet },
+      type: 'addDataSource',
+      params: { screenId, dataSource },
     };
     return this.operations.execute(projectId, op, author);
   }
@@ -57,15 +62,22 @@ export class DatasetsService {
     screenId: string,
     dataSetId: string,
     patch: {
+      scenarioId: string;
       data?: Record<string, unknown>;
       name?: string;
       description?: string;
     },
     author?: string,
   ) {
+    const { scenarioId, ...rest } = patch;
     const op: Operation = {
-      type: 'updateDataSet',
-      params: { screenId, dataSetId, ...patch },
+      type: 'updateDataScenario',
+      params: {
+        screenId,
+        dataSourceId: dataSetId,
+        scenarioId,
+        ...rest,
+      },
     };
     return this.operations.execute(projectId, op, author);
   }
@@ -78,8 +90,8 @@ export class DatasetsService {
     author?: string,
   ) {
     const op: Operation = {
-      type: 'removeDataSet',
-      params: { screenId, dataSetId },
+      type: 'removeDataSource',
+      params: { screenId, dataSourceId: dataSetId },
     };
     return this.operations.execute(projectId, op, author);
   }
@@ -89,11 +101,16 @@ export class DatasetsService {
     projectId: string,
     screenId: string,
     dataSetId: string,
+    scenarioId: string,
     author?: string,
   ) {
     const op: Operation = {
-      type: 'switchDataSet',
-      params: { screenId, dataSetId },
+      type: 'switchDataScenario',
+      params: {
+        screenId,
+        dataSourceId: dataSetId,
+        scenarioId,
+      },
     };
     return this.operations.execute(projectId, op, author);
   }

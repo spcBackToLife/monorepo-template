@@ -16,6 +16,7 @@ export interface PreviewRendererProps {
   screen: Screen;
   assets?: ComponentTemplate[];
   globalStates?: Record<string, string>;
+  /** 可选：仅使用该数据源的活跃场景数据；不传则合并全部已加载数据源 */
   currentDataSet?: string;
   onNavigate?: (screenId: string) => void;
   /** 嵌在编辑器视口内时去掉外层灰底，避免与设备框叠两层底色 */
@@ -52,12 +53,29 @@ export function PreviewRenderer({
   );
 }
 
-function buildDataContextFromScreen(screen: Screen, currentDataSet?: string): DataContext {
-  const dataSetId = currentDataSet ?? screen.activeDataSetId;
-  const activeDataSet = (screen.dataSets ?? []).find((ds) => ds.id === dataSetId);
-  return {
-    data: activeDataSet?.data ?? {},
-  };
+/** 合并所有数据源中处于 loaded 相且对应活跃场景的数据（替代旧 dataSets / activeDataSetId） */
+function getActiveData(screen: Screen): Record<string, unknown> {
+  const mergedData: Record<string, unknown> = {};
+  for (const ds of screen.dataSources ?? []) {
+    if (ds.activePhase !== 'loaded') continue;
+    const scenario = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
+    if (scenario) {
+      Object.assign(mergedData, scenario.data);
+    }
+  }
+  return mergedData;
+}
+
+function buildDataContextFromScreen(screen: Screen, currentDataSourceId?: string): DataContext {
+  const sources = screen.dataSources ?? [];
+  if (currentDataSourceId) {
+    const ds = sources.find((s) => s.id === currentDataSourceId);
+    if (ds && ds.activePhase === 'loaded') {
+      const scenario = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
+      return { data: { ...(scenario?.data ?? {}) } };
+    }
+  }
+  return { data: getActiveData(screen) };
 }
 
 function PreviewInteractiveShell({

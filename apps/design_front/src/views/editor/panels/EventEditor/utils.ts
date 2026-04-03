@@ -11,7 +11,7 @@ export function formatAction(action: EventAction): string {
       return `打开链接 ${action.url}`;
     case 'delay':
       return `延时 ${action.duration}ms`;
-    case 'setGlobalState':
+    case 'setDomainState':
       return `全局状态 ${action.variableName} = ${action.value}`;
     case 'toggleVisible':
       return `切换可见性 ${action.targetId}`;

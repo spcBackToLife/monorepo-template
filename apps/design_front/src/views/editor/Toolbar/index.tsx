@@ -36,15 +36,14 @@ export const Toolbar = observer(function Toolbar() {
   );
 
   const activeScreen = editorStore.activeScreen;
-  const dataSets = activeScreen?.dataSets ?? [];
-  const activeDataSetId = activeScreen?.activeDataSetId ?? '';
-  const screenGlobalStates = activeScreen?.globalStates ?? [];
+  const dataSources = activeScreen?.dataSources ?? [];
+  const screenGlobalStates = activeScreen?.domainStates ?? [];
 
-  const handleDataSetSwitch = (dataSetId: string) => {
+  const handleDataSourceScenarioSwitch = (dataSourceId: string, scenarioId: string) => {
     if (!activeScreen) return;
     editorStore.execute({
-      type: 'switchDataSet',
-      params: { screenId: activeScreen.id, dataSetId },
+      type: 'switchDataScenario',
+      params: { screenId: activeScreen.id, dataSourceId, scenarioId },
     });
   };
 
@@ -95,14 +94,19 @@ export const Toolbar = observer(function Toolbar() {
           style={{ width: 140 }}
           options={screens.map((s) => ({ label: s.name, value: s.id }))}
         />
-        {dataSets.length > 0 && activeScreen && (
-          <Tooltip title="当前页数据集（{{data.*}} 解析来源）">
+        {dataSources.length > 0 && activeScreen && (
+          <Tooltip title="当前页数据源（{{data.*}} 解析来源）">
             <Select
               size="small"
-              value={activeDataSetId || dataSets[0]?.id}
-              onChange={handleDataSetSwitch}
+              value={dataSources[0]?.activeScenarioId}
+              onChange={(scenarioId) => {
+                const ds = dataSources.find(d => d.scenarios.some(s => s.id === scenarioId));
+                if (ds) handleDataSourceScenarioSwitch(ds.id, scenarioId);
+              }}
               style={{ width: 128 }}
-              options={dataSets.map((ds) => ({ label: ds.name, value: ds.id }))}
+              options={dataSources.flatMap((ds) =>
+                ds.scenarios.map((sc) => ({ label: `${ds.name} / ${sc.name}`, value: sc.id }))
+              )}
             />
           </Tooltip>
         )}
@@ -119,7 +123,7 @@ export const Toolbar = observer(function Toolbar() {
                     value={editorStore.currentGlobalStates[gs.name] ?? gs.defaultValue}
                     onChange={(v) => handleGlobalStateChange(gs.name, String(v))}
                     style={{ width: 88 }}
-                    options={gs.values.map((v) => ({ label: v, value: v }))}
+                    options={gs.values.map((v) => ({ label: v.label, value: v.value }))}
                   />
                 </span>
               ))}

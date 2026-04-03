@@ -42,9 +42,18 @@ export class DatasetsController {
   create(
     @Param('projectId') projectId: string,
     @Param('screenId') screenId: string,
-    @Body() body: { dataSet: { id: string; name: string; data: Record<string, unknown>; description?: string }; author?: string },
+    @Body()
+    body: {
+      dataSource: {
+        id: string;
+        name: string;
+        lifecycle: 'api' | 'static';
+        description?: string;
+      };
+      author?: string;
+    },
   ) {
-    return this.datasets.addDataSet(projectId, screenId, body.dataSet, body.author);
+    return this.datasets.addDataSet(projectId, screenId, body.dataSource, body.author);
   }
 
   /** POST /api/projects/:projectId/screens/:screenId/datasets/:dataSetId/update */
@@ -55,6 +64,7 @@ export class DatasetsController {
     @Param('dataSetId') dataSetId: string,
     @Body()
     body: {
+      scenarioId: string;
       data?: Record<string, unknown>;
       name?: string;
       description?: string;
@@ -71,9 +81,15 @@ export class DatasetsController {
     @Param('projectId') projectId: string,
     @Param('screenId') screenId: string,
     @Param('dataSetId') dataSetId: string,
-    @Body() body: { author?: string },
+    @Body() body: { scenarioId: string; author?: string },
   ) {
-    return this.datasets.switchDataSet(projectId, screenId, dataSetId, body.author);
+    return this.datasets.switchDataSet(
+      projectId,
+      screenId,
+      dataSetId,
+      body.scenarioId,
+      body.author,
+    );
   }
 
   /** DELETE /api/projects/:projectId/screens/:screenId/datasets/:dataSetId */

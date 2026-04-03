@@ -1,17 +1,20 @@
-import type { DesignProject } from '@globallink/design-schema';
-import { deepClone } from '@globallink/design-schema';
+import type { DesignProject, DataSource } from '@globallink/design-schema';
+import { deepClone, API_DATA_SOURCE_PHASES } from '@globallink/design-schema';
 import type {
-  AddDataSetOp,
-  RemoveDataSetOp,
-  UpdateDataSetOp,
-  SwitchDataSetOp,
+  AddDataSourceOp,
+  RemoveDataSourceOp,
+  UpdateDataSourceOp,
+  SwitchDataSourcePhaseOp,
+  AddDataScenarioOp,
+  UpdateDataScenarioOp,
+  RemoveDataScenarioOp,
+  SwitchDataScenarioOp,
   BindDataOp,
   OperationResult,
   InverseData,
 } from '../types';
 import { findNodeById } from '../utils/tree';
 
-/** Find a node across all screens */
 function findNodeInProject(project: DesignProject, nodeId: string) {
   for (const screen of project.screens) {
     const node = findNodeById(screen.rootNode, nodeId);
@@ -20,14 +23,25 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
   return undefined;
 }
 
-// ===== addDataSet =====
+function getScreen(project: DesignProject, screenId: string) {
+  return project.screens.find((s) => s.id === screenId);
+}
 
-export function executeAddDataSet(
+function getDataSource(project: DesignProject, screenId: string, dataSourceId: string) {
+  const screen = getScreen(project, screenId);
+  if (!screen) return { screen: undefined, dataSource: undefined };
+  const dataSource = screen.dataSources.find((ds) => ds.id === dataSourceId);
+  return { screen, dataSource };
+}
+
+// ===== addDataSource =====
+
+export function executeAddDataSource(
   project: DesignProject,
-  params: AddDataSetOp['params'],
+  params: AddDataSourceOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
-  const screen = newProject.screens.find((s) => s.id === params.screenId);
+  const screen = getScreen(newProject, params.screenId);
 
   if (!screen) {
     return {
@@ -37,46 +51,57 @@ export function executeAddDataSet(
     };
   }
 
-  // Check for duplicate data set id
-  if (screen.dataSets.some((ds) => ds.id === params.dataSet.id)) {
+  if (screen.dataSources.some((ds) => ds.id === params.dataSource.id)) {
     return {
       project,
-      result: { success: false, description: `DataSet "${params.dataSet.id}" already exists on screen ${params.screenId}`, affectedNodeIds: [] },
+      result: {
+        success: false,
+        description: `Data source "${params.dataSource.id}" already exists on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
 
-  screen.dataSets.push({
-    id: params.dataSet.id,
-    name: params.dataSet.name,
-    data: params.dataSet.data,
-    description: params.dataSet.description,
-  });
+  const phases =
+    params.dataSource.lifecycle === 'api' ? deepClone(API_DATA_SOURCE_PHASES) : [];
 
+  const dataSource: DataSource = {
+    id: params.dataSource.id,
+    name: params.dataSource.name,
+    description: params.dataSource.description,
+    lifecycle: params.dataSource.lifecycle,
+    phases,
+    activePhase: 'loaded',
+    scenarios: [],
+    activeScenarioId: '',
+  };
+
+  screen.dataSources.push(dataSource);
   newProject.updatedAt = new Date().toISOString();
 
   return {
     project: newProject,
     result: {
       success: true,
-      description: `Added data set "${params.dataSet.name}" to screen ${params.screenId}`,
+      description: `Added data source "${params.dataSource.name}" to screen ${params.screenId}`,
       affectedNodeIds: [params.screenId],
     },
     inverse: {
-      type: 'removeDataSet',
-      params: { screenId: params.screenId, dataSetId: params.dataSet.id },
+      type: 'removeDataSource',
+      params: { screenId: params.screenId, dataSourceId: params.dataSource.id },
     },
   };
 }
 
-// ===== removeDataSet =====
+// ===== removeDataSource =====
 
-export function executeRemoveDataSet(
+export function executeRemoveDataSource(
   project: DesignProject,
-  params: RemoveDataSetOp['params'],
+  params: RemoveDataSourceOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
-  const screen = newProject.screens.find((s) => s.id === params.screenId);
+  const screen = getScreen(newProject, params.screenId);
 
   if (!screen) {
     return {
@@ -86,64 +111,266 @@ export function executeRemoveDataSet(
     };
   }
 
-  const dsIndex = screen.dataSets.findIndex((ds) => ds.id === params.dataSetId);
+  const dsIndex = screen.dataSources.findIndex((ds) => ds.id === params.dataSourceId);
   if (dsIndex === -1) {
     return {
       project,
-      result: { success: false, description: `DataSet "${params.dataSetId}" not found on screen ${params.screenId}`, affectedNodeIds: [] },
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
 
-  const [removedDataSet] = screen.dataSets.splice(dsIndex, 1);
-
-  // If the removed data set was active, switch to the first available
-  if (screen.activeDataSetId === params.dataSetId && screen.dataSets.length > 0) {
-    screen.activeDataSetId = screen.dataSets[0].id;
-  }
-
+  const [removed] = screen.dataSources.splice(dsIndex, 1);
   newProject.updatedAt = new Date().toISOString();
 
   return {
     project: newProject,
     result: {
       success: true,
-      description: `Removed data set "${removedDataSet.name}" from screen ${params.screenId}`,
+      description: `Removed data source "${removed.name}" from screen ${params.screenId}`,
       affectedNodeIds: [params.screenId],
     },
     inverse: {
-      type: '_restoreDataSet',
+      type: '_restoreDataSource',
       params: {
         screenId: params.screenId,
-        dataSet: removedDataSet,
+        dataSource: removed,
         position: dsIndex,
       },
     },
   };
 }
 
-// ===== updateDataSet =====
+// ===== updateDataSource =====
 
-export function executeUpdateDataSet(
+export function executeUpdateDataSource(
   project: DesignProject,
-  params: UpdateDataSetOp['params'],
+  params: UpdateDataSourceOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
-  const screen = newProject.screens.find((s) => s.id === params.screenId);
+  const { screen, dataSource } = getDataSource(newProject, params.screenId, params.dataSourceId);
 
-  if (!screen) {
+  if (!screen || !dataSource) {
     return {
       project,
-      result: { success: false, description: `Screen ${params.screenId} not found`, affectedNodeIds: [] },
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
 
-  const dataSet = screen.dataSets.find((ds) => ds.id === params.dataSetId);
-  if (!dataSet) {
+  const hasName = params.name !== undefined;
+  const hasDesc = params.description !== undefined;
+  if (!hasName && !hasDesc) {
     return {
       project,
-      result: { success: false, description: `DataSet "${params.dataSetId}" not found on screen ${params.screenId}`, affectedNodeIds: [] },
+      result: { success: false, description: 'updateDataSource requires at least one of name, description', affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const oldName = dataSource.name;
+  const oldDesc = dataSource.description;
+
+  if (hasName) dataSource.name = params.name!;
+  if (hasDesc) dataSource.description = params.description;
+
+  newProject.updatedAt = new Date().toISOString();
+
+  const inverseParams: UpdateDataSourceOp['params'] = {
+    screenId: params.screenId,
+    dataSourceId: params.dataSourceId,
+  };
+  if (hasName) inverseParams.name = oldName;
+  if (hasDesc) inverseParams.description = oldDesc;
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Updated data source "${dataSource.name}" on screen ${params.screenId}`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'updateDataSource',
+      params: inverseParams,
+    },
+  };
+}
+
+// ===== switchDataSourcePhase =====
+
+export function executeSwitchDataSourcePhase(
+  project: DesignProject,
+  params: SwitchDataSourcePhaseOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const { screen, dataSource } = getDataSource(newProject, params.screenId, params.dataSourceId);
+
+  if (!screen || !dataSource) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  if (dataSource.phases.length === 0) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Cannot switch phase on static data source "${params.dataSourceId}" (no lifecycle phases)`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  if (!dataSource.phases.some((p) => p.name === params.phase)) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Phase "${params.phase}" is not defined on data source "${params.dataSourceId}"`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const oldPhase = dataSource.activePhase;
+  dataSource.activePhase = params.phase;
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Switched data source "${params.dataSourceId}" to phase "${params.phase}"`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'switchDataSourcePhase',
+      params: {
+        screenId: params.screenId,
+        dataSourceId: params.dataSourceId,
+        phase: oldPhase,
+      },
+    },
+  };
+}
+
+// ===== addDataScenario =====
+
+export function executeAddDataScenario(
+  project: DesignProject,
+  params: AddDataScenarioOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const { screen, dataSource } = getDataSource(newProject, params.screenId, params.dataSourceId);
+
+  if (!screen || !dataSource) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  if (dataSource.scenarios.some((s) => s.id === params.scenario.id)) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Scenario "${params.scenario.id}" already exists on data source ${params.dataSourceId}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const scenario = {
+    id: params.scenario.id,
+    name: params.scenario.name,
+    data: params.scenario.data,
+    description: params.scenario.description,
+    isDefault: params.scenario.isDefault,
+  };
+
+  if (scenario.isDefault) {
+    for (const s of dataSource.scenarios) {
+      s.isDefault = false;
+    }
+  }
+
+  dataSource.scenarios.push(scenario);
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Added scenario "${params.scenario.name}" to data source ${params.dataSourceId}`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'removeDataScenario',
+      params: {
+        screenId: params.screenId,
+        dataSourceId: params.dataSourceId,
+        scenarioId: params.scenario.id,
+      },
+    },
+  };
+}
+
+// ===== updateDataScenario =====
+
+export function executeUpdateDataScenario(
+  project: DesignProject,
+  params: UpdateDataScenarioOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const { screen, dataSource } = getDataSource(newProject, params.screenId, params.dataSourceId);
+
+  if (!screen || !dataSource) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const scenario = dataSource.scenarios.find((s) => s.id === params.scenarioId);
+  if (!scenario) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Scenario "${params.scenarioId}" not found on data source ${params.dataSourceId}`,
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
@@ -154,24 +381,29 @@ export function executeUpdateDataSet(
   if (!hasData && !hasName && !hasDesc) {
     return {
       project,
-      result: { success: false, description: 'updateDataSet requires at least one of data, name, description', affectedNodeIds: [] },
+      result: {
+        success: false,
+        description: 'updateDataScenario requires at least one of data, name, description',
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
 
-  const oldData = deepClone(dataSet.data);
-  const oldName = dataSet.name;
-  const oldDesc = dataSet.description;
+  const oldData = deepClone(scenario.data);
+  const oldName = scenario.name;
+  const oldDesc = scenario.description;
 
-  if (hasData) dataSet.data = params.data!;
-  if (hasName) dataSet.name = params.name!;
-  if (hasDesc) dataSet.description = params.description;
+  if (hasData) scenario.data = params.data!;
+  if (hasName) scenario.name = params.name!;
+  if (hasDesc) scenario.description = params.description;
 
   newProject.updatedAt = new Date().toISOString();
 
-  const inverseParams: UpdateDataSetOp['params'] = {
+  const inverseParams: UpdateDataScenarioOp['params'] = {
     screenId: params.screenId,
-    dataSetId: params.dataSetId,
+    dataSourceId: params.dataSourceId,
+    scenarioId: params.scenarioId,
   };
   if (hasData) inverseParams.data = oldData;
   if (hasName) inverseParams.name = oldName;
@@ -181,44 +413,56 @@ export function executeUpdateDataSet(
     project: newProject,
     result: {
       success: true,
-      description: `Updated data set "${dataSet.name}" on screen ${params.screenId}`,
+      description: `Updated scenario "${scenario.name}" on data source ${params.dataSourceId}`,
       affectedNodeIds: [params.screenId],
     },
     inverse: {
-      type: 'updateDataSet',
+      type: 'updateDataScenario',
       params: inverseParams,
     },
   };
 }
 
-// ===== switchDataSet =====
+// ===== removeDataScenario =====
 
-export function executeSwitchDataSet(
+export function executeRemoveDataScenario(
   project: DesignProject,
-  params: SwitchDataSetOp['params'],
+  params: RemoveDataScenarioOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
-  const screen = newProject.screens.find((s) => s.id === params.screenId);
+  const { screen, dataSource } = getDataSource(newProject, params.screenId, params.dataSourceId);
 
-  if (!screen) {
+  if (!screen || !dataSource) {
     return {
       project,
-      result: { success: false, description: `Screen ${params.screenId} not found`, affectedNodeIds: [] },
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
 
-  // Validate the target data set exists
-  if (!screen.dataSets.some((ds) => ds.id === params.dataSetId)) {
+  const idx = dataSource.scenarios.findIndex((s) => s.id === params.scenarioId);
+  if (idx === -1) {
     return {
       project,
-      result: { success: false, description: `DataSet "${params.dataSetId}" not found on screen ${params.screenId}`, affectedNodeIds: [] },
+      result: {
+        success: false,
+        description: `Scenario "${params.scenarioId}" not found on data source ${params.dataSourceId}`,
+        affectedNodeIds: [],
+      },
       inverse: { type: 'noop', params: {} },
     };
   }
 
-  const oldActiveDataSetId = screen.activeDataSetId;
-  screen.activeDataSetId = params.dataSetId;
+  const [removed] = dataSource.scenarios.splice(idx, 1);
+  const previousActiveScenarioId = dataSource.activeScenarioId;
+
+  if (dataSource.activeScenarioId === params.scenarioId) {
+    dataSource.activeScenarioId = dataSource.scenarios.length > 0 ? dataSource.scenarios[0].id : '';
+  }
 
   newProject.updatedAt = new Date().toISOString();
 
@@ -226,14 +470,75 @@ export function executeSwitchDataSet(
     project: newProject,
     result: {
       success: true,
-      description: `Switched active data set to "${params.dataSetId}" on screen ${params.screenId}`,
+      description: `Removed scenario "${removed.name}" from data source ${params.dataSourceId}`,
       affectedNodeIds: [params.screenId],
     },
     inverse: {
-      type: 'switchDataSet',
+      type: '_restoreDataScenario',
       params: {
         screenId: params.screenId,
-        dataSetId: oldActiveDataSetId,
+        dataSourceId: params.dataSourceId,
+        scenario: removed,
+        position: idx,
+        previousActiveScenarioId,
+      },
+    },
+  };
+}
+
+// ===== switchDataScenario =====
+
+export function executeSwitchDataScenario(
+  project: DesignProject,
+  params: SwitchDataScenarioOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const { screen, dataSource } = getDataSource(newProject, params.screenId, params.dataSourceId);
+
+  if (!screen || !dataSource) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Data source "${params.dataSourceId}" not found on screen ${params.screenId}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  if (
+    params.scenarioId !== '' &&
+    !dataSource.scenarios.some((s) => s.id === params.scenarioId)
+  ) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `Scenario "${params.scenarioId}" not found on data source ${params.dataSourceId}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const oldId = dataSource.activeScenarioId;
+  dataSource.activeScenarioId = params.scenarioId;
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Switched active scenario to "${params.scenarioId}" on data source ${params.dataSourceId}`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'switchDataScenario',
+      params: {
+        screenId: params.screenId,
+        dataSourceId: params.dataSourceId,
+        scenarioId: oldId,
       },
     },
   };
@@ -256,7 +561,6 @@ export function executeBindData(
     };
   }
 
-  // Save old prop value for inverse
   const oldValue = node.props[params.propKey];
   node.props[params.propKey] = params.expression;
 

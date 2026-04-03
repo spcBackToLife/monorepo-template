@@ -94,9 +94,19 @@ export function resolveNodeStyles(
   // Layer 1: base styles
   let merged: CSSProperties = { ...node.styles };
 
-  // Layer 2: global state bindings
-  if (node.globalStateBindings?.length) {
-    for (const binding of node.globalStateBindings) {
+  // Layer 2: domain state bindings
+  if (node.domainStateBindings?.length) {
+    for (const binding of node.domainStateBindings) {
+      const currentValue = globalStates[binding.variableName];
+      if (currentValue === binding.value && binding.styles) {
+        merged = { ...merged, ...binding.styles };
+      }
+    }
+  }
+
+  // Layer 2b: environment state bindings
+  if (node.environmentBindings?.length) {
+    for (const binding of node.environmentBindings) {
       const currentValue = globalStates[binding.variableName];
       if (currentValue === binding.value && binding.styles) {
         merged = { ...merged, ...binding.styles };
