@@ -1,40 +1,55 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import type { Operation } from '@globallink/design-operations';
-import { wsService } from '@/services/ws';
+import { syncManager, type OperationEnvelopePayload } from '@/services/SyncManager';
 import { editorStore } from '@/stores/editor';
+import { aiToastStore } from '@/views/editor/AiOperationToast';
 
 export class SyncStore {
-  /** Whether WebSocket is connected */
   connected = false;
-  /** Unsubscribe callback */
   private unsub: (() => void) | null = null;
+  private pollConnectedTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     makeAutoObservable(this);
   }
 
-  /** Start syncing for a project */
   startSync(projectId: string): void {
     this.stopSync();
-    wsService.connect(projectId);
+    syncManager.connect(projectId);
 
-    this.unsub = wsService.onOperation((op: Operation) => {
-      // Apply remote operation to local editor state (4B.17)
+    this.unsub = syncManager.onEnvelope((envelope: OperationEnvelopePayload) => {
       runInAction(() => {
-        editorStore.execute(op);
+        editorStore.applyRemoteOperation(envelope.operation);
+
+        if (envelope.author === 'ai') {
+          const op = envelope.operation as { type?: string; params?: Record<string, unknown> };
+          const description = op.type ?? 'unknown';
+          aiToastStore.add(description);
+        }
       });
     });
 
+    this.pollConnectedTimer = setInterval(() => {
+      const actual = syncManager.connected;
+      if (actual !== this.connected) {
+        runInAction(() => {
+          this.connected = actual;
+        });
+      }
+    }, 1000);
+
     runInAction(() => {
-      this.connected = true;
+      this.connected = syncManager.connected;
     });
   }
 
-  /** Stop syncing */
   stopSync(): void {
     this.unsub?.();
     this.unsub = null;
-    wsService.disconnect();
+    if (this.pollConnectedTimer) {
+      clearInterval(this.pollConnectedTimer);
+      this.pollConnectedTimer = null;
+    }
+    syncManager.disconnect();
     runInAction(() => {
       this.connected = false;
     });

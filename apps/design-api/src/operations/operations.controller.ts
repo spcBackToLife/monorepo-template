@@ -17,21 +17,23 @@ export class OperationsController {
   @Post()
   execute(
     @Param('projectId') projectId: string,
-    @Body() body: { operation: Operation; author?: string },
+    @Body() body: { operation: Operation; author?: string; fingerprint?: string; authorId?: string },
   ) {
-    return this.operations.execute(projectId, body.operation, body.author);
+    return this.operations.execute(projectId, body.operation, body.author, body.fingerprint, body.authorId);
   }
 
   /** POST /api/projects/:projectId/operations/batch — 批量执行 */
   @Post('batch')
   executeBatch(
     @Param('projectId') projectId: string,
-    @Body() body: { operations: Operation[]; author?: string },
+    @Body() body: { operations: Operation[]; author?: string; fingerprints?: string[]; authorId?: string },
   ) {
     return this.operations.executeBatch(
       projectId,
       body.operations,
       body.author,
+      body.fingerprints,
+      body.authorId,
     );
   }
 
@@ -52,5 +54,14 @@ export class OperationsController {
     @Body() body?: { author?: string },
   ) {
     return this.operations.undo(projectId, body?.author);
+  }
+
+  /** POST /api/projects/:projectId/operations/redo — 重做 */
+  @Post('redo')
+  redo(
+    @Param('projectId') projectId: string,
+    @Body() body?: { author?: string },
+  ) {
+    return this.operations.redo(projectId, body?.author);
   }
 }

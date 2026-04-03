@@ -1,11 +1,46 @@
 import { makeAutoObservable, runInAction, toJS } from 'mobx';
-import type { DesignProject, Screen, Viewport } from '@globallink/design-schema';
+import type { ComponentNode, DesignProject, Screen, Viewport } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
-import { OperationExecutor } from '@globallink/design-operations';
+import { OperationExecutor, findNodeInScreens, findParent } from '@globallink/design-operations';
+import { API_BASE, ApiError, apiJson, getErrorMessage } from '@/api/client';
+import { authStore } from '@/stores/auth';
+import { syncManager } from '@/services/SyncManager';
+
+/** W1-002：编辑画布 pan/zoom 与 Schema 视口尺寸独立；按项目会话记忆，刷新后可恢复 */
+const CANVAS_VIEW_KEY = 'design-editor-canvas-view:';
+
+function readStoredCanvasView(projectId: string): { scale: number; panX: number; panY: number } | null {
+  try {
+    const raw = sessionStorage.getItem(CANVAS_VIEW_KEY + projectId);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { scale?: unknown; panX?: unknown; panY?: unknown };
+    if (typeof o.scale !== 'number') return null;
+    return {
+      scale: Math.min(4, Math.max(0.1, o.scale)),
+      panX: typeof o.panX === 'number' ? o.panX : 0,
+      panY: typeof o.panY === 'number' ? o.panY : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredCanvasView(projectId: string, scale: number, panX: number, panY: number): void {
+  try {
+    sessionStorage.setItem(CANVAS_VIEW_KEY + projectId, JSON.stringify({ scale, panX, panY }));
+  } catch {
+    // quota / private mode
+  }
+}
+
+export type ToolType = 'select' | 'hand' | 'container' | 'element' | 'text' | 'component' | 'annotation';
+export type RightTabType = 'styles' | 'events' | 'states' | 'props' | 'data' | 'code';
 
 export class EditorStore {
   /** The operation executor holding immutable project state */
   private executor: OperationExecutor | null = null;
+  /** Observable project snapshot for UI rendering */
+  private projectState: DesignProject | null = null;
 
   /** Current screen ID being edited */
   activeScreenId: string | null = null;
@@ -15,6 +50,99 @@ export class EditorStore {
   hoveredNodeId: string | null = null;
   /** Canvas zoom scale */
   canvasScale = 1;
+  /** Canvas pan offset */
+  canvasPanX = 0;
+  canvasPanY = 0;
+
+  /** W2：8px 栅格吸附开关（与对齐线并存时对齐线优先） */
+  snapToGridEnabled = true;
+  /** 在编辑区绘制浅层栅格（与吸附独立） */
+  showGridInEditor = false;
+  gridSizePx = 8;
+  /** 画布根区域尺寸（用于 Cmd+0 适配视口） */
+  canvasViewportWidth = 0;
+  canvasViewportHeight = 0;
+
+  /** --- Layout state (1.4.1) --- */
+  activeTool: ToolType = 'select';
+  /** 双击工具栏按钮锁定后，创建元素不自动切回选择工具 */
+  toolLocked = false;
+  previewMode = false;
+  /** 预览模式下的页面导航栈（与 navigate 事件一致；返回键 pop）— W6-091 */
+  previewNavStackIds: string[] = [];
+  previewTransition: string = 'fade';
+  leftPanelWidth = 280;
+  rightPanelWidth = 320;
+  leftPanelCollapsed = false;
+  rightPanelCollapsed = false;
+  activeRightTab: RightTabType = 'styles';
+  /** 递增以触发底部工具栏打开组件库 Modal（快捷键 C 与 requestOpenComponentLibrary 联动） */
+  componentLibraryOpenNonce = 0;
+
+  /** --- Global state runtime (2.4.1) --- */
+  currentGlobalStates: Record<string, string> = {};
+
+  /**
+   * W6-042：编辑画布上对选中节点临时叠加交互状态（不写入 Schema；与交互卡片/ activeState 独立）
+   * null 或 'normal' 表示不叠加
+   */
+  previewInteractionState: string | null = null;
+
+  /** W7-022：画布 DOM 检测到有节点超出当前设备视口范围 */
+  viewportOverflow = false;
+
+  /**
+   * W7-025：设备框外不挂载 Schema DOM；命中/对齐使用 buildSchemaLayoutMap + mergeCoordinateMaps。
+   * 若与布局估计不一致可关。
+   */
+  canvasVirtualizeOutsideDeviceFrame = true;
+
+  /** W8-100：预览模式设备外壳开关 */
+  previewShowDeviceFrame = true;
+
+  /** 代码分屏视图开关 */
+  codeSplitView = false;
+
+  /** 最近一次复制到内存的节点 JSON（与系统剪贴板同步写入，供粘贴） */
+  clipboardSubtreeJson: string | null = null;
+
+  /** 内存中的样式剪贴板（复制/粘贴样式，与节点 JSON 剪贴板独立） */
+  styleClipboard: Record<string, string | number> | null = null;
+
+  /** Project color palette (persistent) */
+  projectColorPalette: string[] = [
+    '#000000', '#ffffff', '#f5f5f5', '#e0e0e0', '#9e9e9e', '#616161',
+    '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3',
+    '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39',
+    '#ffeb3b', '#ffc107', '#ff9800', '#ff5722',
+  ];
+
+  /** Recently used colors (last 12) */
+  recentColors: string[] = [];
+
+  addRecentColor(color: string): void {
+    const normalized = color.toLowerCase();
+    this.recentColors = [
+      normalized,
+      ...this.recentColors.filter(c => c !== normalized),
+    ].slice(0, 12);
+  }
+
+  addPaletteColor(color: string): void {
+    if (!this.projectColorPalette.includes(color)) {
+      this.projectColorPalette = [...this.projectColorPalette, color];
+    }
+  }
+
+  removePaletteColor(color: string): void {
+    this.projectColorPalette = this.projectColorPalette.filter(c => c !== color);
+  }
+
+  /** Pending operations waiting for server persistence (with fingerprints) */
+  private pendingOperations: Array<{ operation: Operation; fingerprint: string }> = [];
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private isFlushing = false;
+  private readonly flushIntervalMs = 180000;
 
   constructor() {
     makeAutoObservable(this);
@@ -22,7 +150,7 @@ export class EditorStore {
 
   /** Get the current project from the executor */
   get project(): DesignProject | null {
-    return this.executor?.getProject() ?? null;
+    return this.projectState;
   }
 
   /** Current viewport */
@@ -52,13 +180,32 @@ export class EditorStore {
     return this.executor?.canRedo() ?? false;
   }
 
+  /** 预览中是否可「返回」上一页（导航栈深度大于 1） */
+  get previewCanGoBack(): boolean {
+    return this.previewMode && this.previewNavStackIds.length > 1;
+  }
+
   /** Initialize the editor with a project */
   initProject(project: DesignProject): void {
     // Project data from MobX stores may be observable proxies. Convert to plain JS first.
-    this.executor = new OperationExecutor(toJS(project) as DesignProject);
-    this.activeScreenId = project.screens[0]?.id ?? null;
+    const plain = toJS(project) as DesignProject;
+    this.executor = new OperationExecutor(plain);
+    this.projectState = this.executor.getProject();
+    this.activeScreenId = plain.screens[0]?.id ?? null;
     this.selectedNodeIds = [];
     this.hoveredNodeId = null;
+    this.canvasScale = 1;
+    this.canvasPanX = 0;
+    this.canvasPanY = 0;
+    const restored = readStoredCanvasView(plain.id);
+    if (restored) {
+      this.canvasScale = restored.scale;
+      this.canvasPanX = restored.panX;
+      this.canvasPanY = restored.panY;
+    }
+    this.initGlobalStatesForScreen();
+    this.previewMode = false;
+    this.previewNavStackIds = [];
   }
 
   /** Execute an operation */
@@ -69,24 +216,64 @@ export class EditorStore {
     const result = this.executor.execute(op);
     // Trigger MobX re-render by touching a tracked field
     runInAction(() => {
+      this.projectState = this.executor!.getProject();
       this.selectedNodeIds = [...this.selectedNodeIds];
+      // setActiveScreen 在数据层是 no-op，但 UI 必须切换当前页（见 design-operations/screen.ts）
+      if (op.type === 'setActiveScreen' && result.success) {
+        this.activeScreenId = op.params.screenId;
+        this.selectedNodeIds = [];
+        this.hoveredNodeId = null;
+        this.initGlobalStatesForScreen();
+      }
+    });
+    if (result.success) {
+      // Generate fingerprint for echo deduplication
+      const { fingerprint } = syncManager.wrapOutgoing(op);
+      this.enqueuePersist(op, fingerprint);
+    }
+    return result;
+  }
+
+  /** Apply operation from remote sync without re-persisting */
+  applyRemoteOperation(op: Operation): OperationResult {
+    if (!this.executor) {
+      return { success: false, description: 'No project loaded', affectedNodeIds: [] };
+    }
+    const result = this.executor.execute(op);
+    runInAction(() => {
+      this.projectState = this.executor!.getProject();
+      this.selectedNodeIds = [...this.selectedNodeIds];
+      if (op.type === 'setActiveScreen' && result.success) {
+        this.activeScreenId = op.params.screenId;
+        this.selectedNodeIds = [];
+        this.hoveredNodeId = null;
+        this.initGlobalStatesForScreen();
+      }
     });
     return result;
   }
 
-  /** Execute batch operations */
+  /** Execute batch operations with sync persistence */
   executeBatch(ops: Operation[]): OperationResult[] {
     if (!this.executor) return [];
     const results = this.executor.executeBatch(ops);
     runInAction(() => {
+      this.projectState = this.executor!.getProject();
       this.selectedNodeIds = [...this.selectedNodeIds];
     });
+    for (let i = 0; i < ops.length; i++) {
+      if (results[i]?.success) {
+        const { fingerprint } = syncManager.wrapOutgoing(ops[i]);
+        this.enqueuePersist(ops[i], fingerprint);
+      }
+    }
     return results;
   }
 
   undo(): void {
     this.executor?.undo();
     runInAction(() => {
+      this.projectState = this.executor?.getProject() ?? this.projectState;
       this.selectedNodeIds = [...this.selectedNodeIds];
     });
   }
@@ -94,13 +281,19 @@ export class EditorStore {
   redo(): void {
     this.executor?.redo();
     runInAction(() => {
+      this.projectState = this.executor?.getProject() ?? this.projectState;
       this.selectedNodeIds = [...this.selectedNodeIds];
     });
   }
 
   /** Selection */
   select(nodeId: string | null): void {
-    this.selectedNodeIds = nodeId ? [nodeId] : [];
+    const next = nodeId ? [nodeId] : [];
+    const prev = this.selectedNodeIds[0];
+    if (prev !== next[0]) {
+      this.previewInteractionState = null;
+    }
+    this.selectedNodeIds = next;
   }
 
   setHovered(nodeId: string | null): void {
@@ -108,7 +301,314 @@ export class EditorStore {
   }
 
   setCanvasScale(scale: number): void {
-    this.canvasScale = Math.min(2, Math.max(0.3, scale));
+    this.canvasScale = Math.min(4, Math.max(0.1, scale));
+    this.persistCanvasView();
+  }
+
+  setCanvasPan(x: number, y: number): void {
+    this.canvasPanX = x;
+    this.canvasPanY = y;
+    this.persistCanvasView();
+  }
+
+  private persistCanvasView(): void {
+    const id = this.project?.id;
+    if (!id) return;
+    writeStoredCanvasView(id, this.canvasScale, this.canvasPanX, this.canvasPanY);
+  }
+
+  setSnapToGridEnabled(value: boolean): void {
+    this.snapToGridEnabled = value;
+  }
+
+  setShowGridInEditor(value: boolean): void {
+    this.showGridInEditor = value;
+  }
+
+  setCanvasViewportSize(width: number, height: number): void {
+    this.canvasViewportWidth = Math.max(0, width);
+    this.canvasViewportHeight = Math.max(0, height);
+  }
+
+  /** Cmd+0：按当前设备视口逻辑尺寸适配到编辑区 */
+  fitCanvasToViewport(): void {
+    const vp = this.currentViewport;
+    if (!vp || this.canvasViewportWidth <= 0) return;
+    const pad = 48;
+    const aw = Math.max(1, this.canvasViewportWidth - pad);
+    const ah = Math.max(1, this.canvasViewportHeight - pad);
+    const s = Math.min(aw / vp.width, ah / vp.height, 4);
+    const scale = Math.max(0.1, s);
+    const scaledW = vp.width * scale;
+    const scaledH = vp.height * scale;
+    runInAction(() => {
+      this.canvasScale = scale;
+      this.canvasPanX = (this.canvasViewportWidth - scaledW) / 2;
+      this.canvasPanY = (this.canvasViewportHeight - scaledH) / 2;
+    });
+    this.persistCanvasView();
+  }
+
+  /** Cmd+1：缩放到 100% */
+  zoomTo100Percent(): void {
+    this.setCanvasScale(1);
+  }
+
+  setActiveTool(tool: ToolType): void {
+    this.toolLocked = false;
+    this.activeTool = tool;
+  }
+
+  toggleToolLocked(): void {
+    this.toolLocked = !this.toolLocked;
+  }
+
+  /** 请求打开组件库：BottomToolbar 订阅 nonce 并 setLibraryOpen(true) */
+  requestOpenComponentLibrary(): void {
+    runInAction(() => {
+      this.componentLibraryOpenNonce += 1;
+    });
+  }
+
+  setPreviewMode(preview: boolean): void {
+    this.previewMode = preview;
+    if (preview && this.activeScreenId) {
+      this.previewNavStackIds = [this.activeScreenId];
+    } else if (!preview) {
+      this.previewNavStackIds = [];
+    }
+  }
+
+  /** 预览内页面跳转（事件 navigate / 程序化），压栈 */
+  previewNavigateTo(screenId: string, animation?: string): void {
+    if (!this.previewMode || !this.activeScreenId) return;
+    if (this.previewNavStackIds.length === 0) {
+      this.previewNavStackIds = [this.activeScreenId];
+    }
+    const top = this.previewNavStackIds[this.previewNavStackIds.length - 1];
+    if (top === screenId) return;
+    this.previewTransition = animation ?? 'slide-left';
+    this.previewNavStackIds = [...this.previewNavStackIds, screenId];
+    this.setActiveScreen(screenId);
+  }
+
+  /** 预览顶栏「返回」：弹出当前页，回到栈顶上一屏 */
+  previewNavigateBack(): void {
+    if (!this.previewMode || this.previewNavStackIds.length <= 1) return;
+    const nextStack = this.previewNavStackIds.slice(0, -1);
+    const prevId = nextStack[nextStack.length - 1];
+    if (!prevId) return;
+    this.previewTransition = 'slide-right';
+    this.previewNavStackIds = nextStack;
+    this.setActiveScreen(prevId);
+  }
+
+  setLeftPanelWidth(width: number): void {
+    this.leftPanelWidth = Math.max(180, Math.min(480, width));
+  }
+
+  setRightPanelWidth(width: number): void {
+    this.rightPanelWidth = Math.max(240, Math.min(520, width));
+  }
+
+  toggleLeftPanel(): void {
+    this.leftPanelCollapsed = !this.leftPanelCollapsed;
+  }
+
+  toggleCodeSplitView(): void {
+    this.codeSplitView = !this.codeSplitView;
+  }
+
+  toggleRightPanel(): void {
+    this.rightPanelCollapsed = !this.rightPanelCollapsed;
+  }
+
+  setActiveRightTab(tab: RightTabType): void {
+    this.activeRightTab = tab;
+  }
+
+  /** 展开右侧面板并切换到指定 Tab（底部工具栏「代码」等入口） */
+  focusRightPanelTab(tab: RightTabType): void {
+    runInAction(() => {
+      this.rightPanelCollapsed = false;
+      this.activeRightTab = tab;
+    });
+  }
+
+  /** Multi-select: add or remove from selection */
+  toggleSelect(nodeId: string): void {
+    const idx = this.selectedNodeIds.indexOf(nodeId);
+    if (idx >= 0) {
+      this.selectedNodeIds = this.selectedNodeIds.filter((id) => id !== nodeId);
+    } else {
+      this.selectedNodeIds = [...this.selectedNodeIds, nodeId];
+    }
+    this.previewInteractionState = null;
+  }
+
+  /** Multi-select: set multiple */
+  selectMultiple(nodeIds: string[]): void {
+    this.selectedNodeIds = [...nodeIds];
+    this.previewInteractionState = null;
+  }
+
+  /** 将节点序列化到剪贴板（W1-027） */
+  copyNodeToClipboard(nodeId: string): void {
+    const node = findNodeInScreens(this.screens, nodeId);
+    if (!node) return;
+    const plain = toJS(node) as ComponentNode;
+    const json = JSON.stringify(plain);
+    runInAction(() => {
+      this.clipboardSubtreeJson = json;
+    });
+    void navigator.clipboard?.writeText?.(json).catch(() => {});
+  }
+
+  copySelectionToClipboard(): void {
+    const id = this.selectedNodeIds[0];
+    if (!id) return;
+    this.copyNodeToClipboard(id);
+  }
+
+  /** @param sourceNodeId 若传入则从该节点复制；否则从当前选中的第一个节点复制 */
+  copyStyles(sourceNodeId?: string): void {
+    const nodeId = sourceNodeId ?? this.selectedNodeIds[0];
+    if (!nodeId) return;
+    const node = findNodeInScreens(this.screens, nodeId);
+    if (!node) return;
+    const styles = (node.styles ?? {}) as Record<string, string | number>;
+    runInAction(() => {
+      this.styleClipboard = { ...styles };
+    });
+  }
+
+  /** @param targetNodeIds 若传入则只对这些节点生效；否则对当前全部选中节点生效 */
+  pasteStyles(targetNodeIds?: string[]): void {
+    if (!this.styleClipboard) return;
+    const clip = { ...this.styleClipboard };
+    const ids =
+      targetNodeIds !== undefined && targetNodeIds.length > 0
+        ? targetNodeIds
+        : [...this.selectedNodeIds];
+    for (const nodeId of ids) {
+      this.execute({
+        type: 'updateStyle',
+        params: { nodeId, styles: clip },
+      });
+    }
+  }
+
+  /** 清空已设置的样式（恢复为默认） */
+  resetStyles(targetNodeIds?: string[]): void {
+    const ids =
+      targetNodeIds !== undefined && targetNodeIds.length > 0
+        ? targetNodeIds
+        : [...this.selectedNodeIds];
+    for (const nodeId of ids) {
+      const node = findNodeInScreens(this.screens, nodeId);
+      if (!node) continue;
+      const properties = Object.keys(node.styles ?? {});
+      if (properties.length === 0) continue;
+      this.execute({
+        type: 'resetStyle',
+        params: { nodeId, properties },
+      });
+    }
+  }
+
+  /** 剪切：复制后删除（根节点不可剪） */
+  cutSelection(): void {
+    this.copySelectionToClipboard();
+    const id = this.selectedNodeIds[0];
+    const rootId = this.activeScreen?.rootNode.id;
+    if (!id || !rootId || id === rootId) return;
+    this.execute({ type: 'removeElement', params: { elementId: id } });
+    this.select(null);
+  }
+
+  /** 粘贴：优先内存 JSON，否则读系统剪贴板 */
+  async pasteFromClipboard(): Promise<OperationResult> {
+    let text = this.clipboardSubtreeJson;
+    if (!text?.trim()) {
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        return { success: false, description: '无法读取剪贴板', affectedNodeIds: [] };
+      }
+    }
+    return this.applyPasteJson(text);
+  }
+
+  private applyPasteJson(text: string): OperationResult {
+    let subtree: ComponentNode;
+    try {
+      subtree = JSON.parse(text) as ComponentNode;
+    } catch {
+      return { success: false, description: '剪贴板不是有效 JSON', affectedNodeIds: [] };
+    }
+    if (!isValidPasteSubtree(subtree)) {
+      return { success: false, description: '剪贴板不是有效的节点树', affectedNodeIds: [] };
+    }
+
+    const screen = this.activeScreen;
+    if (!screen) {
+      return { success: false, description: '无当前页面', affectedNodeIds: [] };
+    }
+
+    const rootId = screen.rootNode.id;
+    const selectedId = this.selectedNodeIds[0];
+    let parentId: string;
+    let position: number;
+
+    if (!selectedId || selectedId === rootId) {
+      parentId = rootId;
+      position = screen.rootNode.children?.length ?? 0;
+    } else {
+      const info = findParent(screen.rootNode, selectedId);
+      if (!info) {
+        return { success: false, description: '无法解析父节点', affectedNodeIds: [] };
+      }
+      parentId = info.parent.id;
+      position = info.index + 1;
+    }
+
+    const r = this.execute({
+      type: 'insertSubtree',
+      params: { parentId, subtree, position },
+    });
+    if (r.success && r.affectedNodeIds[0]) {
+      this.select(r.affectedNodeIds[0]);
+    }
+    return r;
+  }
+
+  /** Set a global state variable's current runtime value */
+  setCurrentGlobalState(variableName: string, value: string): void {
+    this.currentGlobalStates = { ...this.currentGlobalStates, [variableName]: value };
+  }
+
+  /** W6-042：一次应用全局状态组合（矩阵行） */
+  applyGlobalStateCombo(valuesByName: Record<string, string>): void {
+    this.currentGlobalStates = { ...this.currentGlobalStates, ...valuesByName };
+  }
+
+  setPreviewInteractionState(state: string | null): void {
+    this.previewInteractionState = state;
+  }
+
+  setViewportOverflow(overflow: boolean): void {
+    this.viewportOverflow = overflow;
+  }
+
+  /** Initialize global state values from the active screen's definitions */
+  initGlobalStatesForScreen(): void {
+    const screen = this.activeScreen;
+    if (!screen) return;
+    const states: Record<string, string> = {};
+    for (const gs of screen.globalStates ?? []) {
+      states[gs.name] = gs.defaultValue;
+    }
+    this.currentGlobalStates = states;
   }
 
   /** Screen switching */
@@ -116,16 +616,151 @@ export class EditorStore {
     this.activeScreenId = screenId;
     this.selectedNodeIds = [];
     this.hoveredNodeId = null;
+    this.initGlobalStatesForScreen();
   }
 
   /** Cleanup */
   dispose(): void {
+    this.flushPersistOnPageExit();
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
     this.executor = null;
+    this.projectState = null;
     this.activeScreenId = null;
     this.selectedNodeIds = [];
     this.hoveredNodeId = null;
     this.canvasScale = 1;
+    this.canvasPanX = 0;
+    this.canvasPanY = 0;
+    this.snapToGridEnabled = true;
+    this.showGridInEditor = false;
+    this.gridSizePx = 8;
+    this.canvasViewportWidth = 0;
+    this.canvasViewportHeight = 0;
+    this.activeTool = 'select';
+    this.previewMode = false;
+    this.previewNavStackIds = [];
+    this.leftPanelWidth = 280;
+    this.rightPanelWidth = 320;
+    this.leftPanelCollapsed = false;
+    this.rightPanelCollapsed = false;
+    this.activeRightTab = 'styles';
+    this.componentLibraryOpenNonce = 0;
+    this.currentGlobalStates = {};
+    this.previewInteractionState = null;
+    this.viewportOverflow = false;
+    this.clipboardSubtreeJson = null;
+    this.styleClipboard = null;
   }
+
+  private enqueuePersist(op: Operation, fingerprint: string): void {
+    if (!this.project?.id) return;
+    this.pendingOperations.push({ operation: op, fingerprint });
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      void this.flushPersistNow();
+    }, this.flushIntervalMs);
+  }
+
+  /** ⌘S / Ctrl+S：取消定时批量，立即把待上报操作发到服务端 */
+  async saveNow(): Promise<{ status: 'saved' | 'noop' | 'failed' }> {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    const hadPending = this.pendingOperations.length > 0;
+    const ok = await this.flushPersistNow();
+    if (!hadPending) return { status: 'noop' };
+    return { status: ok ? 'saved' : 'failed' };
+  }
+
+  /** @returns 无需上报或上报成功为 true；仅在上报失败时为 false */
+  async flushPersistNow(): Promise<boolean> {
+    if (!this.project?.id) return true;
+    if (this.pendingOperations.length === 0) return true;
+    if (this.isFlushing) return true;
+    this.isFlushing = true;
+    syncManager.saveStatus.markSaving();
+    const pending = this.takePendingOperations();
+    const operations = pending.map((p) => p.operation);
+    const fingerprints = pending.map((p) => p.fingerprint);
+    try {
+      const resp = await apiJson<{ results: OperationResult[]; startSeq?: number; endSeq?: number }>(`/projects/${this.project.id}/operations/batch`, {
+        method: 'POST',
+        body: JSON.stringify({ operations, fingerprints }),
+        token: authStore.token,
+      });
+      // Acknowledge sequence numbers from server
+      if (resp.endSeq != null) {
+        syncManager.ackSeq(resp.endSeq);
+      }
+      syncManager.saveStatus.markSaved();
+      return true;
+    } catch (err: unknown) {
+      /** 400：服务端拒绝整批执行（多为操作在服务端不可重放）。勿再逐条 POST /operations，否则会产生 N+1 次相同失败。 */
+      if (err instanceof ApiError && err.status === 400) {
+        this.pendingOperations = [...pending, ...this.pendingOperations];
+        console.error('[editor] persist batch rejected:', getErrorMessage(err.body), err.body);
+        syncManager.saveStatus.markFailed();
+        return false;
+      }
+      this.pendingOperations = [...pending, ...this.pendingOperations];
+      console.error('[editor] persist operation batch failed:', err);
+      syncManager.saveStatus.markFailed();
+      this.scheduleFlush();
+      return false;
+    } finally {
+      this.isFlushing = false;
+      if (this.pendingOperations.length > 0) this.scheduleFlush();
+    }
+  }
+
+  flushPersistOnPageExit(): void {
+    if (!this.project?.id || this.pendingOperations.length === 0) return;
+    const pending = this.takePendingOperations();
+    const operations = pending.map((p) => p.operation);
+    const fingerprints = pending.map((p) => p.fingerprint);
+    const token = authStore.token;
+    const url = `${API_BASE}/projects/${this.project.id}/operations/batch`;
+
+    // keepalive lets browser continue request during unload/navigation.
+    void fetch(url, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ operations, fingerprints }),
+    }).catch(() => {
+      // Best effort on page-exit; if it fails the session is gone.
+    });
+  }
+
+  private takePendingOperations(): Array<{ operation: Operation; fingerprint: string }> {
+    const pending = [...this.pendingOperations];
+    this.pendingOperations = [];
+    return pending;
+  }
+
+}
+
+function isValidPasteSubtree(n: unknown): n is ComponentNode {
+  if (!n || typeof n !== 'object') return false;
+  const o = n as Record<string, unknown>;
+  if (typeof o.type !== 'string') return false;
+  if (!Array.isArray(o.children)) return false;
+  for (const c of o.children) {
+    if (!isValidPasteSubtree(c)) return false;
+  }
+  return true;
 }
 
 export const editorStore = new EditorStore();

@@ -1,0 +1,40 @@
+/**
+ * 行内编辑时隐藏画布上对应节点（避免与透明 textarea 叠成双影）。
+ * 必须用 opacity:0，不要用 color:transparent —— 否则 getComputedStyle(el).color 会变成透明，
+ * 复制到 textarea 后连输入文字也看不见。
+ */
+[data-text-inline-editing='true'] {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/**
+ * 画布文本行内编辑：透明、无外框，与节点同宽高
+ */
+.text-inline-editor {
+  position: fixed;
+  z-index: 10000;
+  margin: 0;
+  box-sizing: border-box;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+  caret-color: #1677ff;
+}
+
+.text-inline-editor:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.text-inline-editor::placeholder {
+  color: currentColor;
+  opacity: 0.45;
+}

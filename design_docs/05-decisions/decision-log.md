@@ -21,6 +21,9 @@
 | 11 | SDK 放 features 还是 packages？ | features | 当前仅内部使用，避免发布管理成本。未来可迁移到 packages | 2026-03-27 |
 | 12 | 内部 SDK 模块导出策略？ | ESM + CJS 双格式导出，且 `exports` 同时提供 `import/require/types` | `design-api`（NestJS）在 Node 侧存在 CJS 消费路径；仅 ESM 导出会触发 `ERR_PACKAGE_PATH_NOT_EXPORTED`。双入口可兼容前后端 | 2026-03-27 |
 | 13 | CJS 路径可否直接用 ESM-only 依赖？ | 不可，默认禁止 | CJS 产物 `require()` ESM-only 包会触发 `ERR_REQUIRE_ESM`。优先用内置实现或确保依赖在 CJS 路径不会被 require | 2026-03-27 |
+| 14 | 新建 `div` 默认尺寸策略？ | 默认 `200px x 50px`（非 root） | 避免默认 100% 宽导致新增元素“不可辨识/像背景层”，提升首触达可见性与可操作性 | 2026-03-27 |
+| 15 | 编辑操作是否逐条同步保存？ | 否，采用 Local-first + 异步批量持久化 | 逐条同步会把网络延迟暴露为编辑卡顿。批量上报 + 重试可兼顾流畅性与可靠性 | 2026-03-27 |
+| 16 | 拖拽落点坐标如何持久化？ | 存父容器局部坐标（local x/y） | 屏幕绝对坐标在缩放/响应式下语义不稳定；局部坐标更可解释、可导出、可迁移 | 2026-03-27 |
 
 ---
 

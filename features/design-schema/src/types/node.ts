@@ -1,5 +1,5 @@
 import type { CSSProperties } from './css';
-import type { ComponentState } from './state';
+import type { ComponentState, GlobalStateBinding } from './state';
 import type { ComponentEvent } from './event';
 
 // ===== Node Types =====
@@ -25,7 +25,8 @@ export type PrimitiveNodeType =
   | 'header'
   | 'footer'
   | 'section'
-  | 'main';
+  | 'main'
+  | 'annotation';
 
 /** Component instance type — references a template from the asset library */
 export type ComponentInstanceType = `component:${string}`;
@@ -79,4 +80,15 @@ export interface ComponentNode {
   constraints?: LayoutConstraints;
   /** Template reference if this node is a component instance */
   templateRef?: TemplateRef;
+  /** Whether the node is locked (prevents editing via canvas interactions) */
+  locked: boolean;
+  /** Whether the node is visible in the canvas (hidden nodes are skipped during rendering) */
+  visible: boolean;
+  /**
+   * When set, the node is shown only if globalStates[variableName] === equals.
+   * Evaluated after globalStateBindings; if the condition fails, the node is hidden.
+   */
+  visibilityWhen?: { variableName: string; equals: string };
+  /** Bindings to global state variables — override styles/props/visible based on global state */
+  globalStateBindings: GlobalStateBinding[];
 }

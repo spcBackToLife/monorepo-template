@@ -28,19 +28,58 @@ export interface OpenUrlAction {
   url: string;
 }
 
+/** Delay before next action in chain (ms) */
+export interface DelayAction {
+  type: 'delay';
+  duration: number; // milliseconds
+}
+
 /** Custom handler (for extensibility) */
 export interface CustomAction {
   type: 'custom';
   handler: string;
 }
 
+/** Set a global state variable value */
+export interface SetGlobalStateAction {
+  type: 'setGlobalState';
+  variableName: string;
+  value: string;
+}
+
+/** Toggle a node's visibility */
+export interface ToggleVisibleAction {
+  type: 'toggleVisible';
+  targetId: string;
+}
+
 /** Union of all possible event actions */
-export type EventAction = NavigateAction | SetStateAction | OpenUrlAction | CustomAction;
+export type EventAction =
+  | NavigateAction
+  | SetStateAction
+  | OpenUrlAction
+  | DelayAction
+  | CustomAction
+  | SetGlobalStateAction
+  | ToggleVisibleAction;
+
+/** Condition for conditional event execution */
+export interface EventCondition {
+  type: 'globalState';
+  variableName: string;
+  value: string;
+}
 
 /** A bound interaction event on a component */
 export interface ComponentEvent {
   /** What triggers this event */
   trigger: EventTrigger;
-  /** What happens when triggered */
-  action: EventAction;
+  /** Ordered list of actions to execute when triggered */
+  actions: EventAction[];
+  /** Optional: only execute when condition is met */
+  condition?: EventCondition;
+  /** Optional: human-readable description */
+  description?: string;
+  /** Optional: disable without removing */
+  disabled?: boolean;
 }

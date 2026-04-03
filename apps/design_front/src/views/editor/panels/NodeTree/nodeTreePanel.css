@@ -1,0 +1,10 @@
+/* 产品 08-layer-tree §3.3 选中与高亮 */
+.node-tree-row--selected {
+  background-color: #e8f4fd !important;
+  box-shadow: inset 2px 0 0 #0d99ff;
+}
+
+.node-tree-row--ancestor {
+  background-color: rgba(232, 244, 253, 0.55);
+  box-shadow: inset 2px 0 0 rgba(13, 153, 255, 0.5);
+}

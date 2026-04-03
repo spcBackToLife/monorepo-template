@@ -5,9 +5,18 @@ export interface BaseViteConfigOptions {
 }
 
 export function createBaseViteConfig({ appDir }: BaseViteConfigOptions) {
+  /** dev 直连源码，改 engine 无需每次手动 build；生产/CI 仍以包 dist 为准 */
+  const designEngineSrc = path.resolve(appDir, '../../features/design-engine/src/index.tsx');
+
   return {
     resolve: {
-      alias: [{ find: '@', replacement: path.resolve(appDir, 'src') }],
+      alias: [
+        { find: '@', replacement: path.resolve(appDir, 'src') },
+        { find: '@globallink/design-engine', replacement: designEngineSrc },
+      ],
+    },
+    optimizeDeps: {
+      exclude: ['@globallink/design-engine'],
     },
     css: {
       preprocessorOptions: {

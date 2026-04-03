@@ -1,0 +1,161 @@
+import { z } from 'zod';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { Operation } from '@globallink/design-operations';
+import type { ComponentEvent } from '@globallink/design-schema';
+import { generateNodeId } from '@globallink/design-schema';
+import * as api from '../api-client.js';
+
+/** 与当前编辑器主色（Ant Design Primary）一致的默认主按钮样式体系 */
+const PRIMARY_DEFAULT_STYLES = {
+  backgroundColor: '#1677ff',
+  color: '#ffffff',
+  border: 'none',
+  borderRadius: '6px',
+  padding: '8px 15px',
+  fontSize: '14px',
+  fontWeight: 500,
+  cursor: 'pointer',
+  lineHeight: '1.5715',
+  minWidth: '88px',
+  textAlign: 'center' as const,
+  boxSizing: 'border-box' as const,
+  boxShadow: 'none',
+  transition: 'background-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease',
+};
+
+const STATE_TRANSITION = { duration: 200, easing: 'ease', properties: ['background-color', 'box-shadow', 'transform'] };
+
+/**
+ * 高阶组件配方：一次 batch 插入主按钮 + hover / pressed / focus 状态 + 预览用事件（与引擎约定状态名一致）。
+ */
+export function registerComponentRecipeTools(server: McpServer): void {
+  server.registerTool(
+    'create_primary_button',
+    {
+      description:
+        '在指定父节点下创建「主按钮」: 默认/hover/pressed/focus 视觉状态（配色对齐编辑器 #1677ff 体系），并绑定 hover·focus·blur 的 setState 便于画布预览。预览模式另可通过 CSS 伪类看到 pressed(:active)、focus(:focus)。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        parentId: z.string().describe('父节点 ID（如 screen.rootNode）'),
+        label: z.string().optional().describe('按钮文案，默认「按钮」'),
+        variant: z
+          .enum(['solid', 'outline'])
+          .optional()
+          .describe('solid=填充主色；outline=描边主色透明底'),
+      },
+    },
+    async ({ projectId, parentId, label, variant }) => {
+      const btnId = generateNodeId();
+      const text = label ?? '按钮';
+      const isOutline = variant === 'outline';
+
+      const base = isOutline
+        ? {
+            ...PRIMARY_DEFAULT_STYLES,
+            backgroundColor: 'transparent',
+            color: '#1677ff',
+            border: '1px solid #1677ff',
+            boxShadow: 'none',
+          }
+        : { ...PRIMARY_DEFAULT_STYLES };
+
+      const hoverStyles = isOutline
+        ? {
+            backgroundColor: 'rgba(22, 119, 255, 0.06)',
+            color: '#4096ff',
+            borderColor: '#4096ff',
+          }
+        : { backgroundColor: '#4096ff' };
+
+      const pressedStyles = isOutline
+        ? {
+            backgroundColor: 'rgba(22, 119, 255, 0.15)',
+            color: '#0958d9',
+            borderColor: '#0958d9',
+            transform: 'scale(0.98)',
+          }
+        : { backgroundColor: '#0958d9', transform: 'scale(0.98)' };
+
+      const focusStyles = {
+        boxShadow: '0 0 0 2px #ffffff, 0 0 0 4px rgba(22, 119, 255, 0.24)',
+      };
+
+      const hoverIn: ComponentEvent = {
+        trigger: 'hover',
+        description: '悬停 → hover 态（mouseleave 由预览引擎还原为 default）',
+        actions: [{ type: 'setState', targetId: btnId, state: 'hover' }],
+      };
+      const focusIn: ComponentEvent = {
+        trigger: 'focus',
+        description: '聚焦 → focus 态',
+        actions: [{ type: 'setState', targetId: btnId, state: 'focus' }],
+      };
+      const blurOut: ComponentEvent = {
+        trigger: 'blur',
+        description: '失焦 → default',
+        actions: [{ type: 'setState', targetId: btnId, state: 'default' }],
+      };
+
+      const operations: Operation[] = [
+        {
+          type: 'addElement',
+          params: {
+            parentId,
+            tag: 'button',
+            elementId: btnId,
+            props: { text },
+            styles: base,
+          },
+        },
+        {
+          type: 'addState',
+          params: {
+            nodeId: btnId,
+            stateName: 'hover',
+            styles: hoverStyles,
+            transition: STATE_TRANSITION,
+          },
+        },
+        {
+          type: 'addState',
+          params: {
+            nodeId: btnId,
+            stateName: 'pressed',
+            styles: pressedStyles,
+            transition: { duration: 120, easing: 'ease-out', properties: ['background-color', 'transform'] },
+          },
+        },
+        {
+          type: 'addState',
+          params: {
+            nodeId: btnId,
+            stateName: 'focus',
+            styles: focusStyles,
+            transition: STATE_TRANSITION,
+          },
+        },
+        { type: 'addEvent', params: { nodeId: btnId, event: hoverIn } },
+        { type: 'addEvent', params: { nodeId: btnId, event: focusIn } },
+        { type: 'addEvent', params: { nodeId: btnId, event: blurOut } },
+      ];
+
+      const result = await api.executeBatch(projectId, operations);
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(
+              {
+                nodeId: btnId,
+                message: '主按钮已创建：含 hover / pressed(CSS :active) / focus 状态与预览事件',
+                batchResult: result,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+  );
+}

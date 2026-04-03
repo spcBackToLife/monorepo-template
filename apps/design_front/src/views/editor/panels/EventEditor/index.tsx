@@ -5,7 +5,7 @@ import { observer } from 'mobx-react-lite';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { editorStore } from '@/stores/editor';
 import { AddEventForm } from './AddEventForm';
-import { formatAction } from './utils';
+import { formatActions } from './utils';
 import './eventEditor.css';
 
 export const EventEditorPanel = observer(function EventEditorPanel() {
@@ -40,7 +40,7 @@ export const EventEditorPanel = observer(function EventEditorPanel() {
           <div className="event-list-item-info">
             <span className="event-trigger-tag">{ev.trigger}</span>
             <span>→</span>
-            <span className="event-action-tag">{formatAction(ev.action)}</span>
+            <span className="event-action-tag">{formatActions(ev.actions)}</span>
           </div>
           <Button
             type="text"

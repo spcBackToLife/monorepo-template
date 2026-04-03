@@ -11,6 +11,7 @@ export type {
   RemoveElementOp,
   MoveElementOp,
   DuplicateElementOp,
+  InsertSubtreeOp,
   UpdateStyleOp,
   ResetStyleOp,
   AddStateOp,
@@ -19,16 +20,46 @@ export type {
   SetActiveStateOp,
   AddEventOp,
   RemoveEventOp,
+  UpdateEventOp,
   AddNavigationOp,
   AddScreenOp,
   RemoveScreenOp,
   SetActiveScreenOp,
+  RenameScreenOp,
   SwitchViewportOp,
   AddViewportPresetOp,
   InstantiateTemplateOp,
   SaveAsTemplateOp,
   DetachInstanceOp,
   SyncInstanceOp,
+  WrapInContainerOp,
+  UnwrapContainerOp,
+  ReorderElementOp,
+  BatchUpdateStyleOp,
+  ChangeElementTypeOp,
+  ReorderScreenOp,
+  SetGlobalStateOp,
+  AddGlobalStateVariableOp,
+  RemoveGlobalStateVariableOp,
+  AddGlobalStateBindingOp,
+  RemoveGlobalStateBindingOp,
+  UpdateGlobalStateBindingOp,
+  UpdateComponentPropsOp,
+  AddPropDefinitionOp,
+  RemovePropDefinitionOp,
+  AddDataSetOp,
+  RemoveDataSetOp,
+  UpdateDataSetOp,
+  SwitchDataSetOp,
+  BindDataOp,
+  UpdateTemplateOp,
+  DeleteTemplateOp,
+  DuplicateTemplateOp,
+  AddAnnotationOp,
+  RemoveAnnotationOp,
+  SetNodeVisibilityWhenOp,
+  SetNodeLockedOp,
+  SetNodeVisibleOp,
 } from './types';
 
 // ===== Executor =====
@@ -51,6 +82,9 @@ export {
   walkTree,
   findNodeInScreens,
   findParentInScreens,
+  isNodeOrAncestorLocked,
+  collectEffectivelyLockedNodeIds,
+  collectAnnotationNodeIds,
 } from './utils/tree';
 
 // ===== Individual Operation Executors (advanced usage) =====
@@ -59,11 +93,17 @@ export {
   executeRemoveElement,
   executeMoveElement,
   executeDuplicateElement,
+  executeInsertSubtree,
+  executeWrapInContainer,
+  executeUnwrapContainer,
+  executeReorderElement,
+  executeChangeElementType,
 } from './operations/element';
 
 export {
   executeUpdateStyle,
   executeResetStyle,
+  executeBatchUpdateStyle,
 } from './operations/style';
 
 export {
@@ -76,6 +116,7 @@ export {
 export {
   executeAddEvent,
   executeRemoveEvent,
+  executeUpdateEvent,
   executeAddNavigation,
 } from './operations/event';
 
@@ -83,6 +124,8 @@ export {
   executeAddScreen,
   executeRemoveScreen,
   executeSetActiveScreen,
+  executeReorderScreen,
+  executeRenameScreen,
 } from './operations/screen';
 
 export {
@@ -96,3 +139,37 @@ export {
   executeDetachInstance,
   executeSyncInstance,
 } from './operations/asset';
+
+export {
+  executeAddGlobalStateVariable,
+  executeRemoveGlobalStateVariable,
+  executeSetGlobalState,
+  executeAddGlobalStateBinding,
+  executeRemoveGlobalStateBinding,
+  executeUpdateGlobalStateBinding,
+} from './operations/global-state';
+
+export {
+  executeUpdateComponentProps,
+  executeAddPropDefinition,
+  executeRemovePropDefinition,
+} from './operations/component-props';
+
+export {
+  executeAddDataSet,
+  executeRemoveDataSet,
+  executeUpdateDataSet,
+  executeSwitchDataSet,
+  executeBindData,
+} from './operations/data';
+
+export {
+  executeUpdateTemplate,
+  executeDeleteTemplate,
+  executeDuplicateTemplate,
+} from './operations/template';
+
+export {
+  executeAddAnnotation,
+  executeRemoveAnnotation,
+} from './operations/annotation';

@@ -51,10 +51,31 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         project_id    UUID NOT NULL REFERENCES design_projects(id) ON DELETE CASCADE,
         seq           INTEGER NOT NULL,
         operation     JSONB NOT NULL,
-        author        VARCHAR(255),
+        fingerprint   VARCHAR(100),
+        author        VARCHAR(10) DEFAULT 'user',
+        author_id     VARCHAR(100),
         created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(project_id, seq)
       );
+    `);
+
+    // Migrate: add new columns to existing tables (idempotent)
+    await this.pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'design_operations' AND column_name = 'fingerprint'
+        ) THEN
+          ALTER TABLE design_operations ADD COLUMN fingerprint VARCHAR(100);
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'design_operations' AND column_name = 'author_id'
+        ) THEN
+          ALTER TABLE design_operations ADD COLUMN author_id VARCHAR(100);
+        END IF;
+      END $$;
     `);
     await this.pool.query(`
       CREATE INDEX IF NOT EXISTS idx_ops_project_seq

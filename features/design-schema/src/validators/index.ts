@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  GlobalStateVariableSchema,
+  GlobalStateBindingSchema,
+  ComponentPropDefinitionSchema,
+  PropBindingSchema,
+} from './props';
+import { DataSetSchema } from './data';
 
 // ===== Component State Schema =====
 
@@ -6,6 +13,13 @@ const ComponentStateSchema = z.object({
   name: z.string().min(1),
   styles: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
   props: z.record(z.string(), z.unknown()).optional(),
+  transition: z
+    .object({
+      duration: z.number().positive().optional(),
+      easing: z.string().optional(),
+      properties: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 // ===== Transition Animation Schema =====
@@ -35,23 +49,56 @@ const OpenUrlActionSchema = z.object({
   url: z.string().url(),
 });
 
+const DelayActionSchema = z.object({
+  type: z.literal('delay'),
+  duration: z.number().positive(),
+});
+
 const CustomActionSchema = z.object({
   type: z.literal('custom'),
   handler: z.string().min(1),
+});
+
+const SetGlobalStateActionSchema = z.object({
+  type: z.literal('setGlobalState'),
+  variableName: z.string().min(1),
+  value: z.string().min(1),
+});
+
+const ToggleVisibleActionSchema = z.object({
+  type: z.literal('toggleVisible'),
+  targetId: z.string().min(1),
 });
 
 const EventActionSchema = z.discriminatedUnion('type', [
   NavigateActionSchema,
   SetStateActionSchema,
   OpenUrlActionSchema,
+  DelayActionSchema,
   CustomActionSchema,
+  SetGlobalStateActionSchema,
+  ToggleVisibleActionSchema,
 ]);
+
+const EventConditionSchema = z.object({
+  type: z.literal('globalState'),
+  variableName: z.string().min(1),
+  value: z.string().min(1),
+});
+
+const VisibilityWhenSchema = z.object({
+  variableName: z.string().min(1),
+  equals: z.string().min(1),
+});
 
 // ===== Component Event Schema =====
 
-const ComponentEventSchema = z.object({
+export const ComponentEventSchema = z.object({
   trigger: z.enum(['click', 'hover', 'focus', 'blur', 'longPress']),
-  action: EventActionSchema,
+  actions: z.array(EventActionSchema).min(1),
+  condition: EventConditionSchema.optional(),
+  description: z.string().optional(),
+  disabled: z.boolean().optional(),
 });
 
 // ===== Layout Constraints Schema =====
@@ -80,6 +127,7 @@ const PrimitiveNodeTypeSchema = z.enum([
   'button', 'input', 'textarea', 'select',
   'img', 'a', 'ul', 'ol', 'li',
   'nav', 'header', 'footer', 'section', 'main',
+  'annotation',
 ]);
 
 const NodeTypeSchema = z.union([
@@ -100,6 +148,10 @@ const BaseComponentNodeSchema = z.object({
   events: z.array(ComponentEventSchema).default([]),
   constraints: LayoutConstraintsSchema,
   templateRef: TemplateRefSchema,
+  locked: z.boolean().default(false),
+  visible: z.boolean().default(true),
+  globalStateBindings: z.array(GlobalStateBindingSchema).default([]),
+  visibilityWhen: VisibilityWhenSchema.optional(),
 });
 
 type ComponentNodeInput = z.input<typeof BaseComponentNodeSchema> & {
@@ -117,6 +169,9 @@ export const ScreenSchema = z.object({
   name: z.string().min(1),
   rootNode: ComponentNodeSchema,
   backgroundColor: z.string().optional(),
+  globalStates: z.array(GlobalStateVariableSchema).default([]),
+  dataSets: z.array(DataSetSchema).default([]),
+  activeDataSetId: z.string().default(''),
 });
 
 // ===== Viewport Schema =====
@@ -140,6 +195,10 @@ export const ComponentTemplateSchema = z.object({
   thumbnail: z.string().optional(),
   schema: ComponentNodeSchema,
   scope: z.enum(['project', 'team', 'global']),
+  kind: z.enum(['skeleton', 'styled']).default('styled'),
+  propDefinitions: z.array(ComponentPropDefinitionSchema).default([]),
+  propBindings: z.array(PropBindingSchema).default([]),
+  version: z.number().int().nonnegative().default(1),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

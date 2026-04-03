@@ -49,4 +49,31 @@ export function registerStyleTools(server: McpServer): void {
       };
     },
   );
+
+  server.registerTool(
+    'batch_update_style',
+    {
+      description: '批量更新多个节点的样式',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        updates: z
+          .array(
+            z.object({
+              nodeId: z.string().describe('节点 ID'),
+              styles: z.record(z.string(), z.union([z.string(), z.number()])).describe('CSS 样式键值对'),
+            }),
+          )
+          .describe('批量更新列表'),
+      },
+    },
+    async ({ projectId, updates }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'batchUpdateStyle',
+        params: { updates },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
 }

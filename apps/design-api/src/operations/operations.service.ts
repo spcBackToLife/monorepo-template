@@ -23,7 +23,9 @@ export interface OperationRow {
   project_id: string;
   seq: number;
   operation: Operation;
+  fingerprint: string | null;
   author: string | null;
+  author_id: string | null;
   created_at: Date;
 }
 
@@ -51,6 +53,8 @@ export class OperationsService {
     projectId: string,
     operation: Operation,
     author?: string,
+    fingerprint?: string,
+    authorId?: string,
   ): Promise<{ seq: number; result: OperationResult }> {
     const pool = this.db.getPool();
 
@@ -76,9 +80,9 @@ export class OperationsService {
 
     // 写入操作日志
     await pool.query(
-      `INSERT INTO design_operations (project_id, seq, operation, author)
-       VALUES ($1, $2, $3, $4)`,
-      [projectId, newSeq, JSON.stringify(operation), author ?? null],
+      `INSERT INTO design_operations (project_id, seq, operation, fingerprint, author, author_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [projectId, newSeq, JSON.stringify(operation), fingerprint ?? null, author ?? 'user', authorId ?? null],
     );
 
     // 更新版本号
@@ -91,7 +95,7 @@ export class OperationsService {
     await this.maybeSnapshot(projectId);
 
     // WebSocket 广播
-    this.gateway.broadcast(projectId, operation, newSeq, author);
+    this.gateway.broadcast(projectId, operation, newSeq, author, fingerprint);
 
     return { seq: newSeq, result };
   }
@@ -103,6 +107,8 @@ export class OperationsService {
     projectId: string,
     operations: Operation[],
     author?: string,
+    fingerprints?: string[],
+    authorId?: string,
   ): Promise<{ startSeq: number; endSeq: number; results: OperationResult[] }> {
     if (operations.length === 0) {
       throw new BadRequestException('操作列表不能为空');
@@ -141,10 +147,11 @@ export class OperationsService {
       // 批量写入操作日志
       const startSeq = current_version + 1;
       for (let i = 0; i < operations.length; i++) {
+        const fp = fingerprints?.[i] ?? null;
         await client.query(
-          `INSERT INTO design_operations (project_id, seq, operation, author)
-           VALUES ($1, $2, $3, $4)`,
-          [projectId, startSeq + i, JSON.stringify(operations[i]), author ?? null],
+          `INSERT INTO design_operations (project_id, seq, operation, fingerprint, author, author_id)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [projectId, startSeq + i, JSON.stringify(operations[i]), fp, author ?? 'user', authorId ?? null],
         );
       }
 
@@ -163,7 +170,8 @@ export class OperationsService {
 
       // WebSocket 广播每条操作
       for (let i = 0; i < operations.length; i++) {
-        this.gateway.broadcast(projectId, operations[i]!, startSeq + i, author);
+        const fp = fingerprints?.[i];
+        this.gateway.broadcast(projectId, operations[i]!, startSeq + i, author, fp);
       }
 
       return { startSeq, endSeq, results };
@@ -267,6 +275,84 @@ export class OperationsService {
     this.gateway.broadcastUndo(projectId, newSeq, current_version);
 
     return { seq: newSeq, undoneSeq: current_version };
+  }
+
+  /**
+   * 重做（redo）上一次撤销的操作
+   * 1. 重建项目状态
+   * 2. 用 OperationExecutor 执行 redo
+   * 3. 创建快照记录新状态
+   */
+  async redo(
+    projectId: string,
+    author?: string,
+  ): Promise<{ seq: number }> {
+    const pool = this.db.getPool();
+
+    // 获取当前项目状态
+    const projResult = await pool.query<ProjectVersionRow>(
+      `SELECT current_version, latest_snapshot FROM design_projects WHERE id = $1`,
+      [projectId],
+    );
+    if (projResult.rows.length === 0) {
+      throw new NotFoundException('项目不存在');
+    }
+    const { current_version } = projResult.rows[0]!;
+
+    // 获取最后两条操作来重建 undo/redo 上下文
+    const lastOpsResult = await pool.query<OperationRow>(
+      `SELECT * FROM design_operations
+       WHERE project_id = $1 AND seq <= $2
+       ORDER BY seq DESC LIMIT 2`,
+      [projectId, current_version],
+    );
+    if (lastOpsResult.rows.length < 2) {
+      throw new BadRequestException('没有可重做的操作');
+    }
+
+    // 重建项目状态并尝试 redo
+    const project = await this.projects.findOne(projectId);
+    const executor = new OperationExecutor(project);
+
+    // We need the executor to have undo history to redo.
+    // Execute the second-to-last op, then undo it, so redo is available.
+    const secondLast = lastOpsResult.rows[1]!;
+    executor.execute(secondLast.operation);
+    const undoResult = executor.undo();
+
+    if (!undoResult) {
+      throw new BadRequestException('无法重做：没有可重做的操作');
+    }
+
+    const redoResult = executor.redo();
+    if (!redoResult) {
+      throw new BadRequestException('无法重做：重做栈为空');
+    }
+
+    const newSeq = current_version + 1;
+
+    // 更新版本号
+    await pool.query(
+      `UPDATE design_projects SET current_version = $1, updated_at = NOW() WHERE id = $2`,
+      [newSeq, projectId],
+    );
+
+    // 创建快照
+    const redoneProject = executor.getProject();
+    await pool.query(
+      `INSERT INTO design_snapshots (project_id, version, schema)
+       VALUES ($1, $2, $3)`,
+      [projectId, newSeq, JSON.stringify(redoneProject)],
+    );
+    await pool.query(
+      `UPDATE design_projects SET latest_snapshot = $1 WHERE id = $2`,
+      [newSeq, projectId],
+    );
+
+    // WebSocket 广播
+    this.gateway.broadcast(projectId, secondLast.operation, newSeq, author);
+
+    return { seq: newSeq };
   }
 
   /**

@@ -10,9 +10,18 @@ import { registerStyleTools } from './tools/style.js';
 import { registerMiscTools } from './tools/misc.js';
 import { registerAssetTools } from './tools/asset.js';
 import { registerHistoryTools } from './tools/history.js';
+import { registerDatasetTools } from './tools/dataset-tools.js';
+import { registerGlobalStateTools } from './tools/global-state-tools.js';
+import { registerComponentPropsTools } from './tools/component-props-tools.js';
+import { registerSnapshotTools } from './tools/snapshot-tools.js';
+import { registerBatchTool } from './tools/batch.js';
+import { registerComponentRecipeTools } from './tools/component-recipes.js';
 
 // Resources
 import { registerResources } from './resources/index.js';
+import { registerDatasetResources } from './resources/dataset-resources.js';
+import { registerGlobalStateResources } from './resources/global-state-resources.js';
+import { registerTemplateResources } from './resources/template-resources.js';
 
 const server = new McpServer({
   name: '@globallink/design-mcp',
@@ -51,10 +60,19 @@ registerStyleTools(server);
 registerMiscTools(server);
 registerAssetTools(server);
 registerHistoryTools(server);
+registerDatasetTools(server);
+registerGlobalStateTools(server);
+registerComponentPropsTools(server);
+registerSnapshotTools(server);
+registerBatchTool(server);
+registerComponentRecipeTools(server);
 
 // ===== Register all resources =====
 
 registerResources(server);
+registerDatasetResources(server);
+registerGlobalStateResources(server);
+registerTemplateResources(server);
 
 // ===== Start =====
 

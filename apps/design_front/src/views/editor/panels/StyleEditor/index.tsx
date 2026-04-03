@@ -5,6 +5,42 @@ import { findNodeInScreens } from '@globallink/design-operations';
 import { STYLE_GROUPS, type StyleGroup } from './styleGroups';
 import './styleEditor.css';
 
+const PIXEL_DEFAULT_KEYS = new Set([
+  'width',
+  'height',
+  'minWidth',
+  'maxWidth',
+  'minHeight',
+  'maxHeight',
+  'padding',
+  'paddingTop',
+  'paddingRight',
+  'paddingBottom',
+  'paddingLeft',
+  'margin',
+  'marginTop',
+  'marginRight',
+  'marginBottom',
+  'marginLeft',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'gap',
+  'fontSize',
+  'lineHeight',
+  'borderRadius',
+  'borderWidth',
+]);
+
+function normalizeStyleInput(key: string, raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+  if (!PIXEL_DEFAULT_KEYS.has(key)) return value;
+  if (/^-?\d+(\.\d+)?$/.test(value)) return `${value}px`;
+  return value;
+}
+
 export const StyleEditorPanel = observer(function StyleEditorPanel() {
   const nodeId = editorStore.selectedNodeIds[0];
   const screens = editorStore.screens;
@@ -21,9 +57,10 @@ export const StyleEditorPanel = observer(function StyleEditorPanel() {
   const styles = node.styles as Record<string, unknown>;
 
   const handleChange = (key: string, value: string) => {
+    const normalized = normalizeStyleInput(key, value);
     editorStore.execute({
       type: 'updateStyle',
-      params: { nodeId, styles: { [key]: value || undefined } },
+      params: { nodeId, styles: { [key]: normalized || undefined } },
     });
   };
 
@@ -74,9 +111,10 @@ function GroupFields({ group, styles, onChange }: GroupFieldsProps) {
               />
             ) : (
               <Input
+                key={`${prop.key}:${strVal}`}
                 size="small"
                 style={{ flex: 1 }}
-                value={strVal}
+                defaultValue={strVal}
                 placeholder={prop.key}
                 onBlur={(e) => onChange(prop.key, e.target.value)}
                 onPressEnter={(e) => onChange(prop.key, (e.target as HTMLInputElement).value)}

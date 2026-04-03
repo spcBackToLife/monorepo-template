@@ -11,20 +11,30 @@ export type {
   TemplateRef,
   ComponentNode,
   ComponentState,
+  GlobalStateVariable,
+  GlobalStateBinding,
   EventTrigger,
   TransitionAnimation,
   NavigateAction,
   SetStateAction,
   OpenUrlAction,
+  DelayAction,
   CustomAction,
   EventAction,
+  EventCondition,
   ComponentEvent,
   Platform,
   Viewport,
   Screen,
+  DataSet,
   TemplateScope,
+  TemplateKind,
   ComponentTemplate,
+  PropType,
+  ComponentPropDefinition,
+  PropBinding,
   DesignProject,
+  OperationEnvelope,
 } from './types';
 
 // ===== Viewport Presets =====
@@ -80,6 +90,10 @@ export {
   getAllowedProps,
 } from './registry/primitives';
 
+// ===== Element Props Registry =====
+export type { ElementPropDefinition, ElementPropRegistry } from './registry/element-props';
+export { ELEMENT_PROP_REGISTRY, getElementProps } from './registry/element-props';
+
 // ===== Validators =====
 export type { ValidationResult } from './validators';
 export {
@@ -88,12 +102,25 @@ export {
   ViewportSchema,
   ComponentTemplateSchema,
   DesignProjectSchema,
+  ComponentEventSchema,
   validateNode,
   validateScreen,
   validateProject,
   validateViewport,
   validateTemplate,
 } from './validators';
+
+export {
+  GlobalStateVariableSchema,
+  GlobalStateBindingSchema,
+  ComponentPropDefinitionSchema,
+  PropBindingSchema,
+  PropTypeSchema,
+} from './validators/props';
+
+export { DataSetSchema } from './validators/data';
+
+export { OperationEnvelopeSchema } from './validators/envelope';
 
 // ===== Asset Utilities =====
 export {

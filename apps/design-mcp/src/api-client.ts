@@ -125,3 +125,122 @@ export async function updateAsset(
 export async function deleteAsset(id: string): Promise<void> {
   await request(`/api/assets/${id}`, { method: 'DELETE' });
 }
+
+// ===== Datasets =====
+
+export async function listDatasets(
+  projectId: string,
+  screenId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/screens/${screenId}/datasets`);
+}
+
+export async function getDataset(
+  projectId: string,
+  screenId: string,
+  dataSetId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/screens/${screenId}/datasets/${dataSetId}`);
+}
+
+export async function addDataset(
+  projectId: string,
+  screenId: string,
+  dataSet: { id: string; name: string; data: Record<string, unknown>; description?: string },
+  author?: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/screens/${screenId}/datasets`, {
+    method: 'POST',
+    body: { dataSet, author: author ?? 'ai:mcp' },
+  });
+}
+
+export async function updateDataset(
+  projectId: string,
+  screenId: string,
+  dataSetId: string,
+  patch: { data?: Record<string, unknown>; name?: string; description?: string },
+  author?: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/screens/${screenId}/datasets/${dataSetId}/update`, {
+    method: 'POST',
+    body: { ...patch, author: author ?? 'ai:mcp' },
+  });
+}
+
+export async function switchDataset(
+  projectId: string,
+  screenId: string,
+  dataSetId: string,
+  author?: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/screens/${screenId}/datasets/${dataSetId}/switch`, {
+    method: 'POST',
+    body: { author: author ?? 'ai:mcp' },
+  });
+}
+
+export async function removeDataset(
+  projectId: string,
+  screenId: string,
+  dataSetId: string,
+  author?: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/screens/${screenId}/datasets/${dataSetId}`, {
+    method: 'DELETE',
+    body: { author: author ?? 'ai:mcp' },
+  });
+}
+
+// ===== File Upload =====
+
+export async function uploadFile(
+  projectId: string,
+  filePath: string,
+): Promise<unknown> {
+  // Note: File upload requires multipart form data; this is a placeholder
+  // for use in contexts where fetch FormData is available.
+  return request(`/api/projects/${projectId}/assets/upload`, {
+    method: 'POST',
+    body: { filePath },
+  });
+}
+
+// ===== Global States =====
+
+export async function listGlobalStates(
+  projectId: string,
+  screenId: string,
+): Promise<unknown> {
+  const project = (await getProject(projectId)) as {
+    screens: Array<{
+      id: string;
+      globalStates?: Array<{ name: string; values: string[]; defaultValue: string }>;
+    }>;
+  };
+  const screen = project.screens.find((s) => s.id === screenId);
+  return screen?.globalStates ?? [];
+}
+
+// ===== Snapshots =====
+
+export async function generateSnapshots(
+  projectId: string,
+  config: {
+    screenIds: string[];
+    viewportIds?: string[];
+    format?: 'png' | 'jpeg' | 'webp';
+  },
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/snapshots/generate`, {
+    method: 'POST',
+    body: config,
+  });
+}
+
+export async function getSnapshotJob(
+  projectId: string,
+  jobId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/snapshots/jobs/${jobId}`);
+}

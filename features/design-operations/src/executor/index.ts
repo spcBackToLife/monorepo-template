@@ -1,4 +1,4 @@
-import type { DesignProject, ComponentNode } from '@globallink/design-schema';
+import type { DesignProject, ComponentNode, ComponentState } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type { Operation, OperationResult, InverseData, OperationDescription } from '../types';
 import { ProjectState } from './state';
@@ -11,10 +11,20 @@ import {
   executeRemoveElement,
   executeMoveElement,
   executeDuplicateElement,
+  executeInsertSubtree,
+  executeRenameNode,
+  executeWrapInContainer,
+  executeUnwrapContainer,
+  executeReorderElement,
+  executeChangeElementType,
+  executeSetNodeVisibilityWhen,
+  executeSetNodeLocked,
+  executeSetNodeVisible,
 } from '../operations/element';
 import {
   executeUpdateStyle,
   executeResetStyle,
+  executeBatchUpdateStyle,
 } from '../operations/style';
 import {
   executeAddState,
@@ -25,12 +35,15 @@ import {
 import {
   executeAddEvent,
   executeRemoveEvent,
+  executeUpdateEvent,
   executeAddNavigation,
 } from '../operations/event';
 import {
   executeAddScreen,
   executeRemoveScreen,
   executeSetActiveScreen,
+  executeRenameScreen,
+  executeReorderScreen,
 } from '../operations/screen';
 import {
   executeSwitchViewport,
@@ -42,6 +55,35 @@ import {
   executeDetachInstance,
   executeSyncInstance,
 } from '../operations/asset';
+import {
+  executeAddGlobalStateVariable,
+  executeRemoveGlobalStateVariable,
+  executeSetGlobalState,
+  executeAddGlobalStateBinding,
+  executeRemoveGlobalStateBinding,
+  executeUpdateGlobalStateBinding,
+} from '../operations/global-state';
+import {
+  executeUpdateComponentProps,
+  executeAddPropDefinition,
+  executeRemovePropDefinition,
+} from '../operations/component-props';
+import {
+  executeAddDataSet,
+  executeRemoveDataSet,
+  executeUpdateDataSet,
+  executeSwitchDataSet,
+  executeBindData,
+} from '../operations/data';
+import {
+  executeUpdateTemplate,
+  executeDeleteTemplate,
+  executeDuplicateTemplate,
+} from '../operations/template';
+import {
+  executeAddAnnotation,
+  executeRemoveAnnotation,
+} from '../operations/annotation';
 import { findNodeById, findParent } from '../utils/tree';
 
 /**
@@ -211,12 +253,32 @@ export class OperationExecutor {
         return executeMoveElement(project, op.params);
       case 'duplicateElement':
         return executeDuplicateElement(project, op.params);
+      case 'insertSubtree':
+        return executeInsertSubtree(project, op.params);
+      case 'renameNode':
+        return executeRenameNode(project, op.params);
+      case 'wrapInContainer':
+        return executeWrapInContainer(project, op.params);
+      case 'unwrapContainer':
+        return executeUnwrapContainer(project, op.params);
+      case 'reorderElement':
+        return executeReorderElement(project, op.params);
+      case 'changeElementType':
+        return executeChangeElementType(project, op.params);
+      case 'setNodeVisibilityWhen':
+        return executeSetNodeVisibilityWhen(project, op.params);
+      case 'setNodeLocked':
+        return executeSetNodeLocked(project, op.params);
+      case 'setNodeVisible':
+        return executeSetNodeVisible(project, op.params);
 
       // Style operations
       case 'updateStyle':
         return executeUpdateStyle(project, op.params);
       case 'resetStyle':
         return executeResetStyle(project, op.params);
+      case 'batchUpdateStyle':
+        return executeBatchUpdateStyle(project, op.params);
 
       // State operations
       case 'addState':
@@ -233,6 +295,8 @@ export class OperationExecutor {
         return executeAddEvent(project, op.params);
       case 'removeEvent':
         return executeRemoveEvent(project, op.params);
+      case 'updateEvent':
+        return executeUpdateEvent(project, op.params);
       case 'addNavigation':
         return executeAddNavigation(project, op.params);
 
@@ -243,6 +307,10 @@ export class OperationExecutor {
         return executeRemoveScreen(project, op.params);
       case 'setActiveScreen':
         return executeSetActiveScreen(project, op.params);
+      case 'renameScreen':
+        return executeRenameScreen(project, op.params);
+      case 'reorderScreen':
+        return executeReorderScreen(project, op.params);
 
       // Viewport operations
       case 'switchViewport':
@@ -259,6 +327,54 @@ export class OperationExecutor {
         return executeDetachInstance(project, op.params);
       case 'syncInstance':
         return executeSyncInstance(project, op.params);
+
+      // Global state operations
+      case 'setGlobalState':
+        return executeSetGlobalState(project, op.params);
+      case 'addGlobalStateVariable':
+        return executeAddGlobalStateVariable(project, op.params);
+      case 'removeGlobalStateVariable':
+        return executeRemoveGlobalStateVariable(project, op.params);
+      case 'addGlobalStateBinding':
+        return executeAddGlobalStateBinding(project, op.params);
+      case 'removeGlobalStateBinding':
+        return executeRemoveGlobalStateBinding(project, op.params);
+      case 'updateGlobalStateBinding':
+        return executeUpdateGlobalStateBinding(project, op.params);
+
+      // Component props operations
+      case 'updateComponentProps':
+        return executeUpdateComponentProps(project, op.params);
+      case 'addPropDefinition':
+        return executeAddPropDefinition(project, op.params);
+      case 'removePropDefinition':
+        return executeRemovePropDefinition(project, op.params);
+
+      // Data operations
+      case 'addDataSet':
+        return executeAddDataSet(project, op.params);
+      case 'removeDataSet':
+        return executeRemoveDataSet(project, op.params);
+      case 'updateDataSet':
+        return executeUpdateDataSet(project, op.params);
+      case 'switchDataSet':
+        return executeSwitchDataSet(project, op.params);
+      case 'bindData':
+        return executeBindData(project, op.params);
+
+      // Template operations
+      case 'updateTemplate':
+        return executeUpdateTemplate(project, op.params);
+      case 'deleteTemplate':
+        return executeDeleteTemplate(project, op.params);
+      case 'duplicateTemplate':
+        return executeDuplicateTemplate(project, op.params);
+
+      // Annotation operations
+      case 'addAnnotation':
+        return executeAddAnnotation(project, op.params);
+      case 'removeAnnotation':
+        return executeRemoveAnnotation(project, op.params);
 
       default:
         return {
@@ -292,6 +408,9 @@ export class OperationExecutor {
       case '_restoreStyle':
         return this.restoreStyle(project, inv.params as any);
 
+      case '_restoreBatchStyle':
+        return this.restoreBatchStyle(project, inv.params as any);
+
       case '_restoreState':
         return this.restoreState(project, inv.params as any);
 
@@ -310,8 +429,20 @@ export class OperationExecutor {
       case '_restoreTemplateRefMode':
         return this.restoreTemplateRefMode(project, inv.params as any);
 
+      case '_restoreGlobalStateVariable':
+        return this.restoreGlobalStateVariable(project, inv.params as any);
+
+      case '_restorePropDefinition':
+        return this.restorePropDefinition(project, inv.params as any);
+
+      case '_restoreDataSet':
+        return this.restoreDataSet(project, inv.params as any);
+
       case '_restoreNode':
         return this.restoreNode(project, inv.params as any);
+
+      case '_restoreDeletedTemplate':
+        return this.restoreDeletedTemplate(project, inv.params as any);
 
       default:
         // Regular operations can be used as inverse too (e.g., moveElement, setActiveState)
@@ -353,7 +484,12 @@ export class OperationExecutor {
 
   private restoreStyle(
     project: DesignProject,
-    params: { nodeId: string; restoreStyles: Record<string, any>; removeKeys: string[] },
+    params: {
+      nodeId: string;
+      restoreStyles: Record<string, any>;
+      removeKeys: string[];
+      restoreScreenBackground?: { screenId: string; previousValue: string | undefined };
+    },
   ) {
     const newProject = deepClone(project);
     let node: ComponentNode | undefined;
@@ -376,6 +512,17 @@ export class OperationExecutor {
     }
     // Restore old values
     Object.assign(node.styles, params.restoreStyles);
+    if (params.restoreScreenBackground) {
+      const sc = newProject.screens.find((s) => s.id === params.restoreScreenBackground!.screenId);
+      if (sc) {
+        const prev = params.restoreScreenBackground.previousValue;
+        if (prev === undefined) {
+          delete sc.backgroundColor;
+        } else {
+          sc.backgroundColor = prev;
+        }
+      }
+    }
     newProject.updatedAt = new Date().toISOString();
 
     return {
@@ -385,9 +532,55 @@ export class OperationExecutor {
     };
   }
 
+  private restoreBatchStyle(
+    project: DesignProject,
+    params: { entries: Array<{ nodeId: string; restoreStyles: Record<string, any>; removeKeys: string[] }> },
+  ) {
+    const newProject = deepClone(project);
+    const affectedNodeIds: string[] = [];
+
+    for (const entry of params.entries) {
+      let node: ComponentNode | undefined;
+      for (const screen of newProject.screens) {
+        node = findNodeById(screen.rootNode, entry.nodeId);
+        if (node) break;
+      }
+
+      if (!node) {
+        return {
+          project,
+          result: { success: false, description: `Cannot restore batch styles: node ${entry.nodeId} not found`, affectedNodeIds: [] },
+          inverse: { type: 'noop', params: {} } as InverseData,
+        };
+      }
+
+      // Remove keys that were newly added
+      for (const key of entry.removeKeys) {
+        delete (node.styles as any)[key];
+      }
+      // Restore old values
+      Object.assign(node.styles, entry.restoreStyles);
+      affectedNodeIds.push(entry.nodeId);
+    }
+
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored batch styles on ${affectedNodeIds.length} node(s)`, affectedNodeIds },
+      inverse: { type: 'noop', params: {} } as InverseData,
+    };
+  }
+
   private restoreState(
     project: DesignProject,
-    params: { nodeId: string; stateName: string; styles: any; props?: any },
+    params: {
+      nodeId: string;
+      stateName: string;
+      styles: any;
+      props?: any;
+      transition?: ComponentState['transition'];
+    },
   ) {
     const newProject = deepClone(project);
     let node: ComponentNode | undefined;
@@ -408,6 +601,13 @@ export class OperationExecutor {
     if (state) {
       state.styles = params.styles;
       state.props = params.props;
+      if ('transition' in params) {
+        if (params.transition !== undefined) {
+          state.transition = params.transition;
+        } else {
+          delete state.transition;
+        }
+      }
     }
     newProject.updatedAt = new Date().toISOString();
 
@@ -551,6 +751,96 @@ export class OperationExecutor {
       project: newProject,
       result: { success: true, description: `Restored node ${params.nodeId}`, affectedNodeIds: [params.nodeId] },
       inverse: { type: 'noop', params: {} } as InverseData,
+    };
+  }
+
+  private restoreDataSet(
+    project: DesignProject,
+    params: { screenId: string; dataSet: any; position: number },
+  ) {
+    const newProject = deepClone(project);
+    const screen = newProject.screens.find((s) => s.id === params.screenId);
+
+    if (!screen) {
+      return {
+        project,
+        result: { success: false, description: `Cannot restore data set: screen ${params.screenId} not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    screen.dataSets.splice(params.position, 0, params.dataSet);
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored data set "${params.dataSet.name}"`, affectedNodeIds: [params.screenId] },
+      inverse: { type: 'removeDataSet', params: { screenId: params.screenId, dataSetId: params.dataSet.id } } as InverseData,
+    };
+  }
+
+  private restoreGlobalStateVariable(
+    project: DesignProject,
+    params: { screenId: string; variable: any; position: number },
+  ) {
+    const newProject = deepClone(project);
+    const screen = newProject.screens.find((s) => s.id === params.screenId);
+
+    if (!screen) {
+      return {
+        project,
+        result: { success: false, description: `Cannot restore global state variable: screen ${params.screenId} not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    screen.globalStates.splice(params.position, 0, params.variable);
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored global state variable "${params.variable.name}"`, affectedNodeIds: [params.screenId] },
+      inverse: { type: 'removeGlobalStateVariable', params: { screenId: params.screenId, variableName: params.variable.name } } as InverseData,
+    };
+  }
+
+  private restorePropDefinition(
+    project: DesignProject,
+    params: { templateId: string; definition: any; position: number },
+  ) {
+    const newProject = deepClone(project);
+    const template = newProject.componentAssets.find((t) => t.id === params.templateId);
+
+    if (!template) {
+      return {
+        project,
+        result: { success: false, description: `Cannot restore prop definition: template ${params.templateId} not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    template.propDefinitions.splice(params.position, 0, params.definition);
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored prop definition "${params.definition.key}"`, affectedNodeIds: [params.templateId] },
+      inverse: { type: 'removePropDefinition', params: { templateId: params.templateId, propKey: params.definition.key } } as InverseData,
+    };
+  }
+
+  private restoreDeletedTemplate(
+    project: DesignProject,
+    params: { template: any; position: number },
+  ) {
+    const newProject = deepClone(project);
+    newProject.componentAssets.splice(params.position, 0, params.template);
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored template "${params.template.name}"`, affectedNodeIds: [params.template.id] },
+      inverse: { type: 'deleteTemplate', params: { templateId: params.template.id } } as InverseData,
     };
   }
 }

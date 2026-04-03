@@ -89,3 +89,44 @@ export function findParentInScreens(
   }
   return undefined;
 }
+
+/** 节点自身或任一祖先 locked 时为 true（W7-023） */
+export function isNodeOrAncestorLocked(root: ComponentNode, nodeId: string): boolean {
+  function walk(n: ComponentNode, ancestorLocked: boolean): boolean | null {
+    const L = ancestorLocked || n.locked;
+    if (n.id === nodeId) return L;
+    for (const c of n.children ?? []) {
+      const r = walk(c, L);
+      if (r !== null) return r;
+    }
+    return null;
+  }
+  return walk(root, false) ?? false;
+}
+
+/** 画布命中测试需跳过的节点 id：自身 locked 或任一祖先 locked（W7-023） */
+export function collectEffectivelyLockedNodeIds(root: ComponentNode): Set<string> {
+  const out = new Set<string>();
+  function walk(n: ComponentNode, ancestorLocked: boolean) {
+    const L = ancestorLocked || n.locked;
+    if (L) {
+      out.add(n.id);
+      for (const c of n.children ?? []) walk(c, true);
+    } else {
+      for (const c of n.children ?? []) walk(c, false);
+    }
+  }
+  walk(root, false);
+  return out;
+}
+
+/** 画布命中时可跳过 annotation，以便在注释标记下拾取真实节点（W7-024） */
+export function collectAnnotationNodeIds(root: ComponentNode): Set<string> {
+  const out = new Set<string>();
+  function walk(n: ComponentNode) {
+    if (n.type === 'annotation') out.add(n.id);
+    for (const c of n.children ?? []) walk(c);
+  }
+  walk(root);
+  return out;
+}

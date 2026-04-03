@@ -3,6 +3,7 @@ import { deepClone, generateScreenId, generateNodeId } from '@globallink/design-
 import type {
   AddEventOp,
   RemoveEventOp,
+  UpdateEventOp,
   AddNavigationOp,
   OperationResult,
   InverseData,
@@ -97,6 +98,53 @@ export function executeRemoveEvent(
   };
 }
 
+// ===== updateEvent =====
+
+export function executeUpdateEvent(
+  project: DesignProject,
+  params: UpdateEventOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const node = findNodeInProject(newProject, params.nodeId);
+
+  if (!node) {
+    return {
+      project,
+      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  if (params.eventIndex < 0 || params.eventIndex >= node.events.length) {
+    return {
+      project,
+      result: { success: false, description: `Event index ${params.eventIndex} out of range`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const previousEvent = { ...node.events[params.eventIndex] };
+  const evt = node.events[params.eventIndex];
+  if (params.event.trigger !== undefined) evt.trigger = params.event.trigger;
+  if (params.event.actions !== undefined) evt.actions = params.event.actions;
+  if (params.event.condition !== undefined) evt.condition = params.event.condition;
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Updated event at index ${params.eventIndex} on ${params.nodeId}`,
+      affectedNodeIds: [params.nodeId],
+    },
+    inverse: {
+      type: 'updateEvent',
+      params: { nodeId: params.nodeId, eventIndex: params.eventIndex, event: previousEvent },
+    },
+  };
+}
+
 // ===== addNavigation =====
 
 export function executeAddNavigation(
@@ -136,19 +184,24 @@ export function executeAddNavigation(
         states: [],
         activeState: 'default',
         events: [],
+        locked: false,
+        visible: true,
+        globalStateBindings: [],
       },
+      globalStates: [],
+      dataSets: [],
+      activeDataSetId: '',
     };
-    newProject.screens.push(newScreen);
     targetScreenId = newScreen.id;
     affectedIds.push(newScreen.id);
   }
 
   const navEvent: ComponentEvent = {
     trigger: params.trigger as ComponentEvent['trigger'],
-    action: {
+    actions: [{
       type: 'navigate',
       targetScreenId,
-    },
+    }],
   };
 
   node.events.push(navEvent);

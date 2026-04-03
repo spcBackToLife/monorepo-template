@@ -13,7 +13,20 @@ design_docs/
 │
 ├── 02-product/                      ← 产品方案（持续增长，补充产品逻辑）
 │   ├── overview.md                  - 产品定位、核心特性、用户流程、页面清单
-│   ├── editor.md                    - 编辑器详细设计（画布、操作面板、视口切换）
+│   ├── editor.md                    - （已迁移，指向 editor/ 目录）
+│   ├── editor/                      - 🆕 编辑器产品方案（拆分为 11 个子系统）
+│   │   ├── README.md                  总纲：第一性原理 + 子系统拆解 + 任务清单
+│   │   ├── 01-canvas/                 中央画布：双层架构、定位模型、视口适配
+│   │   ├── 02-toolbar/                工具栏系统：底部/顶部工具栏、快捷键体系
+│   │   ├── 03-property-panel/         右侧属性面板：五维 Tab 设计
+│   │   ├── 04-state-system/           状态管理：三层状态模型
+│   │   ├── 05-data-driven/            数据驱动：数据集、数据绑定、全景截图
+│   │   ├── 06-component-props/        组件 Props：标准化暴露与配置
+│   │   ├── 07-asset-management/       资产管理：两层资产、素材设计器
+│   │   ├── 08-layer-tree/             组件树与页面管理
+│   │   ├── 09-interaction-bindding/   交互与事件系统
+│   │   ├── 10-preview-mode/           预览与测试
+│   │   └── 11-collaboration/          协作与同步
 │   └── component-assets.md          - 组件资产体系（原子元素、资产库、飞轮）
 │
 ├── 03-tech/                         ← 技术方案（按模块拆分，各自独立阅读）
@@ -25,10 +38,24 @@ design_docs/
 │   ├── design-mcp.md                - APP: MCP Server
 │   ├── frontend.md                  - APP: 前端架构 (design_front)
 │   ├── backend.md                   - APP: 后端架构 (design-api) + 数据库
-│   └── event-sourcing.md            - 存储方案: Event Sourcing + 快照
+│   ├── event-sourcing.md            - 存储方案: Event Sourcing + 快照
+│   └── editor/                      - 🆕 编辑器技术方案（拆分为 11 个技术模块）
+│       ├── README.md                  技术总纲：包映射 + 依赖关系 + 实现阶段
+│       ├── 01-schema-extensions.md    design-schema 扩展：新类型、字段、校验
+│       ├── 02-operations-extensions.md design-operations 扩展：新 Operations
+│       ├── 03-engine-rendering.md     渲染管线：4 层叠加、数据绑定、列表渲染
+│       ├── 04-engine-canvas.md        画布交互：坐标系、hitTest、对齐线、吸附
+│       ├── 05-engine-preview.md       预览模式：事件引擎、CSS 伪类注入
+│       ├── 06-frontend-layout.md      布局框架：4 区布局、面板、响应式
+│       ├── 07-frontend-canvas.md      画布组件：工具状态机、快捷键、右键菜单
+│       ├── 08-frontend-panels.md      面板系统：属性面板 5Tab、组件树、页面列表
+│       ├── 09-backend-extensions.md   后端扩展：新端点、文件上传、截图生成
+│       ├── 10-mcp-extensions.md       MCP 扩展：新 Tools、Resources
+│       └── 11-sync-system.md          同步系统：WebSocket、回声去重、断线重连
 │
 ├── 04-roadmap/                      ← 排期与计划
-│   └── roadmap.md                   - MVP 执行清单（前/后端 Todo 表 + Phase 总览）
+│   ├── roadmap.md                   - MVP 执行清单（前/后端 Todo 表 + Phase 总览）
+│   └── editor-implementation-tasks.md - 🆕 编辑器改造任务清单（155 个任务，5 Phase，12 周）
 │
 └── 05-decisions/                    ← 决策记录（持续追加）
     └── decision-log.md              - 所有关键设计决策及理由

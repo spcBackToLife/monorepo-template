@@ -1,0 +1,35 @@
+/**
+ * 与 design_docs/02-product/editor/01-canvas 一致：
+ * CanvasContainer → 视口栈 → DOM 层（不接收指针）→ EditorOverlay（统一命中）
+ */
+
+.editor-canvas-root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.editor-canvas-transform {
+  transform-origin: 0 0;
+}
+
+.editor-canvas-stack {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* 合成层提到 stack：避免仅 dom-layer translateZ 与兄弟 canvas 重叠时出现亚像素错位 */
+  transform: translateZ(0);
+}
+
+/* Schema 渲染 DOM 不直接接收指针，交互由 EditorOverlay 统一处理 */
+.editor-canvas-dom-layer {
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+/* 同画布预览：无覆盖层 canvas，真实 DOM 接收 hover / click / focus */
+.editor-canvas-dom-layer--preview {
+  pointer-events: auto;
+}

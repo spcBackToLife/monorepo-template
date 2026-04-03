@@ -1,6 +1,6 @@
 import type { DesignProject, CSSProperties } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
-import type { UpdateStyleOp, ResetStyleOp, OperationResult, InverseData } from '../types';
+import type { UpdateStyleOp, ResetStyleOp, BatchUpdateStyleOp, OperationResult, InverseData } from '../types';
 import { findNodeById } from '../utils/tree';
 
 /** Find a node across all screens */
@@ -48,6 +48,22 @@ export function executeUpdateStyle(
   // Apply new styles
   Object.assign(node.styles, params.styles);
 
+  // 根节点背景 = 画布「页面背景」：同步到 Screen.backgroundColor，与 SchemaRenderer 外层 data-screen-id 一致
+  let restoreScreenBackground: { screenId: string; previousValue: string | undefined } | undefined;
+  if (Object.prototype.hasOwnProperty.call(params.styles, 'backgroundColor')) {
+    for (const screen of newProject.screens) {
+      if (screen.rootNode.id !== params.nodeId) continue;
+      restoreScreenBackground = { screenId: screen.id, previousValue: screen.backgroundColor };
+      const bg = params.styles.backgroundColor;
+      if (bg === undefined || bg === '') {
+        delete screen.backgroundColor;
+      } else {
+        screen.backgroundColor = typeof bg === 'string' ? bg : String(bg);
+      }
+      break;
+    }
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
@@ -63,6 +79,7 @@ export function executeUpdateStyle(
         nodeId: params.nodeId,
         restoreStyles: oldStyles,
         removeKeys: removedKeys,
+        ...(restoreScreenBackground ? { restoreScreenBackground } : {}),
       },
     },
   };
@@ -111,6 +128,72 @@ export function executeResetStyle(
         nodeId: params.nodeId,
         styles: oldStyles,
       },
+    },
+  };
+}
+
+// ===== batchUpdateStyle =====
+
+export function executeBatchUpdateStyle(
+  project: DesignProject,
+  params: BatchUpdateStyleOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  if (params.updates.length === 0) {
+    return {
+      project,
+      result: { success: false, description: 'No style updates provided', affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const newProject = deepClone(project);
+  const affectedNodeIds: string[] = [];
+  const restoreEntries: Array<{
+    nodeId: string;
+    restoreStyles: Record<string, unknown>;
+    removeKeys: string[];
+  }> = [];
+
+  for (const update of params.updates) {
+    const node = findNodeInProject(newProject, update.nodeId);
+    if (!node) {
+      return {
+        project,
+        result: { success: false, description: `Node ${update.nodeId} not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} },
+      };
+    }
+
+    // Save old values for inverse
+    const restoreStyles: Record<string, unknown> = {};
+    const removeKeys: string[] = [];
+    const stylesRecord = node.styles as Record<string, unknown>;
+    for (const key of Object.keys(update.styles)) {
+      if (key in stylesRecord) {
+        restoreStyles[key] = stylesRecord[key];
+      } else {
+        removeKeys.push(key);
+      }
+    }
+
+    // Apply new styles
+    Object.assign(node.styles, update.styles);
+    affectedNodeIds.push(update.nodeId);
+    restoreEntries.push({ nodeId: update.nodeId, restoreStyles, removeKeys });
+  }
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Batch updated styles on ${params.updates.length} node(s)`,
+      affectedNodeIds,
+    },
+    inverse: {
+      type: '_restoreBatchStyle',
+      params: { entries: restoreEntries },
     },
   };
 }

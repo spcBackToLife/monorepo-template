@@ -44,8 +44,8 @@ apps/design_front/src/
        ▼
   OperationExecutor.execute(op)    ← 前端直接调用 SDK
        │
-       ├─→ MobX Store 更新 → 画布重新渲染
-       └─→ REST API → design-api 持久化（Operation Log + 快照）
+       ├─→ MobX Store 更新 → 画布重新渲染（立即）
+       └─→ 异步批量 REST API → design-api 持久化（Operation Log + 快照）
 
 路径 B：AI 操作（通过 MCP）
   Cursor/Claude Code 发出 Tool Call

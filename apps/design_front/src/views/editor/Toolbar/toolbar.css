@@ -36,6 +36,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+.toolbar-overflow-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d46b08;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: default;
+  user-select: none;
+}
+
 .zoom-wrap {
   display: flex;
   align-items: center;
@@ -47,4 +59,21 @@
   color: #8c8c8c;
   width: 42px;
   text-align: right;
+}
+
+.toolbar-inline-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #595959;
+}
+
+.toolbar-inline-switch__label {
+  flex-shrink: 0;
+}
+
+.toolbar-btn-active {
+  color: #1677ff !important;
+  background: #e6f4ff !important;
 }

@@ -70,4 +70,130 @@ export function registerAssetTools(server: McpServer): void {
       };
     },
   );
+
+  server.registerTool(
+    'detach_instance',
+    {
+      description:
+        '将组件实例设为脱离模板（detachInstance），之后不再随模板更新同步。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('组件实例根节点 ID'),
+      },
+    },
+    async ({ projectId, nodeId }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'detachInstance',
+        params: { nodeId },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    'sync_instance',
+    {
+      description:
+        '从关联的组件模板重新同步实例结构（syncInstance，需仍为引用模式）。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('组件实例根节点 ID'),
+      },
+    },
+    async ({ projectId, nodeId }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'syncInstance',
+        params: { nodeId },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    'change_element_type',
+    {
+      description:
+        '将 HTML 原子节点的标签类型改为另一种 primitive（如 div → img），对应 changeElementType。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('节点 ID'),
+        newType: z.string().describe('新的标签类型，如 div、img、button、p'),
+      },
+    },
+    async ({ projectId, nodeId, newType }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'changeElementType',
+        params: { nodeId, newType },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    'update_template',
+    {
+      description: '更新组件模板的属性（名称、分类、描述等）',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        templateId: z.string().describe('模板 ID'),
+        patch: z.record(z.string(), z.unknown()).describe('要更新的字段'),
+      },
+    },
+    async ({ projectId, templateId, patch }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'updateTemplate',
+        params: { templateId, patch },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    'delete_template',
+    {
+      description: '删除组件模板',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        templateId: z.string().describe('模板 ID'),
+      },
+    },
+    async ({ projectId, templateId }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'deleteTemplate',
+        params: { templateId },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    'duplicate_template',
+    {
+      description: '复制组件模板',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        sourceTemplateId: z.string().describe('源模板 ID'),
+        newName: z.string().optional().describe('新模板名称'),
+      },
+    },
+    async ({ projectId, sourceTemplateId, newName }) => {
+      const result = await api.executeOperation(projectId, {
+        type: 'duplicateTemplate',
+        params: { sourceTemplateId, newName },
+      });
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
 }

@@ -49,6 +49,7 @@ export function executeAddState(
     name: params.stateName,
     styles: params.styles ?? {},
     props: params.props,
+    ...(params.transition != null ? { transition: params.transition } : {}),
   };
 
   node.states.push(newState);
@@ -117,6 +118,7 @@ export function executeRemoveState(
         stateName: removedState.name,
         styles: removedState.styles,
         props: removedState.props,
+        transition: removedState.transition,
       },
     },
   };
@@ -150,10 +152,15 @@ export function executeUpdateState(
 
   const oldStyles = { ...state.styles };
   const oldProps = state.props ? { ...state.props } : undefined;
+  const oldTransition =
+    state.transition === undefined ? undefined : { ...state.transition };
 
   state.styles = { ...state.styles, ...params.styles };
   if (params.props !== undefined) {
     state.props = { ...(state.props ?? {}), ...params.props };
+  }
+  if (params.transition !== undefined) {
+    state.transition = { ...(state.transition ?? {}), ...params.transition };
   }
 
   newProject.updatedAt = new Date().toISOString();
@@ -172,6 +179,7 @@ export function executeUpdateState(
         stateName: params.stateName,
         styles: oldStyles,
         props: oldProps,
+        transition: oldTransition,
       },
     },
   };

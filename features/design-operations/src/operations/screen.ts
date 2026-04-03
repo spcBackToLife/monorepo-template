@@ -4,6 +4,8 @@ import type {
   AddScreenOp,
   RemoveScreenOp,
   SetActiveScreenOp,
+  RenameScreenOp,
+  ReorderScreenOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -33,10 +35,14 @@ export function executeAddScreen(
       states: [],
       activeState: 'default',
       events: [],
+      locked: false,
+      visible: true,
+      globalStateBindings: [],
     },
+    globalStates: [],
+    dataSets: [],
+    activeDataSetId: '',
   };
-
-  newProject.screens.push(newScreen);
   newProject.updatedAt = new Date().toISOString();
 
   return {
@@ -134,6 +140,91 @@ export function executeSetActiveScreen(
     inverse: {
       type: 'noop',
       params: {},
+    },
+  };
+}
+
+// ===== renameScreen =====
+
+export function executeRenameScreen(
+  project: DesignProject,
+  params: RenameScreenOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const screen = newProject.screens.find((s) => s.id === params.screenId);
+
+  if (!screen) {
+    return {
+      project,
+      result: { success: false, description: `Screen ${params.screenId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const oldName = screen.name;
+  const nextName = params.name.trim();
+  if (!nextName) {
+    return {
+      project,
+      result: { success: false, description: 'Screen name cannot be empty', affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  screen.name = nextName;
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Renamed screen to "${nextName}"`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'renameScreen',
+      params: { screenId: params.screenId, name: oldName },
+    },
+  };
+}
+
+// ===== reorderScreen =====
+
+export function executeReorderScreen(
+  project: DesignProject,
+  params: ReorderScreenOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const currentIndex = newProject.screens.findIndex((s) => s.id === params.screenId);
+
+  if (currentIndex === -1) {
+    return {
+      project,
+      result: { success: false, description: `Screen ${params.screenId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  // Remove from current position and insert at new position
+  const [screen] = newProject.screens.splice(currentIndex, 1);
+  const clampedIndex = Math.min(params.newIndex, newProject.screens.length);
+  newProject.screens.splice(clampedIndex, 0, screen);
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Reordered screen "${screen.name}" from index ${currentIndex} to ${clampedIndex}`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'reorderScreen',
+      params: {
+        screenId: params.screenId,
+        newIndex: currentIndex,
+      },
     },
   };
 }

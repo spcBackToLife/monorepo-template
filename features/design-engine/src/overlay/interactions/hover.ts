@@ -9,8 +9,9 @@ export function getHoveredNode(
   map: CoordinateMap,
   canvasX: number,
   canvasY: number,
+  skipIds?: Set<string>,
 ): string | null {
-  return hitTest(map, canvasX, canvasY);
+  return hitTest(map, canvasX, canvasY, skipIds);
 }
 
 /**

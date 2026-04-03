@@ -3,7 +3,7 @@ import type { PrimitiveNodeType } from '../types/node';
 
 // ===== Categories =====
 
-export type PrimitiveCategory = 'layout' | 'text' | 'form' | 'media' | 'list' | 'navigation';
+export type PrimitiveCategory = 'layout' | 'text' | 'form' | 'media' | 'list' | 'navigation' | 'annotation';
 
 /** Descriptor for a registered primitive element */
 export interface PrimitiveDescriptor {
@@ -101,6 +101,7 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
       fontWeight: 700,
       lineHeight: 1.2,
       margin: 0,
+      width: 'fit-content',
     },
     allowedProps: [],
     description: 'Large heading',
@@ -114,6 +115,7 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
       fontWeight: 600,
       lineHeight: 1.3,
       margin: 0,
+      width: 'fit-content',
     },
     allowedProps: [],
     description: 'Medium heading',
@@ -127,6 +129,7 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
       fontWeight: 600,
       lineHeight: 1.4,
       margin: 0,
+      width: 'fit-content',
     },
     allowedProps: [],
     description: 'Small heading',
@@ -139,6 +142,7 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
       fontSize: '14px',
       lineHeight: 1.5,
       margin: 0,
+      width: 'fit-content',
     },
     allowedProps: [],
     description: 'Paragraph text',
@@ -149,6 +153,7 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
     category: 'text',
     defaultStyles: {
       fontSize: '14px',
+      width: 'fit-content',
     },
     allowedProps: [],
     description: 'Inline text',
@@ -162,6 +167,7 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
       color: '#1677ff',
       textDecoration: 'none',
       cursor: 'pointer',
+      width: 'fit-content',
     },
     allowedProps: ['href', 'target', 'rel'],
     description: 'Hyperlink',
@@ -301,6 +307,25 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
     },
     allowedProps: [],
     description: 'Navigation container',
+  },
+
+  // — Annotation —
+  {
+    type: 'annotation',
+    label: 'Annotation',
+    category: 'annotation',
+    defaultStyles: {
+      position: 'absolute',
+      border: '2px dashed #faad14',
+      backgroundColor: 'rgba(250, 173, 20, 0.08)',
+      borderRadius: '4px',
+      padding: '8px',
+      fontSize: '12px',
+      color: '#faad14',
+      pointerEvents: 'none',
+    },
+    allowedProps: ['content', 'author'],
+    description: 'Design annotation / comment marker',
   },
 ];
 

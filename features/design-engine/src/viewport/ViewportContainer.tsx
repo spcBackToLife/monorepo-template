@@ -12,6 +12,11 @@ export interface ViewportContainerProps {
   children: React.ReactNode;
   /** Additional class name */
   className?: string;
+  /**
+   * 为 true（默认）时设备框使用 `overflow: hidden`，与真机裁切一致。
+   * 编辑模式下选区/手柄会画出节点外缘，设为 false 避免边缘被裁切。
+   */
+  clipDeviceFrame?: boolean;
 }
 
 /**
@@ -26,6 +31,7 @@ export function ViewportContainer({
   backgroundColor = '#ffffff',
   children,
   className,
+  clipDeviceFrame = true,
 }: ViewportContainerProps) {
   const outerStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -46,14 +52,14 @@ export function ViewportContainer({
       width: `${viewport.width}px`,
       height: `${viewport.height}px`,
       backgroundColor,
-      overflow: 'hidden',
+      overflow: clipDeviceFrame ? 'hidden' : 'visible',
       position: 'relative' as const,
       transform: scale !== 1 ? `scale(${scale})` : undefined,
       transformOrigin: 'top center',
       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       flexShrink: 0,
     }),
-    [viewport.width, viewport.height, backgroundColor, scale],
+    [viewport.width, viewport.height, backgroundColor, scale, clipDeviceFrame],
   );
 
   return (

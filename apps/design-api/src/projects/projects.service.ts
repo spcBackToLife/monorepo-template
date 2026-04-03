@@ -94,8 +94,14 @@ export class ProjectsService {
         states: [],
         activeState: 'default',
         events: [],
+        locked: false,
+        visible: true,
+        globalStateBindings: [],
       },
       backgroundColor: '#ffffff',
+      globalStates: [],
+      dataSets: [],
+      activeDataSetId: '',
     };
 
     // INSERT project

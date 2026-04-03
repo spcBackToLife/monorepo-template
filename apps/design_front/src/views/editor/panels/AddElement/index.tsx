@@ -1,6 +1,7 @@
 import { Typography, Collapse, Empty, message } from 'antd';
 import { observer } from 'mobx-react-lite';
 import {
+  generateNodeId,
   getPrimitiveCategories,
   getPrimitivesByCategory,
 } from '@globallink/design-schema';
@@ -25,7 +26,7 @@ export const AddElementPanel = observer(function AddElementPanel() {
     const parentId = screen.rootNode.id;
     const result = editorStore.execute({
       type: 'addElement',
-      params: { parentId, tag: tag as never },
+      params: { parentId, tag: tag as never, elementId: generateNodeId() },
     });
     if (result.success) {
       const createdNodeId = result.affectedNodeIds[0] ?? null;

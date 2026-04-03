@@ -128,9 +128,34 @@ CREATE TABLE component_assets (
 
 保存操作:
 1. 用户/AI 执行一次操作
-2. INSERT INTO design_operations
-3. 更新 projects.current_version
-4. 如果距离上次快照超过 N 次操作 → 创建新快照
+2. 前端先本地执行（UI 立即更新）
+3. 进入异步持久化队列（时间窗批量提交）
+4. INSERT INTO design_operations（批量）
+5. 更新 projects.current_version
+6. 如果距离上次快照超过 N 次操作 → 创建新快照
+
+---
+
+## 前端异步持久化策略（编辑体验优先）
+
+### 目标
+
+- 不让网络抖动干扰编辑体验
+- 降低高频操作（拖拽、连续样式编辑）对后端的写入压力
+- 保证最终一致性（失败可重试）
+
+### 策略
+
+1. **本地优先（Local-first）**：操作先由 `OperationExecutor` 应用到内存状态  
+2. **批量上报（Batch Flush）**：默认每 `1.2s` 聚合多条 operation 走 `/operations/batch`  
+3. **失败补偿（Retry）**：提交失败后操作回退到待发送队列并重试  
+4. **回声去重（Echo Dedup）**：ws 收到本端刚提交的操作时跳过，避免重复应用  
+
+### 建议增强
+
+- 页面隐藏/关闭时触发一次强制 flush
+- 引入 IndexedDB 离线队列，恢复网络后自动续传
+- 为关键动作（发布、导出）提供“阻塞式确认保存完成”开关
 ```
 
 ---

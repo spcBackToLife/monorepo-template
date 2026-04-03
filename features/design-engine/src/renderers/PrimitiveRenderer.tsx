@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ComponentNode } from '@globallink/design-schema';
+import { resolveAssetUrl } from '../assets/resolveAssetUrl';
 
 export interface PrimitiveRendererProps {
   /** The ComponentNode to render */
@@ -37,7 +38,7 @@ export function PrimitiveRenderer({
       return (
         <img
           {...commonProps}
-          src={resolvedProps.src as string}
+          src={resolveAssetUrl(resolvedProps.src)}
           alt={resolvedProps.alt as string ?? ''}
           loading={(resolvedProps.loading as 'lazy' | 'eager') ?? 'lazy'}
         />
@@ -129,6 +130,24 @@ export function PrimitiveRenderer({
       return <ol {...commonProps}>{children}</ol>;
     case 'li':
       return <li {...commonProps}>{resolvedProps.text as string ?? children}</li>;
+
+    case 'annotation':
+      return (
+        <div
+          {...commonProps}
+          style={{
+            ...style,
+            pointerEvents: 'auto',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+          }}
+        >
+          <span style={{ marginRight: 4 }} aria-hidden>
+            📌
+          </span>
+          {(resolvedProps.content as string) ?? ''}
+        </div>
+      );
 
     // --- Default: div ---
     default:

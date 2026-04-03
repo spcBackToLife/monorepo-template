@@ -77,6 +77,10 @@ export function saveAsTemplate(
     thumbnail: options.thumbnail,
     schema,
     scope: options.scope ?? 'project',
+    kind: 'styled',
+    propDefinitions: [],
+    propBindings: [],
+    version: 1,
     createdAt: now,
     updatedAt: now,
   };

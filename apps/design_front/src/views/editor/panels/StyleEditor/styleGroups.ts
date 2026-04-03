@@ -16,6 +16,10 @@ export const STYLE_GROUPS: StyleGroup[] = [
       { key: 'alignItems', label: '交叉轴对齐', type: 'select', options: ['flex-start', 'center', 'flex-end', 'stretch', 'baseline'] },
       { key: 'gap', label: 'Gap', type: 'text' },
       { key: 'position', label: 'Position', type: 'select', options: ['static', 'relative', 'absolute', 'fixed'] },
+      { key: 'left', label: 'Left', type: 'text' },
+      { key: 'top', label: 'Top', type: 'text' },
+      { key: 'right', label: 'Right', type: 'text' },
+      { key: 'bottom', label: 'Bottom', type: 'text' },
     ],
   },
   {
