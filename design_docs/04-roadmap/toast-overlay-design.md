@@ -470,8 +470,20 @@
   └──────────────────────────────────────────────────┘
 
   子链路可以组合多个动作：
-    成功: setState("登陆成功") → delay(500) → navigate("主页")
+    成功: setState("登陆成功") → delay(1000) → navigate("主页", slideLeft)
     失败: setState("登陆失败")
+
+  实际配置示例（登录成功后跳转主页）：
+    ✅ 成功时执行:
+      1. setState → Root → "login-succsess" (autoRevert: 3000ms)  → Toast 出现
+      2. delay → 1000ms                                           → 用户看到 Toast
+      3. navigate → "主页" (animation: slideLeft)                  → 跳转到主页
+
+    时间线:
+      请求成功 → Toast 出现 → 1秒后 → 页面向左滑出到主页
+      总体感受：流畅、利落，有明确的成功反馈
+
+  详细方案见: 02-product/editor/09-interaction-bindding/login-success-navigation.md
 ```
 
 ### 4.3 showToast action 的定位调整

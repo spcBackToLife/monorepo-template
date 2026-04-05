@@ -18,11 +18,19 @@ export function executeAddScreen(
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
+  // Use pre-generated IDs from params for deterministic replay,
+  // or generate new ones on first execution and write back to params.
+  const screenId = params.screenId ?? generateScreenId();
+  const rootNodeId = params.rootNodeId ?? generateNodeId();
+  // Mutate params so the persisted operation carries stable IDs for replay
+  params.screenId = screenId;
+  params.rootNodeId = rootNodeId;
+
   const newScreen = {
-    id: generateScreenId(),
+    id: screenId,
     name: params.name,
     rootNode: {
-      id: generateNodeId(),
+      id: rootNodeId,
       type: 'div' as const,
       styles: {
         display: 'flex',
@@ -41,6 +49,7 @@ export function executeAddScreen(
     domainStates: [],
     dataSources: [],
   };
+  newProject.screens.push(newScreen);
   newProject.updatedAt = new Date().toISOString();
 
   return {

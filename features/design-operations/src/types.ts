@@ -191,6 +191,9 @@ export interface AddScreenOp {
   type: 'addScreen';
   params: {
     name: string;
+    /** Pre-generated IDs for deterministic replay (set by executor on first run) */
+    screenId?: string;
+    rootNodeId?: string;
   };
 }
 
