@@ -6,6 +6,9 @@ import { API_BASE, ApiError, apiJson, getErrorMessage } from '@/api/client';
 import { authStore } from '@/stores/auth';
 import { syncManager } from '@/services/SyncManager';
 
+/** Storage key for pending operations across page reloads */
+const PENDING_OPS_KEY = 'design-editor-pending-ops:';
+
 /** W1-002：编辑画布 pan/zoom 与 Schema 视口尺寸独立；按项目会话记忆，刷新后可恢复 */
 const CANVAS_VIEW_KEY = 'design-editor-canvas-view:';
 
@@ -22,6 +25,35 @@ function readStoredCanvasView(projectId: string): { scale: number; panX: number;
     };
   } catch {
     return null;
+  }
+}
+
+function savePendingOperations(projectId: string, ops: Array<{ operation: any; fingerprint: string }>): void {
+  try {
+    const data = JSON.stringify(ops);
+    localStorage.setItem(PENDING_OPS_KEY + projectId, data);
+  } catch (err) {
+    // quota exceeded / private mode
+    console.warn('[editor] failed to save pending operations to localStorage:', err);
+  }
+}
+
+function loadPendingOperations(projectId: string): Array<{ operation: any; fingerprint: string }> {
+  try {
+    const raw = localStorage.getItem(PENDING_OPS_KEY + projectId);
+    if (!raw) return [];
+    return JSON.parse(raw) as Array<{ operation: any; fingerprint: string }>;
+  } catch (err) {
+    console.warn('[editor] failed to load pending operations from localStorage:', err);
+    return [];
+  }
+}
+
+function clearPendingOperations(projectId: string): void {
+  try {
+    localStorage.removeItem(PENDING_OPS_KEY + projectId);
+  } catch {
+    // ignore
   }
 }
 
@@ -174,10 +206,33 @@ export class EditorStore {
   private pendingOperations: Array<{ operation: Operation; fingerprint: string }> = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private isFlushing = false;
-  private readonly flushIntervalMs = 180000;
+  private readonly flushIntervalMs = 10000; // Reduced from 180s to 10s for faster persistence
+
+  /** Critical operation types that should flush immediately to prevent data loss */
+  private readonly criticalOperationTypes = new Set([
+    'saveAsTemplate',        // Creating component template
+    'deleteTemplate',        // Deleting component template
+    'duplicateTemplate',     // Duplicating component template
+    'createScreen',          // Creating new screen
+    'deleteScreen',          // Deleting screen (risky operation)
+    'createEnvironmentState', // Environment state management
+    'deleteEnvironmentState',
+  ]);
+
+  /** Operations waiting for immediate flush */
+  private immediateFlushQueue: Array<{ operation: Operation; fingerprint: string }> = [];
+  private immediateFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Retry state for failed operations */
+  private retryQueue: Array<{ operation: Operation; fingerprint: string; retryCount: number }> = [];
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly maxRetries = 5;
+  private readonly retryBackoffMs = 1000; // Start with 1s, doubles each time
 
   constructor() {
     makeAutoObservable(this);
+    // Restore pending operations from localStorage on startup
+    this.restorePendingOperationsFromStorage();
   }
 
   /** Get the current project from the executor */
@@ -249,6 +304,10 @@ export class EditorStore {
 
   /** Initialize the editor with a project */
   initProject(project: DesignProject): void {
+    // Clear any previously pending operations for other projects
+    if (this.project?.id && this.project.id !== project.id) {
+      clearPendingOperations(this.project.id);
+    }
     // Project data from MobX stores may be observable proxies. Convert to plain JS first.
     const plain = toJS(project) as DesignProject;
     for (const screen of plain.screens) {
@@ -283,6 +342,26 @@ export class EditorStore {
     this.collapsedSections = {};
     this.rightPanelScrollToSection = null;
     this.leftPanelView = 'elements';
+    // Restore any pending operations after project is initialized
+    this.restoreProjectPendingOps();
+  }
+
+  private restorePendingOperationsFromStorage(): void {
+    // This will be called after project is loaded
+    // We defer restoration to initProject() since projectId is not yet available
+  }
+
+  /** Call this after initProject to restore any pending operations */
+  private restoreProjectPendingOps(): void {
+    if (!this.project?.id) return;
+    const restored = loadPendingOperations(this.project.id);
+    if (restored.length === 0) return;
+    
+    console.log(`[editor] restored ${restored.length} pending operations from localStorage`);
+    // Add to pending operations queue
+    this.pendingOperations.push(...restored);
+    // Schedule flush
+    this.scheduleFlush();
   }
 
   /** Execute an operation */
@@ -306,9 +385,13 @@ export class EditorStore {
     if (result.success) {
       // Generate fingerprint for echo deduplication
       const { fingerprint } = syncManager.wrapOutgoing(op);
-      this.enqueuePersist(op, fingerprint);
+      this.enqueuePersist(op, fingerprint, this.isCriticalOperation(op));
     }
     return result;
+  }
+
+  private isCriticalOperation(op: Operation): boolean {
+    return this.criticalOperationTypes.has(op.type);
   }
 
   /** Apply operation from remote sync without re-persisting */
@@ -341,7 +424,7 @@ export class EditorStore {
     for (let i = 0; i < ops.length; i++) {
       if (results[i]?.success) {
         const { fingerprint } = syncManager.wrapOutgoing(ops[i]);
-        this.enqueuePersist(ops[i], fingerprint);
+        this.enqueuePersist(ops[i], fingerprint, this.isCriticalOperation(ops[i]));
       }
     }
     return results;
@@ -786,10 +869,54 @@ export class EditorStore {
     this.styleClipboard = null;
   }
 
-  private enqueuePersist(op: Operation, fingerprint: string): void {
+  private enqueuePersist(op: Operation, fingerprint: string, forceImmediate = false): void {
     if (!this.project?.id) return;
-    this.pendingOperations.push({ operation: op, fingerprint });
-    this.scheduleFlush();
+
+    if (forceImmediate) {
+      // Critical operations get queued for immediate flush
+      this.immediateFlushQueue.push({ operation: op, fingerprint });
+      this.scheduleImmediateFlush();
+    } else {
+      // Regular operations use the batching strategy
+      this.pendingOperations.push({ operation: op, fingerprint });
+      // Save to localStorage as backup
+      savePendingOperations(this.project.id, this.pendingOperations);
+      this.scheduleFlush();
+    }
+  }
+
+  /** Schedule immediate flush for critical operations (within 100ms) */
+  private scheduleImmediateFlush(): void {
+    if (this.immediateFlushTimer) return;
+    this.immediateFlushTimer = setTimeout(() => {
+      this.immediateFlushTimer = null;
+      void this.flushImmediateCritical();
+    }, 100); // 100ms grace period to batch multiple critical ops
+  }
+
+  /** Flush critical operations immediately */
+  private async flushImmediateCritical(): Promise<void> {
+    if (this.immediateFlushQueue.length === 0) return;
+    const pending = this.immediateFlushQueue;
+    this.immediateFlushQueue = [];
+    const operations = pending.map((p) => p.operation);
+    const fingerprints = pending.map((p) => p.fingerprint);
+
+    try {
+      await apiJson<{ results: OperationResult[] }>(
+        `/projects/${this.project!.id}/operations/batch`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ operations, fingerprints }),
+          token: authStore.token,
+        }
+      );
+    } catch (err) {
+      console.warn('[editor] critical operation flush failed, re-queuing:', err);
+      // Re-queue for retry
+      this.pendingOperations = [...pending, ...this.pendingOperations];
+      this.scheduleFlush();
+    }
   }
 
   private scheduleFlush(): void {
@@ -833,24 +960,120 @@ export class EditorStore {
         syncManager.ackSeq(resp.endSeq);
       }
       syncManager.saveStatus.markSaved();
+      // Clear localStorage after successful flush
+      clearPendingOperations(this.project!.id);
       return true;
     } catch (err: unknown) {
-      /** 400：服务端拒绝整批执行（结构性错误，重试永远不会成功）。
-       *  丢弃这些操作而不是放回队列，避免无限重试循环。
-       *  仅保留 flush 期间新到达的操作（this.pendingOperations 中的）。 */
+      // 400: Structural error - analyze which operations are causing it
       if (err instanceof ApiError && err.status === 400) {
-        console.error('[editor] persist batch rejected (dropped %d ops):', pending.length, getErrorMessage(err.body));
+        console.error('[editor] persist batch rejected (400):', getErrorMessage(err.body));
+        
+        // Try to identify problematic operations from error response
+        if (err.body && typeof err.body === 'object' && 'failedOperationIndex' in err.body) {
+          const failedIdx = (err.body as any).failedOperationIndex;
+          const failedOp = operations[failedIdx];
+          console.error('[editor] operation causing failure:', failedIdx, failedOp?.type, getErrorMessage(err.body));
+          
+          // Move failed op and everything after to retry queue with backoff
+          const failedAndLater = pending.slice(failedIdx);
+          for (const item of failedAndLater) {
+            this.addToRetryQueue(item.operation, item.fingerprint);
+          }
+          
+          // Re-queue operations before the failure
+          const beforeFailed = pending.slice(0, failedIdx);
+          this.pendingOperations = [...beforeFailed, ...this.pendingOperations];
+          
+          if (beforeFailed.length > 0) {
+            this.scheduleFlush();
+          }
+        } else {
+          // Entire batch failed, add to retry queue
+          for (const item of pending) {
+            this.addToRetryQueue(item.operation, item.fingerprint);
+          }
+        }
+        
         syncManager.saveStatus.markFailed();
         return false;
       }
-      this.pendingOperations = [...pending, ...this.pendingOperations];
-      console.error('[editor] persist operation batch failed:', err);
+      
+      // Network errors: re-queue and retry
+      console.error('[editor] persist operation batch failed (retryable):', err);
+      for (const item of pending) {
+        this.addToRetryQueue(item.operation, item.fingerprint);
+      }
+      
       syncManager.saveStatus.markFailed();
-      this.scheduleFlush();
+      this.scheduleRetry();
       return false;
     } finally {
       this.isFlushing = false;
       if (this.pendingOperations.length > 0) this.scheduleFlush();
+    }
+  }
+
+  /** Add operation to retry queue with exponential backoff */
+  private addToRetryQueue(op: Operation, fingerprint: string): void {
+    const existing = this.retryQueue.find((r) => r.operation === op);
+    if (existing) {
+      existing.retryCount++;
+    } else {
+      this.retryQueue.push({ operation: op, fingerprint, retryCount: 0 });
+    }
+  }
+
+  /** Schedule retry for failed operations with exponential backoff */
+  private scheduleRetry(): void {
+    if (this.retryTimer || this.retryQueue.length === 0) return;
+    
+    // Get min retry count from queue
+    const minRetries = Math.min(...this.retryQueue.map((r) => r.retryCount));
+    if (minRetries >= this.maxRetries) {
+      console.error('[editor] max retries exceeded, operations dropped:', this.retryQueue.map((r) => r.operation.type));
+      this.retryQueue = [];
+      return;
+    }
+    
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+    const delayMs = this.retryBackoffMs * Math.pow(2, minRetries);
+    console.log(`[editor] scheduling retry in ${delayMs}ms (attempt ${minRetries + 1}/${this.maxRetries})`);
+    
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      void this.flushRetryQueue();
+    }, delayMs);
+  }
+
+  /** Flush operations from retry queue */
+  private async flushRetryQueue(): Promise<void> {
+    if (this.retryQueue.length === 0) return;
+    
+    const pending = this.retryQueue;
+    this.retryQueue = [];
+    const operations = pending.map((p) => p.operation);
+    const fingerprints = pending.map((p) => p.fingerprint);
+    
+    console.log(`[editor] flushing ${operations.length} operations from retry queue`);
+    
+    try {
+      const resp = await apiJson<{ results: OperationResult[] }>(
+        `/projects/${this.project!.id}/operations/batch`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ operations, fingerprints }),
+          token: authStore.token,
+        }
+      );
+      console.log('[editor] retry batch succeeded');
+      syncManager.saveStatus.markSaved();
+    } catch (err) {
+      console.warn('[editor] retry batch failed, re-queuing:', err);
+      // Add back to retry queue and schedule another retry
+      for (let i = 0; i < pending.length; i++) {
+        this.addToRetryQueue(pending[i].operation, pending[i].fingerprint);
+      }
+      this.scheduleRetry();
     }
   }
 

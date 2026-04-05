@@ -1,5 +1,5 @@
 import type { DesignProject, DataSource } from '@globallink/design-schema';
-import { deepClone, API_DATA_SOURCE_PHASES, generateId } from '@globallink/design-schema';
+import { deepClone, API_DATA_SOURCE_PHASES } from '@globallink/design-schema';
 import type {
   AddDataSourceOp,
   RemoveDataSourceOp,
