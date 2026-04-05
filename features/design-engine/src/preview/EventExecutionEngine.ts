@@ -193,8 +193,26 @@ export class EventExecutionEngine {
       blur: 'blur',
       longPress: 'pointerdown',
       doubleClick: 'dblclick',
+      // screenEnter is NOT a DOM event — handled by PreviewRenderer on mount
     };
     return mapping[trigger] ?? null;
+  }
+
+  /**
+   * Execute a list of actions programmatically (used for screenEnter trigger).
+   */
+  async executeActionsAsync(actions: LooseAction[], context: PreviewContext): Promise<void> {
+    for (const action of actions) {
+      if (action.type === 'delay') {
+        await new Promise((resolve) => setTimeout(resolve, Number(action.duration) || 0));
+        continue;
+      }
+      if (action.type === 'apiRequest') {
+        await this.executeApiRequestAction(action, context);
+        continue;
+      }
+      this.executeAction(action, context);
+    }
   }
 
   private evaluateCondition(event: LooseEvent, context: PreviewContext): boolean {

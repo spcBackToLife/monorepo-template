@@ -1,5 +1,5 @@
 /** Supported event trigger types */
-export type EventTrigger = 'click' | 'hover' | 'focus' | 'blur' | 'longPress';
+export type EventTrigger = 'click' | 'hover' | 'focus' | 'blur' | 'longPress' | 'screenEnter';
 
 /** Transition animation configuration for navigation */
 export interface TransitionAnimation {

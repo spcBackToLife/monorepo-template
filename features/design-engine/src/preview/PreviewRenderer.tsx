@@ -154,6 +154,45 @@ function PreviewInteractiveShell({
     mockRef.current.load(screen.apiEndpoints ?? []);
   }, [screen.apiEndpoints]);
 
+  // ===== screenEnter: auto-execute on page mount / navigate =====
+  const screenEnterFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Only fire once per screen (prevent re-fire on every re-render)
+    if (screenEnterFiredRef.current === screen.id) return;
+    const enterEvents = (screen.rootNode.events ?? []).filter(
+      (e: { trigger: string; disabled?: boolean }) => e.trigger === 'screenEnter' && !e.disabled,
+    );
+    if (enterEvents.length === 0) return;
+    screenEnterFiredRef.current = screen.id;
+
+    const engine = engineRef.current;
+    const mock = mockRef.current;
+    const merge = (name: string, value: string) => {
+      setRuntimeGlobals((g) => ({ ...g, [name]: value }));
+    };
+    const ctx: PreviewContext = {
+      currentScreenId: screen.id,
+      globalStates: runtimeGlobals,
+      onNavigate: (id, anim) => onNavigate?.(id, anim),
+      onSetState: (nodeId, stateName) => {
+        setRuntimeNodeStates((prev) => ({ ...prev, [nodeId]: stateName }));
+      },
+      onSetGlobalState: merge,
+      onSetDomainState: merge,
+      onSetEnvironmentState: merge,
+      onSwitchDataSourcePhase,
+      onToggleVisible: togglePreviewVisible,
+      getNodeState: (nodeId: string) => runtimeNodeStates[nodeId] ?? 'default',
+      onShowToast: addToast,
+      onApiRequest: (requestId, _paramOverrides) => mock.execute(requestId),
+    };
+
+    for (const event of enterEvents) {
+      const actions = (event as { actions?: unknown[] }).actions ?? [];
+      engine.executeActionsAsync(actions as never[], ctx);
+    }
+  }, [screen.id, screen.rootNode.events]);
+
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
