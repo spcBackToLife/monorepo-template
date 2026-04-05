@@ -24,6 +24,73 @@ const selectCls =
 /**
  * Preview Bar — Phase 8：领域态 / 环境态 / 数据源阶段与场景 / 溢出折叠。
  */
+function MockScenarioSwitcher({
+  apiEndpoints,
+  onSwitch,
+}: {
+  apiEndpoints: Array<{
+    definition: { id: string; name: string; method: string; path: string };
+    scenarios: Array<{ id: string; name: string; statusCode: number }>;
+    activeScenarioId: string;
+  }>;
+  onSwitch: (endpointId: string, scenarioId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        className="px-2 py-0.5 rounded bg-purple-700 border border-purple-500 text-[10px] text-white hover:bg-purple-600"
+        onClick={() => setOpen((o) => !o)}
+      >
+        接口场景 ▾
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[240px] max-w-[90vw] p-2 rounded-md border border-gray-600 bg-gray-800 shadow-xl flex flex-col gap-2">
+          <div className="text-[10px] text-gray-400 font-medium">接口 Mock 场景切换</div>
+          {apiEndpoints.map((ep) => (
+            <div key={ep.definition.id} className="flex flex-col gap-0.5">
+              <div className="text-[10px] text-purple-300 font-mono">
+                {ep.definition.method} {ep.definition.path}
+                <span className="text-gray-500 ml-1 font-sans">{ep.definition.name}</span>
+              </div>
+              {ep.scenarios.map((sc) => (
+                <label
+                  key={sc.id}
+                  className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] text-gray-300 hover:bg-gray-700 rounded cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name={`mock-${ep.definition.id}`}
+                    checked={ep.activeScenarioId === sc.id}
+                    onChange={() => onSwitch(ep.definition.id, sc.id)}
+                    className="w-3 h-3"
+                  />
+                  <span>{sc.name}</span>
+                  <span className={`font-mono ${sc.statusCode < 400 ? 'text-green-400' : 'text-red-400'}`}>
+                    {sc.statusCode}
+                  </span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const PreviewBar = observer(function PreviewBar() {
   const screen = editorStore.activeScreen;
   const project = editorStore.project;
@@ -119,6 +186,22 @@ export const PreviewBar = observer(function PreviewBar() {
     },
     [],
   );
+
+  const apiEndpoints = (screen?.apiEndpoints ?? []) as Array<{
+    definition: { id: string; name: string; method: string; path: string };
+    scenarios: Array<{ id: string; name: string; statusCode: number }>;
+    activeScenarioId: string;
+  }>;
+
+  const handleMockScenarioSwitch = (endpointId: string, scenarioId: string) => {
+    if (!screen) return;
+    runInAction(() => {
+      const ep = (screen as any).apiEndpoints?.find(
+        (e: any) => e.definition.id === endpointId,
+      );
+      if (ep) ep.activeScenarioId = scenarioId;
+    });
+  };
 
   const primaryDomain = domainStates.slice(0, 2);
   const extraDomain = domainStates.slice(2);
@@ -274,6 +357,13 @@ export const PreviewBar = observer(function PreviewBar() {
           {primaryDomain.map(renderDomainSelect)}
           {primaryEnv.map(renderEnvSelect)}
           {primaryDs.map((ds) => renderDataSourceBlock(ds, true))}
+
+          {apiEndpoints.length > 0 && (
+            <MockScenarioSwitcher
+              apiEndpoints={apiEndpoints}
+              onSwitch={handleMockScenarioSwitch}
+            />
+          )}
 
           {hasMoreContent && (
             <div className="relative shrink-0" ref={moreRef}>

@@ -18,6 +18,7 @@ export type {
   RemoveStateOp,
   UpdateStateOp,
   SetActiveStateOp,
+  SetChildVisibilityOp,
   AddEventOp,
   RemoveEventOp,
   UpdateEventOp,
@@ -72,6 +73,13 @@ export type {
   SetNodeVisibilityWhenOp,
   SetNodeLockedOp,
   SetNodeVisibleOp,
+  AddApiEndpointOp,
+  RemoveApiEndpointOp,
+  UpdateApiEndpointOp,
+  AddMockScenarioOp,
+  UpdateMockScenarioOp,
+  RemoveMockScenarioOp,
+  SwitchMockScenarioOp,
 } from './types';
 
 // ===== Executor =====
@@ -123,6 +131,7 @@ export {
   executeRemoveState,
   executeUpdateState,
   executeSetActiveState,
+  executeSetChildVisibility,
 } from './operations/state';
 
 export {
@@ -200,3 +209,13 @@ export {
   executeAddAnnotation,
   executeRemoveAnnotation,
 } from './operations/annotation';
+
+export {
+  executeAddApiEndpoint,
+  executeRemoveApiEndpoint,
+  executeUpdateApiEndpoint,
+  executeAddMockScenario,
+  executeUpdateMockScenario,
+  executeRemoveMockScenario,
+  executeSwitchMockScenario,
+} from './operations/api-endpoint';

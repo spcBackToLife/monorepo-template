@@ -267,6 +267,12 @@ function actionSummary(a: EventAction): string {
       return `delay:${a.duration}ms`;
     case 'custom':
       return `custom:${a.handler}`;
+    case 'showToast':
+      return `toast:${a.toastType}:"${a.message}"`;
+    case 'apiRequest':
+      return `apiRequest:${a.requestId}`;
+    default:
+      return `unknown`;
   }
 }
 

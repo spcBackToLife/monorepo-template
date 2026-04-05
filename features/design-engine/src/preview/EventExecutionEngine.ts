@@ -1,4 +1,12 @@
-import type { ComponentNode, TransitionAnimation } from '@globallink/design-schema';
+import type { ComponentNode, TransitionAnimation, ToastType, ToastPosition } from '@globallink/design-schema';
+
+/** Result of a mock API request execution */
+export interface MockResponse {
+  success: boolean;
+  status: number;
+  data: unknown;
+  message: string;
+}
 
 /**
  * Context provided to the EventExecutionEngine for handling actions.
@@ -15,6 +23,12 @@ export interface PreviewContext {
   /** 预览内切换数据源生命周期阶段 */
   onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   onToggleVisible: (nodeId: string) => void;
+  /** Read current runtime state of a node (for auto-revert) */
+  getNodeState?: (nodeId: string) => string;
+  onShowToast?: (type: ToastType, message: string, duration: number, position?: ToastPosition) => void;
+  onApiRequest?: (requestId: string, paramOverrides?: Record<string, string>) => Promise<MockResponse>;
+  /** Injected by apiRequest action for child actions to resolve {{response.xxx}} */
+  responseData?: unknown;
 }
 
 /** Loose shape for action — tolerant of legacy UI field aliases */
@@ -32,8 +46,18 @@ interface LooseAction {
   url?: string;
   duration?: number;
   handler?: string;
+  autoRevertMs?: number;
   dataSourceId?: string;
   phase?: string;
+  // showToast fields
+  toastType?: string;
+  message?: string;
+  position?: string;
+  // apiRequest fields
+  requestId?: string;
+  paramOverrides?: Record<string, string>;
+  onSuccess?: LooseAction[];
+  onFailure?: LooseAction[];
 }
 
 interface LooseCondition {
@@ -104,6 +128,10 @@ export class EventExecutionEngine {
               await new Promise((resolve) =>
                 setTimeout(resolve, Number(action.duration) || 0),
               );
+              continue;
+            }
+            if (action.type === 'apiRequest') {
+              await this.executeApiRequestAction(action, context);
               continue;
             }
             this.executeAction(action, context);
@@ -233,7 +261,15 @@ export class EventExecutionEngine {
         const nodeId = action.nodeId ?? action.targetId;
         const stateName = action.stateName ?? action.state;
         if (nodeId && stateName) {
+          const previousState = context.getNodeState?.(nodeId) ?? 'default';
           context.onSetState(nodeId, stateName);
+
+          const autoRevertMs = (action as { autoRevertMs?: number }).autoRevertMs;
+          if (autoRevertMs && autoRevertMs > 0 && stateName !== previousState) {
+            setTimeout(() => {
+              context.onSetState(nodeId, previousState);
+            }, autoRevertMs);
+          }
         }
         break;
       }
@@ -284,6 +320,25 @@ export class EventExecutionEngine {
         }
         break;
 
+      case 'showToast': {
+        if (context.onShowToast) {
+          const msg = this.resolveResponseExpression(action.message, context);
+          context.onShowToast(
+            (action.toastType as ToastType) ?? 'info',
+            msg,
+            Number(action.duration) || 3000,
+            action.position as ToastPosition | undefined,
+          );
+        }
+        break;
+      }
+
+      case 'apiRequest': {
+        // Handled in the async handler loop — should not reach here via sync path.
+        // The async handler in bind() calls executeActionAsync() directly.
+        break;
+      }
+
       case 'custom':
         if (typeof action.handler === 'string') {
           window.dispatchEvent(
@@ -298,6 +353,73 @@ export class EventExecutionEngine {
         // Unknown action type — silently ignore in preview
         break;
     }
+  }
+
+  /**
+   * Execute an apiRequest action asynchronously, then run the appropriate branch.
+   */
+  async executeApiRequestAction(action: LooseAction, context: PreviewContext): Promise<void> {
+    if (!context.onApiRequest || !action.requestId) return;
+
+    const response = await context.onApiRequest(
+      action.requestId as string,
+      action.paramOverrides as Record<string, string> | undefined,
+    );
+
+    const branch: LooseAction[] = response.success
+      ? (action.onSuccess as LooseAction[] | undefined) ?? []
+      : (action.onFailure as LooseAction[] | undefined) ?? [];
+
+    const childContext: PreviewContext = { ...context, responseData: response.data };
+
+    for (const childAction of branch) {
+      if (childAction.type === 'delay') {
+        await new Promise((r) => setTimeout(r, Number(childAction.duration) || 0));
+        continue;
+      }
+      if (childAction.type === 'apiRequest') {
+        await this.executeApiRequestAction(childAction, childContext);
+        continue;
+      }
+      this.executeAction(childAction, childContext);
+    }
+  }
+
+  /**
+   * Resolve {{response.xxx}} expressions in a string using the current response data.
+   */
+  private resolveResponseExpression(template: string | undefined, context: PreviewContext): string {
+    if (!template) return '';
+    if (typeof template !== 'string') return String(template);
+    if (!template.includes('{{')) return template;
+
+    return template.replace(/\{\{([\s\S]+?)\}\}/g, (_m, inner: string) => {
+      const path = inner.trim();
+      if (path.startsWith('response.') && context.responseData != null) {
+        const subPath = path.substring('response.'.length);
+        const value = this.navigatePath(context.responseData, subPath);
+        return value !== undefined && value !== null ? String(value) : '';
+      }
+      // Fall back to globalStates for non-response expressions
+      if (path.startsWith('globalState.')) {
+        return context.globalStates[path.substring('globalState.'.length)] ?? '';
+      }
+      return '';
+    });
+  }
+
+  private navigatePath(obj: unknown, path: string): unknown {
+    const segments = path.split(/\.|\[(\d+)\]/).filter((s) => s !== '' && s !== undefined);
+    let current: unknown = obj;
+    for (const segment of segments) {
+      if (current === null || current === undefined) return undefined;
+      if (typeof current === 'object') {
+        current = (current as Record<string, unknown>)[segment];
+      } else {
+        return undefined;
+      }
+    }
+    return current;
   }
 }
 

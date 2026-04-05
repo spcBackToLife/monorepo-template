@@ -10,6 +10,7 @@ import { CodeTab } from '../tabs/CodeTab';
 import { StateContextBar } from './StateContextBar';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ChildrenVisibilitySection } from './ChildrenVisibilitySection';
+import { NodeVisibilityCondition } from './NodeVisibilityCondition';
 import { DomainStateResponseSection } from './DomainStateResponseSection';
 
 /**
@@ -83,6 +84,11 @@ export const RightPanel = observer(function RightPanel() {
             <StylesTab />
           </span>
         </CollapsibleSection>
+
+        {/* 2.5 显示条件 — 选中节点自身的状态可见性 */}
+        {node && (
+          <NodeVisibilityCondition node={node} />
+        )}
 
         {/* 3. 子元素（仅容器） */}
         {hasChildren && (

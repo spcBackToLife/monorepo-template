@@ -5,6 +5,7 @@ import type {
   RemoveStateOp,
   UpdateStateOp,
   SetActiveStateOp,
+  SetChildVisibilityOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -219,6 +220,75 @@ export function executeSetActiveState(
     inverse: {
       type: 'setActiveState',
       params: { nodeId: params.nodeId, stateName: oldState },
+    },
+  };
+}
+
+// ===== setChildVisibility =====
+
+export function executeSetChildVisibility(
+  project: DesignProject,
+  params: SetChildVisibilityOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const parent = findNodeInProject(newProject, params.parentNodeId);
+
+  if (!parent) {
+    return {
+      project,
+      result: { success: false, description: `Parent node ${params.parentNodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  if (!parent.states) parent.states = [];
+
+  // Ensure a 'default' state entry exists so childrenVisibility
+  // can be tracked for the implicit default state as well.
+  const hasDefaultState = parent.states.some((s) => s.name === 'default');
+  if (!hasDefaultState) {
+    parent.states.unshift({ name: 'default', styles: {} });
+  }
+
+  // Save old childrenVisibility for undo
+  const oldVisMap: Record<string, boolean | undefined> = {};
+  const oldHadDefaultState = hasDefaultState;
+  for (const state of parent.states) {
+    oldVisMap[state.name] = state.childrenVisibility?.[params.childNodeId];
+  }
+
+  const visibleSet = new Set(params.visibleInStates);
+
+  for (const state of parent.states) {
+    if (!state.childrenVisibility) state.childrenVisibility = {};
+
+    if (visibleSet.has(state.name)) {
+      delete state.childrenVisibility[params.childNodeId];
+    } else {
+      state.childrenVisibility[params.childNodeId] = false;
+    }
+
+    if (Object.keys(state.childrenVisibility).length === 0) {
+      delete state.childrenVisibility;
+    }
+  }
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Set child ${params.childNodeId} visibility in states [${params.visibleInStates.join(', ')}]`,
+      affectedNodeIds: [params.parentNodeId, params.childNodeId],
+    },
+    inverse: {
+      type: '_restoreChildVisibility',
+      params: {
+        parentNodeId: params.parentNodeId,
+        childNodeId: params.childNodeId,
+        oldVisMap,
+      },
     },
   };
 }

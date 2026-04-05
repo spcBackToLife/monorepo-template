@@ -39,6 +39,7 @@ import {
   executeRemoveState,
   executeUpdateState,
   executeSetActiveState,
+  executeSetChildVisibility,
 } from '../operations/state';
 import {
   executeAddEvent,
@@ -106,6 +107,15 @@ import {
   executeAddAnnotation,
   executeRemoveAnnotation,
 } from '../operations/annotation';
+import {
+  executeAddApiEndpoint,
+  executeRemoveApiEndpoint,
+  executeUpdateApiEndpoint,
+  executeAddMockScenario,
+  executeUpdateMockScenario,
+  executeRemoveMockScenario,
+  executeSwitchMockScenario,
+} from '../operations/api-endpoint';
 import { findNodeById, findParent } from '../utils/tree';
 
 /**
@@ -311,6 +321,8 @@ export class OperationExecutor {
         return executeUpdateState(project, op.params);
       case 'setActiveState':
         return executeSetActiveState(project, op.params);
+      case 'setChildVisibility':
+        return executeSetChildVisibility(project, op.params);
 
       // Event operations
       case 'addEvent':
@@ -418,6 +430,22 @@ export class OperationExecutor {
       case 'duplicateTemplate':
         return executeDuplicateTemplate(project, op.params);
 
+      // API Endpoint operations
+      case 'addApiEndpoint':
+        return executeAddApiEndpoint(project, op.params);
+      case 'removeApiEndpoint':
+        return executeRemoveApiEndpoint(project, op.params);
+      case 'updateApiEndpoint':
+        return executeUpdateApiEndpoint(project, op.params);
+      case 'addMockScenario':
+        return executeAddMockScenario(project, op.params);
+      case 'updateMockScenario':
+        return executeUpdateMockScenario(project, op.params);
+      case 'removeMockScenario':
+        return executeRemoveMockScenario(project, op.params);
+      case 'switchMockScenario':
+        return executeSwitchMockScenario(project, op.params);
+
       // Annotation operations
       case 'addAnnotation':
         return executeAddAnnotation(project, op.params);
@@ -503,6 +531,15 @@ export class OperationExecutor {
 
       case '_restoreDeletedTemplate':
         return this.restoreDeletedTemplate(project, inv.params as any);
+
+      case '_restoreApiEndpoint':
+        return this.restoreApiEndpoint(project, inv.params as any);
+
+      case '_restoreMockScenario':
+        return this.restoreMockScenario(project, inv.params as any);
+
+      case '_restoreChildVisibility':
+        return this.restoreChildVisibility(project, inv.params as any);
 
       default:
         // Regular operations can be used as inverse too (e.g., moveElement, setActiveState)
@@ -1133,6 +1170,117 @@ export class OperationExecutor {
       project: newProject,
       result: { success: true, description: `Restored template "${params.template.name}"`, affectedNodeIds: [params.template.id] },
       inverse: { type: 'deleteTemplate', params: { templateId: params.template.id } } as InverseData,
+    };
+  }
+
+  private restoreApiEndpoint(
+    project: DesignProject,
+    params: { screenId: string; endpoint: any; position: number },
+  ) {
+    const newProject = deepClone(project);
+    const screen = newProject.screens.find((s) => s.id === params.screenId);
+
+    if (!screen) {
+      return {
+        project,
+        result: { success: false, description: `Cannot restore API endpoint: screen ${params.screenId} not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    if (!screen.apiEndpoints) {
+      screen.apiEndpoints = [];
+    }
+    screen.apiEndpoints.splice(params.position, 0, params.endpoint);
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored API endpoint "${params.endpoint.definition.name}"`, affectedNodeIds: [params.screenId] },
+      inverse: { type: 'removeApiEndpoint', params: { screenId: params.screenId, endpointId: params.endpoint.definition.id } } as InverseData,
+    };
+  }
+
+  private restoreMockScenario(
+    project: DesignProject,
+    params: {
+      screenId: string;
+      endpointId: string;
+      scenario: any;
+      position: number;
+      previousActiveScenarioId: string;
+    },
+  ) {
+    const newProject = deepClone(project);
+    const screen = newProject.screens.find((s) => s.id === params.screenId);
+    const endpoint = screen?.apiEndpoints?.find((ep) => ep.definition.id === params.endpointId);
+
+    if (!screen || !endpoint) {
+      return {
+        project,
+        result: { success: false, description: `Cannot restore mock scenario: endpoint not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    endpoint.scenarios.splice(params.position, 0, params.scenario);
+    endpoint.activeScenarioId = params.previousActiveScenarioId;
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored mock scenario "${params.scenario.name}"`, affectedNodeIds: [params.screenId] },
+      inverse: {
+        type: 'removeMockScenario',
+        params: { screenId: params.screenId, endpointId: params.endpointId, scenarioId: params.scenario.id },
+      } as InverseData,
+    };
+  }
+
+  private restoreChildVisibility(
+    project: DesignProject,
+    params: {
+      parentNodeId: string;
+      childNodeId: string;
+      oldVisMap: Record<string, boolean | undefined>;
+    },
+  ) {
+    const newProject = deepClone(project);
+    let parent: ReturnType<typeof findNodeById> | undefined;
+    for (const scr of newProject.screens) {
+      parent = findNodeById(scr.rootNode, params.parentNodeId);
+      if (parent) break;
+    }
+
+    if (!parent) {
+      return {
+        project,
+        result: { success: false, description: `Parent node not found`, affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    for (const state of parent.states ?? []) {
+      const oldVal = params.oldVisMap[state.name];
+      if (oldVal === undefined) {
+        if (state.childrenVisibility) {
+          delete state.childrenVisibility[params.childNodeId];
+          if (Object.keys(state.childrenVisibility).length === 0) {
+            delete state.childrenVisibility;
+          }
+        }
+      } else {
+        if (!state.childrenVisibility) state.childrenVisibility = {};
+        state.childrenVisibility[params.childNodeId] = oldVal;
+      }
+    }
+
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored child visibility`, affectedNodeIds: [params.parentNodeId] },
+      inverse: { type: 'noop', params: {} } as InverseData,
     };
   }
 }

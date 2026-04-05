@@ -477,6 +477,7 @@ React DOM 渲染层（SchemaRenderer）
 | 09 | [交互与事件](./09-interaction-bindding/README.md) | 如何在设计阶段定义真实的交互行为？ | 事件绑定、页面跳转 |
 | 10 | [预览与验证](./10-preview-mode/README.md) | 如何验证产品的真实交互效果？ | 预览模式、交互执行 |
 | 11 | [协作与同步](./11-collaboration/README.md) | 如何让人和 AI 实时协作构建？ | MCP 同步、WebSocket |
+| 12 | [可交互原型](./12-interactive-prototype/README.md) | 如何让设计原型具备完整的交互与 Mock API 能力？ | callDataSource、表单收集、Toast |
 
 ---
 

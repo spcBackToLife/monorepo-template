@@ -364,19 +364,42 @@ function NodeRenderer({
       />
     );
   } else {
-    children = node.children?.map((child) => (
-      <NodeRenderer
-        key={child.id}
-        node={child}
-        rootNodeId={rootNodeId}
-        assets={assets}
-        globalStates={globalStates}
-        interactionPreview={interactionPreview}
-        onNodeClick={onNodeClick}
-        onNodeHover={onNodeHover}
-        onNodeDoubleClick={onNodeDoubleClick}
-      />
-    ));
+    const activeStateDef = node.states?.find((s) => s.name === node.activeState);
+    const cvMap = activeStateDef?.childrenVisibility;
+
+    children = node.children?.map((child) => {
+      const hiddenInState = cvMap ? cvMap[child.id] === false : false;
+      if (hiddenInState) {
+        return (
+          <GhostWrapper key={child.id} node={child} visibleStates={getVisibleStateNames(node, child.id)}>
+            <NodeRenderer
+              key={child.id}
+              node={child}
+              rootNodeId={rootNodeId}
+              assets={assets}
+              globalStates={globalStates}
+              interactionPreview={interactionPreview}
+              onNodeClick={onNodeClick}
+              onNodeHover={onNodeHover}
+              onNodeDoubleClick={onNodeDoubleClick}
+            />
+          </GhostWrapper>
+        );
+      }
+      return (
+        <NodeRenderer
+          key={child.id}
+          node={child}
+          rootNodeId={rootNodeId}
+          assets={assets}
+          globalStates={globalStates}
+          interactionPreview={interactionPreview}
+          onNodeClick={onNodeClick}
+          onNodeHover={onNodeHover}
+          onNodeDoubleClick={onNodeDoubleClick}
+        />
+      );
+    });
   }
 
   // Step 7: Wrap with click/hover handlers
@@ -410,5 +433,57 @@ function resolveDataExpressions(
     return props;
   }
   return resolvePropsExpressions(props, context);
+}
+
+// ===== childrenVisibility: Ghost Wrapper for state-hidden components =====
+
+function getVisibleStateNames(parent: ComponentNode, childId: string): string[] {
+  return (parent.states ?? [])
+    .filter((s) => s.childrenVisibility?.[childId] !== false)
+    .map((s) => s.name);
+}
+
+function GhostWrapper({
+  node,
+  visibleStates,
+  children,
+}: {
+  node: ComponentNode;
+  visibleStates: string[];
+  children: React.ReactNode;
+}) {
+  const label = visibleStates.length > 0 ? visibleStates.join(', ') : '(无)';
+  return (
+    <div
+      data-ghost-node={node.id}
+      style={{
+        opacity: 0.2,
+        pointerEvents: 'auto',
+        position: 'relative',
+        outline: '1px dashed rgba(99,102,241,0.4)',
+        outlineOffset: '-1px',
+      }}
+    >
+      {children}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          backgroundColor: 'rgba(99,102,241,0.85)',
+          color: '#fff',
+          fontSize: '9px',
+          lineHeight: '14px',
+          padding: '0 4px',
+          borderBottomLeftRadius: '3px',
+          pointerEvents: 'none',
+          zIndex: 1,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        👁 {label}
+      </div>
+    </div>
+  );
 }
 

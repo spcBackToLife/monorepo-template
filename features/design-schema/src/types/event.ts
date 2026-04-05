@@ -20,6 +20,8 @@ export interface SetStateAction {
   type: 'setState';
   targetId: string;
   state: string;
+  /** Auto-revert to previous state after N ms (e.g. Toast disappears after 3000ms) */
+  autoRevertMs?: number;
 }
 
 /** Open an external URL */
@@ -60,6 +62,36 @@ export interface ToggleVisibleAction {
   targetId: string;
 }
 
+/** Toast display position */
+export type ToastPosition = 'top-center' | 'bottom-center' | 'top-right';
+
+/** Toast visual type */
+export type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+/** Show a toast notification */
+export interface ShowToastAction {
+  type: 'showToast';
+  toastType: ToastType;
+  /** Message content — supports {{response.xxx}} expressions */
+  message: string;
+  /** Duration in ms, default 3000 */
+  duration?: number;
+  position?: ToastPosition;
+}
+
+/** Send an API request with success/failure branching */
+export interface ApiRequestAction {
+  type: 'apiRequest';
+  /** References Screen.apiEndpoints[].definition.id */
+  requestId: string;
+  /** Runtime parameter overrides */
+  paramOverrides?: Record<string, string>;
+  /** Actions to execute on success (2xx status) */
+  onSuccess: EventAction[];
+  /** Actions to execute on failure (non-2xx or timeout) */
+  onFailure: EventAction[];
+}
+
 /** Union of all possible event actions */
 export type EventAction =
   | NavigateAction
@@ -69,7 +101,9 @@ export type EventAction =
   | CustomAction
   | SetDomainStateAction
   | SetEnvironmentStateAction
-  | ToggleVisibleAction;
+  | ToggleVisibleAction
+  | ShowToastAction
+  | ApiRequestAction;
 
 /** Condition for conditional event execution */
 export interface EventCondition {

@@ -8,6 +8,9 @@ import type {
   TemplateScope,
   PropBinding,
   DomainStateValue,
+  ApiEndpoint,
+  RequestDefinition,
+  MockScenario,
 } from '@globallink/design-schema';
 
 // ===== Operation Result =====
@@ -682,6 +685,84 @@ export interface DuplicateTemplateOp {
   };
 }
 
+// -- API Endpoint Operations --
+
+export interface AddApiEndpointOp {
+  type: 'addApiEndpoint';
+  params: {
+    screenId: string;
+    endpoint: ApiEndpoint;
+  };
+}
+
+export interface RemoveApiEndpointOp {
+  type: 'removeApiEndpoint';
+  params: {
+    screenId: string;
+    endpointId: string;
+  };
+}
+
+export interface UpdateApiEndpointOp {
+  type: 'updateApiEndpoint';
+  params: {
+    screenId: string;
+    endpointId: string;
+    definition: Partial<RequestDefinition>;
+  };
+}
+
+export interface AddMockScenarioOp {
+  type: 'addMockScenario';
+  params: {
+    screenId: string;
+    endpointId: string;
+    scenario: MockScenario;
+  };
+}
+
+export interface UpdateMockScenarioOp {
+  type: 'updateMockScenario';
+  params: {
+    screenId: string;
+    endpointId: string;
+    scenarioId: string;
+    changes: Partial<MockScenario>;
+  };
+}
+
+export interface RemoveMockScenarioOp {
+  type: 'removeMockScenario';
+  params: {
+    screenId: string;
+    endpointId: string;
+    scenarioId: string;
+  };
+}
+
+export interface SwitchMockScenarioOp {
+  type: 'switchMockScenario';
+  params: {
+    screenId: string;
+    endpointId: string;
+    scenarioId: string;
+  };
+}
+
+// -- Child Visibility in States --
+
+export interface SetChildVisibilityOp {
+  type: 'setChildVisibility';
+  params: {
+    /** Parent node id whose states' childrenVisibility will be updated */
+    parentNodeId: string;
+    /** Child node id */
+    childNodeId: string;
+    /** State names in which the child IS visible (all other custom states → hidden) */
+    visibleInStates: string[];
+  };
+}
+
 // -- Annotation Operations --
 
 export interface AddAnnotationOp {
@@ -770,6 +851,14 @@ export type Operation =
   | UpdateTemplateOp
   | DeleteTemplateOp
   | DuplicateTemplateOp
+  | AddApiEndpointOp
+  | RemoveApiEndpointOp
+  | UpdateApiEndpointOp
+  | AddMockScenarioOp
+  | UpdateMockScenarioOp
+  | RemoveMockScenarioOp
+  | SwitchMockScenarioOp
+  | SetChildVisibilityOp
   | AddAnnotationOp
   | RemoveAnnotationOp;
 

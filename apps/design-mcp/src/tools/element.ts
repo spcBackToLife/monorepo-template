@@ -136,7 +136,7 @@ export function registerElementTools(server: McpServer): void {
       },
     },
     async ({ projectId, parentId, subtree, position }) => {
-      const tree = subtree as ComponentNode;
+      const tree = subtree as unknown as ComponentNode;
       walkTree(tree, (n) => { n.id = generateNodeId(); });
       const result = await api.executeOperation(projectId, {
         type: 'insertSubtree',

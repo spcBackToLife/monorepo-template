@@ -1,6 +1,7 @@
 import type { ComponentNode } from './node';
 import type { DomainStateVariable } from './domainState';
 import type { DataSource } from './dataSource';
+import type { ApiEndpoint } from './api';
 
 /** A single screen/page in the design project */
 export interface Screen {
@@ -16,4 +17,6 @@ export interface Screen {
   domainStates: DomainStateVariable[];
   /** Data sources for data-driven design */
   dataSources: DataSource[];
+  /** API endpoint definitions with mock scenarios for preview */
+  apiEndpoints?: ApiEndpoint[];
 }

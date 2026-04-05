@@ -36,10 +36,20 @@ export type {
   SetDomainStateAction,
   SetEnvironmentStateAction,
   ToggleVisibleAction,
+  ToastPosition,
+  ToastType,
+  ShowToastAction,
+  ApiRequestAction,
   EventAction,
   EventCondition,
   ComponentEvent,
 } from './event';
+export type {
+  HttpMethod,
+  RequestDefinition,
+  MockScenario,
+  ApiEndpoint,
+} from './api';
 export type { Platform, Viewport } from './viewport';
 export type { Screen } from './screen';
 export type { TemplateScope, TemplateKind, ComponentTemplate } from './template';

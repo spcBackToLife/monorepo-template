@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { App as AntdApp, Empty, Button } from 'antd';
+import { App as AntdApp, Empty, Button, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { generateId } from '@globallink/design-schema';
-import type { DataSource } from '@globallink/design-schema';
+import type { DataSource, ApiEndpoint, HttpMethod, MockScenario } from '@globallink/design-schema';
 
 /**
  * 页面数据面板 — 重写版
@@ -65,6 +65,9 @@ export const DataTab = observer(function DataTab() {
 
       {/* JSON 编辑器 */}
       <PageDataEditor screenId={screen.id} dataSource={activeDs} />
+
+      {/* 接口定义 */}
+      <ApiEndpointsSection screenId={screen.id} />
 
       {/* 预设模板 */}
       <PresetSection screenId={screen.id} dataSource={activeDs} />
@@ -238,6 +241,560 @@ const PageDataEditor = observer(function PageDataEditor({
     </div>
   );
 });
+
+// ===================================================================
+// 接口定义 & Mock 场景管理
+// ===================================================================
+
+const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+const METHOD_COLORS: Record<string, string> = {
+  GET: 'text-green-600 bg-green-50',
+  POST: 'text-blue-600 bg-blue-50',
+  PUT: 'text-amber-600 bg-amber-50',
+  PATCH: 'text-orange-600 bg-orange-50',
+  DELETE: 'text-red-600 bg-red-50',
+};
+
+const ApiEndpointsSection = observer(function ApiEndpointsSection({
+  screenId,
+}: {
+  screenId: string;
+}) {
+  const screen = editorStore.activeScreen;
+  const apiEndpoints: ApiEndpoint[] = (screen?.apiEndpoints ?? []) as ApiEndpoint[];
+  const [open, setOpen] = useState(true);
+  const [addingNew, setAddingNew] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const handleAddEndpoint = (ep: ApiEndpoint) => {
+    editorStore.execute({
+      type: 'addApiEndpoint',
+      params: { screenId, endpoint: ep },
+    } as never);
+    setAddingNew(false);
+  };
+
+  const handleRemoveEndpoint = (endpointId: string) => {
+    editorStore.execute({
+      type: 'removeApiEndpoint',
+      params: { screenId, endpointId },
+    } as never);
+    if (expandedId === endpointId) setExpandedId(null);
+  };
+
+  return (
+    <CollapsibleSection title={`接口定义 (${apiEndpoints.length})`} open={open} onToggle={() => setOpen(!open)}>
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[10px] text-gray-500 leading-snug">
+          定义 API 接口并配置 Mock 场景，在事件中使用「发送请求」动作即可调用。
+        </p>
+
+        {apiEndpoints.map((ep) => (
+          <EndpointCard
+            key={ep.definition.id}
+            endpoint={ep}
+            screenId={screenId}
+            expanded={expandedId === ep.definition.id}
+            onToggle={() => setExpandedId(expandedId === ep.definition.id ? null : ep.definition.id)}
+            onRemove={() => handleRemoveEndpoint(ep.definition.id)}
+          />
+        ))}
+
+        {addingNew ? (
+          <NewEndpointForm
+            onSave={handleAddEndpoint}
+            onCancel={() => setAddingNew(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            className="w-full flex items-center justify-center gap-1 py-1.5 border border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors text-[10px]"
+            onClick={() => setAddingNew(true)}
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            添加接口
+          </button>
+        )}
+      </div>
+    </CollapsibleSection>
+  );
+});
+
+/** 新建接口表单 */
+function NewEndpointForm({
+  onSave,
+  onCancel,
+}: {
+  onSave: (ep: ApiEndpoint) => void;
+  onCancel: () => void;
+}) {
+  const [method, setMethod] = useState<HttpMethod>('GET');
+  const [path, setPath] = useState('');
+  const [name, setName] = useState('');
+
+  const handleSubmit = () => {
+    if (!path.trim()) return;
+    const defId = generateId();
+    const scenarioId = generateId();
+    onSave({
+      definition: {
+        id: defId,
+        name: name.trim() || `${method} ${path}`,
+        method,
+        path: path.trim(),
+      },
+      scenarios: [
+        {
+          id: scenarioId,
+          name: '成功',
+          statusCode: 200,
+          delay: 300,
+          responseBody: { success: true, data: {} },
+        },
+      ],
+      activeScenarioId: scenarioId,
+    });
+  };
+
+  return (
+    <div className="border border-blue-200 rounded bg-blue-50/30 p-2 flex flex-col gap-1.5">
+      <div className="text-[10px] font-medium text-blue-600">新建接口</div>
+      <div className="flex items-center gap-1">
+        <select
+          className="h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none w-20 font-mono"
+          value={method}
+          onChange={(e) => setMethod(e.target.value as HttpMethod)}
+        >
+          {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <input
+          type="text"
+          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
+          placeholder="/api/users"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500 w-10 flex-shrink-0">名称:</span>
+        <input
+          type="text"
+          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
+          placeholder="接口名称（可选）"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center gap-1 justify-end">
+        <button
+          type="button"
+          className="h-6 px-2 bg-blue-500 text-white rounded text-[10px] hover:bg-blue-600 disabled:opacity-50"
+          onClick={handleSubmit}
+          disabled={!path.trim()}
+        >
+          创建
+        </button>
+        <button
+          type="button"
+          className="h-6 px-2 border border-gray-200 text-gray-500 rounded text-[10px]"
+          onClick={onCancel}
+        >
+          取消
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 单个接口卡片 */
+const EndpointCard = observer(function EndpointCard({
+  endpoint,
+  screenId,
+  expanded,
+  onToggle,
+  onRemove,
+}: {
+  endpoint: ApiEndpoint;
+  screenId: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  const def = endpoint.definition;
+  const methodColor = METHOD_COLORS[def.method] ?? 'text-gray-600 bg-gray-50';
+  const [editingDef, setEditingDef] = useState(false);
+
+  return (
+    <div className="border border-gray-200 rounded bg-white overflow-hidden">
+      {/* Header */}
+      <div
+        className="flex items-center gap-1.5 px-2 py-1.5 cursor-pointer hover:bg-gray-50"
+        onClick={onToggle}
+      >
+        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${methodColor}`}>
+          {def.method}
+        </span>
+        <span className="text-xs font-mono text-gray-700 flex-1 truncate">{def.path}</span>
+        <span className="text-[10px] text-gray-400 truncate max-w-[60px]">{def.name}</span>
+        <span className="text-[10px] text-gray-300">{endpoint.scenarios.length} 场景</span>
+        <Popconfirm title="确定删除此接口？" onConfirm={(e) => { e?.stopPropagation(); onRemove(); }} onCancel={(e) => e?.stopPropagation()} okText="删除" cancelText="取消">
+          <button
+            type="button"
+            className="text-gray-300 hover:text-red-400 p-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </Popconfirm>
+        <svg
+          className={`w-3 h-3 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {/* Body (expanded) */}
+      {expanded && (
+        <div className="border-t border-gray-100 p-2 flex flex-col gap-2">
+          {/* Definition editor */}
+          {editingDef ? (
+            <EndpointDefEditor
+              endpoint={endpoint}
+              screenId={screenId}
+              onClose={() => setEditingDef(false)}
+            />
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-500">ID: {def.id.slice(0, 8)}</span>
+              {def.description && <span className="text-[10px] text-gray-400">— {def.description}</span>}
+              <button
+                type="button"
+                className="text-[10px] text-blue-500 hover:text-blue-700 ml-auto"
+                onClick={() => setEditingDef(true)}
+              >
+                编辑定义
+              </button>
+            </div>
+          )}
+
+          {/* Mock scenarios */}
+          <MockScenariosEditor endpoint={endpoint} screenId={screenId} />
+        </div>
+      )}
+    </div>
+  );
+});
+
+/** 接口定义编辑器 */
+function EndpointDefEditor({
+  endpoint,
+  screenId,
+  onClose,
+}: {
+  endpoint: ApiEndpoint;
+  screenId: string;
+  onClose: () => void;
+}) {
+  const def = endpoint.definition;
+  const [method, setMethod] = useState<HttpMethod>(def.method);
+  const [path, setPath] = useState(def.path);
+  const [name, setName] = useState(def.name);
+  const [desc, setDesc] = useState(def.description ?? '');
+  const [bodyText, setBodyText] = useState(def.body ? JSON.stringify(def.body, null, 2) : '');
+
+  const handleSave = () => {
+    const changes: Record<string, unknown> = {};
+    if (method !== def.method) changes.method = method;
+    if (path !== def.path) changes.path = path;
+    if (name !== def.name) changes.name = name;
+    if (desc !== (def.description ?? '')) changes.description = desc || undefined;
+    if (bodyText.trim()) {
+      try {
+        changes.body = JSON.parse(bodyText);
+      } catch {
+        changes.body = bodyText;
+      }
+    }
+    editorStore.execute({
+      type: 'updateApiEndpoint',
+      params: { screenId, endpointId: def.id, definition: changes },
+    } as never);
+    onClose();
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 border border-blue-200 rounded p-1.5 bg-blue-50/20">
+      <div className="flex items-center gap-1">
+        <select
+          className="h-6 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none w-20 font-mono"
+          value={method}
+          onChange={(e) => setMethod(e.target.value as HttpMethod)}
+        >
+          {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <input
+          type="text"
+          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400 font-mono"
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500 w-8">名称</span>
+        <input
+          type="text"
+          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500 w-8">描述</span>
+        <input
+          type="text"
+          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
+          placeholder="可选"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+        />
+      </div>
+      {(method === 'POST' || method === 'PUT' || method === 'PATCH') && (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-500">请求体 (JSON，支持 {'{{expression}}'})</span>
+          <textarea
+            className="w-full h-20 px-1.5 py-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400 font-mono resize-y bg-gray-50"
+            value={bodyText}
+            onChange={(e) => setBodyText(e.target.value)}
+            placeholder={'{\n  "email": "{{data.email}}"\n}'}
+          />
+        </div>
+      )}
+      <div className="flex items-center gap-1 justify-end">
+        <button type="button" className="h-5 px-2 bg-blue-500 text-white rounded text-[10px]" onClick={handleSave}>保存</button>
+        <button type="button" className="h-5 px-2 border border-gray-200 text-gray-500 rounded text-[10px]" onClick={onClose}>取消</button>
+      </div>
+    </div>
+  );
+}
+
+/** Mock 场景列表 + 管理 */
+const MockScenariosEditor = observer(function MockScenariosEditor({
+  endpoint,
+  screenId,
+}: {
+  endpoint: ApiEndpoint;
+  screenId: string;
+}) {
+  const [addingScenario, setAddingScenario] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const endpointId = endpoint.definition.id;
+
+  const handleSwitchScenario = (scenarioId: string) => {
+    editorStore.execute({
+      type: 'switchMockScenario',
+      params: { screenId, endpointId, scenarioId },
+    } as never);
+  };
+
+  const handleRemoveScenario = (scenarioId: string) => {
+    editorStore.execute({
+      type: 'removeMockScenario',
+      params: { screenId, endpointId, scenarioId },
+    } as never);
+  };
+
+  const handleAddScenario = (scenario: MockScenario) => {
+    editorStore.execute({
+      type: 'addMockScenario',
+      params: { screenId, endpointId, scenario },
+    } as never);
+    setAddingScenario(false);
+  };
+
+  const handleUpdateScenario = (scenarioId: string, changes: Partial<MockScenario>) => {
+    editorStore.execute({
+      type: 'updateMockScenario',
+      params: { screenId, endpointId, scenarioId, changes },
+    } as never);
+    setEditingId(null);
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="text-[10px] font-medium text-gray-600">Mock 场景</div>
+
+      {endpoint.scenarios.map((sc) => {
+        const isActive = sc.id === endpoint.activeScenarioId;
+        if (editingId === sc.id) {
+          return (
+            <ScenarioEditForm
+              key={sc.id}
+              scenario={sc}
+              onSave={(changes) => handleUpdateScenario(sc.id, changes)}
+              onCancel={() => setEditingId(null)}
+            />
+          );
+        }
+        return (
+          <div
+            key={sc.id}
+            className={`flex items-center gap-1 px-2 py-1 rounded border text-[10px] ${
+              isActive ? 'border-blue-300 bg-blue-50/50' : 'border-gray-100 bg-white'
+            }`}
+          >
+            <button
+              type="button"
+              className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
+                isActive ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white hover:border-blue-400'
+              }`}
+              onClick={() => handleSwitchScenario(sc.id)}
+              title={isActive ? '当前激活' : '切换到此场景'}
+            />
+            <span className="flex-1 truncate text-gray-700">{sc.name}</span>
+            <span className={`font-mono px-1 rounded ${sc.statusCode < 400 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+              {sc.statusCode}
+            </span>
+            <span className="text-gray-400">{sc.delay}ms</span>
+            <button type="button" className="text-gray-400 hover:text-blue-500" onClick={() => setEditingId(sc.id)} title="编辑">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            </button>
+            {endpoint.scenarios.length > 1 && (
+              <Popconfirm title="删除此场景？" onConfirm={() => handleRemoveScenario(sc.id)} okText="删除" cancelText="取消">
+                <button type="button" className="text-gray-300 hover:text-red-400">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </Popconfirm>
+            )}
+          </div>
+        );
+      })}
+
+      {addingScenario ? (
+        <ScenarioEditForm
+          onSave={(sc) => handleAddScenario(sc as MockScenario)}
+          onCancel={() => setAddingScenario(false)}
+          isNew
+        />
+      ) : (
+        <button
+          type="button"
+          className="w-full py-1 text-[10px] border border-dashed border-gray-200 rounded text-gray-400 hover:text-blue-500 hover:border-blue-300"
+          onClick={() => setAddingScenario(true)}
+        >
+          + 添加场景
+        </button>
+      )}
+    </div>
+  );
+});
+
+/** 场景编辑/创建表单 */
+function ScenarioEditForm({
+  scenario,
+  onSave,
+  onCancel,
+  isNew,
+}: {
+  scenario?: MockScenario;
+  onSave: (data: Partial<MockScenario> & { id?: string; name?: string; statusCode?: number; delay?: number; responseBody?: unknown }) => void;
+  onCancel: () => void;
+  isNew?: boolean;
+}) {
+  const [name, setName] = useState(scenario?.name ?? '');
+  const [statusCode, setStatusCode] = useState(scenario?.statusCode ?? 200);
+  const [delay, setDelay] = useState(scenario?.delay ?? 300);
+  const [isTimeout, setIsTimeout] = useState(scenario?.isTimeout ?? false);
+  const [responseText, setResponseText] = useState(
+    scenario?.responseBody != null ? JSON.stringify(scenario.responseBody, null, 2) : '{\n  "success": true\n}'
+  );
+  const [bodyError, setBodyError] = useState<string | null>(null);
+
+  const handleSave = () => {
+    if (!name.trim()) return;
+    let responseBody: unknown;
+    try {
+      responseBody = JSON.parse(responseText);
+      setBodyError(null);
+    } catch (e) {
+      setBodyError((e as Error).message);
+      return;
+    }
+    if (isNew) {
+      onSave({ id: generateId(), name: name.trim(), statusCode, delay, isTimeout: isTimeout || undefined, responseBody });
+    } else {
+      onSave({ name: name.trim(), statusCode, delay, isTimeout: isTimeout || undefined, responseBody });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1 border border-blue-200 rounded p-1.5 bg-blue-50/20">
+      <div className="text-[10px] font-medium text-blue-600">{isNew ? '新建场景' : '编辑场景'}</div>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">名称:</span>
+        <input
+          type="text"
+          className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
+          placeholder="例: 成功 / 网络错误"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">状态码:</span>
+        <input
+          type="number"
+          className="w-16 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400 font-mono"
+          value={statusCode}
+          onChange={(e) => setStatusCode(Number(e.target.value))}
+        />
+        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0 ml-1">延迟:</span>
+        <input
+          type="number"
+          className="w-16 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400 font-mono"
+          value={delay}
+          onChange={(e) => setDelay(Number(e.target.value))}
+        />
+        <span className="text-[10px] text-gray-400">ms</span>
+      </div>
+      <label className="flex items-center gap-1 text-[10px] text-gray-500">
+        <input
+          type="checkbox"
+          checked={isTimeout}
+          onChange={(e) => setIsTimeout(e.target.checked)}
+        />
+        模拟超时
+      </label>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] text-gray-500">响应体 (JSON):</span>
+        <textarea
+          className="w-full h-20 px-1.5 py-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400 font-mono resize-y bg-gray-50"
+          value={responseText}
+          onChange={(e) => { setResponseText(e.target.value); setBodyError(null); }}
+        />
+        {bodyError && <span className="text-[10px] text-red-500">{bodyError}</span>}
+      </div>
+      <div className="flex items-center gap-1 justify-end">
+        <button
+          type="button"
+          className="h-5 px-2 bg-blue-500 text-white rounded text-[10px] disabled:opacity-50"
+          onClick={handleSave}
+          disabled={!name.trim()}
+        >
+          {isNew ? '添加' : '保存'}
+        </button>
+        <button type="button" className="h-5 px-2 border border-gray-200 text-gray-500 rounded text-[10px]" onClick={onCancel}>
+          取消
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ===================================================================
 // 预设数据模板

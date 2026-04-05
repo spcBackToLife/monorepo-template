@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ComponentNode, ComponentTemplate, Screen } from '@globallink/design-schema';
+import type { ComponentNode, ComponentTemplate, Screen, ToastType, ToastPosition } from '@globallink/design-schema';
 import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
@@ -15,6 +15,8 @@ import {
   type TransitionAnimation,
 } from './EventExecutionEngine';
 import { CSSPseudoInjector } from './CSSPseudoInjector';
+import { ToastRenderer, type ToastItem } from './ToastRenderer';
+import { MockExecutor } from './MockExecutor';
 
 export interface PreviewRendererProps {
   screen: Screen;
@@ -106,11 +108,25 @@ function PreviewInteractiveShell({
   const rootRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(new EventExecutionEngine());
   const pseudoRef = useRef(new CSSPseudoInjector());
+  const mockRef = useRef(new MockExecutor());
   const [runtimeGlobals, setRuntimeGlobals] = useState<Record<string, string>>(() => ({
     ...globalStates,
   }));
+  /** 预览内节点的运行时 activeState 覆盖（setState action 修改） */
+  const [runtimeNodeStates, setRuntimeNodeStates] = useState<Record<string, string>>({});
   /** 预览内 toggleVisible 切换的节点 id（与 schema 可见性叠加，再次切换可恢复） */
   const [previewHiddenIds, setPreviewHiddenIds] = useState<Set<string>>(() => new Set());
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastIdRef = useRef(0);
+
+  const addToast = useCallback((type: ToastType, message: string, duration: number, position?: ToastPosition) => {
+    const id = `toast-${++toastIdRef.current}`;
+    setToasts((prev) => [...prev, { id, type, message, duration, position: position ?? 'top-center' }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const togglePreviewVisible = useCallback((nodeId: string) => {
     setPreviewHiddenIds((prev) => {
@@ -135,9 +151,14 @@ function PreviewInteractiveShell({
   }, [screen.rootNode]);
 
   useEffect(() => {
+    mockRef.current.load(screen.apiEndpoints ?? []);
+  }, [screen.apiEndpoints]);
+
+  useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     const engine = engineRef.current;
+    const mock = mockRef.current;
     const merge = (name: string, value: string) => {
       setRuntimeGlobals((g) => ({ ...g, [name]: value }));
     };
@@ -146,20 +167,20 @@ function PreviewInteractiveShell({
       globalStates: runtimeGlobals,
       onNavigate: (id, anim) => onNavigate?.(id, anim),
       onSetState: (nodeId, stateName) => {
-        const el = rootRef.current?.querySelector(`[data-node-id="${nodeId}"]`);
-        if (el instanceof HTMLElement) {
-          el.setAttribute('data-active-state', stateName);
-        }
+        setRuntimeNodeStates((prev) => ({ ...prev, [nodeId]: stateName }));
       },
       onSetGlobalState: merge,
       onSetDomainState: merge,
       onSetEnvironmentState: merge,
       onSwitchDataSourcePhase,
       onToggleVisible: togglePreviewVisible,
+      getNodeState: (nodeId: string) => runtimeNodeStates[nodeId] ?? 'default',
+      onShowToast: addToast,
+      onApiRequest: (requestId, paramOverrides) => mock.execute(requestId),
     };
     engine.bind(el, screen.rootNode, ctx);
     return () => engine.unbind();
-  }, [screen, screen.rootNode, runtimeGlobals, onNavigate, onSwitchDataSourcePhase, togglePreviewVisible]);
+  }, [screen, screen.rootNode, runtimeGlobals, onNavigate, onSwitchDataSourcePhase, togglePreviewVisible, addToast]);
 
   const fillViewport = embedded;
   return (
@@ -192,7 +213,9 @@ function PreviewInteractiveShell({
           globalStates={runtimeGlobals}
           onNavigate={onNavigate}
           previewHiddenIds={previewHiddenIds}
+          runtimeNodeStates={runtimeNodeStates}
         />
+        <ToastRenderer toasts={toasts} onDismiss={dismissToast} />
       </div>
     </div>
   );
@@ -206,6 +229,8 @@ interface PreviewNodeRendererProps {
   globalStates: Record<string, string>;
   onNavigate?: (screenId: string) => void;
   previewHiddenIds: ReadonlySet<string>;
+  /** 运行时节点 activeState 覆盖（来自 setState action） */
+  runtimeNodeStates?: Record<string, string>;
   /** 标记当前节点是列表容器的直接子项（被重复渲染），需覆盖定位样式 */
   isListItem?: boolean;
 }
@@ -251,6 +276,7 @@ function PreviewNodeRenderer({
   globalStates,
   onNavigate,
   previewHiddenIds,
+  runtimeNodeStates,
   isListItem = false,
 }: PreviewNodeRendererProps) {
   const dataContext = useDataContext();
@@ -267,10 +293,16 @@ function PreviewNodeRenderer({
     return null;
   }
 
-  const isListContainer = hasExpression(node.props?.__listData);
-  const nodeForProps: ComponentNode = isListContainer
-    ? { ...node, props: { ...node.props, __listData: undefined } }
+  // 运行时 activeState 覆盖（来自 setState action）
+  const runtimeState = runtimeNodeStates?.[node.id];
+  const effectiveNode = runtimeState && runtimeState !== node.activeState
+    ? { ...node, activeState: runtimeState }
     : node;
+
+  const isListContainer = hasExpression(effectiveNode.props?.__listData);
+  const nodeForProps: ComponentNode = isListContainer
+    ? { ...effectiveNode, props: { ...effectiveNode.props, __listData: undefined } }
+    : effectiveNode;
   const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates);
   const resolvedProps = resolveDataExpressions(mergedProps, dataContext);
 
@@ -278,7 +310,7 @@ function PreviewNodeRenderer({
     return null;
   }
 
-  const baseStyles = resolveNodeStyles(node, globalStates, undefined, dataContext);
+  const baseStyles = resolveNodeStyles(effectiveNode, globalStates, undefined, dataContext);
   let reactStyles =
     rootNodeId && node.id === rootNodeId
       ? {
@@ -313,7 +345,7 @@ function PreviewNodeRenderer({
   if (isListContainer) {
     children = (
       <ListRenderer
-        node={node}
+        node={effectiveNode}
         renderChild={(child, listIndex) => (
           <PreviewNodeRenderer
             key={`${child.id}-${listIndex}`}
@@ -323,13 +355,30 @@ function PreviewNodeRenderer({
             globalStates={globalStates}
             onNavigate={onNavigate}
             previewHiddenIds={previewHiddenIds}
+            runtimeNodeStates={runtimeNodeStates}
             isListItem
           />
         )}
       />
     );
   } else {
-    children = node.children?.map((child) => (
+    const runtimeState = runtimeNodeStates?.[node.id] ?? 'default';
+    const activeStateDef = effectiveNode.states?.find((s) => s.name === runtimeState);
+    const cvMap = activeStateDef?.childrenVisibility;
+
+    // 对于 default 状态且没有显式的 default 状态定义时，
+    // 需要从其他状态的 childrenVisibility 推导出哪些子节点应被隐藏：
+    // 如果某子节点在任何自定义状态中被显式设为 false，说明它是条件可见的，
+    // 在 default 状态下应当隐藏。
+    const implicitDefaultCvMap = !activeStateDef && runtimeState === 'default'
+      ? buildImplicitDefaultVisibility(effectiveNode)
+      : undefined;
+    const effectiveCvMap = cvMap ?? implicitDefaultCvMap;
+
+    children = node.children?.filter((child) => {
+      if (effectiveCvMap && effectiveCvMap[child.id] === false) return false;
+      return true;
+    }).map((child) => (
       <PreviewNodeRenderer
         key={child.id}
         node={child}
@@ -338,15 +387,45 @@ function PreviewNodeRenderer({
         globalStates={globalStates}
         onNavigate={onNavigate}
         previewHiddenIds={previewHiddenIds}
+        runtimeNodeStates={runtimeNodeStates}
       />
     ));
   }
 
   return (
-    <PrimitiveRenderer node={node} style={previewStyles} resolvedProps={resolvedProps} interactive>
+    <PrimitiveRenderer node={effectiveNode} style={previewStyles} resolvedProps={resolvedProps} interactive>
       {children}
     </PrimitiveRenderer>
   );
+}
+
+/**
+ * 当节点处于 default 状态且 states 数组中没有显式 default 条目时，
+ * 从所有自定义状态推导出隐式的 childrenVisibility。
+ * 逻辑：如果某个子节点在任何状态的 childrenVisibility 中被设为 false，
+ * 说明它是条件可见的，在 default 状态下应被隐藏。
+ */
+function buildImplicitDefaultVisibility(
+  node: ComponentNode,
+): Record<string, boolean> | undefined {
+  const states = node.states;
+  if (!states || states.length === 0) return undefined;
+
+  const result: Record<string, boolean> = {};
+  let hasAny = false;
+
+  for (const state of states) {
+    const cv = state.childrenVisibility;
+    if (!cv) continue;
+    for (const [childId, visible] of Object.entries(cv)) {
+      if (visible === false) {
+        result[childId] = false;
+        hasAny = true;
+      }
+    }
+  }
+
+  return hasAny ? result : undefined;
 }
 
 function resolveDataExpressions(
