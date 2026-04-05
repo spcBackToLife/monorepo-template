@@ -29,6 +29,8 @@ export interface PreviewRendererProps {
   onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   /** 嵌在编辑器视口内时去掉外层灰底，避免与设备框叠两层底色 */
   embedded?: boolean;
+  /** 宿主调用此函数以触发 navigateBack 生命周期事件；返回 true 表示已处理（阻止默认后退） */
+  onNavigateBackRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }
 
 /**
@@ -43,6 +45,7 @@ export function PreviewRenderer({
   onNavigate,
   onSwitchDataSourcePhase,
   embedded = false,
+  onNavigateBackRef,
 }: PreviewRendererProps) {
   const activeDataContext: DataContext = useMemo(
     () => buildDataContextFromScreen(screen, currentDataSet),
@@ -58,6 +61,7 @@ export function PreviewRenderer({
         onNavigate={onNavigate}
         onSwitchDataSourcePhase={onSwitchDataSourcePhase}
         embedded={embedded}
+        onNavigateBackRef={onNavigateBackRef}
       />
     </DataContextProvider>
   );
@@ -97,6 +101,7 @@ function PreviewInteractiveShell({
   onNavigate,
   onSwitchDataSourcePhase,
   embedded,
+  onNavigateBackRef,
 }: {
   screen: Screen;
   assets: ComponentTemplate[];
@@ -104,6 +109,7 @@ function PreviewInteractiveShell({
   onNavigate?: (screenId: string, animation?: TransitionAnimation) => void;
   onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   embedded: boolean;
+  onNavigateBackRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(new EventExecutionEngine());
@@ -154,23 +160,13 @@ function PreviewInteractiveShell({
     mockRef.current.load(screen.apiEndpoints ?? []);
   }, [screen.apiEndpoints]);
 
-  // ===== screenEnter: auto-execute on page mount / navigate =====
-  const screenEnterFiredRef = useRef<string | null>(null);
-  useEffect(() => {
-    // Only fire once per screen (prevent re-fire on every re-render)
-    if (screenEnterFiredRef.current === screen.id) return;
-    const enterEvents = (screen.rootNode.events ?? []).filter(
-      (e: { trigger: string; disabled?: boolean }) => e.trigger === 'screenEnter' && !e.disabled,
-    );
-    if (enterEvents.length === 0) return;
-    screenEnterFiredRef.current = screen.id;
-
-    const engine = engineRef.current;
+  // ===== Helper: build a PreviewContext (avoid repeating this everywhere) =====
+  const buildCtx = useCallback((): PreviewContext => {
     const mock = mockRef.current;
     const merge = (name: string, value: string) => {
       setRuntimeGlobals((g) => ({ ...g, [name]: value }));
     };
-    const ctx: PreviewContext = {
+    return {
       currentScreenId: screen.id,
       globalStates: runtimeGlobals,
       onNavigate: (id, anim) => onNavigate?.(id, anim),
@@ -185,41 +181,155 @@ function PreviewInteractiveShell({
       getNodeState: (nodeId: string) => runtimeNodeStates[nodeId] ?? 'default',
       onShowToast: addToast,
       onApiRequest: (requestId, _paramOverrides) => mock.execute(requestId),
+      onCancelApiRequest: (requestId) => mock.cancel(requestId),
+    };
+  }, [screen.id, runtimeGlobals, onNavigate, onSwitchDataSourcePhase, togglePreviewVisible, addToast, runtimeNodeStates]);
+
+  /** Helper: find lifecycle events by trigger name on rootNode */
+  const getLifecycleEvents = useCallback((trigger: string) => {
+    return (screen.rootNode.events ?? []).filter(
+      (e: { trigger: string; disabled?: boolean }) => e.trigger === trigger && !e.disabled,
+    );
+  }, [screen.rootNode.events]);
+
+  /** Helper: execute all events of a given trigger */
+  const fireLifecycleEvents = useCallback(async (trigger: string) => {
+    const events = getLifecycleEvents(trigger);
+    if (events.length === 0) return;
+    const engine = engineRef.current;
+    const ctx = buildCtx();
+    for (const event of events) {
+      const actions = (event as { actions?: unknown[] }).actions ?? [];
+      await engine.executeActionsAsync(actions as never[], ctx);
+    }
+  }, [getLifecycleEvents, buildCtx]);
+
+  // ===== screenEnter: auto-execute on page mount / navigate =====
+  const screenEnterFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (screenEnterFiredRef.current === screen.id) return;
+    const enterEvents = getLifecycleEvents('screenEnter');
+    if (enterEvents.length === 0) return;
+    screenEnterFiredRef.current = screen.id;
+    fireLifecycleEvents('screenEnter');
+  }, [screen.id, getLifecycleEvents, fireLifecycleEvents]);
+
+  // ===== screenExit: execute before navigating away =====
+  // We wrap onNavigate to intercept and run screenExit first
+  const screenExitNavigateRef = useRef(onNavigate);
+  screenExitNavigateRef.current = onNavigate;
+  const wrappedOnNavigate = useCallback(async (targetId: string, animation?: TransitionAnimation) => {
+    const exitEvents = getLifecycleEvents('screenExit');
+    if (exitEvents.length > 0) {
+      // Execute screenExit with a 2s timeout to prevent blocking
+      const engine = engineRef.current;
+      const ctx = buildCtx();
+      const exitPromise = (async () => {
+        for (const event of exitEvents) {
+          const actions = (event as { actions?: unknown[] }).actions ?? [];
+          await engine.executeActionsAsync(actions as never[], ctx);
+        }
+      })();
+      await Promise.race([
+        exitPromise,
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    }
+    // Reset screenEnter ref so it fires again on return
+    screenEnterFiredRef.current = null;
+    screenExitNavigateRef.current?.(targetId, animation);
+  }, [getLifecycleEvents, buildCtx]);
+
+  // ===== screenVisible / screenHidden: tab visibility change =====
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        fireLifecycleEvents('screenVisible');
+      } else {
+        fireLifecycleEvents('screenHidden');
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [fireLifecycleEvents]);
+
+  // ===== scrollReachBottom / scrollReachTop: scroll detection =====
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    // Find the scrollable container (rootRef's parent with overflow:auto, or rootRef itself)
+    const scrollContainer = el.closest('[data-preview-root]') as HTMLElement | null;
+    if (!scrollContainer) return;
+
+    const bottomEvents = getLifecycleEvents('scrollReachBottom');
+    const topEvents = getLifecycleEvents('scrollReachTop');
+    if (bottomEvents.length === 0 && topEvents.length === 0) return;
+
+    // Get scroll config from the first scroll event
+    const scrollEvent = [...bottomEvents, ...topEvents][0] as { scrollConfig?: { threshold?: number; debounce?: number } } | undefined;
+    const threshold = scrollEvent?.scrollConfig?.threshold ?? 100;
+    const debounceMs = scrollEvent?.scrollConfig?.debounce ?? 300;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastBottomFire = 0;
+    let lastTopFire = 0;
+
+    const handler = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+        const now = Date.now();
+
+        // scrollReachBottom
+        if (bottomEvents.length > 0 && scrollHeight - scrollTop - clientHeight < threshold) {
+          if (now - lastBottomFire > debounceMs) {
+            lastBottomFire = now;
+            fireLifecycleEvents('scrollReachBottom');
+          }
+        }
+
+        // scrollReachTop
+        if (topEvents.length > 0 && scrollTop === 0) {
+          if (now - lastTopFire > debounceMs) {
+            lastTopFire = now;
+            fireLifecycleEvents('scrollReachTop');
+          }
+        }
+      }, 50);
     };
 
-    for (const event of enterEvents) {
-      const actions = (event as { actions?: unknown[] }).actions ?? [];
-      engine.executeActionsAsync(actions as never[], ctx);
-    }
-  }, [screen.id, screen.rootNode.events]);
+    scrollContainer.addEventListener('scroll', handler, { passive: true });
+    return () => {
+      scrollContainer.removeEventListener('scroll', handler);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [getLifecycleEvents, fireLifecycleEvents]);
 
+  // ===== navigateBack: expose handler for host to call =====
+  useEffect(() => {
+    if (!onNavigateBackRef) return;
+    onNavigateBackRef.current = async () => {
+      const backEvents = getLifecycleEvents('navigateBack');
+      if (backEvents.length === 0) return false; // no handler, let host proceed
+      await fireLifecycleEvents('navigateBack');
+      return true; // handled — host should NOT auto-back
+    };
+    return () => {
+      if (onNavigateBackRef) onNavigateBackRef.current = null;
+    };
+  }, [onNavigateBackRef, getLifecycleEvents, fireLifecycleEvents]);
+
+  // ===== DOM event binding (existing — use wrappedOnNavigate for screenExit) =====
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     const engine = engineRef.current;
-    const mock = mockRef.current;
-    const merge = (name: string, value: string) => {
-      setRuntimeGlobals((g) => ({ ...g, [name]: value }));
-    };
-    const ctx: PreviewContext = {
-      currentScreenId: screen.id,
-      globalStates: runtimeGlobals,
-      onNavigate: (id, anim) => onNavigate?.(id, anim),
-      onSetState: (nodeId, stateName) => {
-        setRuntimeNodeStates((prev) => ({ ...prev, [nodeId]: stateName }));
-      },
-      onSetGlobalState: merge,
-      onSetDomainState: merge,
-      onSetEnvironmentState: merge,
-      onSwitchDataSourcePhase,
-      onToggleVisible: togglePreviewVisible,
-      getNodeState: (nodeId: string) => runtimeNodeStates[nodeId] ?? 'default',
-      onShowToast: addToast,
-      onApiRequest: (requestId, _paramOverrides) => mock.execute(requestId),
-    };
+    const ctx = buildCtx();
+    // Override onNavigate in ctx to use wrappedOnNavigate for screenExit support
+    ctx.onNavigate = (id, anim) => wrappedOnNavigate(id, anim);
     engine.bind(el, screen.rootNode, ctx);
     return () => engine.unbind();
-  }, [screen, screen.rootNode, runtimeGlobals, onNavigate, onSwitchDataSourcePhase, togglePreviewVisible, addToast]);
+  }, [screen, screen.rootNode, buildCtx, wrappedOnNavigate]);
 
   const fillViewport = embedded;
   return (

@@ -118,6 +118,8 @@ export class EditorStore {
   /** 预览模式下的页面导航栈（与 navigate 事件一致；返回键 pop）— W6-091 */
   previewNavStackIds: string[] = [];
   previewTransition: string = 'fade';
+  /** Ref for PreviewRenderer to register navigateBack lifecycle handler */
+  previewNavigateBackRef: { current: (() => Promise<boolean>) | null } = { current: null };
   leftPanelWidth = 280;
   rightPanelWidth = 320;
   leftPanelCollapsed = false;
@@ -574,9 +576,17 @@ export class EditorStore {
     this.setActiveScreen(screenId);
   }
 
-  /** 预览顶栏「返回」：弹出当前页，回到栈顶上一屏 */
-  previewNavigateBack(): void {
+  /** 预览顶栏「返回」：先执行 navigateBack 生命周期，再弹出当前页 */
+  async previewNavigateBack(): Promise<void> {
     if (!this.previewMode || this.previewNavStackIds.length <= 1) return;
+
+    // Check if PreviewRenderer has a navigateBack lifecycle handler
+    const handler = this.previewNavigateBackRef.current;
+    if (handler) {
+      const handled = await handler();
+      if (handled) return; // lifecycle event blocked the back navigation
+    }
+
     const nextStack = this.previewNavStackIds.slice(0, -1);
     const prevId = nextStack[nextStack.length - 1];
     if (!prevId) return;

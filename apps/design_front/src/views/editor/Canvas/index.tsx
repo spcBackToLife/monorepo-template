@@ -606,6 +606,7 @@ export const Canvas = observer(function Canvas() {
                     currentDataSet={undefined}
                     onNavigate={handlePreviewNavigate}
                     onSwitchDataSourcePhase={handlePreviewSwitchDataSourcePhase}
+                    onNavigateBackRef={editorStore.previewNavigateBackRef}
                     embedded
                   />
                 </TransitionAnimator>

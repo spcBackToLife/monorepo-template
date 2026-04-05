@@ -9,17 +9,30 @@ interface Props {
 }
 
 const TRIGGERS: { label: string; value: EventTrigger }[] = [
-  { label: 'Click', value: 'click' },
-  { label: 'Hover', value: 'hover' },
-  { label: 'Focus', value: 'focus' },
-  { label: 'Blur', value: 'blur' },
-  { label: 'Long Press', value: 'longPress' },
+  { label: '点击 (Click)', value: 'click' },
+  { label: '悬停 (Hover)', value: 'hover' },
+  { label: '聚焦 (Focus)', value: 'focus' },
+  { label: '失焦 (Blur)', value: 'blur' },
+  { label: '长按 (LongPress)', value: 'longPress' },
+  { label: '页面进入 (ScreenEnter)', value: 'screenEnter' },
+  { label: '页面离开 (ScreenExit)', value: 'screenExit' },
+  { label: '页面可见 (Visible)', value: 'screenVisible' },
+  { label: '页面隐藏 (Hidden)', value: 'screenHidden' },
+  { label: '滚动到底 (ScrollBottom)', value: 'scrollReachBottom' },
+  { label: '滚动到顶 (ScrollTop)', value: 'scrollReachTop' },
+  { label: '返回键 (Back)', value: 'navigateBack' },
 ];
 
 const ACTION_TYPES = [
   { label: '跳转页面', value: 'navigate' },
   { label: '设置状态', value: 'setState' },
+  { label: '设置全局状态', value: 'setDomainState' },
+  { label: '切换数据源阶段', value: 'switchDataSourcePhase' },
+  { label: '发送请求', value: 'apiRequest' },
+  { label: '取消请求', value: 'cancelApiRequest' },
   { label: '打开链接', value: 'openUrl' },
+  { label: '展示提示', value: 'showToast' },
+  { label: '延时', value: 'delay' },
 ];
 
 export function AddEventForm({ nodeId, onDone }: Props) {

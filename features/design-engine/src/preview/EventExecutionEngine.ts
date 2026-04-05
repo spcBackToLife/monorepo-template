@@ -27,6 +27,8 @@ export interface PreviewContext {
   getNodeState?: (nodeId: string) => string;
   onShowToast?: (type: ToastType, message: string, duration: number, position?: ToastPosition) => void;
   onApiRequest?: (requestId: string, paramOverrides?: Record<string, string>) => Promise<MockResponse>;
+  /** Cancel pending API request(s) */
+  onCancelApiRequest?: (requestId?: string) => void;
   /** Injected by apiRequest action for child actions to resolve {{response.xxx}} */
   responseData?: unknown;
 }
@@ -194,6 +196,9 @@ export class EventExecutionEngine {
       longPress: 'pointerdown',
       doubleClick: 'dblclick',
       // screenEnter is NOT a DOM event — handled by PreviewRenderer on mount
+      // screenExit, screenVisible, screenHidden — handled by PreviewRenderer lifecycle hooks
+      // scrollReachBottom, scrollReachTop — handled by PreviewRenderer scroll listener
+      // navigateBack — handled by PreviewRenderer / PreviewBar
     };
     return mapping[trigger] ?? null;
   }
@@ -364,6 +369,12 @@ export class EventExecutionEngine {
               detail: { handler: action.handler },
             }),
           );
+        }
+        break;
+
+      case 'cancelApiRequest':
+        if (context.onCancelApiRequest) {
+          context.onCancelApiRequest(action.requestId);
         }
         break;
 

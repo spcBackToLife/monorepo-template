@@ -716,7 +716,19 @@ executor.execute({
 - [ ] 事件禁用/启用
 - [ ] 事件描述字段（人类可读注释）
 
-### Phase 6（远期高级功能）
+### Phase 6（页面生命周期事件）
+
+> 详细方案见 [12-页面生命周期](../12-page-lifecycle/README.md)
+
+- [x] screenEnter 触发器（页面进入时自动执行）
+- [ ] screenExit 触发器（页面离开时清理）
+- [ ] screenVisible / screenHidden 触发器（可见性变化）
+- [ ] scrollReachBottom / scrollReachTop 触发器（滚动触发）
+- [ ] navigateBack 触发器（返回键拦截）
+- [ ] cancelApiRequest action（取消未完成请求）
+- [ ] 事件执行日志（预览控制条中显示）
+
+### Phase 7（远期高级功能）
 
 - [ ] 条件事件（EventCondition: if globalState == "xxx"）
 - [ ] custom 自定义动作

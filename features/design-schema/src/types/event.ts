@@ -1,5 +1,14 @@
 /** Supported event trigger types */
-export type EventTrigger = 'click' | 'hover' | 'focus' | 'blur' | 'longPress' | 'screenEnter';
+export type EventTrigger =
+  // User interaction triggers
+  | 'click' | 'hover' | 'focus' | 'blur' | 'longPress'
+  // Page lifecycle triggers
+  | 'screenEnter' | 'screenExit'
+  | 'screenVisible' | 'screenHidden'
+  // Scroll triggers
+  | 'scrollReachBottom' | 'scrollReachTop'
+  // Navigation triggers
+  | 'navigateBack';
 
 /** Transition animation configuration for navigation */
 export interface TransitionAnimation {
@@ -92,6 +101,13 @@ export interface ApiRequestAction {
   onFailure: EventAction[];
 }
 
+/** Cancel pending API request(s) */
+export interface CancelApiRequestAction {
+  type: 'cancelApiRequest';
+  /** Specific request to cancel; if omitted, cancels all pending requests */
+  requestId?: string;
+}
+
 /** Union of all possible event actions */
 export type EventAction =
   | NavigateAction
@@ -103,7 +119,8 @@ export type EventAction =
   | SetEnvironmentStateAction
   | ToggleVisibleAction
   | ShowToastAction
-  | ApiRequestAction;
+  | ApiRequestAction
+  | CancelApiRequestAction;
 
 /** Condition for conditional event execution */
 export interface EventCondition {
@@ -124,4 +141,11 @@ export interface ComponentEvent {
   description?: string;
   /** Optional: disable without removing */
   disabled?: boolean;
+  /** Optional: scroll trigger configuration (only for scrollReachBottom/scrollReachTop) */
+  scrollConfig?: {
+    /** Distance from edge in px to trigger (default 100) */
+    threshold?: number;
+    /** Debounce interval in ms (default 300) */
+    debounce?: number;
+  };
 }

@@ -13,16 +13,25 @@ const TRIGGER_OPTIONS = [
   { value: 'focus', label: '聚焦 (Focus)' },
   { value: 'blur', label: '失焦 (Blur)' },
   { value: 'longPress', label: '长按 (LongPress)' },
+  { value: 'screenEnter', label: '页面进入 (ScreenEnter)' },
+  { value: 'screenExit', label: '页面离开 (ScreenExit)' },
+  { value: 'screenVisible', label: '页面可见 (Visible)' },
+  { value: 'screenHidden', label: '页面隐藏 (Hidden)' },
+  { value: 'scrollReachBottom', label: '滚动到底 (ScrollBottom)' },
+  { value: 'scrollReachTop', label: '滚动到顶 (ScrollTop)' },
+  { value: 'navigateBack', label: '返回键 (Back)' },
 ] as const;
 
 const ACTION_TYPES = [
   { value: 'navigate', label: '跳转页面' },
   { value: 'setState', label: '设置状态' },
   { value: 'setDomainState', label: '设置全局状态' },
+  { value: 'switchDataSourcePhase', label: '切换数据源阶段' },
   { value: 'toggleVisible', label: '切换可见性' },
   { value: 'openUrl', label: '打开链接' },
   { value: 'showToast', label: '展示提示' },
   { value: 'apiRequest', label: '发送请求' },
+  { value: 'cancelApiRequest', label: '取消请求' },
   { value: 'delay', label: '延时' },
   { value: 'custom', label: '自定义' },
 ] as const;

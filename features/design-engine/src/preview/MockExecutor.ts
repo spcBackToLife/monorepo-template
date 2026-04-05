@@ -8,6 +8,9 @@ import type { MockResponse } from './EventExecutionEngine';
  */
 export class MockExecutor {
   private endpoints: Map<string, ApiEndpoint> = new Map();
+  /** Track pending request timeouts so they can be cancelled */
+  private pendingTimers: Map<string, { reject: (reason: string) => void }> = new Map();
+  private requestCounter = 0;
 
   load(apiEndpoints: ApiEndpoint[]): void {
     this.endpoints.clear();
@@ -29,9 +32,24 @@ export class MockExecutor {
       return { success: false, status: 500, data: null, message: 'No mock scenario available' };
     }
 
+    // Track this request for cancellation
+    const trackingKey = `${requestId}_${++this.requestCounter}`;
+
     if (scenario.delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, scenario.delay));
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.pendingTimers.set(trackingKey, { reject: (r) => reject(new Error(r)) });
+          setTimeout(() => {
+            this.pendingTimers.delete(trackingKey);
+            resolve();
+          }, scenario.delay);
+        });
+      } catch {
+        // Request was cancelled during delay
+        return { success: false, status: 0, data: null, message: 'Request cancelled' };
+      }
     }
+    this.pendingTimers.delete(trackingKey);
 
     if (scenario.isTimeout) {
       return { success: false, status: 0, data: null, message: 'Request timeout' };
@@ -45,6 +63,29 @@ export class MockExecutor {
         : '';
 
     return { success, status: scenario.statusCode, data: responseBody, message };
+  }
+
+  /** Cancel a specific pending request, or all if no requestId given */
+  cancel(requestId?: string): void {
+    if (requestId) {
+      // Cancel all pending timers whose key starts with this requestId
+      for (const [key, pending] of this.pendingTimers) {
+        if (key.startsWith(`${requestId}_`)) {
+          pending.reject('cancelled');
+          this.pendingTimers.delete(key);
+        }
+      }
+    } else {
+      this.cancelAll();
+    }
+  }
+
+  /** Cancel all pending requests */
+  cancelAll(): void {
+    for (const [key, pending] of this.pendingTimers) {
+      pending.reject('cancelled');
+      this.pendingTimers.delete(key);
+    }
   }
 
   switchScenario(requestId: string, scenarioId: string): void {
