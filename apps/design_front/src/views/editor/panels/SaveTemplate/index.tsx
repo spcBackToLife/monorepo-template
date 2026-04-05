@@ -4,6 +4,7 @@ import { SaveOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import type { ComponentNode, TemplateScope } from '@globallink/design-schema';
 import { findNodeInScreens } from '@globallink/design-operations';
+import { generateTemplateId } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
 
 const CATEGORY_OPTIONS = [
@@ -55,6 +56,8 @@ function SaveAsTemplateWizardModal({
   const { message } = AntdApp.useApp();
   const [step, setStep] = useState(0);
   const [form] = Form.useForm<WizardForm>();
+  /** 确认步骤展示的快照：点击「下一步」时从 form 抓取，避免 Form 卸载后 useWatch 丢值 */
+  const [confirmedValues, setConfirmedValues] = useState<WizardForm | null>(null);
 
   const node = nodeId ? findNodeInScreens(editorStore.screens, nodeId) : null;
   const subtreeNodes = node ? countSubtreeNodes(node) : 0;
@@ -62,6 +65,7 @@ function SaveAsTemplateWizardModal({
   useEffect(() => {
     if (!open) {
       setStep(0);
+      setConfirmedValues(null);
       form.resetFields();
     }
   }, [open, form]);
@@ -69,6 +73,7 @@ function SaveAsTemplateWizardModal({
   const handleNext = async () => {
     try {
       await form.validateFields(['name', 'category', 'scope']);
+      setConfirmedValues(form.getFieldsValue(true) as WizardForm);
       setStep(1);
     } catch {
       // validation
@@ -78,11 +83,18 @@ function SaveAsTemplateWizardModal({
   const handleSave = async () => {
     if (!nodeId) return;
     try {
-      const values = await form.validateFields();
+      const values = confirmedValues ?? (form.getFieldsValue(true) as WizardForm);
+      if (!values.name?.trim() || !values.category) {
+        message.error('缺少必填信息，请返回上一步检查');
+        return;
+      }
+      // Generate template ID upfront to ensure consistency between client and server
+      const templateId = generateTemplateId();
       const result = editorStore.execute({
         type: 'saveAsTemplate',
         params: {
           nodeId,
+          templateId,  // Include pre-generated ID for deterministic template references
           name: values.name.trim(),
           category: values.category,
           description: values.description?.trim() || undefined,
@@ -94,6 +106,7 @@ function SaveAsTemplateWizardModal({
         message.success('已保存为组件资产');
         onClose();
         form.resetFields();
+        setConfirmedValues(null);
         setStep(0);
       } else {
         message.error(result.description);
@@ -102,8 +115,6 @@ function SaveAsTemplateWizardModal({
       // validation
     }
   };
-
-  const watched = Form.useWatch([], form);
 
   return (
     <Modal
@@ -145,32 +156,32 @@ function SaveAsTemplateWizardModal({
         </Form>
       )}
 
-      {step === 1 && (
+      {step === 1 && confirmedValues && (
         <div className="text-xs space-y-2 text-gray-700">
           <p className="text-[10px] text-gray-500">请确认下列信息，保存后将写入项目组件库。</p>
           <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 space-y-1.5 font-mono text-[11px]">
             <div>
               <span className="text-gray-500">名称：</span>
-              {watched?.name ?? '—'}
+              {confirmedValues.name ?? '—'}
             </div>
             <div>
               <span className="text-gray-500">分类：</span>
-              {watched?.category ?? '—'}
+              {confirmedValues.category ?? '—'}
             </div>
             <div>
               <span className="text-gray-500">作用域：</span>
-              {SCOPE_OPTIONS.find((o) => o.value === watched?.scope)?.label ?? watched?.scope}
+              {SCOPE_OPTIONS.find((o) => o.value === confirmedValues.scope)?.label ?? confirmedValues.scope}
             </div>
-            {watched?.description ? (
+            {confirmedValues.description ? (
               <div>
                 <span className="text-gray-500">说明：</span>
-                {watched.description}
+                {confirmedValues.description}
               </div>
             ) : null}
-            {watched?.tags?.trim() ? (
+            {confirmedValues.tags?.trim() ? (
               <div>
                 <span className="text-gray-500">标签：</span>
-                {watched.tags}
+                {confirmedValues.tags}
               </div>
             ) : null}
             {node && (

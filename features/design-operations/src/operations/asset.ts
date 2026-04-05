@@ -100,6 +100,7 @@ export function executeSaveAsTemplate(
   const template = schemaSaveAsTemplate(node, {
     name: params.name,
     category: params.category,
+    templateId: params.templateId,
     tags: params.tags,
     description: params.description,
     scope: params.scope,

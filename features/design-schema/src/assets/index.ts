@@ -60,6 +60,7 @@ export function saveAsTemplate(
     tags?: string[];
     description?: string;
     scope?: TemplateScope;
+    templateId?: string;
     thumbnail?: string;
   },
 ): ComponentTemplate {
@@ -69,7 +70,7 @@ export function saveAsTemplate(
 
   const now = new Date().toISOString();
   return {
-    id: generateTemplateId(),
+    id: options.templateId ?? generateTemplateId(),
     name: options.name,
     description: options.description,
     category: options.category,

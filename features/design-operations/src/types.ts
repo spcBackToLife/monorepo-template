@@ -258,6 +258,7 @@ export interface SaveAsTemplateOp {
     tags?: string[];
     description?: string;
     scope?: TemplateScope;
+    templateId?: string;  // Pre-generated template ID for consistency
   };
 }
 
