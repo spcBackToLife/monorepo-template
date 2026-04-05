@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { generateNodeId } from '@globallink/design-schema';
+import { walkTree } from '@globallink/design-operations';
+import type { ComponentNode } from '@globallink/design-schema';
 import * as api from '../api-client.js';
 
 export function registerElementTools(server: McpServer): void {
@@ -134,9 +136,11 @@ export function registerElementTools(server: McpServer): void {
       },
     },
     async ({ projectId, parentId, subtree, position }) => {
+      const tree = subtree as ComponentNode;
+      walkTree(tree, (n) => { n.id = generateNodeId(); });
       const result = await api.executeOperation(projectId, {
         type: 'insertSubtree',
-        params: { parentId, subtree, position },
+        params: { parentId, subtree: tree, position },
       });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

@@ -206,6 +206,42 @@ interface PreviewNodeRendererProps {
   globalStates: Record<string, string>;
   onNavigate?: (screenId: string) => void;
   previewHiddenIds: ReadonlySet<string>;
+  /** 标记当前节点是列表容器的直接子项（被重复渲染），需覆盖定位样式 */
+  isListItem?: boolean;
+}
+
+/**
+ * 列表容器样式覆盖：当节点绑定了 __listData，强制 flex column 布局，
+ * 使重复渲染的子项能自动纵向排列，而不是因 absolute 叠在一起。
+ */
+function applyListContainerStyleOverrides(
+  styles: React.CSSProperties,
+): React.CSSProperties {
+  return {
+    ...styles,
+    display: 'flex',
+    flexDirection: 'column',
+    height: undefined,
+    minHeight: styles.height ?? styles.minHeight,
+  };
+}
+
+/**
+ * 列表子项样式覆盖：将被重复渲染的直接子元素从 absolute 切换到
+ * relative，使其参与父容器的 flex 流式布局。
+ */
+function applyListItemStyleOverrides(
+  styles: React.CSSProperties,
+): React.CSSProperties {
+  if (styles.position !== 'absolute') return styles;
+  return {
+    ...styles,
+    position: 'relative',
+    left: undefined,
+    top: undefined,
+    right: undefined,
+    bottom: undefined,
+  };
 }
 
 function PreviewNodeRenderer({
@@ -215,6 +251,7 @@ function PreviewNodeRenderer({
   globalStates,
   onNavigate,
   previewHiddenIds,
+  isListItem = false,
 }: PreviewNodeRendererProps) {
   const dataContext = useDataContext();
 
@@ -230,20 +267,11 @@ function PreviewNodeRenderer({
     return null;
   }
 
-  if (hasExpression(node.props.__listData)) {
-    return (
-      <ListRenderer
-        node={node}
-        assets={assets}
-        globalStates={globalStates}
-        renderNode={(n, a, g, _c, _h, _d) =>
-          renderSinglePreviewNode(n, a, g, onNavigate, previewHiddenIds, rootNodeId)
-        }
-      />
-    );
-  }
-
-  const { props: mergedProps, visible } = resolveNodeProps(node, globalStates);
+  const isListContainer = hasExpression(node.props?.__listData);
+  const nodeForProps: ComponentNode = isListContainer
+    ? { ...node, props: { ...node.props, __listData: undefined } }
+    : node;
+  const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates);
   const resolvedProps = resolveDataExpressions(mergedProps, dataContext);
 
   if (visible === false) {
@@ -251,7 +279,7 @@ function PreviewNodeRenderer({
   }
 
   const baseStyles = resolveNodeStyles(node, globalStates, undefined, dataContext);
-  const reactStyles =
+  let reactStyles =
     rootNodeId && node.id === rootNodeId
       ? {
           ...baseStyles,
@@ -265,25 +293,57 @@ function PreviewNodeRenderer({
           boxSizing: 'border-box' as const,
         }
       : baseStyles;
+
+  // 列表容器：强制 flex column，让重复子项自动排列
+  if (isListContainer) {
+    reactStyles = applyListContainerStyleOverrides(reactStyles);
+  }
+  // 列表子项：从 absolute 切到 relative，参与父容器 flex 流
+  if (isListItem) {
+    reactStyles = applyListItemStyleOverrides(reactStyles);
+  }
+
   const previewStyles: React.CSSProperties = {
     ...reactStyles,
     pointerEvents: 'auto',
   };
 
-  const children = node.children?.map((child) => (
-    <PreviewNodeRenderer
-      key={child.id}
-      node={child}
-      rootNodeId={rootNodeId}
-      assets={assets}
-      globalStates={globalStates}
-      onNavigate={onNavigate}
-      previewHiddenIds={previewHiddenIds}
-    />
-  ));
+  // Render children — if this node has __listData, repeat children per list item
+  let children: React.ReactNode;
+  if (isListContainer) {
+    children = (
+      <ListRenderer
+        node={node}
+        renderChild={(child, listIndex) => (
+          <PreviewNodeRenderer
+            key={`${child.id}-${listIndex}`}
+            node={child}
+            rootNodeId={rootNodeId}
+            assets={assets}
+            globalStates={globalStates}
+            onNavigate={onNavigate}
+            previewHiddenIds={previewHiddenIds}
+            isListItem
+          />
+        )}
+      />
+    );
+  } else {
+    children = node.children?.map((child) => (
+      <PreviewNodeRenderer
+        key={child.id}
+        node={child}
+        rootNodeId={rootNodeId}
+        assets={assets}
+        globalStates={globalStates}
+        onNavigate={onNavigate}
+        previewHiddenIds={previewHiddenIds}
+      />
+    ));
+  }
 
   return (
-    <PrimitiveRenderer node={node} style={previewStyles} resolvedProps={resolvedProps}>
+    <PrimitiveRenderer node={node} style={previewStyles} resolvedProps={resolvedProps} interactive>
       {children}
     </PrimitiveRenderer>
   );
@@ -298,30 +358,4 @@ function resolveDataExpressions(
     return props;
   }
   return resolvePropsExpressions(props, context);
-}
-
-function renderSinglePreviewNode(
-  node: ComponentNode,
-  assets: ComponentTemplate[],
-  globalStates: Record<string, string>,
-  onNavigate: ((screenId: string) => void) | undefined,
-  previewHiddenIds: ReadonlySet<string>,
-  rootNodeId: string,
-): React.ReactNode {
-  const nodeWithoutListData: ComponentNode = {
-    ...node,
-    props: { ...node.props },
-  };
-  delete nodeWithoutListData.props.__listData;
-
-  return (
-    <PreviewNodeRenderer
-      node={nodeWithoutListData}
-      rootNodeId={rootNodeId}
-      assets={assets}
-      globalStates={globalStates}
-      onNavigate={onNavigate}
-      previewHiddenIds={previewHiddenIds}
-    />
-  );
 }

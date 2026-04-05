@@ -1,7 +1,8 @@
 import { makeAutoObservable, runInAction, toJS } from 'mobx';
 import type { ComponentNode, DesignProject, DomainStateVariable, Screen, Viewport } from '@globallink/design-schema';
+import { generateNodeId, normalizeNode } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
-import { OperationExecutor, findNodeInScreens, findParent, findParentInScreens } from '@globallink/design-operations';
+import { OperationExecutor, findNodeInScreens, findParent, findParentInScreens, walkTree } from '@globallink/design-operations';
 import { API_BASE, ApiError, apiJson, getErrorMessage } from '@/api/client';
 import { authStore } from '@/stores/auth';
 import { syncManager } from '@/services/SyncManager';
@@ -219,10 +220,6 @@ export class EditorStore {
     'deleteEnvironmentState',
   ]);
 
-  /** Operations waiting for immediate flush */
-  private immediateFlushQueue: Array<{ operation: Operation; fingerprint: string }> = [];
-  private immediateFlushTimer: ReturnType<typeof setTimeout> | null = null;
-
   /** Retry state for failed operations */
   private retryQueue: Array<{ operation: Operation; fingerprint: string; retryCount: number }> = [];
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -311,11 +308,15 @@ export class EditorStore {
     // Project data from MobX stores may be observable proxies. Convert to plain JS first.
     const plain = toJS(project) as DesignProject;
     for (const screen of plain.screens) {
+      normalizeNode(screen.rootNode);
       const rs = screen.rootNode.styles as Record<string, unknown>;
       delete rs.left;
       delete rs.top;
       delete rs.right;
       delete rs.bottom;
+    }
+    for (const asset of plain.componentAssets ?? []) {
+      if (asset.schema) normalizeNode(asset.schema);
     }
     this.executor = new OperationExecutor(plain);
     this.projectState = this.executor.getProject();
@@ -353,12 +354,28 @@ export class EditorStore {
 
   /** Call this after initProject to restore any pending operations */
   private restoreProjectPendingOps(): void {
-    if (!this.project?.id) return;
+    if (!this.project?.id || !this.executor) return;
     const restored = loadPendingOperations(this.project.id);
     if (restored.length === 0) return;
-    
+
     console.log(`[editor] restored ${restored.length} pending operations from localStorage`);
-    // Add to pending operations queue
+
+    // Re-execute operations locally so the in-memory project state includes them.
+    // They may already be included if the server persisted them before the reload,
+    // so we silently ignore failures (duplicate ops are harmless).
+    let replayedCount = 0;
+    for (const entry of restored) {
+      const result = this.executor.execute(entry.operation);
+      if (result.success) replayedCount++;
+    }
+    if (replayedCount > 0) {
+      runInAction(() => {
+        this.projectState = this.executor!.getProject();
+      });
+      console.log(`[editor] replayed ${replayedCount}/${restored.length} pending operations locally`);
+    }
+
+    // Add to pending operations queue for server flush
     this.pendingOperations.push(...restored);
     // Schedule flush
     this.scheduleFlush();
@@ -770,6 +787,7 @@ export class EditorStore {
       position = info.index + 1;
     }
 
+    walkTree(subtree, (n) => { n.id = generateNodeId(); });
     const r = this.execute({
       type: 'insertSubtree',
       params: { parentId, subtree, position },
@@ -872,49 +890,19 @@ export class EditorStore {
   private enqueuePersist(op: Operation, fingerprint: string, forceImmediate = false): void {
     if (!this.project?.id) return;
 
+    // All operations go into a single ordered queue to preserve execution order.
+    // Critical operations trigger an immediate flush of the entire queue.
+    this.pendingOperations.push({ operation: op, fingerprint });
+    savePendingOperations(this.project.id, this.pendingOperations);
+
     if (forceImmediate) {
-      // Critical operations get queued for immediate flush
-      this.immediateFlushQueue.push({ operation: op, fingerprint });
-      this.scheduleImmediateFlush();
+      // Cancel any scheduled batched flush and flush everything now
+      if (this.flushTimer) {
+        clearTimeout(this.flushTimer);
+        this.flushTimer = null;
+      }
+      void this.flushPersistNow();
     } else {
-      // Regular operations use the batching strategy
-      this.pendingOperations.push({ operation: op, fingerprint });
-      // Save to localStorage as backup
-      savePendingOperations(this.project.id, this.pendingOperations);
-      this.scheduleFlush();
-    }
-  }
-
-  /** Schedule immediate flush for critical operations (within 100ms) */
-  private scheduleImmediateFlush(): void {
-    if (this.immediateFlushTimer) return;
-    this.immediateFlushTimer = setTimeout(() => {
-      this.immediateFlushTimer = null;
-      void this.flushImmediateCritical();
-    }, 100); // 100ms grace period to batch multiple critical ops
-  }
-
-  /** Flush critical operations immediately */
-  private async flushImmediateCritical(): Promise<void> {
-    if (this.immediateFlushQueue.length === 0) return;
-    const pending = this.immediateFlushQueue;
-    this.immediateFlushQueue = [];
-    const operations = pending.map((p) => p.operation);
-    const fingerprints = pending.map((p) => p.fingerprint);
-
-    try {
-      await apiJson<{ results: OperationResult[] }>(
-        `/projects/${this.project!.id}/operations/batch`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ operations, fingerprints }),
-          token: authStore.token,
-        }
-      );
-    } catch (err) {
-      console.warn('[editor] critical operation flush failed, re-queuing:', err);
-      // Re-queue for retry
-      this.pendingOperations = [...pending, ...this.pendingOperations];
       this.scheduleFlush();
     }
   }

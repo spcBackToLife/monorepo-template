@@ -60,7 +60,7 @@ export function resolveNodeProps(
   // Layer 3: business state (activeState override)
   const activeStateName = node.activeState;
   if (activeStateName && activeStateName !== 'default') {
-    const activeState = node.states.find((s) => s.name === activeStateName);
+    const activeState = node.states?.find((s) => s.name === activeStateName);
     if (activeState?.props) {
       mergedProps = { ...mergedProps, ...activeState.props };
     }
@@ -68,9 +68,9 @@ export function resolveNodeProps(
 
   // Layer 4: interaction state (hover, active, focus, etc.)
   if (interactionState) {
-    let interactionStateObj = node.states.find((s) => s.name === interactionState);
+    let interactionStateObj = node.states?.find((s) => s.name === interactionState);
     if (!interactionStateObj && interactionState === 'active') {
-      interactionStateObj = node.states.find((s) => s.name === 'pressed');
+      interactionStateObj = node.states?.find((s) => s.name === 'pressed');
     }
     if (interactionStateObj?.props) {
       mergedProps = { ...mergedProps, ...interactionStateObj.props };

@@ -117,7 +117,7 @@ export function resolveNodeStyles(
   // Layer 3: business state (activeState override)
   const activeStateName = node.activeState ?? 'default';
   if (activeStateName !== 'default') {
-    const activeState = node.states.find((s) => s.name === activeStateName);
+    const activeState = node.states?.find((s) => s.name === activeStateName);
     if (activeState?.styles) {
       merged = { ...merged, ...activeState.styles };
     }
@@ -132,10 +132,10 @@ export function resolveNodeStyles(
 
   // Layer 4: interaction state (hover, active, focus, etc.)
   if (interactionState) {
-    let interactionStateObj = node.states.find((s) => s.name === interactionState);
+    let interactionStateObj = node.states?.find((s) => s.name === interactionState);
     /** 画布「交互状态预览」下拉为 active，Schema 常命名为 pressed（与 CSS :active 一致） */
     if (!interactionStateObj && interactionState === 'active') {
-      interactionStateObj = node.states.find((s) => s.name === 'pressed');
+      interactionStateObj = node.states?.find((s) => s.name === 'pressed');
     }
     if (interactionStateObj?.styles) {
       merged = { ...merged, ...interactionStateObj.styles };

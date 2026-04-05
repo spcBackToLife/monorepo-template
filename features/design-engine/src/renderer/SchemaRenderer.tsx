@@ -127,34 +127,6 @@ export function SchemaRenderer({
       ? rootBg
       : (screen.backgroundColor ?? 'transparent');
 
-  function renderSingleNode(
-    node: ComponentNode,
-    assetsArg: ComponentTemplate[],
-    globalStatesArg: Record<string, string>,
-    onNodeClickArg?: (nodeId: string) => void,
-    onNodeHoverArg?: (nodeId: string | null) => void,
-    onNodeDoubleClickArg?: (nodeId: string) => void,
-  ): React.ReactNode {
-    const nodeWithoutListData: ComponentNode = {
-      ...node,
-      props: { ...node.props },
-    };
-    delete nodeWithoutListData.props.__listData;
-
-    return (
-      <NodeRenderer
-        node={nodeWithoutListData}
-        assets={assetsArg}
-        globalStates={globalStatesArg}
-        interactionPreview={interactionPreview}
-        renderListNode={renderSingleNode}
-        onNodeClick={onNodeClickArg}
-        onNodeHover={onNodeHoverArg}
-        onNodeDoubleClick={onNodeDoubleClickArg}
-      />
-    );
-  }
-
   return (
     <DataContextProvider value={activeDataContext}>
       <SchemaVirtualizeContext.Provider value={virtualizeCtx}>
@@ -176,7 +148,6 @@ export function SchemaRenderer({
             assets={assets}
             globalStates={globalStates}
             interactionPreview={interactionPreview}
-            renderListNode={renderSingleNode}
             onNodeClick={onNodeClick}
             onNodeHover={onNodeHover}
             onNodeDoubleClick={onNodeDoubleClick}
@@ -210,14 +181,40 @@ function buildDataContextFromScreen(screen: Screen): DataContext {
 
 const TEXT_PRIMITIVE_TYPES = new Set<string>(['p', 'span', 'h1', 'h2', 'h3', 'a']);
 
-export type RenderListNodeFn = (
-  node: ComponentNode,
-  assets: ComponentTemplate[],
-  globalStates: Record<string, string>,
-  onNodeClick?: (nodeId: string) => void,
-  onNodeHover?: (nodeId: string | null) => void,
-  onNodeDoubleClick?: (nodeId: string) => void,
-) => React.ReactNode;
+/**
+ * 列表容器样式覆盖：当节点绑定了 __listData，强制 flex column 布局，
+ * 使重复渲染的子项能自动纵向排列，而不是因 absolute 叠在一起。
+ */
+function applyListContainerStyleOverrides(
+  styles: React.CSSProperties,
+): React.CSSProperties {
+  return {
+    ...styles,
+    display: 'flex',
+    flexDirection: 'column',
+    // 固定 height 会截断列表项，改为最小高度
+    height: undefined,
+    minHeight: styles.height ?? styles.minHeight,
+  };
+}
+
+/**
+ * 列表子项样式覆盖：将被重复渲染的直接子元素从 absolute 切换到
+ * relative，使其参与父容器的 flex 流式布局。
+ */
+function applyListItemStyleOverrides(
+  styles: React.CSSProperties,
+): React.CSSProperties {
+  if (styles.position !== 'absolute') return styles;
+  return {
+    ...styles,
+    position: 'relative',
+    left: undefined,
+    top: undefined,
+    right: undefined,
+    bottom: undefined,
+  };
+}
 
 interface NodeRendererProps {
   node: ComponentNode;
@@ -226,8 +223,8 @@ interface NodeRendererProps {
   assets: ComponentTemplate[];
   globalStates: Record<string, string>;
   interactionPreview?: InteractionPreview | null;
-  /** 列表项渲染（与 NodeRenderer 同逻辑，需传入以闭包捕获 interactionPreview） */
-  renderListNode: RenderListNodeFn;
+  /** 标记当前节点是列表容器的直接子项（被重复渲染），需覆盖定位样式 */
+  isListItem?: boolean;
   onNodeClick?: (nodeId: string) => void;
   onNodeHover?: (nodeId: string | null) => void;
   onNodeDoubleClick?: (nodeId: string) => void;
@@ -249,7 +246,7 @@ function NodeRenderer({
   assets,
   globalStates,
   interactionPreview = null,
-  renderListNode,
+  isListItem = false,
   onNodeClick,
   onNodeHover,
   onNodeDoubleClick,
@@ -264,27 +261,15 @@ function NodeRenderer({
 
   const interactionForNode = resolveInteractionForNode(node.id, interactionPreview);
 
-  // Step 1.5: Check for list rendering (__listData prop)
-  if (hasExpression(node.props.__listData)) {
-    return (
-      <ListRenderer
-        node={node}
-        assets={assets}
-        globalStates={globalStates}
-        renderNode={renderListNode}
-        onNodeClick={onNodeClick}
-        onNodeHover={onNodeHover}
-        onNodeDoubleClick={onNodeDoubleClick}
-      />
-    );
-  }
-
   if (shouldVirtualizeCullNode(vctx, { nodeId: node.id, rootNodeId })) {
     return null;
   }
 
   // Step 2: Resolve props + visibility through 4-layer merge
-  const { props: mergedProps, visible } = resolveNodeProps(node, globalStates, interactionForNode);
+  const nodeForProps: ComponentNode = hasExpression(node.props?.__listData)
+    ? { ...node, props: { ...node.props, __listData: undefined } }
+    : node;
+  const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates, interactionForNode);
 
   // Step 2.5: Resolve data binding expressions in props
   const resolvedProps = resolveDataExpressions(mergedProps, dataContext);
@@ -296,7 +281,8 @@ function NodeRenderer({
 
   // Step 4: Resolve styles through 4-layer merge and convert to React.CSSProperties
   const baseStyles = resolveNodeStyles(node, globalStates, interactionForNode, dataContext);
-  const reactStyles =
+  const isListContainer = hasExpression(node.props?.__listData);
+  let reactStyles =
     rootNodeId && node.id === rootNodeId
       ? {
           ...baseStyles,
@@ -310,6 +296,15 @@ function NodeRenderer({
           boxSizing: 'border-box' as const,
         }
       : baseStyles;
+
+  // 列表容器：强制 flex column，让重复子项自动排列
+  if (isListContainer) {
+    reactStyles = applyListContainerStyleOverrides(reactStyles);
+  }
+  // 列表子项：从 absolute 切到 relative，参与父容器 flex 流
+  if (isListItem) {
+    reactStyles = applyListItemStyleOverrides(reactStyles);
+  }
 
   // Step 5: Event handlers
   const handleClick = useCallback(
@@ -346,21 +341,43 @@ function NodeRenderer({
     [node.id, node.type, onNodeDoubleClick],
   );
 
-  // Step 6: Recursively render children
-  const children = node.children?.map((child) => (
-    <NodeRenderer
-      key={child.id}
-      node={child}
-      rootNodeId={rootNodeId}
-      assets={assets}
-      globalStates={globalStates}
-      interactionPreview={interactionPreview}
-      renderListNode={renderListNode}
-      onNodeClick={onNodeClick}
-      onNodeHover={onNodeHover}
-      onNodeDoubleClick={onNodeDoubleClick}
-    />
-  ));
+  // Step 6: Render children — if this node has __listData, repeat children per list item
+  let children: React.ReactNode;
+  if (isListContainer) {
+    children = (
+      <ListRenderer
+        node={node}
+        renderChild={(child, listIndex) => (
+          <NodeRenderer
+            key={`${child.id}-${listIndex}`}
+            node={child}
+            rootNodeId={rootNodeId}
+            assets={assets}
+            globalStates={globalStates}
+            interactionPreview={interactionPreview}
+            isListItem
+            onNodeClick={onNodeClick}
+            onNodeHover={onNodeHover}
+            onNodeDoubleClick={onNodeDoubleClick}
+          />
+        )}
+      />
+    );
+  } else {
+    children = node.children?.map((child) => (
+      <NodeRenderer
+        key={child.id}
+        node={child}
+        rootNodeId={rootNodeId}
+        assets={assets}
+        globalStates={globalStates}
+        interactionPreview={interactionPreview}
+        onNodeClick={onNodeClick}
+        onNodeHover={onNodeHover}
+        onNodeDoubleClick={onNodeDoubleClick}
+      />
+    ));
+  }
 
   // Step 7: Wrap with click/hover handlers
   return (

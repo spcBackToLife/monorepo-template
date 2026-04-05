@@ -12,6 +12,8 @@ export interface PrimitiveRendererProps {
   resolvedProps: Record<string, unknown>;
   /** Rendered children */
   children: React.ReactNode;
+  /** When true, form elements are fully interactive (preview mode) */
+  interactive?: boolean;
 }
 
 /**
@@ -25,6 +27,7 @@ export function PrimitiveRenderer({
   style,
   resolvedProps,
   children,
+  interactive = false,
 }: PrimitiveRendererProps) {
   const listPath = useListInstancePath();
   const instanceKey = encodeNodeInstanceKey(listPath, node.id);
@@ -50,19 +53,52 @@ export function PrimitiveRenderer({
         />
       );
 
-    case 'input':
+    case 'input': {
+      const inputType = (resolvedProps.type as string) ?? 'text';
+      const isCheckbox = inputType === 'checkbox' || inputType === 'radio';
+      if (interactive) {
+        return isCheckbox ? (
+          <input
+            {...commonProps}
+            type={inputType}
+            defaultChecked={resolvedProps.checked as boolean ?? resolvedProps.value as boolean ?? false}
+            disabled={resolvedProps.disabled as boolean}
+          />
+        ) : (
+          <input
+            {...commonProps}
+            placeholder={resolvedProps.placeholder as string}
+            type={inputType}
+            defaultValue={resolvedProps.value as string}
+            disabled={resolvedProps.disabled as boolean}
+          />
+        );
+      }
       return (
         <input
           {...commonProps}
           placeholder={resolvedProps.placeholder as string}
-          type={(resolvedProps.type as string) ?? 'text'}
-          value={resolvedProps.value as string}
+          type={inputType}
+          value={resolvedProps.value as string ?? ''}
           disabled={resolvedProps.disabled as boolean}
           readOnly
+          onChange={() => {}}
         />
       );
+    }
 
     case 'textarea':
+      if (interactive) {
+        return (
+          <textarea
+            {...commonProps}
+            placeholder={resolvedProps.placeholder as string}
+            rows={resolvedProps.rows as number}
+            defaultValue={resolvedProps.value as string}
+            disabled={resolvedProps.disabled as boolean}
+          />
+        );
+      }
       return (
         <textarea
           {...commonProps}
@@ -70,16 +106,29 @@ export function PrimitiveRenderer({
           rows={resolvedProps.rows as number}
           disabled={resolvedProps.disabled as boolean}
           readOnly
-          value={resolvedProps.value as string}
+          value={resolvedProps.value as string ?? ''}
+          onChange={() => {}}
         />
       );
 
     case 'select':
+      if (interactive) {
+        return (
+          <select
+            {...commonProps}
+            defaultValue={resolvedProps.value as string}
+            disabled={resolvedProps.disabled as boolean}
+          >
+            {children}
+          </select>
+        );
+      }
       return (
         <select
           {...commonProps}
           disabled={resolvedProps.disabled as boolean}
           value={resolvedProps.value as string}
+          onChange={() => {}}
         >
           {children}
         </select>

@@ -657,7 +657,7 @@ export class OperationExecutor {
       };
     }
 
-    const state = node.states.find((s) => s.name === params.stateName);
+    const state = node.states?.find((s) => s.name === params.stateName);
     if (state) {
       state.styles = params.styles;
       state.props = params.props;
@@ -690,7 +690,7 @@ export class OperationExecutor {
       node = findNodeById(screen.rootNode, params.nodeId);
       if (node) break;
     }
-    if (node && params.eventIndex < node.events.length) {
+    if (node && node.events && params.eventIndex < node.events.length) {
       node.events.splice(params.eventIndex, 1);
     }
 

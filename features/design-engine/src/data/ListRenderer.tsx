@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ComponentNode, ComponentTemplate } from '@globallink/design-schema';
+import type { ComponentNode } from '@globallink/design-schema';
 import { DataContextProvider, useDataContext } from './DataContext';
 import type { DataContext } from './resolveExpression';
 import { resolveExpression } from './resolveExpression';
@@ -10,45 +10,39 @@ import { ListInstanceContext, useListInstancePath } from '../renderer/ListInstan
 const MAX_LIST_ITEMS = 50;
 
 export interface ListRendererProps {
-  /** The node that has __listData in its props */
+  /** The node that has __listData in its props (the list container) */
   node: ComponentNode;
-  /** Component template assets */
-  assets: ComponentTemplate[];
-  /** Runtime global state values */
-  globalStates: Record<string, string>;
-  /** Renderer function for a single node with its children */
-  renderNode: (
-    node: ComponentNode,
-    assets: ComponentTemplate[],
-    globalStates: Record<string, string>,
-    onNodeClick?: (nodeId: string) => void,
-    onNodeHover?: (nodeId: string | null) => void,
-    onNodeDoubleClick?: (nodeId: string) => void,
+  /** Render a single child node within a list-item data context */
+  renderChild: (
+    child: ComponentNode,
+    listIndex: number,
   ) => React.ReactNode;
-  /** Called when a node is clicked */
-  onNodeClick?: (nodeId: string) => void;
-  /** Called when mouse enters/leaves a node */
-  onNodeHover?: (nodeId: string | null) => void;
-  onNodeDoubleClick?: (nodeId: string) => void;
 }
 
 /**
- * ListRenderer detects __listData in node props, resolves the expression to an array,
- * and renders the node once per array item with a child DataContext.
+ * ListRenderer resolves the __listData expression on a container node to an array,
+ * then repeats the node's **children** once per array item, each wrapped in a
+ * DataContext that provides `item` and `index`.
+ *
+ * The container node itself is NOT rendered by ListRenderer — the caller is
+ * responsible for rendering the container and using ListRenderer's output as children.
+ *
+ * Usage (in NodeRenderer / PreviewNodeRenderer):
+ * ```
+ *   const listChildren = (
+ *     <ListRenderer node={node} renderChild={(child, idx) => <NodeRenderer node={child} ... />} />
+ *   );
+ *   return <PrimitiveRenderer ...>{listChildren}</PrimitiveRenderer>;
+ * ```
  */
 export function ListRenderer({
   node,
-  assets,
-  globalStates,
-  renderNode,
-  onNodeClick,
-  onNodeHover,
-  onNodeDoubleClick,
+  renderChild,
 }: ListRendererProps) {
   const parentContext = useDataContext();
   const parentVirtualize = useSchemaVirtualize();
   const parentListPath = useListInstancePath();
-  const listExpression = node.props.__listData as string;
+  const listExpression = node.props?.__listData as string;
 
   // Resolve the expression to get the array
   const resolvedData = resolveExpression(listExpression, parentContext);
@@ -62,12 +56,14 @@ export function ListRenderer({
     cullDisabledForSubtree: true,
   };
 
+  const nodeChildren = node.children ?? [];
+
   if (visibleItems.length === 0) {
-    // Render once with empty context as placeholder
+    // Render children once with parent context as placeholder (no item context)
     return (
       <SchemaVirtualizeContext.Provider value={listVirtualizeValue}>
         <ListInstanceContext.Provider value={parentListPath}>
-          {renderNode(node, assets, globalStates, onNodeClick, onNodeHover, onNodeDoubleClick)}
+          {nodeChildren.map((child) => renderChild(child, 0))}
         </ListInstanceContext.Provider>
       </SchemaVirtualizeContext.Provider>
     );
@@ -91,7 +87,7 @@ export function ListRenderer({
           >
             <ListInstanceContext.Provider value={rowPath}>
               <DataContextProvider value={childContext}>
-                {renderNode(node, assets, globalStates, onNodeClick, onNodeHover, onNodeDoubleClick)}
+                {nodeChildren.map((child) => renderChild(child, index))}
               </DataContextProvider>
             </ListInstanceContext.Provider>
           </SchemaVirtualizeContext.Provider>

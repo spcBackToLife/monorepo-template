@@ -36,7 +36,9 @@ export function executeAddState(
     };
   }
 
-  // Check for duplicate state name
+  if (!node.states) {
+    node.states = [];
+  }
   if (node.states.some((s) => s.name === params.stateName)) {
     return {
       project,

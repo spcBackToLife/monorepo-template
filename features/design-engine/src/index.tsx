@@ -3,7 +3,6 @@ export { SchemaRenderer } from './renderer/SchemaRenderer';
 export type {
   SchemaRendererProps,
   InteractionPreview,
-  RenderListNodeFn,
 } from './renderer/SchemaRenderer';
 
 export { EditorOverlay } from './overlay/EditorOverlay';

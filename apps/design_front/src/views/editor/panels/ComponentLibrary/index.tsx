@@ -106,6 +106,7 @@ export const ComponentLibrary = observer(function ComponentLibrary({
         type: 'instantiateTemplate',
         params: { templateId, parentId: rootId },
       });
+      onClose();
       return;
     }
 
@@ -118,6 +119,7 @@ export const ComponentLibrary = observer(function ComponentLibrary({
       message.success('组件已添加');
       const createdId = result.affectedNodeIds[0];
       if (createdId) editorStore.select(createdId);
+      onClose();
     } else {
       message.error(result.description);
     }

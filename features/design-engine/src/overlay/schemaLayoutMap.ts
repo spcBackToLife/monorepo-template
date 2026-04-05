@@ -106,7 +106,7 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
 
     const interactionForNode = resolveInteractionForNode(resolved.id, options.interactionPreview ?? null);
 
-    if (hasExpression(resolved.props.__listData)) {
+    if (hasExpression(resolved.props?.__listData)) {
       for (const child of resolved.children ?? []) {
         walk(child, offsetParentRect, false);
       }

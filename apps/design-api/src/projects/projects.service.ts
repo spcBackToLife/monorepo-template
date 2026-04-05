@@ -14,6 +14,7 @@ import {
   getDefaultViewport,
   generateScreenId,
   generateNodeId,
+  normalizeNode,
 } from '@globallink/design-schema';
 import {
   OperationExecutor,
@@ -189,6 +190,14 @@ export class ProjectsService {
         executor.execute(row.operation);
       }
       project = executor.getProject();
+    }
+
+    // 5. 规范化：确保所有节点的 props/states/events/styles 字段存在
+    for (const screen of project.screens ?? []) {
+      if (screen.rootNode) normalizeNode(screen.rootNode);
+    }
+    for (const asset of project.componentAssets ?? []) {
+      if (asset.schema) normalizeNode(asset.schema);
     }
 
     return project;

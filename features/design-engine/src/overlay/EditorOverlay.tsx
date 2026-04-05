@@ -6,7 +6,6 @@ import {
   expandRootRectToContainer,
   getEditorCoordinateRoot,
   getRectForInteraction,
-  hitTest,
   hitTestAll,
   hitTestAt,
   type CoordinateMap,

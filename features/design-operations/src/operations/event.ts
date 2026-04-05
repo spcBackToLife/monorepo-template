@@ -36,6 +36,9 @@ export function executeAddEvent(
     };
   }
 
+  if (!node.events) {
+    node.events = [];
+  }
   node.events.push(params.event);
   const eventIndex = node.events.length - 1;
 

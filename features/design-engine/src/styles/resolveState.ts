@@ -19,7 +19,7 @@ export function resolveActiveState(node: ComponentNode): {
     return { styles: baseStyles, props: baseProps };
   }
 
-  const activeState = node.states.find((s) => s.name === node.activeState);
+  const activeState = node.states?.find((s) => s.name === node.activeState);
   if (!activeState) {
     return { styles: baseStyles, props: baseProps };
   }

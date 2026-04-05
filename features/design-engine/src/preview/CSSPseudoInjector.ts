@@ -54,7 +54,7 @@ export class CSSPseudoInjector {
       'focus-visible': ':focus-visible',
     };
 
-    for (const state of node.states) {
+    for (const state of node.states ?? []) {
       const pseudo = pseudoMap[state.name];
       if (!pseudo) continue;
 

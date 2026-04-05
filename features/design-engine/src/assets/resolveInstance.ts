@@ -41,17 +41,17 @@ export function resolveComponentInstance(
   resolved.id = node.id;
 
   // Preserve any style/state/event overrides from the instance
-  if (Object.keys(node.styles).length > 0) {
+  if (node.styles && Object.keys(node.styles).length > 0) {
     resolved.styles = { ...resolved.styles, ...node.styles };
   }
-  if (node.states.length > 0) {
+  if (node.states && node.states.length > 0) {
     resolved.states = node.states;
   }
   if (node.activeState !== 'default') {
     resolved.activeState = node.activeState;
   }
-  if (node.events.length > 0) {
-    resolved.events = [...resolved.events, ...node.events];
+  if (node.events && node.events.length > 0) {
+    resolved.events = [...(resolved.events ?? []), ...node.events];
   }
 
   return resolved;

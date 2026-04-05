@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { generateTemplateId } from '@globallink/design-schema';
 import * as api from '../api-client.js';
 
 export function registerAssetTools(server: McpServer): void {
@@ -41,9 +42,10 @@ export function registerAssetTools(server: McpServer): void {
       },
     },
     async ({ projectId, nodeId, name, category, tags, description }) => {
+      const templateId = generateTemplateId();
       const result = await api.executeOperation(projectId, {
         type: 'saveAsTemplate',
-        params: { nodeId, name, category, tags, description },
+        params: { nodeId, name, category, tags, description, templateId },
       });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

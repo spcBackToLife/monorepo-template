@@ -153,6 +153,7 @@ export {
 // ===== Serialization =====
 export {
   deepClone,
+  normalizeNode,
   toJSON,
   fromJSON,
   nodeToJSON,

@@ -309,9 +309,8 @@ export function executeInsertSubtree(
   }
 
   const cloned = deepClone(params.subtree);
-  walkTree(cloned, (n) => {
-    n.id = generateNodeId();
-  });
+  // Preserve provided IDs for deterministic replay.
+  // Callers must pre-generate unique IDs before creating this operation.
 
   const position = params.position ?? parent.children.length;
   const safePos = Math.max(0, Math.min(position, parent.children.length));
