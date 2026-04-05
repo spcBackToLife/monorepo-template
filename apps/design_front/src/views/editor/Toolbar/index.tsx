@@ -223,6 +223,16 @@ export const Toolbar = observer(function Toolbar() {
             />
           </span>
         </Tooltip>
+        <Tooltip title="在画布上方显示数据源/领域态/环境态上下文条">
+          <span className="toolbar-inline-switch">
+            <span className="toolbar-inline-switch__label">上下文</span>
+            <Switch
+              size="small"
+              checked={editorStore.showCanvasContextBar}
+              onChange={(v) => editorStore.setShowCanvasContextBar(v)}
+            />
+          </span>
+        </Tooltip>
       </div>
 
       <div className="toolbar-right">

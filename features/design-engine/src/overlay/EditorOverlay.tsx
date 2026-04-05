@@ -4,13 +4,16 @@ import {
   mergeCoordinateMaps,
   scaleCoordinateMapToLayoutContainer,
   expandRootRectToContainer,
+  getEditorCoordinateRoot,
+  getRectForInteraction,
   hitTest,
   hitTestAll,
+  hitTestAt,
   type CoordinateMap,
 } from './coordinateMap';
 import type { BoundingRect } from './BoundingBoxCache';
 import { drawSelection, normalizeNodeRectForOverlay } from './interactions/select';
-import { getHoveredNode, drawHover } from './interactions/hover';
+import { drawHover } from './interactions/hover';
 import {
   beginDrag,
   updateDragWithSnap,
@@ -49,8 +52,16 @@ import { drawSpacingHints } from './spacingHints';
 /** 与 snapping / alignment 模块共用：由当前坐标图生成包围盒列表 */
 function coordMapToBoundingRects(map: CoordinateMap): BoundingRect[] {
   const rects: BoundingRect[] = [];
-  for (const [nodeId, r] of map.entries()) {
-    rects.push({ nodeId, x: r.x, y: r.y, width: r.width, height: r.height });
+  for (const [instanceKey, entry] of map.entries()) {
+    const r = entry.rect;
+    rects.push({
+      nodeId: entry.nodeId,
+      instanceKey,
+      x: r.x,
+      y: r.y,
+      width: r.width,
+      height: r.height,
+    });
   }
   return rects;
 }
@@ -66,9 +77,10 @@ function drawListBindingBadges(
   map: CoordinateMap,
   nodeIds: string[],
 ): void {
-  for (const id of nodeIds) {
-    const r = map.get(id);
-    if (!r) continue;
+  const idSet = new Set(nodeIds);
+  for (const [, entry] of map) {
+    if (!idSet.has(entry.nodeId)) continue;
+    const r = entry.rect;
     const bx = r.x + 4;
     const by = r.y + 4;
     ctx.save();
@@ -94,9 +106,10 @@ function drawInteractionEventBadges(
   map: CoordinateMap,
   nodeIds: string[],
 ): void {
-  for (const id of nodeIds) {
-    const r = map.get(id);
-    if (!r) continue;
+  const idSet = new Set(nodeIds);
+  for (const [, entry] of map) {
+    if (!idSet.has(entry.nodeId)) continue;
+    const r = entry.rect;
     const bx = r.x + r.width - 22;
     const by = r.y + 4;
     ctx.save();
@@ -320,6 +333,9 @@ export function EditorOverlay({
   const deepSelectIdxRef = useRef(0);
   const marqueeStateRef = useRef<MarqueeState | null>(null);
   const drawStateRef = useRef<DrawState | null>(null);
+  /** 列表多实例：最近一次命中/悬停的实例键，用于缩放手柄与吸附排除自身 */
+  const interactionInstanceKeyRef = useRef<string | null>(null);
+  const hoverInstanceKeyRef = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isMarquee, setIsMarquee] = useState(false);
@@ -342,16 +358,17 @@ export function EditorOverlay({
   // ===== Coordinate map refresh =====
 
   const refreshCoordMap = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const domMap = buildCoordinateMap(container);
+    const stack = containerRef.current;
+    if (!stack) return;
+    const coordRoot = getEditorCoordinateRoot(stack);
+    const domMap = buildCoordinateMap(coordRoot);
     let merged: CoordinateMap;
     if (coordinateLayoutFallback && coordinateLayoutFallback.size > 0) {
       const vw = layoutViewportWidth ?? 375;
       const vh = layoutViewportHeight ?? 812;
       const scaled = scaleCoordinateMapToLayoutContainer(
         coordinateLayoutFallback,
-        container,
+        coordRoot,
         vw,
         vh,
       );
@@ -361,7 +378,7 @@ export function EditorOverlay({
     }
     coordMapRef.current =
       rootNodeId != null && rootNodeId !== ''
-        ? expandRootRectToContainer(merged, container, rootNodeId)
+        ? expandRootRectToContainer(merged, coordRoot, rootNodeId)
         : merged;
   }, [
     containerRef,
@@ -375,17 +392,17 @@ export function EditorOverlay({
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    const stack = containerRef.current;
+    if (!canvas || !stack) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Use logical dimensions (offsetWidth/offsetHeight are NOT affected by ancestor CSS transforms).
-    // The canvas element lives inside a scale(S) ancestor; using logical sizes ensures
-    // draw coordinates match the DOM's logical coordinate space exactly.
-    const logicalW = container.offsetWidth;
-    const logicalH = container.offsetHeight;
+    // canvas 大小 = stack 的 offsetWidth/offsetHeight（CSS 逻辑像素，不受祖先 transform 影响）。
+    // canvas 在 stack 的 (0,0)；coordRoot（[data-screen-id]）始终与 stack 共享 (0,0) 与尺寸，
+    // 不需要额外 offset；保持与 React inline style 一致，避免 React 与 imperative DOM 打架。
+    const logicalW = stack.offsetWidth;
+    const logicalH = stack.offsetHeight;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = logicalW * dpr;
     canvas.height = logicalH * dpr;
@@ -406,10 +423,10 @@ export function EditorOverlay({
     const map = coordMapRef.current;
 
     // Draw hover highlight
-    drawHover(ctx, map, hoveredNodeId, selectedNodeIds);
+    drawHover(ctx, map, hoveredNodeId, selectedNodeIds, hoverInstanceKeyRef.current);
 
     if (altKeyHeld && hoveredNodeId) {
-      drawSpacingHints(ctx, map, hoveredNodeId, logicalW, logicalH);
+      drawSpacingHints(ctx, map, hoveredNodeId, logicalW, logicalH, hoverInstanceKeyRef.current);
     }
 
     // Draw selection
@@ -425,7 +442,11 @@ export function EditorOverlay({
 
     // Draw resize handles for single selection
     if (selectedNodeIds.length === 1 && !isDragging) {
-      const rect = map.get(selectedNodeIds[0]);
+      const rect = getRectForInteraction(
+        map,
+        selectedNodeIds[0]!,
+        interactionInstanceKeyRef.current,
+      );
       if (rect) {
         drawResizeHandles(ctx, normalizeNodeRectForOverlay(rect), zoomLevel);
       }
@@ -510,10 +531,14 @@ export function EditorOverlay({
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['style', 'class'],
+        attributeFilter: ['style', 'class', 'data-node-instance-key'],
       });
       resizeObserver = new ResizeObserver(scheduleRefresh);
       resizeObserver.observe(container);
+      const coordRoot = getEditorCoordinateRoot(container);
+      if (coordRoot !== container) {
+        resizeObserver.observe(coordRoot);
+      }
 
       let scrollEl: HTMLElement | null = container.closest('[data-viewport-container]') as HTMLElement | null;
       if (scrollEl) {
@@ -536,19 +561,18 @@ export function EditorOverlay({
 
   const getCanvasCoords = useCallback(
     (e: React.MouseEvent): { x: number; y: number } | null => {
-      const canvas = canvasRef.current;
-      if (!canvas) return null;
-      const rect = canvas.getBoundingClientRect();
-      // getBoundingClientRect is in screen-space (affected by ancestor scale transform).
-      // Divide by effective scale to get logical coordinates matching the coordinate map.
+      const stack = containerRef.current;
+      if (!stack) return null;
+      const coordRoot = getEditorCoordinateRoot(stack);
+      const rect = coordRoot.getBoundingClientRect();
       const effectiveScale =
-        canvas.offsetWidth > 0 ? rect.width / canvas.offsetWidth : 1;
+        coordRoot.offsetWidth > 0 ? rect.width / coordRoot.offsetWidth : 1;
       return {
         x: (e.clientX - rect.left) / effectiveScale,
         y: (e.clientY - rect.top) / effectiveScale,
       };
     },
-    [],
+    [containerRef],
   );
 
   // ===== Mouse handlers =====
@@ -569,7 +593,7 @@ export function EditorOverlay({
         lockedNodeIds?.forEach((id) => skipPlacement.add(id));
         annotationNodeIds?.forEach((id) => skipPlacement.add(id));
         const skipPlacementArg = skipPlacement.size > 0 ? skipPlacement : undefined;
-        const hitId = hitTest(map, coords.x, coords.y, skipPlacementArg);
+        const hitId = hitTestAt(map, coords.x, coords.y, skipPlacementArg)?.nodeId ?? null;
         const parentId = hitId ?? rootNodeId;
         onAnnotationPlace({ parentId, canvasX: coords.x, canvasY: coords.y });
         return;
@@ -585,12 +609,23 @@ export function EditorOverlay({
       // Select tool (default)
       // Check if we're clicking on a resize handle
       if (selectedNodeIds.length === 1 && !skipLocked?.has(selectedNodeIds[0])) {
-        const rect = map.get(selectedNodeIds[0]);
+        const rect = getRectForInteraction(
+          map,
+          selectedNodeIds[0],
+          interactionInstanceKeyRef.current,
+        );
         if (rect) {
           const handle = hitTestHandle(normalizeNodeRectForOverlay(rect), coords.x, coords.y, zoomLevel);
           if (handle) {
             resizeModifiersRef.current = { shiftKey: e.shiftKey, altKey: e.altKey };
-            const state = beginResize(map, selectedNodeIds[0], handle, coords.x, coords.y);
+            const state = beginResize(
+              map,
+              selectedNodeIds[0],
+              handle,
+              coords.x,
+              coords.y,
+              interactionInstanceKeyRef.current,
+            );
             if (state) {
               resizeStateRef.current = state;
               setIsResizing(true);
@@ -618,8 +653,13 @@ export function EditorOverlay({
       deepSelectKeyRef.current = '';
       deepSelectIdxRef.current = 0;
 
-      // Check for select
-      const hitNodeId = hitTest(map, coords.x, coords.y, skipLocked);
+      const hat = hitTestAt(map, coords.x, coords.y, skipLocked);
+      const hitNodeId = hat?.nodeId ?? null;
+      if (hitNodeId) {
+        interactionInstanceKeyRef.current = hat!.instanceKey;
+      } else {
+        interactionInstanceKeyRef.current = null;
+      }
       onSelect?.(hitNodeId);
 
       // Start drag if we hit a node
@@ -631,11 +671,12 @@ export function EditorOverlay({
         if (dragIds?.some((id) => lockedNodeIds?.has(id))) {
           dragIds = undefined;
         }
-        const state = beginDrag(map, hitNodeId, coords.x, coords.y, dragIds);
+        const state = beginDrag(map, hitNodeId, coords.x, coords.y, dragIds, hat?.instanceKey);
         if (state) {
           dragStateRef.current = state;
         }
       } else {
+        interactionInstanceKeyRef.current = null;
         // Empty canvas click — start marquee selection
         marqueeStateRef.current = beginMarquee(coords.x, coords.y);
       }
@@ -725,8 +766,11 @@ export function EditorOverlay({
       // Normal hover
       refreshCoordMap();
       const skipLocked = lockedNodeIds && lockedNodeIds.size > 0 ? lockedNodeIds : undefined;
-      const hoveredId = getHoveredNode(coordMapRef.current, coords.x, coords.y, skipLocked);
+      const hat = hitTestAt(coordMapRef.current, coords.x, coords.y, skipLocked);
+      hoverInstanceKeyRef.current = hat?.instanceKey ?? null;
+      const hoveredId = hat?.nodeId ?? null;
       onHover?.(hoveredId);
+      draw();
     },
     [
       getCanvasCoords,
@@ -856,7 +900,7 @@ export function EditorOverlay({
       refreshCoordMap();
       const map = coordMapRef.current;
       const skipLocked = lockedNodeIds && lockedNodeIds.size > 0 ? lockedNodeIds : undefined;
-      const hitId = hitTest(map, coords.x, coords.y, skipLocked);
+      const hitId = hitTestAt(map, coords.x, coords.y, skipLocked)?.nodeId ?? null;
       if (!hitId) return;
       const container = containerRef.current;
       const el = container?.querySelector(`[data-node-id="${hitId}"]`) as HTMLElement | null;

@@ -30,7 +30,8 @@ export function shouldVirtualizeCullNode(
 ): boolean {
   if (!ctx.enabled || ctx.cullDisabledForSubtree) return false;
   if (options.rootNodeId && options.nodeId === options.rootNodeId) return false;
-  const r = ctx.layoutMap.get(options.nodeId);
-  if (!r) return false;
+  const entry = ctx.layoutMap.get(options.nodeId);
+  if (!entry) return false;
+  const r = entry.rect;
   return !nodeRectIntersectsCull(r, ctx.cullRect);
 }

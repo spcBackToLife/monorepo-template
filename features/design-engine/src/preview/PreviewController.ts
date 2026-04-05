@@ -1,8 +1,8 @@
 import type { Viewport } from '@globallink/design-schema';
 
 /**
- * W8-100：程序化预览控制器。
- * 用于 MCP / AI 自动化测试等场景，通过回调驱动宿主编辑器状态。
+ * 程序化预览控制器（MCP / 自动化测试等）。
+ * Phase 8：对齐数据源阶段、领域态、环境态。
  */
 export interface PreviewControllerCallbacks {
   enterPreview: () => void;
@@ -10,8 +10,14 @@ export interface PreviewControllerCallbacks {
   navigateTo: (screenId: string) => void;
   navigateBack: () => void;
   switchViewport: (viewport: Viewport) => void;
-  setGlobalState: (variableName: string, value: string) => void;
-  switchDataSet: (screenId: string, dataSetId: string) => void;
+  /** 切换指定屏幕上某数据源的生命周期阶段 */
+  switchDataSourcePhase: (screenId: string, dataSourceId: string, phase: string) => void;
+  /** 切换数据源内的数据场景 */
+  switchDataScenario: (screenId: string, dataSourceId: string, scenarioId: string) => void;
+  /** 领域态预览值（与 resolve 使用的 globalStates 表一致） */
+  setDomainState: (variableName: string, value: string) => void;
+  /** 环境态预览值 */
+  setEnvironmentState: (variableName: string, value: string) => void;
   toggleDeviceFrame: (show: boolean) => void;
 }
 
@@ -38,12 +44,20 @@ export class PreviewController {
     this.callbacks.switchViewport(viewport);
   }
 
-  setGlobalState(variableName: string, value: string): void {
-    this.callbacks.setGlobalState(variableName, value);
+  switchDataSourcePhase(screenId: string, dataSourceId: string, phase: string): void {
+    this.callbacks.switchDataSourcePhase(screenId, dataSourceId, phase);
   }
 
-  switchDataSet(screenId: string, dataSetId: string): void {
-    this.callbacks.switchDataSet(screenId, dataSetId);
+  switchDataScenario(screenId: string, dataSourceId: string, scenarioId: string): void {
+    this.callbacks.switchDataScenario(screenId, dataSourceId, scenarioId);
+  }
+
+  setDomainState(variableName: string, value: string): void {
+    this.callbacks.setDomainState(variableName, value);
+  }
+
+  setEnvironmentState(variableName: string, value: string): void {
+    this.callbacks.setEnvironmentState(variableName, value);
   }
 
   showDeviceFrame(show: boolean): void {

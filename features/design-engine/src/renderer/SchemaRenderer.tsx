@@ -300,6 +300,10 @@ function NodeRenderer({
     rootNodeId && node.id === rootNodeId
       ? {
           ...baseStyles,
+          left: undefined,
+          top: undefined,
+          right: undefined,
+          bottom: undefined,
           minHeight: baseStyles.minHeight ?? '100%',
           height: baseStyles.height ?? '100%',
           width: baseStyles.width ?? '100%',

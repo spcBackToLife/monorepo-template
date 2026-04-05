@@ -40,7 +40,21 @@ export {
   scaleCoordinateMapToLayoutContainer,
   expandRootRectToContainer,
   hitTest,
+  hitTestAt,
   hitTestAll,
+  rectFullyContains,
+  hitTestAllContainingBounds,
+  getEditorCoordinateRoot,
+  getEditorContentRootRect,
+  getRootStackPlacementRect,
+  getParentContentRectInContainer,
+  screenToContainerLogical,
+  getPlacementParentRect,
+  resolvePlacementParentElement,
+  getRectForInteraction,
+  mapHasNodeId,
+  collectRectsForNodeId,
+  DATA_NODE_INSTANCE_KEY_ATTR,
 } from './overlay/coordinateMap';
 export { buildSchemaLayoutMap, expandCullRect } from './overlay/schemaLayoutMap';
 export type { BuildSchemaLayoutMapOptions } from './overlay/schemaLayoutMap';
@@ -50,7 +64,13 @@ export {
   canvasToViewport,
   viewportToParent,
 } from './overlay/coordinateMap';
-export type { NodeRect, CoordinateMap, Point, CanvasViewState } from './overlay/coordinateMap';
+export type {
+  NodeRect,
+  CoordinateMap,
+  CoordinateMapEntry,
+  Point,
+  CanvasViewState,
+} from './overlay/coordinateMap';
 
 // ===== Bounding Box Cache =====
 export { BoundingBoxCache } from './overlay/BoundingBoxCache';
@@ -127,6 +147,9 @@ export type { PreviewRendererProps } from './preview/PreviewRenderer';
 
 export { EventExecutionEngine } from './preview/EventExecutionEngine';
 export type { PreviewContext, TransitionAnimation } from './preview/EventExecutionEngine';
+
+export { TransitionAnimator } from './preview/TransitionAnimator';
+export type { TransitionAnimatorProps } from './preview/TransitionAnimator';
 
 export { CSSPseudoInjector } from './preview/CSSPseudoInjector';
 

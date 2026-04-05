@@ -1,5 +1,5 @@
 import type { DesignProject, DataSource } from '@globallink/design-schema';
-import { deepClone, API_DATA_SOURCE_PHASES } from '@globallink/design-schema';
+import { deepClone, API_DATA_SOURCE_PHASES, generateId } from '@globallink/design-schema';
 import type {
   AddDataSourceOp,
   RemoveDataSourceOp,
@@ -30,7 +30,8 @@ function getScreen(project: DesignProject, screenId: string) {
 function getDataSource(project: DesignProject, screenId: string, dataSourceId: string) {
   const screen = getScreen(project, screenId);
   if (!screen) return { screen: undefined, dataSource: undefined };
-  const dataSource = screen.dataSources.find((ds) => ds.id === dataSourceId);
+  const list = Array.isArray(screen.dataSources) ? screen.dataSources : [];
+  const dataSource = list.find((ds) => ds.id === dataSourceId);
   return { screen, dataSource };
 }
 
@@ -51,6 +52,19 @@ export function executeAddDataSource(
     };
   }
 
+  if (!params?.dataSource?.id) {
+    return {
+      project,
+      result: { success: false, description: 'addDataSource 缺少 dataSource.id', affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  // 旧快照 / 外部 JSON 可能缺少 dataSources，避免 .some / .push 在 undefined 上报错
+  if (!Array.isArray(screen.dataSources)) {
+    screen.dataSources = [];
+  }
+
   if (screen.dataSources.some((ds) => ds.id === params.dataSource.id)) {
     return {
       project,
@@ -66,6 +80,15 @@ export function executeAddDataSource(
   const phases =
     params.dataSource.lifecycle === 'api' ? deepClone(API_DATA_SOURCE_PHASES) : [];
 
+  // 所有 ID 和数据结构由调用方提供，执行器不产生任何随机值。
+  // 对于旧操作日志（没有 scenarios 字段），用数据源 ID 派生确定性 scenario ID。
+  const scenarios = params.dataSource.scenarios
+    ? deepClone(params.dataSource.scenarios)
+    : [{ id: `${params.dataSource.id}_sc0`, name: '默认', data: {}, isDefault: true }];
+  const activeScenarioId = params.dataSource.activeScenarioId
+    ?? scenarios[0]?.id
+    ?? '';
+
   const dataSource: DataSource = {
     id: params.dataSource.id,
     name: params.dataSource.name,
@@ -73,8 +96,8 @@ export function executeAddDataSource(
     lifecycle: params.dataSource.lifecycle,
     phases,
     activePhase: 'loaded',
-    scenarios: [],
-    activeScenarioId: '',
+    scenarios,
+    activeScenarioId,
   };
 
   screen.dataSources.push(dataSource);
@@ -109,6 +132,10 @@ export function executeRemoveDataSource(
       result: { success: false, description: `Screen ${params.screenId} not found`, affectedNodeIds: [] },
       inverse: { type: 'noop', params: {} },
     };
+  }
+
+  if (!Array.isArray(screen.dataSources)) {
+    screen.dataSources = [];
   }
 
   const dsIndex = screen.dataSources.findIndex((ds) => ds.id === params.dataSourceId);

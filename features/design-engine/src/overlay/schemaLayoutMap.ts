@@ -5,7 +5,7 @@ import { resolveNodeStyles } from '../styles/resolveStyles';
 import { resolveNodeProps } from '../styles/resolveProps';
 import type { DataContext } from '../data/resolveExpression';
 import { hasExpression } from '../data/resolveExpression';
-import type { CoordinateMap, NodeRect } from './coordinateMap';
+import type { CoordinateMap, CoordinateMapEntry, NodeRect } from './coordinateMap';
 
 export type SchemaLayoutInteractionPreview = { nodeId: string; state: string } | null;
 
@@ -87,7 +87,7 @@ export function nodeRectIntersectsCull(
  * 用于 W7-025：DOM 未挂载时与 mergeCoordinateMaps 合并，保证 hitTest / 对齐线与 Schema 一致。
  */
 export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutMapOptions): CoordinateMap {
-  const out: CoordinateMap = new Map();
+  const out = new Map<string, CoordinateMapEntry>();
   const vp = {
     x: 0,
     y: 0,
@@ -126,7 +126,7 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
 
     if (isRoot) {
       const box: NodeRect = { x: 0, y: 0, width: vp.width, height: vp.height };
-      out.set(resolved.id, box);
+      out.set(resolved.id, { nodeId: resolved.id, rect: box });
       for (const child of resolved.children ?? []) {
         walk(child, box, false);
       }
@@ -146,7 +146,7 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
         width: Math.max(w, 1),
         height: Math.max(h, 1),
       };
-      out.set(resolved.id, box);
+      out.set(resolved.id, { nodeId: resolved.id, rect: box });
       for (const child of resolved.children ?? []) {
         walk(child, box, false);
       }
@@ -166,7 +166,7 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
         width: Math.max(w, 1),
         height: Math.max(h, 1),
       };
-      out.set(resolved.id, box);
+      out.set(resolved.id, { nodeId: resolved.id, rect: box });
       for (const child of resolved.children ?? []) {
         walk(child, box, false);
       }

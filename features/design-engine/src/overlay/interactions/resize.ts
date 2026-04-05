@@ -1,4 +1,5 @@
 import type { CoordinateMap, NodeRect } from '../coordinateMap';
+import { getRectForInteraction } from '../coordinateMap';
 import type { AlignmentGuide } from '../alignment';
 import { computeAlignmentGuides } from '../alignment';
 import type { BoundingRect } from '../BoundingBoxCache';
@@ -28,6 +29,7 @@ export interface ResizeModifiers {
 
 export interface ResizeState {
   nodeId: string;
+  instanceKey?: string;
   handle: ResizeHandlePosition;
   startX: number;
   startY: number;
@@ -107,12 +109,14 @@ export function beginResize(
   handle: ResizeHandlePosition,
   startX: number,
   startY: number,
+  preferredInstanceKey?: string | null,
 ): ResizeState | null {
-  const rect = map.get(nodeId);
+  const rect = getRectForInteraction(map, nodeId, preferredInstanceKey);
   if (!rect) return null;
 
   return {
     nodeId,
+    instanceKey: preferredInstanceKey ?? undefined,
     handle,
     startX,
     startY,
@@ -235,6 +239,7 @@ export function updateResizeWithSnap(
 
   const virtualRect: BoundingRect = {
     nodeId: state.nodeId,
+    instanceKey: state.instanceKey,
     x: newX,
     y: newY,
     width: base.currentWidth,

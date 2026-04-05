@@ -1,64 +1,47 @@
-import { useRef, useState, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
-import { NewNodeTree } from '../NodeTree';
-import { NewPageList } from '../PageList';
+import { editorStore, type LeftPanelView } from '@/stores/editor';
+import { PageView } from './PageView';
+import { ElementView } from './ElementView';
+import { DataView } from './DataView';
+
+const VIEWS: { key: LeftPanelView; label: string; icon: string }[] = [
+  { key: 'pages', label: '页面', icon: '📄' },
+  { key: 'elements', label: '元素', icon: '🌳' },
+  { key: 'data', label: '数据', icon: '📊' },
+];
 
 /**
- * Task 1.4.7 — Left Panel
- * Split into top (NodeTree) and bottom (PageList) with draggable horizontal splitter.
+ * Phase 4：左侧产品导航器 — 页面 / 元素 / 数据 三视图
  */
 export const LeftPanel = observer(function LeftPanel() {
-  const [splitRatio, setSplitRatio] = useState(0.6); // 60% tree, 40% pages
-  const panelRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
-
-  const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    dragging.current = true;
-
-    const onMouseMove = (me: MouseEvent) => {
-      if (!dragging.current || !panelRef.current) return;
-      const rect = panelRef.current.getBoundingClientRect();
-      const ratio = (me.clientY - rect.top) / rect.height;
-      setSplitRatio(Math.min(0.85, Math.max(0.15, ratio)));
-    };
-
-    const onMouseUp = () => {
-      dragging.current = false;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }, []);
+  const view = editorStore.leftPanelView;
 
   return (
-    <div ref={panelRef} className="flex flex-col h-full bg-white border-r border-gray-100">
-      {/* W1-011：上 — 节点树（标题与搜索在 NewNodeTree 内，避免重复） */}
-      <div className="flex flex-col min-h-0 border-b border-gray-100" style={{ height: `${splitRatio * 100}%` }}>
-        {/* 仅由 NodeTree 内虚拟列表容器滚动，避免双滚动条与虚拟高度错位（W7-021） */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          <NewNodeTree />
-        </div>
+    <div className="flex flex-col h-full bg-white border-r border-gray-100">
+      <div className="flex-shrink-0 flex border-b border-gray-200 bg-gray-50/80">
+        {VIEWS.map((v) => (
+          <button
+            key={v.key}
+            type="button"
+            title={v.label}
+            className={`flex-1 py-2 text-xs font-medium transition-colors ${
+              view === v.key
+                ? 'text-blue-600 border-b-2 border-blue-500 bg-white'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+            onClick={() => editorStore.setLeftPanelView(v.key)}
+          >
+            <span className="mr-0.5" aria-hidden>
+              {v.icon}
+            </span>
+            {v.label}
+          </button>
+        ))}
       </div>
-
-      <div
-        className="flex-shrink-0 h-1 hover:h-1.5 bg-gray-100 hover:bg-blue-400 cursor-row-resize transition-colors"
-        onMouseDown={handleSplitterMouseDown}
-        aria-hidden
-      />
-
-      {/* 下 — 页面列表 */}
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex-shrink-0 px-3 py-2 text-xs font-medium text-gray-500 tracking-wide">页面</div>
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <NewPageList />
-        </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {view === 'pages' && <PageView />}
+        {view === 'elements' && <ElementView />}
+        {view === 'data' && <DataView />}
       </div>
     </div>
   );

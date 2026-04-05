@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ComponentNode } from '@globallink/design-schema';
 import { resolveAssetUrl } from '../assets/resolveAssetUrl';
+import { encodeNodeInstanceKey, useListInstancePath } from '../renderer/ListInstanceContext';
 
 export interface PrimitiveRendererProps {
   /** The ComponentNode to render */
@@ -17,8 +18,7 @@ export interface PrimitiveRendererProps {
  * Renders a primitive node type as its corresponding HTML element.
  *
  * Maps the node's `type` (div, button, img, etc.) to a real HTML element,
- * applies the resolved styles and props, and injects `data-node-id` for
- * the overlay coordinate mapping system.
+ * applies the resolved styles and props，并注入 `data-node-id` 与 `data-node-instance-key`（列表多实例唯一）。
  */
 export function PrimitiveRenderer({
   node,
@@ -26,11 +26,17 @@ export function PrimitiveRenderer({
   resolvedProps,
   children,
 }: PrimitiveRendererProps) {
+  const listPath = useListInstancePath();
+  const instanceKey = encodeNodeInstanceKey(listPath, node.id);
   const commonProps = {
     'data-node-id': node.id,
+    'data-node-instance-key': instanceKey,
     'data-node-type': node.type,
     style,
   };
+
+  // textContent（数据绑定）优先于 text（静态默认值），兼容两种写法
+  const textValue = (resolvedProps.textContent ?? resolvedProps.text) as string | undefined;
 
   switch (node.type) {
     // --- Self-closing / void elements ---
@@ -81,15 +87,15 @@ export function PrimitiveRenderer({
 
     // --- Text elements ---
     case 'h1':
-      return <h1 {...commonProps}>{resolvedProps.text as string ?? children}</h1>;
+      return <h1 {...commonProps}>{textValue ?? children}</h1>;
     case 'h2':
-      return <h2 {...commonProps}>{resolvedProps.text as string ?? children}</h2>;
+      return <h2 {...commonProps}>{textValue ?? children}</h2>;
     case 'h3':
-      return <h3 {...commonProps}>{resolvedProps.text as string ?? children}</h3>;
+      return <h3 {...commonProps}>{textValue ?? children}</h3>;
     case 'p':
-      return <p {...commonProps}>{resolvedProps.text as string ?? children}</p>;
+      return <p {...commonProps}>{textValue ?? children}</p>;
     case 'span':
-      return <span {...commonProps}>{resolvedProps.text as string ?? children}</span>;
+      return <span {...commonProps}>{textValue ?? children}</span>;
     case 'a':
       return (
         <a
@@ -99,7 +105,7 @@ export function PrimitiveRenderer({
           rel={resolvedProps.rel as string}
           onClick={(e) => e.preventDefault()}
         >
-          {resolvedProps.text as string ?? children}
+          {textValue ?? children}
         </a>
       );
 
@@ -111,7 +117,7 @@ export function PrimitiveRenderer({
           disabled={resolvedProps.disabled as boolean}
           type="button"
         >
-          {resolvedProps.text as string ?? children}
+          {textValue ?? children}
         </button>
       );
     case 'nav':
@@ -129,7 +135,7 @@ export function PrimitiveRenderer({
     case 'ol':
       return <ol {...commonProps}>{children}</ol>;
     case 'li':
-      return <li {...commonProps}>{resolvedProps.text as string ?? children}</li>;
+      return <li {...commonProps}>{textValue ?? children}</li>;
 
     case 'annotation':
       return (

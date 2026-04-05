@@ -15,7 +15,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { Toolbar } from './Toolbar';
 import { Canvas } from './Canvas';
 import { LeftPanel } from './panels/LeftPanel';
-import { PropertyPanel } from './panels/PropertyPanel';
+import { RightPanel } from './panels/RightPanel';
 import { PanelResizer } from './panels/PanelResizer';
 import { BottomToolbar } from './BottomToolbar';
 import { PreviewBar } from './PreviewBar';
@@ -116,7 +116,7 @@ export const EditorPage = observer(function EditorPage() {
               className="editor-right-panel"
               style={{ width: editorStore.rightPanelWidth }}
             >
-              <PropertyPanel />
+              <RightPanel />
             </div>
           </>
         ) : (

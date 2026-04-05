@@ -1,5 +1,5 @@
 import type { CoordinateMap } from '../coordinateMap';
-import { hitTest } from '../coordinateMap';
+import { getRectForInteraction, hitTest } from '../coordinateMap';
 
 /**
  * Handle hover by hit-testing the current mouse position.
@@ -22,13 +22,15 @@ export function drawHover(
   map: CoordinateMap,
   hoveredNodeId: string | null,
   selectedNodeIds: string[],
+  /** 列表多实例时悬停的那一块；缺省则取该 nodeId 的第一个实例 */
+  hoveredInstanceKey?: string | null,
 ): void {
   if (!hoveredNodeId) return;
 
   // Don't draw hover on already-selected nodes
   if (selectedNodeIds.includes(hoveredNodeId)) return;
 
-  const rect = map.get(hoveredNodeId);
+  const rect = getRectForInteraction(map, hoveredNodeId, hoveredInstanceKey);
   if (!rect) return;
 
   ctx.save();

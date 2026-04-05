@@ -14,16 +14,12 @@ import { randomUUID } from 'crypto';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
-// Ensure the uploads directory exists
 if (!existsSync(UPLOAD_DIR)) {
   mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 /**
- * Task 3.5.4-3.5.5 — File Upload Controller
- *
  * POST /api/projects/:projectId/assets/upload
- * Accept multipart form data, save to local filesystem, return the file URL.
  */
 @Controller('api/projects/:projectId/assets')
 export class FileUploadController {
@@ -41,7 +37,7 @@ export class FileUploadController {
         },
       }),
       limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB
+        fileSize: 10 * 1024 * 1024,
       },
       fileFilter: (_req: any, file: any, cb: any) => {
         const allowedMimes = [

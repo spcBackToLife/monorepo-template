@@ -1,4 +1,5 @@
 import type { CoordinateMap, NodeRect } from '../coordinateMap';
+import { getRectForInteraction, mapHasNodeId } from '../coordinateMap';
 import type { AlignmentGuide } from '../alignment';
 import type { BoundingRect } from '../BoundingBoxCache';
 import { computeSnap } from '../snapping';
@@ -6,6 +7,8 @@ import { computeSnap } from '../snapping';
 export interface DragState {
   /** Node being dragged */
   nodeId: string;
+  /** 主拖拽实例（列表多 DOM 时锁定 hit 的那一块） */
+  primaryInstanceKey?: string;
   /** 多选时一并移动的节点 id（均含于 coordinate map） */
   dragGroupIds?: string[];
   /** 各节点拖拽前矩形（多选时用） */
@@ -34,22 +37,24 @@ export function beginDrag(
   startX: number,
   startY: number,
   dragGroupIds?: string[],
+  preferredInstanceKey?: string | null,
 ): DragState | null {
-  const rect = map.get(nodeId);
+  const rect = getRectForInteraction(map, nodeId, preferredInstanceKey);
   if (!rect) return null;
 
   const ids =
     dragGroupIds && dragGroupIds.length > 0
-      ? [...new Set(dragGroupIds)].filter((id) => map.has(id))
+      ? [...new Set(dragGroupIds)].filter((id) => mapHasNodeId(map, id))
       : [nodeId];
   const originals: Record<string, NodeRect> = {};
   for (const id of ids) {
-    const r = map.get(id);
+    const r = getRectForInteraction(map, id, id === nodeId ? preferredInstanceKey : null);
     if (r) originals[id] = { ...r };
   }
 
   return {
     nodeId,
+    primaryInstanceKey: preferredInstanceKey ?? undefined,
     dragGroupIds: ids.length > 1 ? ids : undefined,
     originalRects: ids.length > 1 ? originals : undefined,
     startX,
@@ -97,6 +102,7 @@ export function updateDragWithSnap(
 
   const movingRect: BoundingRect = {
     nodeId: state.nodeId,
+    instanceKey: state.primaryInstanceKey,
     x: state.originalRect.x,
     y: state.originalRect.y,
     width: state.originalRect.width,

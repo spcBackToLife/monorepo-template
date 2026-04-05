@@ -519,6 +519,15 @@ export interface AddDataSourceOp {
       name: string;
       lifecycle: 'api' | 'static';
       description?: string;
+      /** 调用方负责生成完整的 scenarios 和 activeScenarioId，
+       *  执行器不在内部产生任何随机值，保证操作重放确定性。 */
+      scenarios?: Array<{
+        id: string;
+        name: string;
+        data: Record<string, unknown>;
+        isDefault?: boolean;
+      }>;
+      activeScenarioId?: string;
     };
   };
 }

@@ -164,7 +164,7 @@ export const StateCombinationPreview = observer(function StateCombinationPreview
               size="small"
               type="default"
               className="text-[11px]"
-              onClick={() => editorStore.focusRightPanelTab('data')}
+              onClick={() => editorStore.focusRightPanelSection('data')}
             >
               打开数据 Tab（数据集 / JSON）
             </Button>

@@ -42,8 +42,14 @@ export function computeAlignmentGuides(
   const mCenterY = movingRect.y + movingRect.height / 2;
 
   for (const ref of allRects) {
-    // Don't compare the node with itself
-    if (ref.nodeId === movingRect.nodeId) continue;
+    const sameInstance =
+      ref.instanceKey != null &&
+      movingRect.instanceKey != null &&
+      ref.instanceKey === movingRect.instanceKey;
+    if (sameInstance) continue;
+    if (ref.instanceKey == null && movingRect.instanceKey == null && ref.nodeId === movingRect.nodeId) {
+      continue;
+    }
 
     const rLeft = ref.x;
     const rRight = ref.x + ref.width;

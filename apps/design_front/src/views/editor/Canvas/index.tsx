@@ -1,10 +1,12 @@
 import { useRef, useCallback, useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { App as AntdApp } from 'antd';
 import { observer } from 'mobx-react-lite';
+import { runInAction } from 'mobx';
 import {
   ViewportContainer,
   SchemaRenderer,
   PreviewRenderer,
+  TransitionAnimator,
   EditorOverlay,
   buildCoordinateMap,
   mergeCoordinateMaps,
@@ -12,11 +14,16 @@ import {
   expandRootRectToContainer,
   buildSchemaLayoutMap,
   hitTest,
-  hitTestAll,
+  getEditorCoordinateRoot,
+  getPlacementParentRect,
+  screenToContainerLogical,
+  resolvePlacementParentElement,
   type CoordinateMap,
   type DrawBounds,
+  type NodeRect,
   type OverlayToolMode,
 } from '@globallink/design-engine';
+import type { TransitionAnimation } from '@globallink/design-schema';
 import {
   findNodeInScreens,
   collectEffectivelyLockedNodeIds,
@@ -26,6 +33,7 @@ import { generateNodeId } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
 import { useEditorCanvasOperations } from './useEditorCanvasOps';
 import { TextInlineEditor } from './TextInlineEditor';
+import { CanvasContextBar } from './CanvasContextBar';
 import { useZoomPan } from '../hooks/useZoomPan';
 import {
   buildEditorContextMenuItems,
@@ -34,6 +42,7 @@ import {
 } from '../EditorContextMenu';
 import { collectNodeIdsWithEvents } from '../utils/collectNodeIdsWithEvents';
 import { collectNodeIdsWithListBinding } from '../utils/collectNodeIdsWithListBinding';
+import { resolveDrawParentId } from '../utils/placement';
 import './canvas.css';
 
 const NEW_NODE_DEFAULT_WIDTH = 200;
@@ -130,19 +139,20 @@ export const Canvas = observer(function Canvas() {
   ]);
 
   const mergeCanvasCoordinateMap = useCallback(
-    (container: HTMLElement) => {
-      const dom = buildCoordinateMap(container);
+    (stack: HTMLElement) => {
+      const coordRoot = getEditorCoordinateRoot(stack);
+      const dom = buildCoordinateMap(coordRoot);
       let map: CoordinateMap;
       if (!schemaLayoutMap || schemaLayoutMap.size === 0) {
         map = dom;
       } else {
         const vw = viewport?.width ?? 375;
         const vh = viewport?.height ?? 812;
-        const scaled = scaleCoordinateMapToLayoutContainer(schemaLayoutMap, container, vw, vh);
+        const scaled = scaleCoordinateMapToLayoutContainer(schemaLayoutMap, coordRoot, vw, vh);
         map = mergeCoordinateMaps(dom, scaled);
       }
       const rid = screen?.rootNode?.id;
-      return rid ? expandRootRectToContainer(map, container, rid) : map;
+      return rid ? expandRootRectToContainer(map, coordRoot, rid) : map;
     },
     [schemaLayoutMap, viewport?.width, viewport?.height, screen?.rootNode?.id],
   );
@@ -157,16 +167,19 @@ export const Canvas = observer(function Canvas() {
     }
     const EPS = 2;
     const check = () => {
-      const node = containerRef.current;
-      if (!node) return;
-      const map = mergeCanvasCoordinateMap(node);
+      const stack = containerRef.current;
+      if (!stack) return;
+      const coordRoot = getEditorCoordinateRoot(stack);
+      const map = mergeCanvasCoordinateMap(stack);
       let maxR = 0;
       let maxB = 0;
-      for (const r of map.values()) {
+      for (const entry of map.values()) {
+        const r = entry.rect;
         maxR = Math.max(maxR, r.x + r.width);
         maxB = Math.max(maxB, r.y + r.height);
       }
-      const overflow = maxR > node.offsetWidth + EPS || maxB > node.offsetHeight + EPS;
+      const overflow =
+        maxR > coordRoot.offsetWidth + EPS || maxB > coordRoot.offsetHeight + EPS;
       editorStore.setViewportOverflow(overflow);
     };
     check();
@@ -213,8 +226,19 @@ export const Canvas = observer(function Canvas() {
     editorStore.selectMultiple(nodeIds);
   }, []);
 
-  const handlePreviewNavigate = useCallback((screenId: string) => {
-    editorStore.previewNavigateTo(screenId);
+  const handlePreviewNavigate = useCallback((screenId: string, animation?: TransitionAnimation) => {
+    const name =
+      animation == null || animation.type === 'none' ? 'fade' : animation.type;
+    editorStore.previewNavigateTo(screenId, name);
+  }, []);
+
+  const handlePreviewSwitchDataSourcePhase = useCallback((dataSourceId: string, phase: string) => {
+    const screen = editorStore.activeScreen;
+    if (!screen) return;
+    runInAction(() => {
+      const ds = screen.dataSources?.find((d) => d.id === dataSourceId);
+      if (ds) ds.activePhase = phase;
+    });
   }, []);
 
   useEffect(() => {
@@ -224,36 +248,21 @@ export const Canvas = observer(function Canvas() {
   const handleDrawCreate = useCallback(
     (bounds: DrawBounds) => {
       const container = containerRef.current;
-      if (!container) return;
+      if (!container || !screen) return;
 
       const map = mergeCanvasCoordinateMap(container);
-
+      const rootId = screen.rootNode.id;
+      const parentId = resolveDrawParentId(screen.rootNode, editorStore.selectedNodeIds[0], rootId);
       const cx = bounds.x + bounds.width / 2;
       const cy = bounds.y + bounds.height / 2;
-
-      const LEAF_TYPES = new Set([
-        'img', 'input', 'textarea', 'p', 'span', 'h1', 'h2', 'h3', 'a',
-      ]);
-
-      const hits = hitTestAll(map, cx, cy);
-      let parentId: string | undefined;
-      for (const id of hits) {
-        const node = findNodeInScreens(editorStore.screens, id);
-        if (!node) continue;
-        if (LEAF_TYPES.has(node.type)) continue;
-        parentId = id;
-        break;
-      }
-      if (!parentId) {
-        parentId = screen?.rootNode?.id;
-      }
-      if (!parentId) return;
-
-      const parentRect = map.get(parentId);
-      if (!parentRect) {
-        message.error('无法解析父容器位置');
-        return;
-      }
+      const parentEl = resolvePlacementParentElement(container, parentId, { x: cx, y: cy });
+      const parentRect: NodeRect = getPlacementParentRect(
+        container,
+        parentId,
+        rootId,
+        parentEl,
+        map,
+      );
 
       const localLeft = bounds.x - parentRect.x;
       const localTop = bounds.y - parentRect.y;
@@ -305,7 +314,7 @@ export const Canvas = observer(function Canvas() {
         message.error(result.description);
       }
     },
-    [screen, message, mergeCanvasCoordinateMap],
+    [screen, message, mergeCanvasCoordinateMap, editorStore.selectedNodeIds[0]],
   );
 
   /** W7-024：注释工具点击 → addAnnotation，落点相对父节点包围盒 */
@@ -316,9 +325,20 @@ export const Canvas = observer(function Canvas() {
       if (!container) return;
 
       const map = mergeCanvasCoordinateMap(container);
-      const parentRect = map.get(args.parentId);
-      const left = parentRect ? args.canvasX - parentRect.x : args.canvasX;
-      const top = parentRect ? args.canvasY - parentRect.y : args.canvasY;
+      const rootId = screen.rootNode.id;
+      const parentEl = resolvePlacementParentElement(container, args.parentId, {
+        x: args.canvasX,
+        y: args.canvasY,
+      });
+      const parentRect = getPlacementParentRect(
+        container,
+        args.parentId,
+        rootId,
+        parentEl,
+        map,
+      );
+      const left = args.canvasX - parentRect.x;
+      const top = args.canvasY - parentRect.y;
 
       const parentNode = findNodeInScreens(editorStore.screens, args.parentId);
       if (parentNode && (!parentNode.styles.position || parentNode.styles.position === 'static')) {
@@ -372,23 +392,18 @@ export const Canvas = observer(function Canvas() {
       const container = containerRef.current;
       if (!container) return;
       const map = mergeCanvasCoordinateMap(container);
-      const r = container.getBoundingClientRect();
-      const effectiveScale =
-        container.offsetWidth > 0 ? r.width / container.offsetWidth : 1;
-      const x = (e.clientX - r.left) / effectiveScale;
-      const y = (e.clientY - r.top) / effectiveScale;
-      const nodeId = hitTest(map, x, y);
+      const logical = screenToContainerLogical(container, e.clientX, e.clientY);
+      const nodeId = hitTest(map, logical.x, logical.y);
       setContextMenu({ x: e.clientX, y: e.clientY, nodeId });
     },
     [mergeCanvasCoordinateMap],
   );
 
-  if (!screen || !viewport) {
-    return <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>无可用屏幕</div>;
-  }
-
   const onDropTemplate = useCallback(
     (templateId: string, clientX?: number, clientY?: number) => {
+      const active = editorStore.activeScreen;
+      if (!active) return;
+
       const hitNodeId = (() => {
         if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
         const elements = document.elementsFromPoint(clientX, clientY);
@@ -399,12 +414,14 @@ export const Canvas = observer(function Canvas() {
         return null;
       })();
 
-      const parentId = hitNodeId ?? editorStore.selectedNodeIds[0];
-      if (!parentId) {
+      const startId = hitNodeId ?? editorStore.selectedNodeIds[0];
+      if (!startId) {
         message.warning('请先选中一个容器，再把组件拖到画布');
         return;
       }
 
+      const rootId = active.rootNode.id;
+      const parentId = resolveDrawParentId(active.rootNode, startId, rootId);
       const parentNode = findNodeInScreens(editorStore.screens, parentId);
       if (!parentNode) {
         message.warning('未命中可放置的容器，请重试');
@@ -428,34 +445,33 @@ export const Canvas = observer(function Canvas() {
       }
 
       const newId = result.affectedNodeIds[0];
-      if (
-        newId &&
-        typeof clientX === 'number' &&
-        typeof clientY === 'number'
-      ) {
-        const parentEl = containerRef.current?.querySelector(
-          `[data-node-id="${parentId}"]`,
-        ) as HTMLElement | null;
-        const baseRect = (parentEl ?? containerRef.current)?.getBoundingClientRect();
-        if (baseRect) {
-          const parentW = Math.max(0, baseRect.width / editorStore.canvasScale);
-          const parentH = Math.max(0, baseRect.height / editorStore.canvasScale);
-          const rawLeft = Math.max(0, (clientX - baseRect.left) / editorStore.canvasScale);
-          const rawTop = Math.max(0, (clientY - baseRect.top) / editorStore.canvasScale);
-          const left = Math.min(Math.max(0, snapToGrid(rawLeft)), Math.max(0, parentW - 40));
-          const top = Math.min(Math.max(0, snapToGrid(rawTop)), Math.max(0, parentH - 40));
-          editorStore.execute({
-            type: 'updateStyle',
-            params: {
-              nodeId: newId,
-              styles: {
-                position: 'absolute',
-                left: `${left}px`,
-                top: `${top}px`,
-              },
+      const container = containerRef.current;
+      if (newId && container && typeof clientX === 'number' && typeof clientY === 'number') {
+        const map = mergeCanvasCoordinateMap(container);
+        const logical = screenToContainerLogical(container, clientX, clientY);
+        const pel = resolvePlacementParentElement(container, parentId, logical);
+        const parentRect = getPlacementParentRect(container, parentId, rootId, pel, map);
+        const rawLeft = Math.max(0, logical.x - parentRect.x);
+        const rawTop = Math.max(0, logical.y - parentRect.y);
+        const left = Math.min(
+          Math.max(0, snapToGrid(rawLeft)),
+          Math.max(0, parentRect.width - 40),
+        );
+        const top = Math.min(
+          Math.max(0, snapToGrid(rawTop)),
+          Math.max(0, parentRect.height - 40),
+        );
+        editorStore.execute({
+          type: 'updateStyle',
+          params: {
+            nodeId: newId,
+            styles: {
+              position: 'absolute',
+              left: `${left}px`,
+              top: `${top}px`,
             },
-          });
-        }
+          },
+        });
       }
 
       if (newId) {
@@ -463,78 +479,85 @@ export const Canvas = observer(function Canvas() {
         message.success('已添加组件实例');
       }
     },
-    [message],
+    [message, mergeCanvasCoordinateMap],
   );
 
-  const onDropElement = (tag: string, clientX?: number, clientY?: number) => {
-    const hitNodeId = (() => {
-      if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
-      const elements = document.elementsFromPoint(clientX, clientY);
-      for (const el of elements) {
-        const id = (el as HTMLElement).getAttribute?.('data-node-id');
-        if (id) return id;
+  const onDropElement = useCallback(
+    (tag: string, clientX?: number, clientY?: number) => {
+      const active = editorStore.activeScreen;
+      if (!active) return;
+
+      const hitNodeId = (() => {
+        if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+        const elements = document.elementsFromPoint(clientX, clientY);
+        for (const el of elements) {
+          const id = (el as HTMLElement).getAttribute?.('data-node-id');
+          if (id) return id;
+        }
+        return null;
+      })();
+
+      const startId = hitNodeId ?? editorStore.selectedNodeIds[0];
+      if (!startId) {
+        message.warning('请先选中一个容器，再把元素拖到画布');
+        return;
       }
-      return null;
-    })();
 
-    const parentId = hitNodeId ?? editorStore.selectedNodeIds[0];
-    if (!parentId) {
-      message.warning('请先选中一个容器，再把元素拖到画布');
-      return;
-    }
+      const rootId = active.rootNode.id;
+      const parentId = resolveDrawParentId(active.rootNode, startId, rootId);
+      const parentNode = findNodeInScreens(editorStore.screens, parentId);
+      if (!parentNode) {
+        message.warning('未命中可放置的容器，请重试');
+        return;
+      }
 
-    const parentNode = findNodeInScreens(editorStore.screens, parentId);
-    if (!parentNode) {
-      message.warning('未命中可放置的容器，请重试');
-      return;
-    }
+      const container = containerRef.current;
+      const droppedStyles =
+        container && typeof clientX === 'number' && typeof clientY === 'number'
+          ? (() => {
+              const map = mergeCanvasCoordinateMap(container);
+              const logical = screenToContainerLogical(container, clientX, clientY);
+              const pel = resolvePlacementParentElement(container, parentId, logical);
+              const parentRect = getPlacementParentRect(container, parentId, rootId, pel, map);
+              const rawLeft = Math.max(0, logical.x - parentRect.x);
+              const rawTop = Math.max(0, logical.y - parentRect.y);
+              const maxLeft = Math.max(0, parentRect.width - NEW_NODE_DEFAULT_WIDTH);
+              const maxTop = Math.max(0, parentRect.height - NEW_NODE_DEFAULT_HEIGHT);
+              const left = Math.min(maxLeft, snapToGrid(rawLeft));
+              const top = Math.min(maxTop, snapToGrid(rawTop));
+              return {
+                position: 'absolute' as const,
+                left: `${Math.max(0, left)}px`,
+                top: `${Math.max(0, top)}px`,
+                width: `${NEW_NODE_DEFAULT_WIDTH}px`,
+                height: `${NEW_NODE_DEFAULT_HEIGHT}px`,
+              };
+            })()
+          : undefined;
 
-    const parentEl = containerRef.current?.querySelector(`[data-node-id="${parentId}"]`) as HTMLElement | null;
-    const baseRect = (parentEl ?? containerRef.current)?.getBoundingClientRect();
-    const droppedStyles =
-      baseRect && typeof clientX === 'number' && typeof clientY === 'number'
-        ? (() => {
-            const parentW = Math.max(0, baseRect.width / editorStore.canvasScale);
-            const parentH = Math.max(0, baseRect.height / editorStore.canvasScale);
-            const maxLeft = Math.max(0, parentW - NEW_NODE_DEFAULT_WIDTH);
-            const maxTop = Math.max(0, parentH - NEW_NODE_DEFAULT_HEIGHT);
+      if (!parentNode.styles.position || parentNode.styles.position === 'static') {
+        editorStore.execute({
+          type: 'updateStyle',
+          params: { nodeId: parentId, styles: { position: 'relative' } },
+        });
+      }
 
-            const rawLeft = Math.max(0, (clientX - baseRect.left) / editorStore.canvasScale);
-            const rawTop = Math.max(0, (clientY - baseRect.top) / editorStore.canvasScale);
-
-            const left = Math.min(maxLeft, snapToGrid(rawLeft));
-            const top = Math.min(maxTop, snapToGrid(rawTop));
-
-            return {
-              position: 'absolute',
-              left: `${Math.max(0, left)}px`,
-              top: `${Math.max(0, top)}px`,
-              width: `${NEW_NODE_DEFAULT_WIDTH}px`,
-              height: `${NEW_NODE_DEFAULT_HEIGHT}px`,
-            };
-          })()
-        : undefined;
-
-    if (!parentNode.styles.position || parentNode.styles.position === 'static') {
-      editorStore.execute({
-        type: 'updateStyle',
-        params: { nodeId: parentId, styles: { position: 'relative' } },
+      const result = editorStore.execute({
+        type: 'addElement',
+        params: { parentId, tag: tag as never, elementId: generateNodeId(), styles: droppedStyles },
       });
-    }
-
-    const result = editorStore.execute({
-      type: 'addElement',
-      params: { parentId, tag: tag as never, elementId: generateNodeId(), styles: droppedStyles },
-    });
-    if (result.success) {
-      const createdNodeId = result.affectedNodeIds[0] ?? null;
-      editorStore.select(createdNodeId);
-      return;
-    }
-    if (!result.success) {
+      if (result.success) {
+        editorStore.select(result.affectedNodeIds[0] ?? null);
+        return;
+      }
       message.error(result.description);
-    }
-  };
+    },
+    [message, mergeCanvasCoordinateMap],
+  );
+
+  if (!screen || !viewport) {
+    return <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>无可用屏幕</div>;
+  }
 
   return (
     <div
@@ -556,6 +579,7 @@ export const Canvas = observer(function Canvas() {
         }
       }}
     >
+      {editorStore.showCanvasContextBar && <CanvasContextBar />}
       <div
         className="editor-canvas-transform"
         style={{
@@ -571,14 +595,20 @@ export const Canvas = observer(function Canvas() {
               style={{ position: 'relative' }}
             >
               {editorStore.previewMode ? (
-                <PreviewRenderer
-                  screen={screen}
-                  assets={editorStore.project?.componentAssets ?? []}
-                  globalStates={editorStore.currentGlobalStates}
-                  currentDataSet={undefined}
-                  onNavigate={handlePreviewNavigate}
-                  embedded
-                />
+                <TransitionAnimator
+                  transitionKey={screen.id}
+                  transition={editorStore.previewTransition}
+                >
+                  <PreviewRenderer
+                    screen={screen}
+                    assets={editorStore.project?.componentAssets ?? []}
+                    globalStates={editorStore.currentGlobalStates}
+                    currentDataSet={undefined}
+                    onNavigate={handlePreviewNavigate}
+                    onSwitchDataSourcePhase={handlePreviewSwitchDataSourcePhase}
+                    embedded
+                  />
+                </TransitionAnimator>
               ) : (
                 <>
                   <SchemaRenderer

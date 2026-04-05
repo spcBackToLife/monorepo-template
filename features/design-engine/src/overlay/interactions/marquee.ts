@@ -58,12 +58,14 @@ export function findNodesInMarquee(
   skipIds?: Set<string>,
 ): string[] {
   const result: string[] = [];
+  const seen = new Set<string>();
 
   const mRight = marquee.x + marquee.width;
   const mBottom = marquee.y + marquee.height;
 
-  for (const [nodeId, rect] of map.entries()) {
-    if (skipIds?.has(nodeId)) continue;
+  for (const [, entry] of map.entries()) {
+    if (skipIds?.has(entry.nodeId)) continue;
+    const rect = entry.rect;
     const nodeRight = rect.x + rect.width;
     const nodeBottom = rect.y + rect.height;
 
@@ -74,7 +76,10 @@ export function findNodesInMarquee(
       nodeRight <= mRight &&
       nodeBottom <= mBottom
     ) {
-      result.push(nodeId);
+      if (!seen.has(entry.nodeId)) {
+        seen.add(entry.nodeId);
+        result.push(entry.nodeId);
+      }
     }
   }
 
@@ -90,11 +95,13 @@ export function findNodesIntersectingMarquee(
   marquee: MarqueeRect,
 ): string[] {
   const result: string[] = [];
+  const seen = new Set<string>();
 
   const mRight = marquee.x + marquee.width;
   const mBottom = marquee.y + marquee.height;
 
-  for (const [nodeId, rect] of map.entries()) {
+  for (const [, entry] of map.entries()) {
+    const rect = entry.rect;
     const nodeRight = rect.x + rect.width;
     const nodeBottom = rect.y + rect.height;
 
@@ -105,8 +112,9 @@ export function findNodesIntersectingMarquee(
       nodeBottom < marquee.y ||
       rect.y > mBottom;
 
-    if (!disjoint) {
-      result.push(nodeId);
+    if (!disjoint && !seen.has(entry.nodeId)) {
+      seen.add(entry.nodeId);
+      result.push(entry.nodeId);
     }
   }
 

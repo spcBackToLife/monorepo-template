@@ -4,6 +4,9 @@ import {
   mergeCoordinateMaps,
   scaleCoordinateMapToLayoutContainer,
   expandRootRectToContainer,
+  getEditorCoordinateRoot,
+  getRectForInteraction,
+  getParentContentRectInContainer,
 } from '@globallink/design-engine';
 import type { CoordinateMap } from '@globallink/design-engine';
 import { findNodeInScreens, findParentInScreens } from '@globallink/design-operations';
@@ -11,10 +14,11 @@ import type { ComponentNode } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
 
 function mergeDomWithScaledFallback(
-  container: HTMLElement,
+  stack: HTMLElement,
   domMap: CoordinateMap,
   coordinateLayoutFallback?: CoordinateMap | null,
 ): CoordinateMap {
+  const coordRoot = getEditorCoordinateRoot(stack);
   let map: CoordinateMap;
   if (!coordinateLayoutFallback || coordinateLayoutFallback.size === 0) {
     map = domMap;
@@ -24,14 +28,14 @@ function mergeDomWithScaledFallback(
     const vh = vp?.height ?? 812;
     const scaled = scaleCoordinateMapToLayoutContainer(
       coordinateLayoutFallback,
-      container,
+      coordRoot,
       vw,
       vh,
     );
     map = mergeCoordinateMaps(domMap, scaled);
   }
   const rootId = editorStore.activeScreen?.rootNode?.id;
-  return rootId ? expandRootRectToContainer(map, container, rootId) : map;
+  return rootId ? expandRootRectToContainer(map, coordRoot, rootId) : map;
 }
 
 function parseCssPx(value: string | number | undefined): number {
@@ -68,8 +72,10 @@ export function useEditorCanvasOperations(
     (nodeId: string, deltaX: number, deltaY: number, groupIds?: string[]) => {
       if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
 
+      const rootId = editorStore.activeScreen?.rootNode?.id;
       const ids = groupIds?.length ? groupIds : [nodeId];
       for (const id of ids) {
+        if (id === rootId) continue;
         const node = findNodeInScreens(editorStore.screens, id);
         if (!node) continue;
 
@@ -126,13 +132,13 @@ export function useEditorCanvasOperations(
     deltaX: number,
     deltaY: number,
   ) {
-    const container = containerRef.current;
-    if (!container) return;
+    const stack = containerRef.current;
+    if (!stack) return;
 
-    const domMap = buildCoordinateMap(container);
-    const map = mergeDomWithScaledFallback(container, domMap, coordinateLayoutFallback);
+    const domMap = buildCoordinateMap(getEditorCoordinateRoot(stack));
+    const map = mergeDomWithScaledFallback(stack, domMap, coordinateLayoutFallback);
 
-    const nodeRect = map.get(nodeId);
+    const nodeRect = getRectForInteraction(map, nodeId);
     if (!nodeRect) return;
 
     const centerX = nodeRect.x + nodeRect.width / 2 + deltaX;
@@ -146,7 +152,7 @@ export function useEditorCanvasOperations(
     for (let i = 0; i < siblings.length; i++) {
       const sib = siblings[i];
       if (sib.id === nodeId) continue;
-      const sibRect = map.get(sib.id);
+      const sibRect = getRectForInteraction(map, sib.id);
       if (!sibRect) continue;
       const sibCenter = isHorizontal
         ? sibRect.x + sibRect.width / 2
@@ -170,24 +176,42 @@ export function useEditorCanvasOperations(
 
   const handleResize = useCallback(
     (nodeId: string, frame: { x: number; y: number; width: number; height: number }) => {
-      const container = containerRef.current;
-      if (!container) return;
+      const stack = containerRef.current;
+      if (!stack) return;
 
-      const domMap = buildCoordinateMap(container);
-      const map = mergeDomWithScaledFallback(container, domMap, coordinateLayoutFallback);
+      const rootId = editorStore.activeScreen?.rootNode?.id;
+
+      const coordRoot = getEditorCoordinateRoot(stack);
+      const domMap = buildCoordinateMap(coordRoot);
+      const map = mergeDomWithScaledFallback(stack, domMap, coordinateLayoutFallback);
       const parentInfo = findParentInScreens(editorStore.screens, nodeId);
-      const parentRect = parentInfo ? map.get(parentInfo.parent.id) : null;
 
-      const localLeft = parentRect ? frame.x - parentRect.x : frame.x;
-      const localTop = parentRect ? frame.y - parentRect.y : frame.y;
+      let localLeft = frame.x;
+      let localTop = frame.y;
+      if (parentInfo && parentInfo.parent.id !== rootId) {
+        const parentEl = coordRoot.querySelector<HTMLElement>(
+          `[data-node-id="${parentInfo.parent.id}"]`,
+        );
+        if (parentEl) {
+          const pr = getParentContentRectInContainer(coordRoot, parentEl);
+          localLeft = frame.x - pr.x;
+          localTop = frame.y - pr.y;
+        } else {
+          const fallback = getRectForInteraction(map, parentInfo.parent.id);
+          if (fallback) {
+            localLeft = frame.x - fallback.x;
+            localTop = frame.y - fallback.y;
+          }
+        }
+      }
 
       const node = findNodeInScreens(editorStore.screens, nodeId);
       if (!node) return;
 
+      const isRoot = nodeId === rootId;
       const activeState = node.activeState ?? 'default';
       const styles = {
-        left: `${Math.round(localLeft)}px`,
-        top: `${Math.round(localTop)}px`,
+        ...(isRoot ? {} : { left: `${Math.round(localLeft)}px`, top: `${Math.round(localTop)}px` }),
         width: `${Math.round(Math.max(1, frame.width))}px`,
         height: `${Math.round(Math.max(1, frame.height))}px`,
       };

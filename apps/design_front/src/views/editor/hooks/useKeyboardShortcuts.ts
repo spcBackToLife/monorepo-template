@@ -136,6 +136,13 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Alt+1/2/3 — 左侧产品导航器视图
+      if (e.altKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
+        e.preventDefault();
+        editorStore.setLeftPanelView(e.key === '1' ? 'pages' : e.key === '2' ? 'elements' : 'data');
+        return;
+      }
+
       // Alt+Up/Down — reorder element within its parent
       if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();

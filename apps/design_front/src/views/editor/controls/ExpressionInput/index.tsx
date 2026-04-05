@@ -143,8 +143,8 @@ export const ExpressionInput = observer(function ExpressionInput({
 
       {/* Resolved preview */}
       {resolvedPreview !== null && (
-        <div className="mt-0.5 text-[10px] text-gray-500 font-mono truncate px-1" title={String(resolvedPreview)}>
-          → {String(resolvedPreview)}
+        <div className="mt-0.5 text-[10px] text-gray-500 font-mono truncate px-1" title={formatPreviewTitle(resolvedPreview)}>
+          → {formatPreviewValue(resolvedPreview)}
         </div>
       )}
     </div>
@@ -200,15 +200,40 @@ function resolveDataPath(data: Record<string, unknown>, path: string): unknown {
   return current;
 }
 
-/** Resolve {{data.xxx}} expressions in a string */
-function resolveExpression(expression: string, data: Record<string, unknown>): string | null {
+/** Resolve {{data.xxx}} expressions — returns raw value when the entire string is one expression */
+function resolveExpression(expression: string, data: Record<string, unknown>): unknown {
+  const fullMatch = expression.match(/^\{\{(.*?)\}\}$/);
+  if (fullMatch) {
+    const value = resolveDataPath(data, fullMatch[1].trim());
+    return value !== undefined ? value : null;
+  }
   const regex = /\{\{(.*?)\}\}/g;
-  let hasExpression = false;
+  let hasExpr = false;
   const result = expression.replace(regex, (_, path: string) => {
-    hasExpression = true;
-    const trimmed = path.trim();
-    const value = resolveDataPath(data, trimmed);
-    return value !== undefined ? String(value) : `{{${trimmed}}}`;
+    hasExpr = true;
+    const value = resolveDataPath(data, path.trim());
+    return value !== undefined ? formatPreviewValue(value) : `{{${path.trim()}}}`;
   });
-  return hasExpression ? result : null;
+  return hasExpr ? result : null;
+}
+
+function formatPreviewValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `数组 (${value.length} 项)`;
+  }
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>);
+    return `对象 {${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '…' : ''}}`;
+  }
+  return String(value ?? '');
+}
+
+function formatPreviewTitle(value: unknown): string {
+  if (Array.isArray(value)) {
+    try { return JSON.stringify(value, null, 2).slice(0, 500); } catch { return `Array(${value.length})`; }
+  }
+  if (value && typeof value === 'object') {
+    try { return JSON.stringify(value, null, 2).slice(0, 500); } catch { return String(value); }
+  }
+  return String(value ?? '');
 }

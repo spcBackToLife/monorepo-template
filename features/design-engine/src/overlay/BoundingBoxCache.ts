@@ -1,5 +1,7 @@
 export interface BoundingRect {
   nodeId: string;
+  /** 与 CoordinateMap 键一致；列表多实例时用于对齐吸附排除「自身」 */
+  instanceKey?: string;
   x: number;
   y: number;
   width: number;

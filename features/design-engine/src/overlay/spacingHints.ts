@@ -1,4 +1,5 @@
 import type { CoordinateMap, NodeRect } from './coordinateMap';
+import { getRectForInteraction } from './coordinateMap';
 
 function verticalOverlap(a: NodeRect, b: NodeRect): boolean {
   const top = Math.max(a.y, b.y);
@@ -22,8 +23,9 @@ export function drawSpacingHints(
   hoveredId: string,
   containerW: number,
   containerH: number,
+  hoveredInstanceKey?: string | null,
 ): void {
-  const rect = map.get(hoveredId);
+  const rect = getRectForInteraction(map, hoveredId, hoveredInstanceKey);
   if (!rect) return;
 
   let bestRight = Infinity;
@@ -31,8 +33,9 @@ export function drawSpacingHints(
   let bestBottom = Infinity;
   let bestTop = Infinity;
 
-  for (const [id, o] of map) {
-    if (id === hoveredId) continue;
+  for (const [key, entry] of map) {
+    if (key === hoveredInstanceKey) continue;
+    const o = entry.rect;
     if (verticalOverlap(rect, o) && o.x >= rect.x + rect.width) {
       const gap = o.x - (rect.x + rect.width);
       if (gap >= 0 && gap < bestRight) bestRight = gap;

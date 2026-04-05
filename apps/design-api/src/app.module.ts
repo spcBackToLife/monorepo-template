@@ -7,7 +7,8 @@ import { HealthModule } from './health/health.module';
 import { ProjectsModule } from './projects/projects.module';
 import { OperationsModule } from './operations/operations.module';
 import { AssetsModule } from './assets/assets.module';
-import { DatasetsModule } from './modules/datasets/datasets.module';
+import { DatasourcesModule } from './modules/datasources/datasources.module';
+import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { SnapshotsModule } from './modules/snapshots/snapshots.module';
 
 @Module({
@@ -22,7 +23,8 @@ import { SnapshotsModule } from './modules/snapshots/snapshots.module';
     ProjectsModule,
     OperationsModule,
     AssetsModule,
-    DatasetsModule,
+    DatasourcesModule,
+    FileUploadModule,
     SnapshotsModule,
   ],
   controllers: [AppController],

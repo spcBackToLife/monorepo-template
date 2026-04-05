@@ -10,8 +10,9 @@ import { registerStyleTools } from './tools/style.js';
 import { registerMiscTools } from './tools/misc.js';
 import { registerAssetTools } from './tools/asset.js';
 import { registerHistoryTools } from './tools/history.js';
-import { registerDatasetTools } from './tools/dataset-tools.js';
-import { registerGlobalStateTools } from './tools/global-state-tools.js';
+import { registerDomainStateTools } from './tools/domain-state-tools.js';
+import { registerEnvironmentTools } from './tools/environment-tools.js';
+import { registerDataSourceTools } from './tools/data-source-tools.js';
 import { registerComponentPropsTools } from './tools/component-props-tools.js';
 import { registerSnapshotTools } from './tools/snapshot-tools.js';
 import { registerBatchTool } from './tools/batch.js';
@@ -19,8 +20,9 @@ import { registerComponentRecipeTools } from './tools/component-recipes.js';
 
 // Resources
 import { registerResources } from './resources/index.js';
-import { registerDatasetResources } from './resources/dataset-resources.js';
-import { registerGlobalStateResources } from './resources/global-state-resources.js';
+import { registerDatasourceResources } from './resources/datasource-resources.js';
+import { registerDomainStateResources } from './resources/domain-state-resources.js';
+import { registerEnvironmentStateResources } from './resources/environment-state-resources.js';
 import { registerTemplateResources } from './resources/template-resources.js';
 
 const server = new McpServer({
@@ -60,8 +62,9 @@ registerStyleTools(server);
 registerMiscTools(server);
 registerAssetTools(server);
 registerHistoryTools(server);
-registerDatasetTools(server);
-registerGlobalStateTools(server);
+registerDomainStateTools(server);
+registerEnvironmentTools(server);
+registerDataSourceTools(server);
 registerComponentPropsTools(server);
 registerSnapshotTools(server);
 registerBatchTool(server);
@@ -70,8 +73,9 @@ registerComponentRecipeTools(server);
 // ===== Register all resources =====
 
 registerResources(server);
-registerDatasetResources(server);
-registerGlobalStateResources(server);
+registerDatasourceResources(server);
+registerDomainStateResources(server);
+registerEnvironmentStateResources(server);
 registerTemplateResources(server);
 
 // ===== Start =====

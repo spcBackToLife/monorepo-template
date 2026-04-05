@@ -9,7 +9,11 @@ import { DataContextProvider, useDataContext } from '../data/DataContext';
 import type { DataContext } from '../data/resolveExpression';
 import { hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
 import { ListRenderer } from '../data/ListRenderer';
-import { EventExecutionEngine, type PreviewContext } from './EventExecutionEngine';
+import {
+  EventExecutionEngine,
+  type PreviewContext,
+  type TransitionAnimation,
+} from './EventExecutionEngine';
 import { CSSPseudoInjector } from './CSSPseudoInjector';
 
 export interface PreviewRendererProps {
@@ -18,7 +22,9 @@ export interface PreviewRendererProps {
   globalStates?: Record<string, string>;
   /** 可选：仅使用该数据源的活跃场景数据；不传则合并全部已加载数据源 */
   currentDataSet?: string;
-  onNavigate?: (screenId: string) => void;
+  onNavigate?: (screenId: string, animation?: TransitionAnimation) => void;
+  /** 预览内切换数据源生命周期阶段（由宿主写入可观察 screen） */
+  onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   /** 嵌在编辑器视口内时去掉外层灰底，避免与设备框叠两层底色 */
   embedded?: boolean;
 }
@@ -33,6 +39,7 @@ export function PreviewRenderer({
   globalStates = {},
   currentDataSet,
   onNavigate,
+  onSwitchDataSourcePhase,
   embedded = false,
 }: PreviewRendererProps) {
   const activeDataContext: DataContext = useMemo(
@@ -47,6 +54,7 @@ export function PreviewRenderer({
         assets={assets}
         globalStates={globalStates}
         onNavigate={onNavigate}
+        onSwitchDataSourcePhase={onSwitchDataSourcePhase}
         embedded={embedded}
       />
     </DataContextProvider>
@@ -58,8 +66,9 @@ function getActiveData(screen: Screen): Record<string, unknown> {
   const mergedData: Record<string, unknown> = {};
   for (const ds of screen.dataSources ?? []) {
     if (ds.activePhase !== 'loaded') continue;
-    const scenario = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
-    if (scenario) {
+    const scenarios = ds.scenarios ?? [];
+    const scenario = scenarios.find((s) => s.id === ds.activeScenarioId);
+    if (scenario?.data != null && typeof scenario.data === 'object') {
       Object.assign(mergedData, scenario.data);
     }
   }
@@ -71,7 +80,8 @@ function buildDataContextFromScreen(screen: Screen, currentDataSourceId?: string
   if (currentDataSourceId) {
     const ds = sources.find((s) => s.id === currentDataSourceId);
     if (ds && ds.activePhase === 'loaded') {
-      const scenario = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
+      const scenarios = ds.scenarios ?? [];
+      const scenario = scenarios.find((s) => s.id === ds.activeScenarioId);
       return { data: { ...(scenario?.data ?? {}) } };
     }
   }
@@ -83,12 +93,14 @@ function PreviewInteractiveShell({
   assets,
   globalStates,
   onNavigate,
+  onSwitchDataSourcePhase,
   embedded,
 }: {
   screen: Screen;
   assets: ComponentTemplate[];
   globalStates: Record<string, string>;
-  onNavigate?: (screenId: string) => void;
+  onNavigate?: (screenId: string, animation?: TransitionAnimation) => void;
+  onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   embedded: boolean;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -126,31 +138,37 @@ function PreviewInteractiveShell({
     const el = rootRef.current;
     if (!el) return;
     const engine = engineRef.current;
+    const merge = (name: string, value: string) => {
+      setRuntimeGlobals((g) => ({ ...g, [name]: value }));
+    };
     const ctx: PreviewContext = {
       currentScreenId: screen.id,
       globalStates: runtimeGlobals,
-      onNavigate: (id) => onNavigate?.(id),
+      onNavigate: (id, anim) => onNavigate?.(id, anim),
       onSetState: (nodeId, stateName) => {
         const el = rootRef.current?.querySelector(`[data-node-id="${nodeId}"]`);
         if (el instanceof HTMLElement) {
           el.setAttribute('data-active-state', stateName);
         }
       },
-      onSetGlobalState: (name, value) => {
-        setRuntimeGlobals((g) => ({ ...g, [name]: value }));
-      },
+      onSetGlobalState: merge,
+      onSetDomainState: merge,
+      onSetEnvironmentState: merge,
+      onSwitchDataSourcePhase,
       onToggleVisible: togglePreviewVisible,
     };
     engine.bind(el, screen.rootNode, ctx);
     return () => engine.unbind();
-  }, [screen, screen.rootNode, runtimeGlobals, onNavigate, togglePreviewVisible]);
+  }, [screen, screen.rootNode, runtimeGlobals, onNavigate, onSwitchDataSourcePhase, togglePreviewVisible]);
 
+  const fillViewport = embedded;
   return (
     <div
       data-preview-root
       style={{
         width: '100%',
         minHeight: '100%',
+        ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
         backgroundColor: embedded ? 'transparent' : '#2C2C2C',
         position: 'relative' as const,
         overflow: embedded ? 'hidden' : 'auto',
@@ -162,12 +180,14 @@ function PreviewInteractiveShell({
         style={{
           width: '100%',
           minHeight: '100%',
+          ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
           backgroundColor: screen.backgroundColor,
           position: 'relative' as const,
         }}
       >
         <PreviewNodeRenderer
           node={screen.rootNode}
+          rootNodeId={screen.rootNode.id}
           assets={assets}
           globalStates={runtimeGlobals}
           onNavigate={onNavigate}
@@ -180,6 +200,8 @@ function PreviewInteractiveShell({
 
 interface PreviewNodeRendererProps {
   node: ComponentNode;
+  /** 与编辑态 SchemaRenderer 一致：根节点铺满设备视口，避免 flex 子项在 overflow:hidden 下高度塌陷导致整页空白 */
+  rootNodeId: string;
   assets: ComponentTemplate[];
   globalStates: Record<string, string>;
   onNavigate?: (screenId: string) => void;
@@ -188,6 +210,7 @@ interface PreviewNodeRendererProps {
 
 function PreviewNodeRenderer({
   node: rawNode,
+  rootNodeId,
   assets,
   globalStates,
   onNavigate,
@@ -214,7 +237,7 @@ function PreviewNodeRenderer({
         assets={assets}
         globalStates={globalStates}
         renderNode={(n, a, g, _c, _h, _d) =>
-          renderSinglePreviewNode(n, a, g, onNavigate, previewHiddenIds)
+          renderSinglePreviewNode(n, a, g, onNavigate, previewHiddenIds, rootNodeId)
         }
       />
     );
@@ -227,7 +250,21 @@ function PreviewNodeRenderer({
     return null;
   }
 
-  const reactStyles = resolveNodeStyles(node, globalStates, undefined, dataContext);
+  const baseStyles = resolveNodeStyles(node, globalStates, undefined, dataContext);
+  const reactStyles =
+    rootNodeId && node.id === rootNodeId
+      ? {
+          ...baseStyles,
+          left: undefined,
+          top: undefined,
+          right: undefined,
+          bottom: undefined,
+          minHeight: baseStyles.minHeight ?? '100%',
+          height: baseStyles.height ?? '100%',
+          width: baseStyles.width ?? '100%',
+          boxSizing: 'border-box' as const,
+        }
+      : baseStyles;
   const previewStyles: React.CSSProperties = {
     ...reactStyles,
     pointerEvents: 'auto',
@@ -237,6 +274,7 @@ function PreviewNodeRenderer({
     <PreviewNodeRenderer
       key={child.id}
       node={child}
+      rootNodeId={rootNodeId}
       assets={assets}
       globalStates={globalStates}
       onNavigate={onNavigate}
@@ -268,6 +306,7 @@ function renderSinglePreviewNode(
   globalStates: Record<string, string>,
   onNavigate: ((screenId: string) => void) | undefined,
   previewHiddenIds: ReadonlySet<string>,
+  rootNodeId: string,
 ): React.ReactNode {
   const nodeWithoutListData: ComponentNode = {
     ...node,
@@ -278,6 +317,7 @@ function renderSinglePreviewNode(
   return (
     <PreviewNodeRenderer
       node={nodeWithoutListData}
+      rootNodeId={rootNodeId}
       assets={assets}
       globalStates={globalStates}
       onNavigate={onNavigate}

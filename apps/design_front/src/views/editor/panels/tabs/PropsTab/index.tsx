@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type ReactNode } from 'react';
+import { useState, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { Empty, Switch } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
@@ -84,8 +84,6 @@ export const PropsTab = observer(function PropsTab() {
         />
       )}
 
-      <ListBindingSection nodeId={nodeId} />
-
       {/* Common: Text content for text-like elements */}
       {!isComponentInstance && (
         <TextContentSection
@@ -95,6 +93,8 @@ export const PropsTab = observer(function PropsTab() {
         />
       )}
 
+      <ListBindingSection nodeId={nodeId} />
+
       {/* Custom attributes (data-*) */}
       <CustomAttributesSection nodeId={nodeId} props={nodeProps} onChange={handlePropChange} />
     </div>
@@ -102,14 +102,70 @@ export const PropsTab = observer(function PropsTab() {
 });
 
 // ===================================================================
-// List binding (__listData) — W6-050
+// 重复与列表
+//
+// 设计原则（第一性原理）：
+// - __listData 的含义是「重复此节点 N 次」，与节点类型无关
+//   span/button/img/div 都可以重复
+// - 唯一的约束是层级：已经在列表内的节点不应再设列表绑定
+//   因为它的上下文已经是单个 item，应该用 {{item.xxx}} 引用字段
+// - 所以判断规则是：有祖先节点带 __listData → 隐藏此区域
+//   没有祖先带 __listData → 显示，允许绑定
 // ===================================================================
+
+/** 从数据源合并出当前页面的顶层数据对象 */
+function getMergedScreenData(screen: { dataSources?: import('@globallink/design-schema').DataSource[] }): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const ds of screen.dataSources ?? []) {
+    if (ds.activePhase !== 'loaded') continue;
+    const sc = (ds.scenarios ?? []).find((s) => s.id === ds.activeScenarioId);
+    if (sc?.data && typeof sc.data === 'object') Object.assign(merged, sc.data);
+  }
+  return merged;
+}
+
+/** 解析 {{data.xxx}} 表达式，从 merged data 中取出值 */
+function resolveDataPath(merged: Record<string, unknown>, expr: string): unknown {
+  const match = expr.match(/\{\{data\.(.+?)\}\}/);
+  if (!match) return undefined;
+  let current: unknown = merged;
+  for (const seg of match[1].split('.')) {
+    if (current && typeof current === 'object') {
+      current = (current as Record<string, unknown>)[seg];
+    } else return undefined;
+  }
+  return current;
+}
+
+/** 从数组第一项中提取字段名列表 */
+function extractItemFields(arr: unknown[]): string[] {
+  if (arr.length === 0) return [];
+  const first = arr[0];
+  if (first && typeof first === 'object' && !Array.isArray(first)) {
+    return Object.keys(first as Record<string, unknown>);
+  }
+  return [];
+}
 
 const ListBindingSection = observer(function ListBindingSection({ nodeId }: { nodeId: string }) {
   const [open, setOpen] = useState(true);
   const node = findNodeInScreens(editorStore.screens, nodeId);
   const raw = node?.props?.__listData;
   const value = typeof raw === 'string' ? raw : '';
+  const screen = editorStore.activeScreen;
+
+  // 检查是否在列表内（祖先有 __listData）
+  const isInsideList = useMemo(() => {
+    if (!node) return false;
+    for (const s of editorStore.screens) {
+      if (findAncestorWithListData(s.rootNode, nodeId)) return true;
+    }
+    return false;
+  }, [nodeId, node]);
+
+  // 如果已经在列表内，不显示「重复与列表」
+  // 因为这个节点是列表项的一部分，应该用 {{item.xxx}} 来引用数据
+  if (isInsideList) return null;
 
   const apply = (next: string) => {
     editorStore.execute({
@@ -118,45 +174,108 @@ const ListBindingSection = observer(function ListBindingSection({ nodeId }: { no
     });
   };
 
-  const handleCopy = async () => {
-    const t = value.trim() || '{{data.items}}';
-    try {
-      await navigator.clipboard.writeText(t);
-    } catch {
-      // ignore
-    }
-  };
+  const merged = screen ? getMergedScreenData(screen) : {};
+  const resolvedArray = value ? resolveDataPath(merged, value) : undefined;
+  const items = Array.isArray(resolvedArray) ? resolvedArray : [];
+  const itemFields = extractItemFields(items);
 
   return (
-    <CollapsibleSection title="列表绑定 (__listData)" open={open} onToggle={() => setOpen(!open)}>
+    <CollapsibleSection title="重复与列表" open={open} onToggle={() => setOpen(!open)}>
       <p className="text-[10px] text-gray-500 mb-1.5 leading-snug">
-        绑定到数组字段（如 data 下的列表），子树将按项重复渲染，与预览一致。
+        将此节点变成<strong>列表模板</strong>：绑定一个数组路径，预览时按数组长度重复渲染。
       </p>
       <ExpressionInput
         value={value}
         onChange={(v) => apply(v)}
-        placeholder="{{data.items}}"
+        placeholder="{{data.tasks}}"
       />
-      <div className="flex flex-wrap gap-1 mt-1.5">
+
+      {/* 绑定状态反馈 */}
+      {value && items.length > 0 && (
+        <div className="mt-1.5 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-[10px] text-green-800">
+          已绑定数组，共 <strong>{items.length}</strong> 项，预览时此节点重复 {items.length} 次。
+        </div>
+      )}
+      {value && items.length === 0 && (
+        <div className="mt-1.5 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-800">
+          未解析到数组。请检查左侧「数据」面板中是否有对应字段。
+        </div>
+      )}
+
+      {/* 子节点字段引导 */}
+      {value && itemFields.length > 0 && (
+        <div className="mt-2 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded">
+          <div className="text-[10px] font-medium text-blue-800 mb-1">
+            子节点可用字段（选中子元素，在文本或属性绑定中使用）：
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {itemFields.map((field) => (
+              <button
+                key={field}
+                type="button"
+                className="text-[10px] font-mono px-1.5 py-0.5 bg-white border border-blue-200 rounded text-purple-600 hover:bg-purple-50 transition-colors"
+                onClick={() => { void navigator.clipboard.writeText(`{{item.${field}}}`); }}
+                title={`点击复制 {{item.${field}}}`}
+              >
+                {'{{item.'}{field}{'}}'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-blue-600 mt-1 leading-snug">
+            点击复制后，粘贴到子节点的「文本内容」或属性绑定中。
+          </p>
+        </div>
+      )}
+
+      {value && (
         <button
           type="button"
-          className="h-6 px-2 text-[10px] rounded border border-gray-200 bg-white hover:bg-gray-50"
-          onClick={() => void handleCopy()}
-        >
-          复制表达式
-        </button>
-        <button
-          type="button"
-          className="h-6 px-2 text-[10px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40"
+          className="mt-1.5 h-6 px-2 text-[10px] rounded border border-gray-200 text-gray-500 hover:bg-gray-50"
           onClick={() => apply('')}
-          disabled={!value}
         >
-          清除
+          清除绑定
         </button>
-      </div>
+      )}
     </CollapsibleSection>
   );
 });
+
+/** 在节点树中查找 nodeId 的祖先中是否有节点带 __listData */
+function findAncestorWithListData(
+  root: import('@globallink/design-schema').ComponentNode,
+  targetId: string,
+): import('@globallink/design-schema').ComponentNode | null {
+  // 递归搜索：如果当前节点的子树中包含 target，且当前节点有 __listData，则返回
+  if (root.id === targetId) return null; // 自身不算祖先
+  for (const child of root.children ?? []) {
+    if (child.id === targetId) {
+      // target 是 root 的直接子节点
+      if (typeof root.props?.__listData === 'string' && root.props.__listData) return root;
+      return null;
+    }
+    // target 在 child 的子树中
+    if (subtreeContains(child, targetId)) {
+      // 先检查 root 自身是否有 __listData
+      if (typeof root.props?.__listData === 'string' && root.props.__listData) return root;
+      // 再递归看 child 及其后代中有没有更近的祖先带 __listData
+      const deeper = findAncestorWithListData(child, targetId);
+      return deeper;
+    }
+  }
+  return null;
+}
+
+/** 检查子树中是否包含指定 nodeId */
+function subtreeContains(
+  node: import('@globallink/design-schema').ComponentNode,
+  targetId: string,
+): boolean {
+  if (node.id === targetId) return true;
+  for (const child of node.children ?? []) {
+    if (subtreeContains(child, targetId)) return true;
+  }
+  return false;
+}
 
 // ===================================================================
 // Element type (primitive → changeElementType)
@@ -432,25 +551,73 @@ const TEXT_ELEMENTS: PrimitiveNodeType[] = ['p', 'h1', 'h2', 'h3', 'span', 'butt
 
 function TextContentSection({ nodeType, nodeId, children }: TextContentSectionProps) {
   const [open, setOpen] = useState(true);
-
-  if (!TEXT_ELEMENTS.includes(nodeType)) return null;
-
   const node = findNodeInScreens(editorStore.screens, nodeId);
-  const existingText = (() => {
-    const propText = (node?.props as Record<string, unknown>)?.textContent;
-    if (typeof propText === 'string') return propText;
+  const textContentProp = (node?.props as Record<string, unknown> | undefined)?.textContent;
+
+  const existingText = useMemo(() => {
+    if (typeof textContentProp === 'string') return textContentProp;
     if (typeof children === 'string') return children;
     if (Array.isArray(children) && children.length > 0 && typeof children[0] === 'string') return children[0];
     return '';
-  })();
+  }, [nodeId, textContentProp, children]);
 
-  const [localText, setLocalText] = useState(existingText);
+  const [localText, setLocalText] = useState('');
+
+  useEffect(() => {
+    setLocalText(existingText);
+  }, [nodeId, existingText]);
+
+  // 检查祖先节点是否有列表绑定
+  const parentListFields = useMemo(() => {
+    if (!node) return [];
+    for (const screen of editorStore.screens) {
+      const ancestor = findAncestorWithListData(screen.rootNode, nodeId);
+      if (!ancestor) continue;
+      const listExpr = ancestor.props?.__listData;
+      if (typeof listExpr !== 'string') continue;
+      const merged = getMergedScreenData(screen);
+      const resolved = resolveDataPath(merged, listExpr);
+      if (!Array.isArray(resolved)) continue;
+      return extractItemFields(resolved);
+    }
+    return [];
+  }, [nodeId, node]);
+
+  if (!TEXT_ELEMENTS.includes(nodeType)) return null;
+
+  const isInsideList = parentListFields.length > 0;
+  const hasItemBinding = localText.includes('{{item.');
 
   return (
     <CollapsibleSection title="文本内容" open={open} onToggle={() => setOpen(!open)}>
+      {isInsideList && !hasItemBinding && (
+        <div className="mb-1.5 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-800 leading-snug">
+          <strong>此节点在列表内</strong>，可用以下表达式显示每项的字段：
+          <div className="flex flex-wrap gap-1 mt-1">
+            {parentListFields.map((field) => (
+              <button
+                key={field}
+                type="button"
+                className="font-mono px-1.5 py-0.5 bg-white border border-blue-200 rounded text-purple-600 hover:bg-purple-50 transition-colors"
+                onClick={() => {
+                  const expr = `{{item.${field}}}`;
+                  setLocalText(expr);
+                  editorStore.execute({
+                    type: 'updateComponentProps',
+                    params: { nodeId, props: { textContent: expr } },
+                  });
+                }}
+                title={`设置为 {{item.${field}}}`}
+              >
+                {'{{item.'}{field}{'}}'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <textarea
-        className="w-full h-16 px-1.5 py-1 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 resize-y"
-        placeholder="输入文本内容..."
+        className="w-full h-16 px-1.5 py-1 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 resize-y font-mono"
+        placeholder={isInsideList ? '{{item.title}}' : '输入文本内容...'}
         value={localText}
         onChange={(e) => {
           setLocalText(e.target.value);
@@ -466,6 +633,7 @@ function TextContentSection({ nodeType, nodeId, children }: TextContentSectionPr
     </CollapsibleSection>
   );
 }
+
 
 /** 图片 URL + 本地上传 → asset://uploads/… */
 function ImagePropField({

@@ -1,5 +1,5 @@
 import type { CoordinateMap, NodeRect } from '../coordinateMap';
-import { hitTest } from '../coordinateMap';
+import { collectRectsForNodeId, hitTest } from '../coordinateMap';
 
 /** 与 drawResizeHandles 共用：极小的 DOM 选区仍显示可操作的框 */
 export function normalizeNodeRectForOverlay(rect: NodeRect): NodeRect {
@@ -53,24 +53,23 @@ export function drawSelection(
   const cornerSize = Math.max(4, Math.min(12, 6 / z));
 
   for (const nodeId of selectedNodeIds) {
-    const rect = map.get(nodeId);
-    if (!rect) continue;
+    const rects = collectRectsForNodeId(map, nodeId);
+    for (const rect of rects) {
+      const { x: ox, y: oy, width: w, height: h } = normalizeNodeRectForOverlay(rect);
 
-    const { x: ox, y: oy, width: w, height: h } = normalizeNodeRectForOverlay(rect);
+      ctx.strokeRect(ox, oy, w, h);
 
-    ctx.strokeRect(ox, oy, w, h);
-
-    // Draw small filled squares at corners (selection handles indicator)
-    const handleSize = cornerSize;
-    ctx.fillStyle = '#1677ff';
-    const corners = [
-      [ox, oy],
-      [ox + w, oy],
-      [ox, oy + h],
-      [ox + w, oy + h],
-    ];
-    for (const [cx, cy] of corners) {
-      ctx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+      const handleSize = cornerSize;
+      ctx.fillStyle = '#1677ff';
+      const corners = [
+        [ox, oy],
+        [ox + w, oy],
+        [ox, oy + h],
+        [ox + w, oy + h],
+      ];
+      for (const [cx, cy] of corners) {
+        ctx.fillRect(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+      }
     }
   }
 

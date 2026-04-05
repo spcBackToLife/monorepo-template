@@ -10,6 +10,14 @@
  *
  * `screenToCanvas` / `canvasToScreen` 用于「未套在统一 transform 内」的裸坐标换算；
  * 当前编辑器主画布以 DOM 层 + 覆盖层同容器为主路径。
+ *
+ * **坐标根（第一性原理）**：`editor-canvas-stack` 与内部 `[data-screen-id]` 在部分布局下
+ * 可能不完全重合（设备框、安全区、嵌套包装等）。凡 `buildCoordinateMap` / 放置 / 命中
+ * 应以 `getEditorCoordinateRoot(stack)` 为原点，与 Schema 设备内容区一致。
+ *
+ * **实例键（根治列表重复 DOM）**：`__listData` 展开时多个 DOM 共用同一 `data-node-id`。
+ * 坐标图必须以 `data-node-instance-key` 为 Map 键，值为 `{ nodeId, rect }`；命中仍返回 Schema `nodeId`，
+ * 拖拽/缩放用 `hitTestAt` 得到的 `instanceKey` 锁定具体那一块 DOM。
  */
 
 // ===== Coordinate Transform Types =====
@@ -80,14 +88,85 @@ export interface NodeRect {
   height: number;
 }
 
-/** Map from node ID to its bounding rectangle */
-export type CoordinateMap = Map<string, NodeRect>;
+/** 与 DOM `data-node-instance-key` 一致；无列表上下文时等于 `nodeId` */
+export interface CoordinateMapEntry {
+  nodeId: string;
+  rect: NodeRect;
+}
+
+/** Map 键 = 实例键；`nodeId` 在 entry 内，供选中/写回 Schema */
+export type CoordinateMap = Map<string, CoordinateMapEntry>;
+
+export const DATA_NODE_INSTANCE_KEY_ATTR = 'data-node-instance-key';
+
+function fallbackMapEntry(key: string, val: NodeRect | CoordinateMapEntry): CoordinateMapEntry {
+  if ('rect' in val && 'nodeId' in val && typeof (val as CoordinateMapEntry).rect?.x === 'number') {
+    return val as CoordinateMapEntry;
+  }
+  return { nodeId: key, rect: val as NodeRect };
+}
+
+function fallbackRectFromMap(map: CoordinateMap | null | undefined, parentId: string): NodeRect | null {
+  if (!map) return null;
+  const direct = map.get(parentId);
+  if (direct) return direct.rect;
+  for (const v of map.values()) {
+    if (v.nodeId === parentId) return v.rect;
+  }
+  return null;
+}
+
+/** 拖拽/缩放：优先 `preferredInstanceKey` 对应块，否则任选一个该 nodeId 的实例（通常仅单例） */
+export function getRectForInteraction(
+  map: CoordinateMap,
+  nodeId: string,
+  preferredInstanceKey?: string | null,
+): NodeRect | null {
+  if (preferredInstanceKey) {
+    const e = map.get(preferredInstanceKey);
+    if (e?.nodeId === nodeId) return e.rect;
+  }
+  const selfKeyed = map.get(nodeId);
+  if (selfKeyed?.nodeId === nodeId) return selfKeyed.rect;
+  for (const v of map.values()) {
+    if (v.nodeId === nodeId) return v.rect;
+  }
+  return null;
+}
+
+export function mapHasNodeId(map: CoordinateMap, nodeId: string): boolean {
+  return getRectForInteraction(map, nodeId) != null;
+}
+
+/** 绘制多选区/列表模板：同一 nodeId 的多块 DOM 各画一层选框 */
+export function collectRectsForNodeId(map: CoordinateMap, nodeId: string): NodeRect[] {
+  const out: NodeRect[] = [];
+  for (const v of map.values()) {
+    if (v.nodeId === nodeId) out.push(v.rect);
+  }
+  return out;
+}
+
+/**
+ * 编辑画布：返回 Schema 内容根（`SchemaRenderer` / `PreviewRenderer` 外层 `data-screen-id`）。
+ * 不存在时回退为 `host`（如尚未挂载或空画布）。
+ */
+export function getEditorCoordinateRoot(host: HTMLElement): HTMLElement {
+  return host.querySelector<HTMLElement>('[data-screen-id]') ?? host;
+}
 
 /**
  * DOM 测量优先；缺失 id 用 fallback（如 Schema 推导）补齐。W7-025 视口虚拟化时保证命中与对齐一致。
+ * 凡某 `nodeId` 已在 DOM 图中有任一实例，则丢弃 fallback 中同 `nodeId` 的估算盒，避免与列表多实例打架。
  */
 export function mergeCoordinateMaps(domMap: CoordinateMap, fallbackMap: CoordinateMap): CoordinateMap {
-  const out = new Map(fallbackMap);
+  const domNodeIds = new Set(Array.from(domMap.values()).map((e) => e.nodeId));
+  const out = new Map<string, CoordinateMapEntry>();
+  for (const [k, v] of fallbackMap) {
+    const entry = fallbackMapEntry(k, v as NodeRect | CoordinateMapEntry);
+    if (domNodeIds.has(entry.nodeId)) continue;
+    out.set(k, entry);
+  }
   for (const [k, v] of domMap) {
     out.set(k, v);
   }
@@ -95,22 +174,34 @@ export function mergeCoordinateMaps(domMap: CoordinateMap, fallbackMap: Coordina
 }
 
 /**
- * 根节点 DOM 测量可能小于 `editor-canvas-stack`（仅 min-height:100% 时高度链未撑满、或内容收缩等），
+ * 根节点 DOM 测量可能小于坐标根（仅 min-height:100% 时高度链未撑满、或内容收缩等），
  * 与设备白底/覆盖层 canvas 尺寸不一致，选框会「左上对齐、右下内收」。将 Root 在坐标图中对齐为整容器。
  * 使用 `offsetWidth/offsetHeight`（不受祖先 CSS transform 影响），与 buildCoordinateMap 同坐标系。
+ * @param coordSpaceRoot - 与 `buildCoordinateMap(coordSpaceRoot)` 同一元素，通常为 `getEditorCoordinateRoot(stack)`。
  */
 export function expandRootRectToContainer(
   map: CoordinateMap,
-  container: HTMLElement,
+  coordSpaceRoot: HTMLElement,
   rootNodeId: string,
 ): CoordinateMap {
   const out = new Map(map);
-  if (!out.has(rootNodeId)) return out;
-  out.set(rootNodeId, {
-    x: 0,
-    y: 0,
-    width: container.offsetWidth,
-    height: container.offsetHeight,
+  let rootKey: string | null = null;
+  for (const [k, v] of out) {
+    if (v.nodeId === rootNodeId) {
+      rootKey = k;
+      break;
+    }
+  }
+  if (rootKey == null) return out;
+  const prev = out.get(rootKey)!;
+  out.set(rootKey, {
+    nodeId: prev.nodeId,
+    rect: {
+      x: 0,
+      y: 0,
+      width: coordSpaceRoot.offsetWidth,
+      height: coordSpaceRoot.offsetHeight,
+    },
   });
   return out;
 }
@@ -122,19 +213,23 @@ export function expandRootRectToContainer(
  */
 export function scaleCoordinateMapToLayoutContainer(
   map: CoordinateMap,
-  container: HTMLElement,
+  coordSpaceRoot: HTMLElement,
   layoutViewportWidth: number,
   layoutViewportHeight: number,
 ): CoordinateMap {
-  const sx = container.offsetWidth / Math.max(1, layoutViewportWidth);
-  const sy = container.offsetHeight / Math.max(1, layoutViewportHeight);
+  const sx = coordSpaceRoot.offsetWidth / Math.max(1, layoutViewportWidth);
+  const sy = coordSpaceRoot.offsetHeight / Math.max(1, layoutViewportHeight);
   const out: CoordinateMap = new Map();
-  for (const [id, r] of map) {
+  for (const [id, entry] of map) {
+    const r = entry.rect;
     out.set(id, {
-      x: r.x * sx,
-      y: r.y * sy,
-      width: r.width * sx,
-      height: r.height * sy,
+      nodeId: entry.nodeId,
+      rect: {
+        x: r.x * sx,
+        y: r.y * sy,
+        width: r.width * sx,
+        height: r.height * sy,
+      },
     });
   }
   return out;
@@ -147,8 +242,8 @@ export function scaleCoordinateMapToLayoutContainer(
  * 自动检测容器上的祖先 CSS `transform: scale()` 并补偿，
  * 保证覆盖层 canvas（也在同一 transform 内）绘制坐标与 DOM 完全对齐。
  *
- * @param container - The container element (usually the viewport div)
- * @returns A Map of nodeId to NodeRect in logical pixels
+ * @param container - 坐标空间根（通常为 `getEditorCoordinateRoot(stack)`）
+ * @returns Map 键为 `data-node-instance-key`，值为 `{ nodeId, rect }`
  */
 export function buildCoordinateMap(container: HTMLElement): CoordinateMap {
   const map: CoordinateMap = new Map();
@@ -164,12 +259,18 @@ export function buildCoordinateMap(container: HTMLElement): CoordinateMap {
     const nodeId = el.getAttribute('data-node-id');
     if (!nodeId) return;
 
+    const instanceKey =
+      el.getAttribute(DATA_NODE_INSTANCE_KEY_ATTR) ?? nodeId;
+
     const rect = el.getBoundingClientRect();
-    map.set(nodeId, {
-      x: (rect.left - containerRect.left) / effectiveScale,
-      y: (rect.top - containerRect.top) / effectiveScale,
-      width: rect.width / effectiveScale,
-      height: rect.height / effectiveScale,
+    map.set(instanceKey, {
+      nodeId,
+      rect: {
+        x: (rect.left - containerRect.left) / effectiveScale,
+        y: (rect.top - containerRect.top) / effectiveScale,
+        width: rect.width / effectiveScale,
+        height: rect.height / effectiveScale,
+      },
     });
   });
 
@@ -185,17 +286,18 @@ export function buildCoordinateMap(container: HTMLElement): CoordinateMap {
  * `querySelectorAll` tree order (ancestor before descendant), so the **child**
  * wins when parent and child share the same bounding rect (e.g. both 100%×100%).
  */
-export function hitTest(
+export function hitTestAt(
   map: CoordinateMap,
   x: number,
   y: number,
-  /** W7-023：跳过这些 id（如画布上不可选的锁定节点） */
   skipIds?: Set<string>,
-): string | null {
-  let bestId: string | null = null;
+): { nodeId: string; instanceKey: string } | null {
+  let bestKey: string | null = null;
+  let bestNodeId: string | null = null;
   let bestArea = Infinity;
 
-  for (const [nodeId, rect] of map) {
+  for (const [instanceKey, entry] of map) {
+    const { nodeId, rect } = entry;
     if (skipIds?.has(nodeId)) continue;
     if (
       x >= rect.x &&
@@ -204,15 +306,26 @@ export function hitTest(
       y <= rect.y + rect.height
     ) {
       const area = rect.width * rect.height;
-      // Strictly smaller wins; same area → last in document order wins (deeper node).
       if (area < bestArea || area === bestArea) {
         bestArea = area;
-        bestId = nodeId;
+        bestKey = instanceKey;
+        bestNodeId = nodeId;
       }
     }
   }
 
-  return bestId;
+  return bestKey != null && bestNodeId != null
+    ? { nodeId: bestNodeId, instanceKey: bestKey }
+    : null;
+}
+
+export function hitTest(
+  map: CoordinateMap,
+  x: number,
+  y: number,
+  skipIds?: Set<string>,
+): string | null {
+  return hitTestAt(map, x, y, skipIds)?.nodeId ?? null;
 }
 
 /**
@@ -221,7 +334,8 @@ export function hitTest(
  */
 export function hitTestAll(map: CoordinateMap, x: number, y: number, skipIds?: Set<string>): string[] {
   const hits: { id: string; area: number }[] = [];
-  for (const [nodeId, rect] of map) {
+  for (const [, entry] of map) {
+    const { nodeId, rect } = entry;
     if (skipIds?.has(nodeId)) continue;
     if (
       x >= rect.x &&
@@ -234,4 +348,178 @@ export function hitTestAll(map: CoordinateMap, x: number, y: number, skipIds?: S
   }
   hits.sort((a, b) => a.area - b.area);
   return hits.map((h) => h.id);
+}
+
+const BOUNDS_CONTAIN_EPS = 0.5;
+
+/** `outer` 是否完全包含 `inner`（逻辑像素，容差处理浮点） */
+export function rectFullyContains(
+  outer: NodeRect,
+  inner: { x: number; y: number; width: number; height: number },
+  eps = BOUNDS_CONTAIN_EPS,
+): boolean {
+  return (
+    inner.x >= outer.x - eps &&
+    inner.y >= outer.y - eps &&
+    inner.x + inner.width <= outer.x + outer.width + eps &&
+    inner.y + inner.height <= outer.y + outer.height + eps
+  );
+}
+
+/**
+ * 返回其包围盒**完全包含**给定矩形的所有节点 id，按面积**升序**（越小越靠前）。
+ * 用于拖拽绘制：优先把新节点挂到「能包住整段绘制框」的最小容器上，避免仅用中心点命中到按钮等小节点导致落点错位。
+ */
+export function hitTestAllContainingBounds(
+  map: CoordinateMap,
+  bounds: { x: number; y: number; width: number; height: number },
+  skipIds?: Set<string>,
+): string[] {
+  const hits: { id: string; area: number }[] = [];
+  for (const [, entry] of map) {
+    const { nodeId, rect } = entry;
+    if (skipIds?.has(nodeId)) continue;
+    if (rectFullyContains(rect, bounds)) {
+      hits.push({ id: nodeId, area: rect.width * rect.height });
+    }
+  }
+  hits.sort((a, b) => a.area - b.area);
+  return hits.map((h) => h.id);
+}
+
+/**
+ * 设备内容区在逻辑像素下的整框矩形（与 expandRootRectToContainer 同一坐标根）。
+ * @param stack - `editor-canvas-stack`；实际尺寸取自 `getEditorCoordinateRoot(stack)`。
+ */
+export function getRootStackPlacementRect(stack: HTMLElement): NodeRect {
+  return getEditorContentRootRect(getEditorCoordinateRoot(stack));
+}
+
+/** 与 `buildCoordinateMap(coordRoot)` 原点一致的内容根矩形 */
+export function getEditorContentRootRect(coordRoot: HTMLElement): NodeRect {
+  return {
+    x: 0,
+    y: 0,
+    width: coordRoot.offsetWidth,
+    height: coordRoot.offsetHeight,
+  };
+}
+
+/**
+ * 定位父级在**容器逻辑坐标**下的 padding-edge 矩形。
+ *
+ * **第一性原理**：CSS absolute 子元素的 (0,0) = 包含块的 padding edge。
+ *
+ * 关键量纲：
+ * - `getBoundingClientRect()` 返回的是**视口 / 屏幕像素**，已乘以祖先 CSS transform scale。
+ * - `clientLeft / clientTop / clientWidth / clientHeight` 是**CSS 布局像素**，不受 transform 影响。
+ *
+ * 必须先把 `getBoundingClientRect` 差值除以 scale 得到**逻辑偏移**，再加上 CSS 布局像素的 border 修正；
+ * `clientWidth/clientHeight` 本身已是逻辑像素，不可再除以 scale。
+ */
+export function getParentContentRectInContainer(
+  container: HTMLElement,
+  parentEl: HTMLElement,
+): NodeRect {
+  const containerRect = container.getBoundingClientRect();
+  const scale =
+    container.offsetWidth > 0 ? containerRect.width / container.offsetWidth : 1;
+  const r = parentEl.getBoundingClientRect();
+  const borderBoxX = (r.left - containerRect.left) / scale;
+  const borderBoxY = (r.top - containerRect.top) / scale;
+  return {
+    x: borderBoxX + parentEl.clientLeft,
+    y: borderBoxY + parentEl.clientTop,
+    width: parentEl.clientWidth,
+    height: parentEl.clientHeight,
+  };
+}
+
+/**
+ * 屏幕坐标 → 与 `buildCoordinateMap(getEditorCoordinateRoot(stack))` 一致的逻辑坐标（含祖先 scale 补偿）。
+ * `stack` 传 `editor-canvas-stack`；原点为 Schema 内容根 `[data-screen-id]`（若存在）。
+ */
+export function screenToContainerLogical(
+  stack: HTMLElement,
+  clientX: number,
+  clientY: number,
+): { x: number; y: number } {
+  const coordRoot = getEditorCoordinateRoot(stack);
+  const containerRect = coordRoot.getBoundingClientRect();
+  const scale =
+    coordRoot.offsetWidth > 0 ? containerRect.width / coordRoot.offsetWidth : 1;
+  return {
+    x: (clientX - containerRect.left) / scale,
+    y: (clientY - containerRect.top) / scale,
+  };
+}
+
+/**
+ * 放置运算用的父级矩形。
+ *
+ * **必须优先用真实 DOM（含 Root）**：`position:absolute` 的 left/top 相对父级 **padding 边**；
+ * 若 Root 在栈内与 (0,0) 有偏差、或仅用整栈 offset 而忽略 Root 边框，会出现「绘制点与落点差一大截」。
+ * 仅当拿不到对应 DOM（如虚拟化裁切）时再回退整栈或坐标图。
+ */
+export function getPlacementParentRect(
+  stack: HTMLElement,
+  parentId: string,
+  rootId: string,
+  parentEl: HTMLElement | null,
+  mapFallback?: CoordinateMap | null,
+): NodeRect {
+  const coordRoot = getEditorCoordinateRoot(stack);
+  if (parentId === rootId) {
+    return getEditorContentRootRect(coordRoot);
+  }
+  if (parentEl) {
+    return getParentContentRectInContainer(coordRoot, parentEl);
+  }
+  return fallbackRectFromMap(mapFallback ?? null, parentId) ?? getEditorContentRootRect(coordRoot);
+}
+
+/**
+ * 解析放置父级对应的真实 DOM。列表重复渲染时同一 `data-node-id` 会出现多个节点：
+ * 若给出 `preferLogicalPoint`（容器逻辑坐标），优先选**包含该点**的实例；否则取**面积最大**的实例。
+ */
+export function resolvePlacementParentElement(
+  stack: HTMLElement,
+  parentId: string,
+  preferLogicalPoint?: { x: number; y: number },
+): HTMLElement | null {
+  const coordRoot = getEditorCoordinateRoot(stack);
+  const matches: HTMLElement[] = [];
+  coordRoot.querySelectorAll<HTMLElement>('[data-node-id]').forEach((el) => {
+    if (el.getAttribute('data-node-id') === parentId) matches.push(el);
+  });
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+
+  const pt = preferLogicalPoint;
+  if (pt) {
+    for (const el of matches) {
+      const r = getParentContentRectInContainer(coordRoot, el);
+      const eps = 1;
+      if (
+        pt.x >= r.x - eps &&
+        pt.x <= r.x + r.width + eps &&
+        pt.y >= r.y - eps &&
+        pt.y <= r.y + r.height + eps
+      ) {
+        return el;
+      }
+    }
+  }
+
+  let best: HTMLElement | null = null;
+  let bestArea = -1;
+  for (const el of matches) {
+    const r = getParentContentRectInContainer(coordRoot, el);
+    const a = r.width * r.height;
+    if (a > bestArea) {
+      bestArea = a;
+      best = el;
+    }
+  }
+  return best;
 }

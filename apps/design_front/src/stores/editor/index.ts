@@ -1,7 +1,7 @@
 import { makeAutoObservable, runInAction, toJS } from 'mobx';
-import type { ComponentNode, DesignProject, Screen, Viewport } from '@globallink/design-schema';
+import type { ComponentNode, DesignProject, DomainStateVariable, Screen, Viewport } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
-import { OperationExecutor, findNodeInScreens, findParent } from '@globallink/design-operations';
+import { OperationExecutor, findNodeInScreens, findParent, findParentInScreens } from '@globallink/design-operations';
 import { API_BASE, ApiError, apiJson, getErrorMessage } from '@/api/client';
 import { authStore } from '@/stores/auth';
 import { syncManager } from '@/services/SyncManager';
@@ -34,7 +34,21 @@ function writeStoredCanvasView(projectId: string, scale: number, panX: number, p
 }
 
 export type ToolType = 'select' | 'hand' | 'container' | 'element' | 'text' | 'component' | 'annotation';
-export type RightTabType = 'styles' | 'events' | 'states' | 'props' | 'data' | 'code';
+
+/** 右侧面板可滚动分区（用于「展开并定位」） */
+export type RightPanelSectionId = 'props' | 'styles' | 'states' | 'events' | 'data' | 'code' | 'children';
+
+/** Phase 3：编辑上下文（五层状态驱动） */
+export interface EditorStateContext {
+  /** 交互态预览：default | hover | active | focus | disabled */
+  interactionState: string;
+  /** 正在编辑 props/styles 覆盖的组件态；null = base/default */
+  componentStateEditing: string | null;
+  /** 领域态上下文锁定（子元素导航不丢预览） */
+  lockedDomain: { variableName: string } | null;
+}
+
+export type LeftPanelView = 'pages' | 'elements' | 'data';
 
 export class EditorStore {
   /** The operation executor holding immutable project state */
@@ -75,11 +89,29 @@ export class EditorStore {
   rightPanelWidth = 320;
   leftPanelCollapsed = false;
   rightPanelCollapsed = false;
-  activeRightTab: RightTabType = 'styles';
   /** 递增以触发底部工具栏打开组件库 Modal（快捷键 C 与 requestOpenComponentLibrary 联动） */
   componentLibraryOpenNonce = 0;
 
-  /** --- Global state runtime (2.4.1) --- */
+  /** Phase 3：统一状态上下文（与画布 / 右栏联动） */
+  stateContext: EditorStateContext = {
+    interactionState: 'default',
+    componentStateEditing: null,
+    lockedDomain: null,
+  };
+
+  /** 各折叠区块是否收起（key = section id） */
+  collapsedSections: Record<string, boolean> = {};
+
+  /** 展开右栏后滚动到该分区（由 RightPanel 消费后清空） */
+  rightPanelScrollToSection: RightPanelSectionId | null = null;
+
+  /** Phase 4：左侧产品导航器当前视图 */
+  leftPanelView: LeftPanelView = 'elements';
+
+  /** Phase 5：画布顶部上下文条是否显示 */
+  showCanvasContextBar = true;
+
+  /** --- 领域态 + 环境态运行时预览（合并传入 SchemaRenderer globalStates） --- */
   currentGlobalStates: Record<string, string> = {};
 
   /**
@@ -170,6 +202,36 @@ export class EditorStore {
     return this.project?.screens ?? [];
   }
 
+  /**
+   * 当前选中节点可继承的领域态变量：页面级 + 自选中节点向上到根的各容器上定义的 domainStates。
+   */
+  get resolvedInheritedDomainStates(): DomainStateVariable[] {
+    const screen = this.activeScreen;
+    if (!screen) return [];
+    const seen = new Set<string>();
+    const out: DomainStateVariable[] = [];
+    const push = (list: DomainStateVariable[] | undefined) => {
+      for (const d of list ?? []) {
+        if (!seen.has(d.id)) {
+          seen.add(d.id);
+          out.push(d);
+        }
+      }
+    };
+    push(screen.domainStates);
+    const nodeId = this.selectedNodeIds[0];
+    if (!nodeId) return out;
+    let cur: string | null = nodeId;
+    while (cur) {
+      const fp = findParentInScreens(this.screens, cur);
+      if (!fp) break;
+      const parent = findNodeInScreens(this.screens, fp.parent.id);
+      push(parent?.domainStates);
+      cur = fp.parent.id;
+    }
+    return out;
+  }
+
   /** Can undo */
   get canUndo(): boolean {
     return this.executor?.canUndo() ?? false;
@@ -189,6 +251,13 @@ export class EditorStore {
   initProject(project: DesignProject): void {
     // Project data from MobX stores may be observable proxies. Convert to plain JS first.
     const plain = toJS(project) as DesignProject;
+    for (const screen of plain.screens) {
+      const rs = screen.rootNode.styles as Record<string, unknown>;
+      delete rs.left;
+      delete rs.top;
+      delete rs.right;
+      delete rs.bottom;
+    }
     this.executor = new OperationExecutor(plain);
     this.projectState = this.executor.getProject();
     this.activeScreenId = plain.screens[0]?.id ?? null;
@@ -206,6 +275,14 @@ export class EditorStore {
     this.initGlobalStatesForScreen();
     this.previewMode = false;
     this.previewNavStackIds = [];
+    this.stateContext = {
+      interactionState: 'default',
+      componentStateEditing: null,
+      lockedDomain: null,
+    };
+    this.collapsedSections = {};
+    this.rightPanelScrollToSection = null;
+    this.leftPanelView = 'elements';
   }
 
   /** Execute an operation */
@@ -292,6 +369,11 @@ export class EditorStore {
     const prev = this.selectedNodeIds[0];
     if (prev !== next[0]) {
       this.previewInteractionState = null;
+      this.stateContext = {
+        ...this.stateContext,
+        interactionState: 'default',
+        componentStateEditing: null,
+      };
     }
     this.selectedNodeIds = next;
   }
@@ -423,16 +505,49 @@ export class EditorStore {
     this.rightPanelCollapsed = !this.rightPanelCollapsed;
   }
 
-  setActiveRightTab(tab: RightTabType): void {
-    this.activeRightTab = tab;
+  /** 交互态预览（与 stateContext 同步） */
+  setStateContextInteraction(state: string): void {
+    this.stateContext = { ...this.stateContext, interactionState: state };
+    this.previewInteractionState = state === 'default' ? null : state;
   }
 
-  /** 展开右侧面板并切换到指定 Tab（底部工具栏「代码」等入口） */
-  focusRightPanelTab(tab: RightTabType): void {
+  setStateContextComponentState(name: string | null): void {
+    this.stateContext = { ...this.stateContext, componentStateEditing: name };
+  }
+
+  lockDomainState(variableName: string): void {
+    this.stateContext = { ...this.stateContext, lockedDomain: { variableName } };
+  }
+
+  unlockDomainState(): void {
+    this.stateContext = { ...this.stateContext, lockedDomain: null };
+  }
+
+  toggleSectionCollapsed(sectionId: string): void {
+    this.collapsedSections = {
+      ...this.collapsedSections,
+      [sectionId]: !this.collapsedSections[sectionId],
+    };
+  }
+
+  /** 展开右侧面板并请求滚动到指定分区（代码 / 数据等入口） */
+  focusRightPanelSection(section: RightPanelSectionId): void {
     runInAction(() => {
       this.rightPanelCollapsed = false;
-      this.activeRightTab = tab;
+      this.rightPanelScrollToSection = section;
     });
+  }
+
+  clearRightPanelScrollTarget(): void {
+    this.rightPanelScrollToSection = null;
+  }
+
+  setLeftPanelView(view: LeftPanelView): void {
+    this.leftPanelView = view;
+  }
+
+  setShowCanvasContextBar(show: boolean): void {
+    this.showCanvasContextBar = show;
   }
 
   /** Multi-select: add or remove from selection */
@@ -594,19 +709,27 @@ export class EditorStore {
 
   setPreviewInteractionState(state: string | null): void {
     this.previewInteractionState = state;
+    this.stateContext = {
+      ...this.stateContext,
+      interactionState: state == null || state === 'normal' ? 'default' : state,
+    };
   }
 
   setViewportOverflow(overflow: boolean): void {
     this.viewportOverflow = overflow;
   }
 
-  /** Initialize global state values from the active screen's definitions */
+  /** 初始化领域态 + 环境态预览值（写入 currentGlobalStates 供画布解析） */
   initGlobalStatesForScreen(): void {
     const screen = this.activeScreen;
+    const project = this.project;
     if (!screen) return;
     const states: Record<string, string> = {};
     for (const gs of screen.domainStates ?? []) {
-      states[gs.name] = gs.defaultValue;
+      states[gs.name] = gs.currentPreviewValue ?? gs.defaultValue;
+    }
+    for (const ev of project?.environmentStates ?? []) {
+      states[ev.name] = ev.currentPreviewValue ?? ev.defaultValue;
     }
     this.currentGlobalStates = states;
   }
@@ -646,10 +769,18 @@ export class EditorStore {
     this.rightPanelWidth = 320;
     this.leftPanelCollapsed = false;
     this.rightPanelCollapsed = false;
-    this.activeRightTab = 'styles';
     this.componentLibraryOpenNonce = 0;
     this.currentGlobalStates = {};
     this.previewInteractionState = null;
+    this.stateContext = {
+      interactionState: 'default',
+      componentStateEditing: null,
+      lockedDomain: null,
+    };
+    this.collapsedSections = {};
+    this.rightPanelScrollToSection = null;
+    this.leftPanelView = 'elements';
+    this.showCanvasContextBar = true;
     this.viewportOverflow = false;
     this.clipboardSubtreeJson = null;
     this.styleClipboard = null;
@@ -704,10 +835,11 @@ export class EditorStore {
       syncManager.saveStatus.markSaved();
       return true;
     } catch (err: unknown) {
-      /** 400：服务端拒绝整批执行（多为操作在服务端不可重放）。勿再逐条 POST /operations，否则会产生 N+1 次相同失败。 */
+      /** 400：服务端拒绝整批执行（结构性错误，重试永远不会成功）。
+       *  丢弃这些操作而不是放回队列，避免无限重试循环。
+       *  仅保留 flush 期间新到达的操作（this.pendingOperations 中的）。 */
       if (err instanceof ApiError && err.status === 400) {
-        this.pendingOperations = [...pending, ...this.pendingOperations];
-        console.error('[editor] persist batch rejected:', getErrorMessage(err.body), err.body);
+        console.error('[editor] persist batch rejected (dropped %d ops):', pending.length, getErrorMessage(err.body));
         syncManager.saveStatus.markFailed();
         return false;
       }

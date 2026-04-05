@@ -247,7 +247,7 @@ export const BottomToolbar = observer(function BottomToolbar() {
             <button
               type="button"
               className="bottom-toolbar__btn"
-              onClick={() => editorStore.focusRightPanelTab('code')}
+              onClick={() => editorStore.focusRightPanelSection('code')}
             >
               <CodeOutlined />
             </button>

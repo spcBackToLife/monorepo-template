@@ -8,7 +8,12 @@ export interface PreviewContext {
   globalStates: Record<string, string>;
   onNavigate: (screenId: string, animation?: TransitionAnimation) => void;
   onSetState: (nodeId: string, stateName: string) => void;
+  /** @deprecated 兼容旧事件；与领域态共用同一运行时表 */
   onSetGlobalState: (name: string, value: string) => void;
+  onSetDomainState?: (variableName: string, value: string) => void;
+  onSetEnvironmentState?: (variableName: string, value: string) => void;
+  /** 预览内切换数据源生命周期阶段 */
+  onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   onToggleVisible: (nodeId: string) => void;
 }
 
@@ -27,6 +32,8 @@ interface LooseAction {
   url?: string;
   duration?: number;
   handler?: string;
+  dataSourceId?: string;
+  phase?: string;
 }
 
 interface LooseCondition {
@@ -166,7 +173,13 @@ export class EventExecutionEngine {
     const cond = event.condition;
     if (!cond || !cond.type) return true;
 
-    if (cond.type === 'globalState' && cond.variableName !== undefined && cond.value !== undefined) {
+    if (
+      (cond.type === 'globalState' ||
+        cond.type === 'domainState' ||
+        cond.type === 'environmentState') &&
+      cond.variableName !== undefined &&
+      cond.value !== undefined
+    ) {
       const actual = context.globalStates[cond.variableName] ?? '';
       return this.compare(actual, cond.value, cond.operator ?? 'equals');
     }
@@ -228,6 +241,32 @@ export class EventExecutionEngine {
       case 'setGlobalState':
         if (action.variableName && action.value !== undefined) {
           context.onSetGlobalState(action.variableName, action.value);
+        }
+        break;
+
+      case 'setDomainState':
+        if (action.variableName && action.value !== undefined) {
+          if (context.onSetDomainState) {
+            context.onSetDomainState(action.variableName, action.value);
+          } else {
+            context.onSetGlobalState(action.variableName, action.value);
+          }
+        }
+        break;
+
+      case 'setEnvironmentState':
+        if (action.variableName && action.value !== undefined) {
+          if (context.onSetEnvironmentState) {
+            context.onSetEnvironmentState(action.variableName, action.value);
+          } else {
+            context.onSetGlobalState(action.variableName, action.value);
+          }
+        }
+        break;
+
+      case 'switchDataSourcePhase':
+        if (action.dataSourceId && action.phase && context.onSwitchDataSourcePhase) {
+          context.onSwitchDataSourcePhase(action.dataSourceId, action.phase);
         }
         break;
 

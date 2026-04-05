@@ -4,6 +4,7 @@ import { DataContextProvider, useDataContext } from './DataContext';
 import type { DataContext } from './resolveExpression';
 import { resolveExpression } from './resolveExpression';
 import { SchemaVirtualizeContext, useSchemaVirtualize } from '../renderer/SchemaVirtualizeContext';
+import { ListInstanceContext, useListInstancePath } from '../renderer/ListInstanceContext';
 
 /** Maximum list items rendered; avoids unbounded DOM in editor. Preview uses same cap. */
 const MAX_LIST_ITEMS = 50;
@@ -46,6 +47,7 @@ export function ListRenderer({
 }: ListRendererProps) {
   const parentContext = useDataContext();
   const parentVirtualize = useSchemaVirtualize();
+  const parentListPath = useListInstancePath();
   const listExpression = node.props.__listData as string;
 
   // Resolve the expression to get the array
@@ -64,7 +66,9 @@ export function ListRenderer({
     // Render once with empty context as placeholder
     return (
       <SchemaVirtualizeContext.Provider value={listVirtualizeValue}>
-        {renderNode(node, assets, globalStates, onNodeClick, onNodeHover, onNodeDoubleClick)}
+        <ListInstanceContext.Provider value={parentListPath}>
+          {renderNode(node, assets, globalStates, onNodeClick, onNodeHover, onNodeDoubleClick)}
+        </ListInstanceContext.Provider>
       </SchemaVirtualizeContext.Provider>
     );
   }
@@ -78,15 +82,18 @@ export function ListRenderer({
           index,
           parent: parentContext,
         };
+        const rowPath = [...parentListPath, { listHostId: node.id, index }];
 
         return (
           <SchemaVirtualizeContext.Provider
             key={`${node.id}-list-${index}`}
             value={listVirtualizeValue}
           >
-            <DataContextProvider value={childContext}>
-              {renderNode(node, assets, globalStates, onNodeClick, onNodeHover, onNodeDoubleClick)}
-            </DataContextProvider>
+            <ListInstanceContext.Provider value={rowPath}>
+              <DataContextProvider value={childContext}>
+                {renderNode(node, assets, globalStates, onNodeClick, onNodeHover, onNodeDoubleClick)}
+              </DataContextProvider>
+            </ListInstanceContext.Provider>
           </SchemaVirtualizeContext.Provider>
         );
       })}
