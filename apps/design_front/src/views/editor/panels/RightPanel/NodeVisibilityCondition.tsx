@@ -33,7 +33,7 @@ export const NodeVisibilityCondition = observer(function NodeVisibilityCondition
 
   useEffect(() => {
     setMode(hiddenInAny ? 'conditional' : 'always');
-  }, [node.id, parentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [node.id, parentId, hiddenInAny]);
 
   // Nothing to show if no parent or no custom states
   if (!parent || customStates.length === 0) return null;

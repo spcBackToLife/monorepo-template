@@ -29,7 +29,7 @@ function readStoredCanvasView(projectId: string): { scale: number; panX: number;
   }
 }
 
-function savePendingOperations(projectId: string, ops: Array<{ operation: any; fingerprint: string }>): void {
+function savePendingOperations(projectId: string, ops: Array<{ operation: Operation; fingerprint: string }>): void {
   try {
     const data = JSON.stringify(ops);
     localStorage.setItem(PENDING_OPS_KEY + projectId, data);
@@ -39,11 +39,11 @@ function savePendingOperations(projectId: string, ops: Array<{ operation: any; f
   }
 }
 
-function loadPendingOperations(projectId: string): Array<{ operation: any; fingerprint: string }> {
+function loadPendingOperations(projectId: string): Array<{ operation: Operation; fingerprint: string }> {
   try {
     const raw = localStorage.getItem(PENDING_OPS_KEY + projectId);
     if (!raw) return [];
-    return JSON.parse(raw) as Array<{ operation: any; fingerprint: string }>;
+    return JSON.parse(raw) as Array<{ operation: Operation; fingerprint: string }>;
   } catch (err) {
     console.warn('[editor] failed to load pending operations from localStorage:', err);
     return [];
@@ -958,7 +958,7 @@ export class EditorStore {
         
         // Try to identify problematic operations from error response
         if (err.body && typeof err.body === 'object' && 'failedOperationIndex' in err.body) {
-          const failedIdx = (err.body as any).failedOperationIndex;
+          const failedIdx = (err.body as Record<string, unknown>).failedOperationIndex as number;
           const failedOp = operations[failedIdx];
           console.error('[editor] operation causing failure:', failedIdx, failedOp?.type, getErrorMessage(err.body));
           
@@ -1045,7 +1045,7 @@ export class EditorStore {
     console.log(`[editor] flushing ${operations.length} operations from retry queue`);
     
     try {
-      const resp = await apiJson<{ results: OperationResult[] }>(
+      await apiJson<{ results: OperationResult[] }>(
         `/projects/${this.project!.id}/operations/batch`,
         {
           method: 'POST',

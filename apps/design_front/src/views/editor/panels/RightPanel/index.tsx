@@ -43,7 +43,7 @@ export const RightPanel = observer(function RightPanel() {
 
   const hasChildren = node && (node.children?.length ?? 0) > 0;
   const hasEvents = node && (node.events ?? []).length > 0;
-  const hasDomainBindings = node && (node.domainStateBindings ?? []).length > 0;
+  
 
   // No selection → page-level info
   if (!node && editorStore.selectedNodeIds.length === 0) {

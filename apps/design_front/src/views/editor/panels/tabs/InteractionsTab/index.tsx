@@ -356,6 +356,14 @@ function ActionBadge({ action }: { action: { type: string; [key: string]: unknow
 
 // ===== Helpers =====
 
+type NodeWithChildren = {
+  id: string;
+  name?: string;
+  type: string;
+  states?: Array<{ name: string }>;
+  children?: NodeWithChildren[];
+};
+
 interface FlatNode {
   id: string;
   name: string;
@@ -364,7 +372,7 @@ interface FlatNode {
   states: Array<{ name: string }>;
 }
 
-function collectFlatNodes(node: { id: string; name?: string; type: string; states?: Array<{ name: string }>; children?: any[] }, depth = 0): FlatNode[] {
+function collectFlatNodes(node: NodeWithChildren, depth = 0): FlatNode[] {
   const result: FlatNode[] = [{
     id: node.id,
     name: node.name || node.type,

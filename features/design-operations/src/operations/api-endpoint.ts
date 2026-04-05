@@ -1,4 +1,4 @@
-import type { DesignProject, ApiEndpoint, MockScenario } from '@globallink/design-schema';
+import type { DesignProject } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
   AddApiEndpointOp,

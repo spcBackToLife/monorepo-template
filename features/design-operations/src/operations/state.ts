@@ -252,7 +252,7 @@ export function executeSetChildVisibility(
 
   // Save old childrenVisibility for undo
   const oldVisMap: Record<string, boolean | undefined> = {};
-  const oldHadDefaultState = hasDefaultState;
+  // const oldHadDefaultState = hasDefaultState;
   for (const state of parent.states) {
     oldVisMap[state.name] = state.childrenVisibility?.[params.childNodeId];
   }

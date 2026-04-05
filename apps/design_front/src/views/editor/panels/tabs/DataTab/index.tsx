@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { App as AntdApp, Empty, Button, Popconfirm } from 'antd';
+import { App as AntdApp, Empty, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { generateId } from '@globallink/design-schema';

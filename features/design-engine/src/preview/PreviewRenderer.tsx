@@ -176,7 +176,7 @@ function PreviewInteractiveShell({
       onToggleVisible: togglePreviewVisible,
       getNodeState: (nodeId: string) => runtimeNodeStates[nodeId] ?? 'default',
       onShowToast: addToast,
-      onApiRequest: (requestId, paramOverrides) => mock.execute(requestId),
+      onApiRequest: (requestId, _paramOverrides) => mock.execute(requestId),
     };
     engine.bind(el, screen.rootNode, ctx);
     return () => engine.unbind();

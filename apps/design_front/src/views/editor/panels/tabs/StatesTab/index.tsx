@@ -3,7 +3,7 @@ import { Empty, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
-import { generateId, type DomainStateVariable, type DomainStateValue } from '@globallink/design-schema';
+import { type DomainStateVariable, type DomainStateValue } from '@globallink/design-schema';
 import { StateCombinationPreview } from './StateCombinationPreview';
 
 // ===== Interaction state presets =====

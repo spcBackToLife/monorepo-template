@@ -187,7 +187,7 @@ function getNestedValuePreview(data: Record<string, unknown>, path: string): str
 function resolveDataPath(data: Record<string, unknown>, path: string): unknown {
   // Remove leading "data." prefix
   const stripped = path.startsWith('data.') ? path.slice(5) : path;
-  const parts = stripped.split(/[.\[\]]+/).filter(Boolean);
+  const parts = stripped.split(/[.[]]+/).filter(Boolean);
   let current: unknown = data;
   for (const part of parts) {
     if (current === null || current === undefined) return undefined;
