@@ -4,6 +4,7 @@ import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
 import { resolveNodeProps } from '../styles/resolveProps';
+import { mergeStateMaps } from '../styles/mergeStateMaps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContext';
 import type { DataContext } from '../data/resolveExpression';
@@ -27,6 +28,12 @@ export interface SchemaRendererProps {
   dataContext?: DataContext;
   /** 对选中节点临时预览 hover/active 等（与 setActiveState 独立） */
   interactionPreview?: InteractionPreview | null;
+  /**
+   * 全景/预览模式：childrenVisibility 隐藏的节点不渲染 GhostWrapper，而是真正不渲染。
+   * 编辑模式下为 false（显示 ghost 便于设计师看到节点存在）。
+   * 全景/预览模式下为 true（展示真实最终效果）。
+   */
+  hideGhostNodes?: boolean;
   /** Called when a node is clicked */
   onNodeClick?: (nodeId: string) => void;
   /** Called when mouse enters/leaves a node */
@@ -71,6 +78,7 @@ export function SchemaRenderer({
   globalStates = {},
   dataContext,
   interactionPreview = null,
+  hideGhostNodes = false,
   onNodeClick,
   onNodeHover,
   onNodeDoubleClick,
@@ -148,6 +156,7 @@ export function SchemaRenderer({
             assets={assets}
             globalStates={globalStates}
             interactionPreview={interactionPreview}
+            hideGhostNodes={hideGhostNodes}
             onNodeClick={onNodeClick}
             onNodeHover={onNodeHover}
             onNodeDoubleClick={onNodeDoubleClick}
@@ -218,12 +227,13 @@ function applyListItemStyleOverrides(
 
 interface NodeRendererProps {
   node: ComponentNode;
-  /** 当前 Screen 的根节点 id：用于默认铺满视口，避免根上设置的背景色被视口白底盖住 */
   rootNodeId?: string;
   assets: ComponentTemplate[];
   globalStates: Record<string, string>;
   interactionPreview?: InteractionPreview | null;
-  /** 标记当前节点是列表容器的直接子项（被重复渲染），需覆盖定位样式 */
+  hideGhostNodes?: boolean;
+  /** State override from parent's childrenStates mapping */
+  parentStateOverride?: string | null;
   isListItem?: boolean;
   onNodeClick?: (nodeId: string) => void;
   onNodeHover?: (nodeId: string | null) => void;
@@ -246,6 +256,8 @@ function NodeRenderer({
   assets,
   globalStates,
   interactionPreview = null,
+  hideGhostNodes = false,
+  parentStateOverride = null,
   isListItem = false,
   onNodeClick,
   onNodeHover,
@@ -269,7 +281,7 @@ function NodeRenderer({
   const nodeForProps: ComponentNode = hasExpression(node.props?.__listData)
     ? { ...node, props: { ...node.props, __listData: undefined } }
     : node;
-  const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates, interactionForNode);
+  const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates, interactionForNode, parentStateOverride);
 
   // Step 2.5: Resolve data binding expressions in props
   const resolvedProps = resolveDataExpressions(mergedProps, dataContext);
@@ -280,7 +292,7 @@ function NodeRenderer({
   }
 
   // Step 4: Resolve styles through 4-layer merge and convert to React.CSSProperties
-  const baseStyles = resolveNodeStyles(node, globalStates, interactionForNode, dataContext);
+  const baseStyles = resolveNodeStyles(node, globalStates, interactionForNode, dataContext, parentStateOverride);
   const isListContainer = hasExpression(node.props?.__listData);
   let reactStyles =
     rootNodeId && node.id === rootNodeId
@@ -355,6 +367,7 @@ function NodeRenderer({
             assets={assets}
             globalStates={globalStates}
             interactionPreview={interactionPreview}
+            hideGhostNodes={hideGhostNodes}
             isListItem
             onNodeClick={onNodeClick}
             onNodeHover={onNodeHover}
@@ -364,16 +377,59 @@ function NodeRenderer({
       />
     );
   } else {
-    // Determine which state to use for childrenVisibility:
-    // Priority 1: interactionForNode (from interactionPreview) — used in panorama/preview
-    // Priority 2: node.activeState — actual schema state
-    const stateNameForVisibility = interactionForNode ?? node.activeState;
-    const activeStateDef = node.states?.find((s) => s.name === stateNameForVisibility);
-    const cvMap = activeStateDef?.childrenVisibility;
+    // Determine childrenVisibility and childrenStates using the
+    // "default + delta" merge model: the default state provides the
+    // baseline; the active/preview state's map is merged on top so
+    // that only explicitly overridden keys differ from default.
+    const rawPreviewState = interactionPreview?.nodeId === node.id
+      ? interactionPreview.state
+      : null;
+
+    const defaultStateDef = node.states?.find((s) => s.name === 'default');
+
+    let cvMap: Record<string, boolean> | undefined;
+    let csMap: Record<string, string> | undefined;
+
+    if (rawPreviewState) {
+      if (rawPreviewState === 'default' || rawPreviewState === 'normal') {
+        cvMap = defaultStateDef?.childrenVisibility;
+        csMap = defaultStateDef?.childrenStates;
+      } else {
+        const previewStateDef = node.states?.find((s) => s.name === rawPreviewState);
+        cvMap = mergeStateMaps(
+          defaultStateDef?.childrenVisibility,
+          previewStateDef?.childrenVisibility,
+        );
+        csMap = mergeStateMaps(
+          defaultStateDef?.childrenStates,
+          previewStateDef?.childrenStates,
+        );
+      }
+    } else {
+      const effectiveActiveState = node.activeState ?? 'default';
+      if (effectiveActiveState === 'default') {
+        cvMap = defaultStateDef?.childrenVisibility;
+        csMap = defaultStateDef?.childrenStates;
+      } else {
+        const activeStateDef = node.states?.find((s) => s.name === effectiveActiveState);
+        cvMap = mergeStateMaps(
+          defaultStateDef?.childrenVisibility,
+          activeStateDef?.childrenVisibility,
+        );
+        csMap = mergeStateMaps(
+          defaultStateDef?.childrenStates,
+          activeStateDef?.childrenStates,
+        );
+      }
+    }
 
     children = node.children?.map((child) => {
       const hiddenInState = cvMap ? cvMap[child.id] === false : false;
+      const childStateOverride = csMap?.[child.id] ?? null;
       if (hiddenInState) {
+        if (hideGhostNodes) {
+          return null;
+        }
         return (
           <GhostWrapper key={child.id} node={child} visibleStates={getVisibleStateNames(node, child.id)}>
             <NodeRenderer
@@ -383,6 +439,8 @@ function NodeRenderer({
               assets={assets}
               globalStates={globalStates}
               interactionPreview={interactionPreview}
+              hideGhostNodes={hideGhostNodes}
+              parentStateOverride={childStateOverride}
               onNodeClick={onNodeClick}
               onNodeHover={onNodeHover}
               onNodeDoubleClick={onNodeDoubleClick}
@@ -398,6 +456,8 @@ function NodeRenderer({
           assets={assets}
           globalStates={globalStates}
           interactionPreview={interactionPreview}
+          hideGhostNodes={hideGhostNodes}
+          parentStateOverride={childStateOverride}
           onNodeClick={onNodeClick}
           onNodeHover={onNodeHover}
           onNodeDoubleClick={onNodeDoubleClick}

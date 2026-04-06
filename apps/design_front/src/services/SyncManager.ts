@@ -17,7 +17,7 @@ export type OperationEnvelopePayload = {
 
 export type IncomingHandler = (envelope: OperationEnvelopePayload) => void;
 
-const WS_BASE = import.meta.env.VITE_WS_BASE ?? 'http://127.0.0.1:3002';
+const WS_BASE = import.meta.env.VITE_WS_BASE ?? 'http://127.0.0.1:3001';
 
 /** Max reconnection attempts before falling back to HTTP polling */
 const MAX_WS_RETRIES = 5;
@@ -55,7 +55,7 @@ export class SyncManager {
   private apiBase: string;
 
   constructor(apiBase?: string) {
-    this.apiBase = apiBase ?? (import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:3002/api');
+    this.apiBase = apiBase ?? (import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:3001/api');
   }
 
   // ------- Public API -------

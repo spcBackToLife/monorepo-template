@@ -11,6 +11,7 @@ interface NumericInputProps {
   step?: number;
   placeholder?: string;
   disabled?: boolean;
+  isOverridden?: boolean;
 }
 
 /**
@@ -28,6 +29,7 @@ export function NumericInput({
   step = 1,
   placeholder,
   disabled = false,
+  isOverridden = false,
 }: NumericInputProps) {
   const [localValue, setLocalValue] = useState(value);
   const [selectedUnit, setSelectedUnit] = useState(() => {
@@ -105,7 +107,7 @@ export function NumericInput({
   );
 
   return (
-    <div className="flex items-center gap-1 text-xs">
+    <div className="flex items-center gap-1 text-xs relative">
       {label && (
         <span
           className="text-gray-500 w-8 text-right select-none cursor-ns-resize flex-shrink-0"
@@ -179,6 +181,12 @@ export function NumericInput({
           )}
         </div>
       </div>
+      {isOverridden && (
+        <div
+          className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"
+          title="此属性已在当前状态中被覆盖"
+        />
+      )}
     </div>
   );
 }

@@ -21,6 +21,8 @@ export function resolveNodeProps(
   node: ComponentNode,
   globalStates: Record<string, string>,
   interactionState?: string | null,
+  /** State override from parent's childrenStates mapping */
+  parentStateOverride?: string | null,
 ): ResolvedProps {
   // Layer 1: base props + visible
   // undefined 必须视为「可见」：旧数据/接口若省略 visible，不能当成隐藏，否则整棵子树不渲染且无 data-node-id，选区也无法绘制
@@ -58,9 +60,10 @@ export function resolveNodeProps(
   }
 
   // Layer 3: business state (activeState override)
-  const activeStateName = node.activeState;
-  if (activeStateName && activeStateName !== 'default') {
-    const activeState = node.states?.find((s) => s.name === activeStateName);
+  // Priority: interactionState > parentStateOverride > node.activeState
+  const effectiveStateName = parentStateOverride ?? node.activeState;
+  if (!interactionState && effectiveStateName && effectiveStateName !== 'default') {
+    const activeState = node.states?.find((s) => s.name === effectiveStateName);
     if (activeState?.props) {
       mergedProps = { ...mergedProps, ...activeState.props };
     }
@@ -74,6 +77,14 @@ export function resolveNodeProps(
     }
     if (interactionStateObj?.props) {
       mergedProps = { ...mergedProps, ...interactionStateObj.props };
+    }
+  }
+
+  // Layer 5: visibilityWhen — global-state equality gate
+  if (visible && node.visibilityWhen) {
+    const currentValue = globalStates[node.visibilityWhen.variableName];
+    if (currentValue !== undefined && currentValue !== node.visibilityWhen.equals) {
+      visible = false;
     }
   }
 

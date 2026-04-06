@@ -16,12 +16,19 @@ const MIXED = '—';
 function computeIntersectedStyles(
   screens: typeof editorStore.screens,
   nodeIds: string[],
+  parentStateOverride?: string | null,
 ): Record<string, string> {
   if (nodeIds.length <= 1) {
     const node = findNodeInScreens(screens, nodeIds[0]);
     if (!node) return {};
-    const activeState = node.activeState ?? 'default';
-    const stateEntry = activeState !== 'default' ? node.states.find((s) => s.name === activeState) : undefined;
+    
+    // Determine the effective state: parent override takes precedence
+    let effectiveState = node.activeState ?? 'default';
+    if (parentStateOverride && parentStateOverride !== 'default') {
+      effectiveState = parentStateOverride;
+    }
+    
+    const stateEntry = effectiveState !== 'default' ? node.states.find((s) => s.name === effectiveState) : undefined;
     return { ...(node.styles as Record<string, string>), ...((stateEntry?.styles ?? {}) as Record<string, string>) };
   }
 
@@ -42,11 +49,77 @@ function computeIntersectedStyles(
   }
   return result;
 }
+/**
+ * Helper function to determine which CSS properties have overrides
+ * in the current effective state
+ */
+function computeOverriddenProperties(
+  screens: typeof editorStore.screens,
+  nodeId: string,
+  effectiveState: string,
+): Set<string> {
+  const node = findNodeInScreens(screens, nodeId);
+  if (!node) return new Set();
+
+  const overridden = new Set<string>();
+
+  // If editing a non-default state, mark properties in that state's styles
+  if (effectiveState !== 'default') {
+    const stateEntry = node.states?.find((s) => s.name === effectiveState);
+    if (stateEntry?.styles) {
+      Object.keys(stateEntry.styles).forEach((key) => {
+        overridden.add(key);
+      });
+    }
+  }
+
+  return overridden;
+}
+
+/**
+ * Wrapper component to show blue dot indicator on overridden properties
+ * with optional reset-to-default button.
+ */
+function PropertyWithIndicator({
+  children,
+  isOverridden,
+  onReset,
+}: {
+  children: React.ReactNode;
+  isOverridden: boolean;
+  onReset?: () => void;
+}) {
+  return (
+    <div className="relative group/prop">
+      {children}
+      {isOverridden && (
+        <>
+          <div
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500 group-hover/prop:hidden"
+            title="此属性已在当前状态中被覆盖"
+          />
+          {onReset && (
+            <button
+              type="button"
+              className="absolute right-0.5 top-1/2 -translate-y-1/2 hidden group-hover/prop:flex items-center justify-center w-4 h-4 text-[10px] text-blue-500 hover:text-blue-700 rounded hover:bg-blue-50"
+              onClick={onReset}
+              title="重置为默认（删除此状态的覆盖）"
+            >
+              ↩
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 
 export const StylesTab = observer(function StylesTab() {
   const nodeId = editorStore.selectedNodeIds[0];
   const screens = editorStore.screens;
   const allSelectedIds = editorStore.selectedNodeIds;
+  const parentStateOverride = editorStore.selectedNodeParentStateOverride;
 
   if (!nodeId) {
     return <Empty description="请先选中一个元素" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
@@ -57,14 +130,17 @@ export const StylesTab = observer(function StylesTab() {
     return <Empty description="节点未找到" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
-  const activeState = node.activeState ?? 'default';
-  const styles = computeIntersectedStyles(screens, allSelectedIds);
+  const nodeActiveState = node.activeState ?? 'default';
+  // Effective state considers parent override
+  const effectiveState = parentStateOverride && parentStateOverride !== 'default' ? parentStateOverride : nodeActiveState;
+  const styles = computeIntersectedStyles(screens, allSelectedIds, parentStateOverride);
+  const overriddenProps = computeOverriddenProperties(screens, nodeId, effectiveState);
 
   const handleChange = (key: string, value: string) => {
     const v = value || undefined;
     const ids = allSelectedIds.length > 1 ? allSelectedIds : [nodeId];
     for (const nid of ids) {
-      if (activeState === 'default') {
+      if (effectiveState === 'default') {
         editorStore.execute({
           type: 'updateStyle',
           params: { nodeId: nid, styles: { [key]: v } },
@@ -72,11 +148,24 @@ export const StylesTab = observer(function StylesTab() {
       } else {
         editorStore.execute({
           type: 'updateState',
-          params: { nodeId: nid, stateName: activeState, styles: { [key]: v } },
+          params: { nodeId: nid, stateName: effectiveState, styles: { [key]: v } },
         });
       }
     }
   };
+
+  const handleResetProperty = (key: string) => {
+    if (effectiveState === 'default') return;
+    const ids = allSelectedIds.length > 1 ? allSelectedIds : [nodeId];
+    for (const nid of ids) {
+      editorStore.execute({
+        type: 'resetStateStyle',
+        params: { nodeId: nid, stateName: effectiveState, properties: [key] },
+      } as never);
+    }
+  };
+
+  const canReset = effectiveState !== 'default';
 
   return (
     <div className="flex flex-col gap-0.5 p-2 text-xs">
@@ -85,9 +174,17 @@ export const StylesTab = observer(function StylesTab() {
           已选中 <strong>{allSelectedIds.length}</strong> 个节点，显示交集样式（混合值显示 {MIXED}），修改将批量应用
         </div>
       )}
-      {activeState !== 'default' && (
+      {effectiveState !== 'default' && (
         <div className="mb-1 px-2 py-1.5 rounded bg-amber-50 text-amber-800 text-[10px] border border-amber-200">
-          正在编辑状态 <strong>{activeState}</strong> 的样式覆盖（与「状态」Tab 中激活态一致）
+          {parentStateOverride && parentStateOverride !== 'default' ? (
+            <>
+              正在编辑状态 <strong>{effectiveState}</strong> 的样式覆盖（从父容器状态继承）
+            </>
+          ) : (
+            <>
+              正在编辑状态 <strong>{effectiveState}</strong> 的样式覆盖（与「状态」Tab 中激活态一致）
+            </>
+          )}
         </div>
       )}
       {/* 1. Layout */}
@@ -95,42 +192,49 @@ export const StylesTab = observer(function StylesTab() {
         <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
           <SelectField
             label="Display"
+            isOverridden={overriddenProps.has('display')}
             value={styles.display ?? ''}
             options={['flex', 'block', 'inline-flex', 'inline', 'grid', 'none']}
             onChange={(v) => handleChange('display', v)}
           />
           <SelectField
             label="方向"
+            isOverridden={overriddenProps.has('flexDirection')}
             value={styles.flexDirection ?? ''}
             options={['row', 'column', 'row-reverse', 'column-reverse']}
             onChange={(v) => handleChange('flexDirection', v)}
           />
           <SelectField
             label="主轴"
+            isOverridden={overriddenProps.has('justifyContent')}
             value={styles.justifyContent ?? ''}
             options={['flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']}
             onChange={(v) => handleChange('justifyContent', v)}
           />
           <SelectField
             label="交叉轴"
+            isOverridden={overriddenProps.has('alignItems')}
             value={styles.alignItems ?? ''}
             options={['flex-start', 'center', 'flex-end', 'stretch', 'baseline']}
             onChange={(v) => handleChange('alignItems', v)}
           />
           <SelectField
             label="换行"
+            isOverridden={overriddenProps.has('flexWrap')}
             value={styles.flexWrap ?? ''}
             options={['nowrap', 'wrap', 'wrap-reverse']}
             onChange={(v) => handleChange('flexWrap', v)}
           />
           <NumericInput
             label="Gap"
+            isOverridden={overriddenProps.has('gap')}
             value={styles.gap ?? ''}
             onChange={(v) => handleChange('gap', v)}
             placeholder="0"
           />
           <SelectField
             label="Overflow"
+            isOverridden={overriddenProps.has('overflow')}
             value={styles.overflow ?? ''}
             options={['visible', 'hidden', 'scroll', 'auto']}
             onChange={(v) => handleChange('overflow', v)}
@@ -141,12 +245,18 @@ export const StylesTab = observer(function StylesTab() {
       {/* 2. Size */}
       <CollapsibleSection title="尺寸" defaultOpen>
         <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
-          <NumericInput label="W" value={styles.width ?? ''} onChange={(v) => handleChange('width', v)} placeholder="auto" />
-          <NumericInput label="H" value={styles.height ?? ''} onChange={(v) => handleChange('height', v)} placeholder="auto" />
-          <NumericInput label="minW" value={styles.minWidth ?? ''} onChange={(v) => handleChange('minWidth', v)} placeholder="0" />
-          <NumericInput label="maxW" value={styles.maxWidth ?? ''} onChange={(v) => handleChange('maxWidth', v)} placeholder="none" />
-          <NumericInput label="minH" value={styles.minHeight ?? ''} onChange={(v) => handleChange('minHeight', v)} placeholder="0" />
-          <NumericInput label="maxH" value={styles.maxHeight ?? ''} onChange={(v) => handleChange('maxHeight', v)} placeholder="none" />
+          <NumericInput label="W"
+            isOverridden={overriddenProps.has('width')} value={styles.width ?? ''} onChange={(v) => handleChange('width', v)} placeholder="auto" />
+          <NumericInput label="H"
+            isOverridden={overriddenProps.has('height')} value={styles.height ?? ''} onChange={(v) => handleChange('height', v)} placeholder="auto" />
+          <NumericInput label="minW"
+            isOverridden={overriddenProps.has('minWidth')} value={styles.minWidth ?? ''} onChange={(v) => handleChange('minWidth', v)} placeholder="0" />
+          <NumericInput label="maxW"
+            isOverridden={overriddenProps.has('maxWidth')} value={styles.maxWidth ?? ''} onChange={(v) => handleChange('maxWidth', v)} placeholder="none" />
+          <NumericInput label="minH"
+            isOverridden={overriddenProps.has('minHeight')} value={styles.minHeight ?? ''} onChange={(v) => handleChange('minHeight', v)} placeholder="0" />
+          <NumericInput label="maxH"
+            isOverridden={overriddenProps.has('maxHeight')} value={styles.maxHeight ?? ''} onChange={(v) => handleChange('maxHeight', v)} placeholder="none" />
         </div>
       </CollapsibleSection>
 
@@ -176,16 +286,22 @@ export const StylesTab = observer(function StylesTab() {
           <div className="col-span-2">
             <SelectField
               label="Position"
+            isOverridden={overriddenProps.has('position')}
               value={styles.position ?? ''}
               options={['static', 'relative', 'absolute', 'fixed', 'sticky']}
               onChange={(v) => handleChange('position', v)}
             />
           </div>
-          <NumericInput label="Top" value={styles.top ?? ''} onChange={(v) => handleChange('top', v)} placeholder="auto" />
-          <NumericInput label="Right" value={styles.right ?? ''} onChange={(v) => handleChange('right', v)} placeholder="auto" />
-          <NumericInput label="Bottom" value={styles.bottom ?? ''} onChange={(v) => handleChange('bottom', v)} placeholder="auto" />
-          <NumericInput label="Left" value={styles.left ?? ''} onChange={(v) => handleChange('left', v)} placeholder="auto" />
-          <NumericInput label="z-index" value={styles.zIndex ?? ''} onChange={(v) => handleChange('zIndex', v)} placeholder="auto" units={['']} />
+          <NumericInput label="Top"
+            isOverridden={overriddenProps.has('top')} value={styles.top ?? ''} onChange={(v) => handleChange('top', v)} placeholder="auto" />
+          <NumericInput label="Right"
+            isOverridden={overriddenProps.has('right')} value={styles.right ?? ''} onChange={(v) => handleChange('right', v)} placeholder="auto" />
+          <NumericInput label="Bottom"
+            isOverridden={overriddenProps.has('bottom')} value={styles.bottom ?? ''} onChange={(v) => handleChange('bottom', v)} placeholder="auto" />
+          <NumericInput label="Left"
+            isOverridden={overriddenProps.has('left')} value={styles.left ?? ''} onChange={(v) => handleChange('left', v)} placeholder="auto" />
+          <NumericInput label="z-index"
+            isOverridden={overriddenProps.has('zIndex')} value={styles.zIndex ?? ''} onChange={(v) => handleChange('zIndex', v)} placeholder="auto" units={['']} />
         </div>
       </CollapsibleSection>
 
@@ -198,9 +314,11 @@ export const StylesTab = observer(function StylesTab() {
       <CollapsibleSection title="边框">
         <div className="flex flex-col gap-1.5">
           <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
-            <NumericInput label="宽度" value={styles.borderWidth ?? ''} onChange={(v) => handleChange('borderWidth', v)} placeholder="0" />
+            <NumericInput label="宽度"
+            isOverridden={overriddenProps.has('borderWidth')} value={styles.borderWidth ?? ''} onChange={(v) => handleChange('borderWidth', v)} placeholder="0" />
             <SelectField
               label="样式"
+            isOverridden={overriddenProps.has('borderStyle')}
               value={styles.borderStyle ?? ''}
               options={['none', 'solid', 'dashed', 'dotted', 'double']}
               onChange={(v) => handleChange('borderStyle', v)}
@@ -209,11 +327,13 @@ export const StylesTab = observer(function StylesTab() {
           <ColorPicker
             label="颜色"
             value={styles.borderColor ?? ''}
+            isOverridden={overriddenProps.has("borderColor")}
             onChange={(v) => handleChange('borderColor', v)}
             showOpacity={false}
           />
           <NumericInput
             label="圆角"
+            isOverridden={overriddenProps.has('borderRadius')}
             value={styles.borderRadius ?? ''}
             onChange={(v) => handleChange('borderRadius', v)}
             placeholder="0"
@@ -224,23 +344,29 @@ export const StylesTab = observer(function StylesTab() {
       {/* 7. Typography */}
       <CollapsibleSection title="文字">
         <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
-          <NumericInput label="字号" value={styles.fontSize ?? ''} onChange={(v) => handleChange('fontSize', v)} placeholder="14" />
+          <NumericInput label="字号"
+            isOverridden={overriddenProps.has('fontSize')} value={styles.fontSize ?? ''} onChange={(v) => handleChange('fontSize', v)} placeholder="14" />
           <SelectField
             label="字重"
+            isOverridden={overriddenProps.has('fontWeight')}
             value={styles.fontWeight ?? ''}
             options={['100', '200', '300', '400', '500', '600', '700', '800', '900']}
             onChange={(v) => handleChange('fontWeight', v)}
           />
-          <NumericInput label="行高" value={styles.lineHeight ?? ''} onChange={(v) => handleChange('lineHeight', v)} placeholder="normal" />
-          <NumericInput label="字距" value={styles.letterSpacing ?? ''} onChange={(v) => handleChange('letterSpacing', v)} placeholder="normal" />
+          <NumericInput label="行高"
+            isOverridden={overriddenProps.has('lineHeight')} value={styles.lineHeight ?? ''} onChange={(v) => handleChange('lineHeight', v)} placeholder="normal" />
+          <NumericInput label="字距"
+            isOverridden={overriddenProps.has('letterSpacing')} value={styles.letterSpacing ?? ''} onChange={(v) => handleChange('letterSpacing', v)} placeholder="normal" />
           <SelectField
             label="对齐"
+            isOverridden={overriddenProps.has('textAlign')}
             value={styles.textAlign ?? ''}
             options={['left', 'center', 'right', 'justify']}
             onChange={(v) => handleChange('textAlign', v)}
           />
           <SelectField
             label="装饰"
+            isOverridden={overriddenProps.has('textDecoration')}
             value={styles.textDecoration ?? ''}
             options={['none', 'underline', 'line-through', 'overline']}
             onChange={(v) => handleChange('textDecoration', v)}
@@ -249,6 +375,7 @@ export const StylesTab = observer(function StylesTab() {
             <ColorPicker
               label="颜色"
               value={styles.color ?? ''}
+              isOverridden={overriddenProps.has("color")}
               onChange={(v) => handleChange('color', v)}
             />
           </div>
@@ -260,6 +387,7 @@ export const StylesTab = observer(function StylesTab() {
         <div className="flex flex-col gap-1.5">
           <NumericInput
             label="透明"
+            isOverridden={overriddenProps.has('opacity')}
             value={styles.opacity ?? ''}
             onChange={(v) => handleChange('opacity', v)}
             min={0}
@@ -272,6 +400,7 @@ export const StylesTab = observer(function StylesTab() {
           <FilterEditor value={styles.filter ?? ''} onChange={(v) => handleChange('filter', v)} />
           <SelectField
             label="Cursor"
+            isOverridden={overriddenProps.has('cursor')}
             value={styles.cursor ?? ''}
             options={['default', 'pointer', 'move', 'text', 'not-allowed', 'grab']}
             onChange={(v) => handleChange('cursor', v)}
@@ -707,11 +836,12 @@ interface SelectFieldProps {
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  isOverridden?: boolean;
 }
 
-function SelectField({ label, value, options, onChange }: SelectFieldProps) {
+function SelectField({ label, value, options, onChange, isOverridden }: SelectFieldProps) {
   return (
-    <div className="flex items-center gap-1 text-xs">
+    <div className="flex items-center gap-1 text-xs relative">
       <span className="text-gray-500 w-8 text-right flex-shrink-0">{label}</span>
       <select
         className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400 min-w-0"
@@ -725,6 +855,12 @@ function SelectField({ label, value, options, onChange }: SelectFieldProps) {
           </option>
         ))}
       </select>
+      {isOverridden && (
+        <div
+          className="absolute right-0.5 w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"
+          title="此属性已在当前状态中被覆盖"
+        />
+      )}
     </div>
   );
 }

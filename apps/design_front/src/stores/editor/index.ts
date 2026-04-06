@@ -303,6 +303,30 @@ export class EditorStore {
     return this.previewMode && this.previewNavStackIds.length > 1;
   }
 
+  /**
+   * Get the parent state override for the first selected node (if any).
+   * This determines which state a child node should render with based on parent's childrenStates mapping.
+   */
+  get selectedNodeParentStateOverride(): string | null {
+    const nodeId = this.selectedNodeIds[0];
+    if (!nodeId) return null;
+
+    const parent = findParentInScreens(this.screens, nodeId);
+    if (!parent?.parent) return null;
+
+    // Check if parent has custom states with childrenStates mapping
+    const parentNode = parent.parent;
+    const activeState = parentNode.activeState ?? 'default';
+    const stateDef = parentNode.states?.find((s) => s.name === activeState);
+
+    // Look up the override for this child in the parent's active state
+    if (stateDef?.childrenStates?.[nodeId]) {
+      return stateDef.childrenStates[nodeId];
+    }
+
+    return null;
+  }
+
   /** Initialize the editor with a project */
   initProject(project: DesignProject): void {
     // Clear any previously pending operations for other projects

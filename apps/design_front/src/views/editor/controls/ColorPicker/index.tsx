@@ -7,6 +7,7 @@ interface ColorPickerProps {
   onChange: (value: string) => void;
   label?: string;
   showOpacity?: boolean;
+  isOverridden?: boolean;
 }
 
 type ColorMode = 'hex' | 'rgb';
@@ -29,7 +30,7 @@ function rgbToHex(r: number, g: number, b: number): string {
  * Task 1.6.3 — ColorPicker
  * Color input with hex/rgb mode and opacity.
  */
-export const ColorPicker = observer(function ColorPicker({ value, onChange, label, showOpacity = true }: ColorPickerProps) {
+export const ColorPicker = observer(function ColorPicker({ value, onChange, label, showOpacity = true, isOverridden = false }: ColorPickerProps) {
   const [mode, setMode] = useState<ColorMode>('hex');
   const [localHex, setLocalHex] = useState(value || '#000000');
   const [opacity, setOpacity] = useState(100);
@@ -164,6 +165,12 @@ export const ColorPicker = observer(function ColorPicker({ value, onChange, labe
             />
             <span className="text-gray-400 text-[10px] pr-1">%</span>
           </div>
+        )}
+        {isOverridden && (
+          <div
+            className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"
+            title="此属性已在当前状态中被覆盖"
+          />
         )}
       </div>
 

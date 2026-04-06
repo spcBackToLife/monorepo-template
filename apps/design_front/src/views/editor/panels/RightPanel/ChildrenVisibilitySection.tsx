@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Checkbox } from 'antd';
 import type { ComponentNode } from '@globallink/design-schema';
@@ -8,27 +7,50 @@ type Props = {
   node: ComponentNode;
 };
 
+const BUILT_IN_STATES = new Set(['default', 'hover', 'pressed', 'focus', 'disabled']);
+
 /**
- * 直接子元素可见性（default 态写 node.visible；组件态 childrenVisibility）
+ * 子元素可见性编辑（状态感知版本）。
+ *
+ * 遵循「默认 + 差异」模型：
+ * - 显示当前编辑状态下各子元素的可见性
+ * - default 状态的修改作为基线
+ * - 非 default 状态的修改作为覆盖
+ * - 标注哪些子元素的可见性是继承默认、哪些是当前状态覆盖
  */
 export const ChildrenVisibilitySection = observer(function ChildrenVisibilitySection({ node }: Props) {
   const children = node.children ?? [];
   if (children.length === 0) return null;
 
-  const customStates = (node.states ?? []).filter(
-    (s) => !['default', 'hover', 'pressed', 'focus', 'disabled'].includes(s.name),
-  );
+  const ctx = editorStore.stateContext;
+  const currentEditState = ctx.componentStateEditing ?? 'default';
+  const isEditingDefault = currentEditState === 'default';
+
+  const defaultStateDef = (node.states ?? []).find((s) => s.name === 'default');
+  const activeStateDef = !isEditingDefault
+    ? (node.states ?? []).find((s) => s.name === currentEditState)
+    : undefined;
+
+  const customStates = (node.states ?? []).filter((s) => !BUILT_IN_STATES.has(s.name));
   const hasCustomStates = customStates.length > 0;
 
   return (
     <div className="space-y-1 px-2">
+      {!isEditingDefault && (
+        <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 mb-1">
+          当前状态: <strong>{currentEditState}</strong> — 修改将作为此状态的覆盖
+        </div>
+      )}
       {children.map((c) => (
         <ChildVisibilityRow
           key={c.id}
           child={c}
           parentNode={node}
+          currentEditState={currentEditState}
+          isEditingDefault={isEditingDefault}
+          defaultStateDef={defaultStateDef}
+          activeStateDef={activeStateDef}
           hasCustomStates={hasCustomStates}
-          customStates={customStates}
         />
       ))}
     </div>
@@ -38,100 +60,37 @@ export const ChildrenVisibilitySection = observer(function ChildrenVisibilitySec
 const ChildVisibilityRow = observer(function ChildVisibilityRow({
   child,
   parentNode,
+  currentEditState,
+  isEditingDefault,
+  defaultStateDef,
+  activeStateDef,
   hasCustomStates,
-  customStates,
 }: {
   child: ComponentNode;
   parentNode: ComponentNode;
+  currentEditState: string;
+  isEditingDefault: boolean;
+  defaultStateDef: import('@globallink/design-schema').ComponentState | undefined;
+  activeStateDef: import('@globallink/design-schema').ComponentState | undefined;
   hasCustomStates: boolean;
-  customStates: Array<{ name: string; childrenVisibility?: Record<string, boolean> }>;
 }) {
-  const [showCondition, setShowCondition] = useState(false);
+  // Compute effective visibility
+  const defaultVisible = defaultStateDef?.childrenVisibility?.[child.id] !== false;
+  const activeExplicit = activeStateDef?.childrenVisibility?.[child.id];
+  const isInherited = !isEditingDefault && activeExplicit === undefined;
+  const effectiveVisible = isEditingDefault
+    ? defaultVisible
+    : (isInherited ? defaultVisible : activeExplicit !== false);
 
-  const isHiddenInAnyState = customStates.some(
-    (s) => s.childrenVisibility?.[child.id] === false,
-  );
-  const visibleInStates = customStates
-    .filter((s) => s.childrenVisibility?.[child.id] !== false)
-    .map((s) => s.name);
-  const isConditional = isHiddenInAnyState && visibleInStates.length < customStates.length;
-
-  return (
-    <div className="border-b border-gray-50 pb-1 last:border-0">
-      <div className="flex items-center gap-2 text-xs text-gray-700">
-        <Checkbox
-          checked={child.visible !== false}
-          onChange={(e) =>
-            editorStore.execute({
-              type: 'setNodeVisible',
-              params: { nodeId: child.id, visible: e.target.checked },
-            })
-          }
-        />
-        <span className="truncate flex-1">{child.name || child.type}</span>
-        {isConditional && (
-          <span className="text-[9px] text-indigo-500 bg-indigo-50 px-1 rounded">
-            条件
-          </span>
-        )}
-        {hasCustomStates && (
-          <button
-            type="button"
-            className={`text-[10px] px-1 rounded transition-colors ${
-              showCondition ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            onClick={() => setShowCondition(!showCondition)}
-            title="显示条件"
-          >
-            👁
-          </button>
-        )}
-        <code className="text-[10px] text-gray-400">{child.id.slice(0, 6)}</code>
-      </div>
-
-      {showCondition && hasCustomStates && (
-        <VisibilityConditionEditor
-          childId={child.id}
-          parentNode={parentNode}
-          customStates={customStates}
-        />
-      )}
-    </div>
-  );
-});
-
-/**
- * 显示条件编辑器 — 设置子元素在哪些自定义状态下可见
- */
-const VisibilityConditionEditor = observer(function VisibilityConditionEditor({
-  childId,
-  parentNode,
-  customStates,
-}: {
-  childId: string;
-  parentNode: ComponentNode;
-  customStates: Array<{ name: string; childrenVisibility?: Record<string, boolean> }>;
-}) {
-  const visibleInAll = customStates.every(
-    (s) => s.childrenVisibility?.[childId] !== false,
-  );
-  const currentVisibleStates = customStates
-    .filter((s) => s.childrenVisibility?.[childId] !== false)
-    .map((s) => s.name);
-
-  const [mode, setMode] = useState<'always' | 'conditional'>(
-    visibleInAll ? 'always' : 'conditional',
-  );
-
-  const handleModeChange = (newMode: 'always' | 'conditional') => {
-    setMode(newMode);
-    if (newMode === 'always') {
+  const handleToggle = (checked: boolean) => {
+    if (isEditingDefault) {
       editorStore.execute({
         type: 'setChildVisibility',
         params: {
           parentNodeId: parentNode.id,
-          childNodeId: childId,
-          visibleInStates: customStates.map((s) => s.name),
+          childNodeId: child.id,
+          stateName: 'default',
+          visible: checked ? true : false,
         },
       } as never);
     } else {
@@ -139,72 +98,52 @@ const VisibilityConditionEditor = observer(function VisibilityConditionEditor({
         type: 'setChildVisibility',
         params: {
           parentNodeId: parentNode.id,
-          childNodeId: childId,
-          visibleInStates: [],
+          childNodeId: child.id,
+          stateName: currentEditState,
+          visible: checked,
         },
       } as never);
     }
   };
 
-  const handleToggleState = (stateName: string, checked: boolean) => {
-    const newVisible = checked
-      ? [...currentVisibleStates, stateName]
-      : currentVisibleStates.filter((n) => n !== stateName);
-
+  const handleResetToDefault = () => {
+    if (isEditingDefault) return;
     editorStore.execute({
       type: 'setChildVisibility',
       params: {
         parentNodeId: parentNode.id,
-        childNodeId: childId,
-        visibleInStates: newVisible,
+        childNodeId: child.id,
+        stateName: currentEditState,
+        visible: undefined,
       },
     } as never);
   };
 
   return (
-    <div className="ml-6 mt-1 mb-1 p-1.5 border border-indigo-100 rounded bg-indigo-50/30">
-      <div className="text-[10px] text-gray-500 font-medium mb-1">显示条件</div>
-      <div className="flex flex-col gap-1">
-        <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer">
-          <input
-            type="radio"
-            name={`vis-${childId}`}
-            checked={mode === 'always'}
-            onChange={() => handleModeChange('always')}
-            className="w-3 h-3"
-          />
-          始终显示
-        </label>
-        <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer">
-          <input
-            type="radio"
-            name={`vis-${childId}`}
-            checked={mode === 'conditional'}
-            onChange={() => handleModeChange('conditional')}
-            className="w-3 h-3"
-          />
-          仅在以下状态显示
-        </label>
-        {mode === 'conditional' && (
-          <div className="ml-4 flex flex-col gap-0.5">
-            {customStates.map((s) => (
-              <label
-                key={s.name}
-                className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer"
-              >
-                <Checkbox
-                  checked={s.childrenVisibility?.[childId] !== false}
-                  onChange={(e) => handleToggleState(s.name, e.target.checked)}
-                  style={{ transform: 'scale(0.8)' }}
-                />
-                <span className="text-indigo-600 bg-indigo-50 px-1 rounded">{s.name}</span>
-              </label>
-            ))}
-            {customStates.length === 0 && (
-              <span className="text-[10px] text-gray-400">暂无自定义状态</span>
-            )}
-          </div>
+    <div className="border-b border-gray-50 pb-1 last:border-0">
+      <div className="flex items-center gap-2 text-xs text-gray-700">
+        <Checkbox
+          checked={effectiveVisible}
+          onChange={(e) => handleToggle(e.target.checked)}
+        />
+        <span className="truncate flex-1">{child.name || child.type}</span>
+        {!isEditingDefault && !isInherited && (
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" title="此状态有显式覆盖" />
         )}
+        {!isEditingDefault && isInherited && (
+          <span className="text-[9px] text-gray-400">(继承)</span>
+        )}
+        {!isEditingDefault && !isInherited && (
+          <button
+            type="button"
+            className="text-[9px] text-blue-500 hover:text-blue-700 px-1"
+            onClick={handleResetToDefault}
+            title="重置为继承默认"
+          >
+            ↩
+          </button>
+        )}
+        <code className="text-[10px] text-gray-400">{child.id.slice(0, 6)}</code>
       </div>
     </div>
   );

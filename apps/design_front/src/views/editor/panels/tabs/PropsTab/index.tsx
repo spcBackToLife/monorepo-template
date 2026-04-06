@@ -26,6 +26,7 @@ export const PropsTab = observer(function PropsTab() {
   const nodeId = editorStore.selectedNodeIds[0];
   const screens = editorStore.screens;
   const [propSearch, setPropSearch] = useState('');
+  const parentStateOverride = editorStore.selectedNodeParentStateOverride;
 
   if (!nodeId) {
     return <Empty description="请先选中一个元素" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
@@ -37,20 +38,44 @@ export const PropsTab = observer(function PropsTab() {
   }
 
   const isComponentInstance = isComponentInstanceType(node.type);
-  const nodeProps = (node.props ?? {}) as Record<string, unknown>;
+  const nodeActiveState = node.activeState ?? 'default';
+  const effectiveState = parentStateOverride && parentStateOverride !== 'default'
+    ? parentStateOverride
+    : nodeActiveState;
+
+  // Merge base props + state delta for display
+  const baseProps = (node.props ?? {}) as Record<string, unknown>;
+  const stateProps = effectiveState !== 'default'
+    ? (node.states?.find((s) => s.name === effectiveState)?.props as Record<string, unknown> | undefined)
+    : undefined;
+  const mergedProps = { ...baseProps, ...(stateProps ?? {}) };
+
+  const overriddenPropKeys = useMemo(
+    () => new Set(Object.keys(stateProps ?? {})),
+    [stateProps],
+  );
 
   const handlePropChange = (key: string, value: unknown) => {
-    editorStore.execute({
-      type: 'updateComponentProps',
-      params: {
-        nodeId,
-        props: { [key]: value },
-      },
-    });
+    if (effectiveState === 'default') {
+      editorStore.execute({
+        type: 'updateComponentProps',
+        params: { nodeId, props: { [key]: value } },
+      });
+    } else {
+      editorStore.execute({
+        type: 'updateState',
+        params: { nodeId, stateName: effectiveState, styles: {}, props: { [key]: value } },
+      });
+    }
   };
 
   return (
     <div className="flex flex-col gap-0.5 p-2 text-xs">
+      {effectiveState !== 'default' && (
+        <div className="mb-1 px-2 py-1.5 rounded bg-amber-50 text-amber-800 text-[10px] border border-amber-200">
+          正在编辑状态 <strong>{effectiveState}</strong> 的属性覆盖
+        </div>
+      )}
       <input
         type="text"
         className="w-full h-7 px-2 mb-1 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 bg-white"
@@ -67,7 +92,7 @@ export const PropsTab = observer(function PropsTab() {
         <ElementPropsSection
           nodeType={node.type as PrimitiveNodeType}
           nodeId={nodeId}
-          props={nodeProps}
+          props={mergedProps}
           onChange={handlePropChange}
           searchFilter={propSearch}
         />
@@ -77,7 +102,7 @@ export const PropsTab = observer(function PropsTab() {
       {isComponentInstance && (
         <ComponentInstancePropsSection
           nodeId={nodeId}
-          props={nodeProps}
+          props={mergedProps}
           templateRef={node.templateRef}
           onChange={handlePropChange}
           searchFilter={propSearch}
@@ -96,7 +121,7 @@ export const PropsTab = observer(function PropsTab() {
       <ListBindingSection nodeId={nodeId} />
 
       {/* Custom attributes (data-*) */}
-      <CustomAttributesSection nodeId={nodeId} props={nodeProps} onChange={handlePropChange} />
+      <CustomAttributesSection nodeId={nodeId} props={mergedProps} onChange={handlePropChange} />
     </div>
   );
 });

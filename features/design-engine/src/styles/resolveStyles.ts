@@ -90,6 +90,8 @@ export function resolveNodeStyles(
   globalStates: Record<string, string>,
   interactionState?: string | null,
   dataContext?: DataContext,
+  /** State override from parent's childrenStates mapping */
+  parentStateOverride?: string | null,
 ): React.CSSProperties {
   // Layer 1: base styles
   let merged: CSSProperties = { ...node.styles };
@@ -115,9 +117,12 @@ export function resolveNodeStyles(
   }
 
   // Layer 3: business state (activeState override)
-  const activeStateName = node.activeState ?? 'default';
-  if (activeStateName !== 'default') {
-    const activeState = node.states?.find((s) => s.name === activeStateName);
+  // Priority: interactionState > parentStateOverride > node.activeState
+  // When interactionState is provided (panorama/preview), it REPLACES the business state.
+  // When parentStateOverride is provided, parent's childrenStates mapping takes precedence over node's own activeState.
+  const effectiveStateName = parentStateOverride ?? (node.activeState ?? 'default');
+  if (!interactionState && effectiveStateName !== 'default') {
+    const activeState = node.states?.find((s) => s.name === effectiveStateName);
     if (activeState?.styles) {
       merged = { ...merged, ...activeState.styles };
     }

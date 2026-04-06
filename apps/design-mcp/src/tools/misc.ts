@@ -10,7 +10,7 @@ export function registerMiscTools(server: McpServer): void {
     'add_state',
     {
       description:
-        '为组件添加一个视觉状态（如 hover、pressed、disabled 或自定义状态名），可设置该状态下的样式覆盖',
+        '为组件添加一个视觉状态（如 hover、pressed、disabled 或自定义状态名），可设置该状态下的样式覆盖和子元素状态映射',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         nodeId: z.string().describe('目标节点 ID'),
@@ -27,12 +27,13 @@ export function registerMiscTools(server: McpServer): void {
           })
           .optional()
           .describe('进入该状态时的 CSS transition 元数据（写入 ComponentState.transition）'),
+        childrenStates: z.record(z.string(), z.string()).optional().describe('该状态下子元素的状态映射（childId → stateName）'),
       },
     },
-    async ({ projectId, nodeId, stateName, styles, transition }) => {
+    async ({ projectId, nodeId, stateName, styles, transition, childrenStates }) => {
       const result = await api.executeOperation(projectId, {
         type: 'addState',
-        params: { nodeId, stateName, styles, ...(transition != null ? { transition } : {}) },
+        params: { nodeId, stateName, styles, ...(transition != null ? { transition } : {}), ...(childrenStates ? { childrenStates } : {}) },
       });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -239,19 +240,28 @@ export function registerMiscTools(server: McpServer): void {
   server.registerTool(
     'update_state',
     {
-      description: '更新节点上某个视觉状态的样式和属性',
+      description: '更新节点上某个视觉状态的样式、属性和子元素状态映射',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         nodeId: z.string().describe('节点 ID'),
         stateName: z.string().describe('状态名称'),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).describe('该状态下的 CSS 样式'),
         props: z.record(z.string(), z.unknown()).optional().describe('该状态下的属性覆盖'),
+        childrenStates: z.record(z.string(), z.string()).optional().describe('该状态下子元素的状态映射（childId → stateName）'),
+        transition: z
+          .object({
+            duration: z.number().optional().describe('进入该状态的过渡时长(ms)'),
+            easing: z.string().optional().describe('如 ease、ease-out'),
+            properties: z.array(z.string()).optional().describe('参与过渡的 CSS 属性，默认 all'),
+          })
+          .optional()
+          .describe('进入该状态时的 CSS transition 元数据'),
       },
     },
-    async ({ projectId, nodeId, stateName, styles, props }) => {
+    async ({ projectId, nodeId, stateName, styles, props, childrenStates, transition }) => {
       const result = await api.executeOperation(projectId, {
         type: 'updateState',
-        params: { nodeId, stateName, styles, props },
+        params: { nodeId, stateName, styles, props, ...(childrenStates ? { childrenStates } : {}), ...(transition != null ? { transition } : {}) },
       });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

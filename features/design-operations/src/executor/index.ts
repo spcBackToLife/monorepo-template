@@ -40,6 +40,7 @@ import {
   executeUpdateState,
   executeSetActiveState,
   executeSetChildVisibility,
+  executeResetStateStyle,
 } from '../operations/state';
 import {
   executeAddEvent,
@@ -323,6 +324,8 @@ export class OperationExecutor {
         return executeSetActiveState(project, op.params);
       case 'setChildVisibility':
         return executeSetChildVisibility(project, op.params);
+      case 'resetStateStyle':
+        return executeResetStateStyle(project, op.params);
 
       // Event operations
       case 'addEvent':
@@ -1242,7 +1245,8 @@ export class OperationExecutor {
     params: {
       parentNodeId: string;
       childNodeId: string;
-      oldVisMap: Record<string, boolean | undefined>;
+      stateName: string;
+      oldValue: boolean | undefined;
     },
   ) {
     const newProject = deepClone(project);
@@ -1260,9 +1264,9 @@ export class OperationExecutor {
       };
     }
 
-    for (const state of parent.states ?? []) {
-      const oldVal = params.oldVisMap[state.name];
-      if (oldVal === undefined) {
+    const state = (parent.states ?? []).find((s) => s.name === params.stateName);
+    if (state) {
+      if (params.oldValue === undefined) {
         if (state.childrenVisibility) {
           delete state.childrenVisibility[params.childNodeId];
           if (Object.keys(state.childrenVisibility).length === 0) {
@@ -1271,7 +1275,7 @@ export class OperationExecutor {
         }
       } else {
         if (!state.childrenVisibility) state.childrenVisibility = {};
-        state.childrenVisibility[params.childNodeId] = oldVal;
+        state.childrenVisibility[params.childNodeId] = params.oldValue;
       }
     }
 

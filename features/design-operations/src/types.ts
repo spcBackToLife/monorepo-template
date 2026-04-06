@@ -119,6 +119,7 @@ export interface AddStateOp {
     styles?: Partial<CSSProperties>;
     props?: Record<string, unknown>;
     transition?: ComponentState['transition'];
+    childrenStates?: Record<string, string>;
   };
 }
 
@@ -138,6 +139,8 @@ export interface UpdateStateOp {
     styles: Partial<CSSProperties>;
     props?: Record<string, unknown>;
     transition?: ComponentState['transition'];
+    /** Per-child state overrides: when parent is in this state, set child's effective state */
+    childrenStates?: Record<string, string>;
   };
 }
 
@@ -146,6 +149,16 @@ export interface SetActiveStateOp {
   params: {
     nodeId: string;
     stateName: string;
+  };
+}
+
+export interface ResetStateStyleOp {
+  type: 'resetStateStyle';
+  params: {
+    nodeId: string;
+    stateName: string;
+    /** CSS property keys to remove from the state's style overrides */
+    properties: string[];
   };
 }
 
@@ -761,8 +774,19 @@ export interface SetChildVisibilityOp {
     parentNodeId: string;
     /** Child node id */
     childNodeId: string;
-    /** State names in which the child IS visible (all other custom states → hidden) */
-    visibleInStates: string[];
+    /**
+     * Which state to write to. 'default' modifies the baseline.
+     * Non-default states store overrides that take precedence over default.
+     */
+    stateName: string;
+    /**
+     * true  → explicitly visible in this state
+     * false → explicitly hidden in this state
+     * undefined → remove override, revert to inheriting from default (only meaningful for non-default states)
+     *
+     * For 'default' state: true deletes the key (default is visible), false hides.
+     */
+    visible: boolean | undefined;
   };
 }
 
@@ -802,6 +826,7 @@ export type Operation =
   | RemoveStateOp
   | UpdateStateOp
   | SetActiveStateOp
+  | ResetStateStyleOp
   | AddEventOp
   | RemoveEventOp
   | UpdateEventOp

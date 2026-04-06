@@ -12,7 +12,6 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { ChildrenVisibilitySection } from './ChildrenVisibilitySection';
 import { NodeVisibilityCondition } from './NodeVisibilityCondition';
 import { DomainStateResponseSection } from './DomainStateResponseSection';
-import { ChildrenStateBindings } from './ChildrenStateBindings';
 
 /**
  * 右侧面板 v2 — 按产品设计重写。
@@ -86,7 +85,7 @@ export const RightPanel = observer(function RightPanel() {
           </span>
         </CollapsibleSection>
 
-        {/* 2.5 可见性 — 选中节点的可见性条件 */}
+        {/* 2.5 显示条件 — 选中节点自身的状态可见性 */}
         {node && (
           <NodeVisibilityCondition node={node} />
         )}
@@ -96,15 +95,6 @@ export const RightPanel = observer(function RightPanel() {
           <CollapsibleSection id="sec-children" title="子元素">
             <span data-right-section="children" className="block">
               <ChildrenVisibilitySection node={node} />
-            </span>
-          </CollapsibleSection>
-        )}
-
-        {/* 3.5 子元素状态绑定（仅容器） */}
-        {hasChildren && (
-          <CollapsibleSection id="sec-children-states" title="子元素状态绑定" defaultOpen={false}>
-            <span data-right-section="children-states" className="block">
-              <ChildrenStateBindings node={node} />
             </span>
           </CollapsibleSection>
         )}

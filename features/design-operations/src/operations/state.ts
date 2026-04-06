@@ -6,6 +6,7 @@ import type {
   UpdateStateOp,
   SetActiveStateOp,
   SetChildVisibilityOp,
+  ResetStateStyleOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -53,6 +54,7 @@ export function executeAddState(
     styles: params.styles ?? {},
     props: params.props,
     ...(params.transition != null ? { transition: params.transition } : {}),
+    ...(params.childrenStates != null ? { childrenStates: params.childrenStates } : {}),
   };
 
   node.states.push(newState);
@@ -157,6 +159,8 @@ export function executeUpdateState(
   const oldProps = state.props ? { ...state.props } : undefined;
   const oldTransition =
     state.transition === undefined ? undefined : { ...state.transition };
+  const oldChildrenStates =
+    state.childrenStates === undefined ? undefined : { ...state.childrenStates };
 
   state.styles = { ...state.styles, ...params.styles };
   if (params.props !== undefined) {
@@ -164,6 +168,9 @@ export function executeUpdateState(
   }
   if (params.transition !== undefined) {
     state.transition = { ...(state.transition ?? {}), ...params.transition };
+  }
+  if (params.childrenStates !== undefined) {
+    state.childrenStates = { ...(state.childrenStates ?? {}), ...params.childrenStates };
   }
 
   newProject.updatedAt = new Date().toISOString();
@@ -243,33 +250,95 @@ export function executeSetChildVisibility(
 
   if (!parent.states) parent.states = [];
 
-  // Ensure a 'default' state entry exists so childrenVisibility
-  // can be tracked for the implicit default state as well.
-  const hasDefaultState = parent.states.some((s) => s.name === 'default');
-  if (!hasDefaultState) {
-    parent.states.unshift({ name: 'default', styles: {} });
-  }
-
-  // Save old childrenVisibility for undo
-  const oldVisMap: Record<string, boolean | undefined> = {};
-  // const oldHadDefaultState = hasDefaultState;
-  for (const state of parent.states) {
-    oldVisMap[state.name] = state.childrenVisibility?.[params.childNodeId];
-  }
-
-  const visibleSet = new Set(params.visibleInStates);
-
-  for (const state of parent.states) {
-    if (!state.childrenVisibility) state.childrenVisibility = {};
-
-    if (visibleSet.has(state.name)) {
-      delete state.childrenVisibility[params.childNodeId];
+  // Ensure target state exists
+  let targetState = parent.states.find((s) => s.name === params.stateName);
+  if (!targetState) {
+    targetState = { name: params.stateName, styles: {} };
+    if (params.stateName === 'default') {
+      parent.states.unshift(targetState);
     } else {
-      state.childrenVisibility[params.childNodeId] = false;
+      parent.states.push(targetState);
     }
+  }
 
-    if (Object.keys(state.childrenVisibility).length === 0) {
-      delete state.childrenVisibility;
+  // Save old value for undo
+  const oldValue = targetState.childrenVisibility?.[params.childNodeId];
+
+  if (params.visible === undefined) {
+    // Remove override → revert to inheriting from default
+    if (targetState.childrenVisibility) {
+      delete targetState.childrenVisibility[params.childNodeId];
+      if (Object.keys(targetState.childrenVisibility).length === 0) {
+        delete targetState.childrenVisibility;
+      }
+    }
+  } else if (params.visible === true && params.stateName === 'default') {
+    // Default state: visible is the natural default, so just remove the key
+    if (targetState.childrenVisibility) {
+      delete targetState.childrenVisibility[params.childNodeId];
+      if (Object.keys(targetState.childrenVisibility).length === 0) {
+        delete targetState.childrenVisibility;
+      }
+    }
+  } else {
+    // Set explicit value (false for hiding, or true for non-default override)
+    if (!targetState.childrenVisibility) targetState.childrenVisibility = {};
+    targetState.childrenVisibility[params.childNodeId] = params.visible;
+  }
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Set child ${params.childNodeId} visibility=${params.visible} in state "${params.stateName}"`,
+      affectedNodeIds: [params.parentNodeId, params.childNodeId],
+    },
+    inverse: {
+      type: '_restoreChildVisibility',
+      params: {
+        parentNodeId: params.parentNodeId,
+        childNodeId: params.childNodeId,
+        stateName: params.stateName,
+        oldValue,
+      },
+    },
+  };
+}
+
+// ===== resetStateStyle =====
+
+export function executeResetStateStyle(
+  project: DesignProject,
+  params: ResetStateStyleOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  const node = findNodeInProject(newProject, params.nodeId);
+
+  if (!node) {
+    return {
+      project,
+      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const state = node.states?.find((s) => s.name === params.stateName);
+  if (!state) {
+    return {
+      project,
+      result: { success: false, description: `State "${params.stateName}" not found on ${params.nodeId}`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const oldValues: Record<string, unknown> = {};
+  const stylesRecord = state.styles as Record<string, unknown>;
+  for (const prop of params.properties) {
+    if (prop in stylesRecord) {
+      oldValues[prop] = stylesRecord[prop];
+      delete stylesRecord[prop];
     }
   }
 
@@ -279,15 +348,15 @@ export function executeSetChildVisibility(
     project: newProject,
     result: {
       success: true,
-      description: `Set child ${params.childNodeId} visibility in states [${params.visibleInStates.join(', ')}]`,
-      affectedNodeIds: [params.parentNodeId, params.childNodeId],
+      description: `Reset state style [${params.properties.join(', ')}] on "${params.stateName}" of ${params.nodeId}`,
+      affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: '_restoreChildVisibility',
+      type: 'updateState',
       params: {
-        parentNodeId: params.parentNodeId,
-        childNodeId: params.childNodeId,
-        oldVisMap,
+        nodeId: params.nodeId,
+        stateName: params.stateName,
+        styles: oldValues,
       },
     },
   };

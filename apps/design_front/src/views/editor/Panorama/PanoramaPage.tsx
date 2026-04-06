@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { Button, Slider, Segmented, Tooltip } from 'antd';
 import { ArrowLeftOutlined, AppstoreOutlined } from '@ant-design/icons';
-import type { Screen, ComponentTemplate } from '@globallink/design-schema';
+import type { Screen, ComponentNode, ComponentTemplate } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
 import { PanoramaCell } from './PanoramaCell';
 import { usePanoramaCombinations, type PanoramaCombination } from './useCombinations';
@@ -11,10 +11,71 @@ import { usePanoramaCombinations, type PanoramaCombination } from './useCombinat
 type FilterType = 'all' | 'interaction' | 'custom';
 
 /**
+ * 在组件树中找到指定 ID 的节点
+ */
+function findNodeById(node: ComponentNode, id: string): ComponentNode | undefined {
+  if (node.id === id) return node;
+  for (const child of node.children ?? []) {
+    const found = findNodeById(child, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * 为组件全景构造一个只包含目标组件的临时 Screen。
+ *
+ * 不能直接把目标组件当 rootNode——SchemaRenderer 会给 rootNode 强制
+ * height:100%/width:100%，导致按钮之类的小组件撑满整个视口。
+ *
+ * 解决方案：创建一个固定宽度的 wrapper div 作为 rootNode，目标组件作为唯一子节点。
+ * wrapper 宽度与视口宽度相同，这样 width:100% 的子组件能正常展示。
+ * wrapper 高度 auto 让内容自适应。
+ */
+export function buildIsolatedScreen(screen: Screen, targetNode: ComponentNode, viewportWidth = 375): Screen {
+  const wrapperId = `__panorama_wrapper_${targetNode.id}`;
+  const wrapperNode: ComponentNode = {
+    id: wrapperId,
+    type: 'div',
+    name: 'PanoramaWrapper',
+    styles: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      width: `${viewportWidth}px`,
+      height: 'auto',
+      minHeight: 'auto',
+      padding: '16px',
+      margin: '0',
+      background: 'transparent',
+    },
+    props: {},
+    children: [targetNode],
+    states: [],
+    activeState: 'default',
+    visible: true,
+    events: [],
+    locked: false,
+  };
+
+  return {
+    ...screen,
+    rootNode: wrapperNode,
+    backgroundColor: 'transparent',
+  };
+}
+
+/**
  * PanoramaPage — 全屏全景路由页 /editor/:id/panorama
  *
  * 独立路由页面，全屏展示组件/页面在所有状态下的渲染。
  * 通过 URL query param ?node=xxx 区分组件全景和页面全景。
+ *
+ * 关键设计决策（第一性原理）：
+ * - 全景 = 把所有场景的预览平铺在一起对比
+ * - 每个格子 = 在该状态/数据下的真实渲染效果
+ * - 组件全景只渲染目标组件（不是整个页面），因为目的是对比组件自身的状态差异
+ * - 使用 hideGhostNodes=true 让被 childrenVisibility 隐藏的节点真正不渲染
  */
 export const PanoramaPage = observer(function PanoramaPage() {
   const navigate = useNavigate();
@@ -25,14 +86,34 @@ export const PanoramaPage = observer(function PanoramaPage() {
   const project = editorStore.project;
   const viewport = editorStore.currentViewport;
 
-  const isComponentMode = !!targetNodeId;
+  // Determine if this is component mode or page mode
+  // If targetNodeId is the root node, treat as page mode (not component mode)
+  const isRootNode = targetNodeId && screen ? targetNodeId === screen.rootNode.id : false;
+  const isComponentMode = !!targetNodeId && !isRootNode;
+
   const [scale, setScale] = useState(isComponentMode ? 1.0 : 0.35);
   const [filter, setFilter] = useState<FilterType>('all');
+
+  // For component mode: find the target node and build an isolated screen
+  const targetNode = useMemo(() => {
+    if (!isComponentMode || !targetNodeId || !screen) return null;
+    return findNodeById(screen.rootNode, targetNodeId) ?? null;
+  }, [isComponentMode, targetNodeId, screen]);
+
+  const isolatedScreen = useMemo(() => {
+    if (!isComponentMode || !targetNode || !screen) return null;
+    return buildIsolatedScreen(screen, targetNode, viewport?.width ?? 375);
+  }, [isComponentMode, targetNode, screen, viewport?.width]);
+
+  // The effective node id for panorama combinations:
+  // - Component mode (non-root): use targetNodeId for state enumeration
+  // - Page/Root mode: null (enumerate domain states)
+  const effectiveTargetNodeId = isComponentMode ? targetNodeId : (isRootNode ? targetNodeId : null);
 
   // Compute combinations
   const combinations = usePanoramaCombinations(
     screen ?? undefined,
-    targetNodeId,
+    effectiveTargetNodeId,
     editorStore.currentGlobalStates,
   );
 
@@ -72,6 +153,12 @@ export const PanoramaPage = observer(function PanoramaPage() {
     );
   }
 
+  // For component panorama: use the original page background color so isolated components
+  // render in the same visual context as they do on the page (e.g., dark bg for dark-themed pages)
+  const pageBgColor = screen.rootNode.styles?.backgroundColor
+    || screen.backgroundColor
+    || '#ffffff';
+
   // Find target node name
   const targetNodeName = targetNodeId ? findNodeName(screen.rootNode, targetNodeId) : null;
   const title = isComponentMode
@@ -92,6 +179,10 @@ export const PanoramaPage = observer(function PanoramaPage() {
   // Render sections
   const interactionCells = filtered.filter((c) => c.category === 'interaction');
   const customCells = filtered.filter((c) => c.category === 'custom');
+
+  // For component mode: use isolated screen (only the target component)
+  // For page mode: use the full screen
+  const renderScreen = (isComponentMode && isolatedScreen) ? isolatedScreen : screen;
 
   return (
     <div
@@ -199,10 +290,12 @@ export const PanoramaPage = observer(function PanoramaPage() {
                 </div>
                 <CellGrid
                   cells={interactionCells}
-                  screen={screen}
+                  screen={renderScreen}
                   assets={project?.componentAssets ?? []}
                   viewport={viewport}
                   scale={scale}
+                  autoSize={isComponentMode}
+                  cellBackground={isComponentMode ? pageBgColor : undefined}
                   onCellClick={handleCellClick}
                 />
               </div>
@@ -223,10 +316,12 @@ export const PanoramaPage = observer(function PanoramaPage() {
                 </div>
                 <CellGrid
                   cells={customCells}
-                  screen={screen}
+                  screen={renderScreen}
                   assets={project?.componentAssets ?? []}
                   viewport={viewport}
                   scale={scale}
+                  autoSize={isComponentMode}
+                  cellBackground={isComponentMode ? pageBgColor : undefined}
                   onCellClick={handleCellClick}
                 />
               </div>
@@ -235,10 +330,11 @@ export const PanoramaPage = observer(function PanoramaPage() {
         ) : (
           <CellGrid
             cells={filtered}
-            screen={screen}
+            screen={renderScreen}
             assets={project?.componentAssets ?? []}
             viewport={viewport}
             scale={scale}
+            autoSize={isComponentMode}
             onCellClick={handleCellClick}
           />
         )}
@@ -275,6 +371,8 @@ function CellGrid({
   assets,
   viewport,
   scale,
+  autoSize,
+  cellBackground,
   onCellClick,
 }: {
   cells: PanoramaCombination[];
@@ -282,6 +380,9 @@ function CellGrid({
   assets: ComponentTemplate[];
   viewport: { width: number; height: number };
   scale: number;
+  autoSize?: boolean;
+  /** Background color for cells (component panorama should use original page bg) */
+  cellBackground?: string;
   onCellClick: (combo: PanoramaCombination) => void;
 }) {
   return (
@@ -305,6 +406,8 @@ function CellGrid({
           viewportWidth={viewport.width}
           viewportHeight={viewport.height}
           scale={scale}
+          autoSize={autoSize}
+          cellBackground={cellBackground}
           onClick={() => onCellClick(combo)}
         />
       ))}

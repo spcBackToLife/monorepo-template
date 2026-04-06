@@ -4,7 +4,7 @@
  */
 import { generateNodeId } from '@globallink/design-schema';
 
-const BASE_URL = process.env.DESIGN_API_URL ?? 'http://127.0.0.1:3002';
+const BASE_URL = process.env.DESIGN_API_URL ?? 'http://127.0.0.1:3001';
 const PROJECT_ID = process.env.PROJECT_ID ?? '461639cd-aba9-4059-9d91-b86ae57dc760';
 const PARENT_ID = process.env.PARENT_ID ?? 'nd_817ca3add8d94599ad25a';
 const LABEL = process.env.LABEL ?? '主按钮';

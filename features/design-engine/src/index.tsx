@@ -20,6 +20,7 @@ export { resolveStyles, resolveNodeStyles } from './styles/resolveStyles';
 export { resolveActiveState } from './styles/resolveState';
 export { resolveNodeProps } from './styles/resolveProps';
 export type { ResolvedProps } from './styles/resolveProps';
+export { mergeStateMaps } from './styles/mergeStateMaps';
 
 // ===== Asset Resolution =====
 export { resolveComponentInstance } from './assets/resolveInstance';
