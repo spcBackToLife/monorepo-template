@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Select, Button, Typography, Segmented, Dropdown, Switch, Tooltip, App as AntdApp } from 'antd';
-import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
 import { toJS } from 'mobx';
@@ -253,6 +253,19 @@ export const Toolbar = observer(function Toolbar() {
           className={editorStore.previewMode ? 'toolbar-btn-active' : ''}
           onClick={() => editorStore.setPreviewMode(!editorStore.previewMode)}
           title={editorStore.previewMode ? '退出预览' : '预览（同画布，可点按、悬停）'}
+        />
+        <Button
+          type="text"
+          icon={<AppstoreOutlined />}
+          onClick={() => {
+            // 有选中组件 → 组件全景；否则 → 页面全景
+            const target = editorStore.selectedNodeIds.length === 1
+              ? editorStore.selectedNodeIds[0]
+              : null;
+            const path = target ? `panorama?node=${target}` : 'panorama';
+            navigate(path);
+          }}
+          title="全景视图（查看所有状态）"
         />
         <Button
           type="text"

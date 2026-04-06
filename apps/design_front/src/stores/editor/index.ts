@@ -115,6 +115,8 @@ export class EditorStore {
   /** 双击工具栏按钮锁定后，创建元素不自动切回选择工具 */
   toolLocked = false;
   previewMode = false;
+  /** 状态预览缩略图条是否展开（持久化到 localStorage） */
+  statePreviewStripExpanded = typeof localStorage !== 'undefined' ? localStorage.getItem('statePreviewStripExpanded') !== 'false' : true;
   /** 预览模式下的页面导航栈（与 navigate 事件一致；返回键 pop）— W6-091 */
   previewNavStackIds: string[] = [];
   previewTransition: string = 'fade';
@@ -561,6 +563,12 @@ export class EditorStore {
     } else if (!preview) {
       this.previewNavStackIds = [];
     }
+  }
+
+  /** 切换状态预览缩略图条展开/折叠 */
+  toggleStatePreviewStrip(): void {
+    this.statePreviewStripExpanded = !this.statePreviewStripExpanded;
+    try { localStorage.setItem('statePreviewStripExpanded', String(this.statePreviewStripExpanded)); } catch { /* ignore localStorage errors */ }
   }
 
   /** 预览内页面跳转（事件 navigate / 程序化），压栈 */

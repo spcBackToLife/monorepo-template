@@ -1,16 +1,12 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { App as AntdApp, Spin, Segmented, Button } from 'antd';
+import { useState, useMemo, useCallback } from 'react';
+import { App as AntdApp, Segmented, Button } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { toJS } from 'mobx';
 import { generateReactCode } from '@globallink/design-engine';
 import type { Screen, ComponentNode } from '@globallink/design-schema';
 import { findNodeInScreens } from '@globallink/design-operations';
-import { projectStore } from '@/stores/project';
 import { editorStore } from '@/stores/editor';
-import { syncStore } from '@/stores/sync';
-import { useEditorLoader } from './hooks/useEditorLoader';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { Toolbar } from './Toolbar';
 import { Canvas } from './Canvas';
@@ -22,61 +18,17 @@ import { PreviewBar } from './PreviewBar';
 import { AiOperationToast } from './AiOperationToast';
 import './editor.css';
 
-export const EditorPage = observer(function EditorPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const loading = useEditorLoader(id);
-  const { message } = AntdApp.useApp();
+// Re-export EditorShell as EditorPage for backward compatibility with route config
+export { EditorShell as EditorPage } from './EditorShell';
+
+/**
+ * EditorWorkspace — 编辑器工作区（画布 + 面板 + 工具栏）。
+ *
+ * 作为 EditorShell 的子路由渲染（index route），
+ * Shell 负责项目加载和 store 生命周期管理。
+ */
+export const EditorWorkspace = observer(function EditorWorkspace() {
   useKeyboardShortcuts();
-
-  useEffect(() => {
-    const handlePageExit = () => {
-      editorStore.flushPersistOnPageExit();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        editorStore.flushPersistOnPageExit();
-      }
-    };
-
-    window.addEventListener('beforeunload', handlePageExit);
-    window.addEventListener('pagehide', handlePageExit);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('beforeunload', handlePageExit);
-      window.removeEventListener('pagehide', handlePageExit);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      editorStore.dispose();
-      syncStore.stopSync();
-      projectStore.clearCurrent();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!loading && !editorStore.project) {
-      message.error('项目加载失败');
-      navigate('/');
-    }
-  }, [loading, message, navigate]);
-
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (!editorStore.project) {
-    return null;
-  }
-
-  /**
-   * 预览已并入中间画布（Canvas 内切换 PreviewRenderer，见 02-toolbar / 01-canvas）；
-   * 此处仅保留顶栏下的预览条（全局状态、退出等）。
-   */
 
   return (
     <div className="editor-layout">

@@ -3,7 +3,9 @@ import { themeStore, ThemeMode } from '@/stores/theme';
 import { LoginPage } from '@/views/auth/login';
 import { RegisterPage } from '@/views/auth/register';
 import { HomePage } from '@/views/home';
-import { EditorPage } from '@/views/editor';
+import { EditorShell } from '@/views/editor/EditorShell';
+import { EditorWorkspace } from '@/views/editor';
+import { PanoramaPage } from '@/views/editor/Panorama/PanoramaPage';
 import { App as AntdApp, ConfigProvider, Spin, theme } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { useEffect } from 'react';
@@ -114,10 +116,13 @@ export const App = observer(function App() {
           path="/editor/:id"
           element={
             <PrivateRoute>
-              <EditorPage />
+              <EditorShell />
             </PrivateRoute>
           }
-        />
+        >
+          <Route index element={<EditorWorkspace />} />
+          <Route path="panorama" element={<PanoramaPage />} />
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ThemedLayout>

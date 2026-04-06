@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite';
 import { Popconfirm } from 'antd';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { editorStore } from '@/stores/editor';
+import { StatePreviewStrip } from './StatePreviewStrip';
 
 const INTERACTION_STATES = [
   { value: 'default', label: '默认' },
@@ -257,10 +258,31 @@ export const StateContextBar = observer(function StateContextBar() {
         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border-t border-blue-100">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
           <span className="text-[11px] text-blue-700">
-            正在编辑<strong>「{activeLabel}」</strong>状态
+            正在编辑<strong>{'\u300C'}{activeLabel}{'\u300D'}</strong>状态
           </span>
           <span className="text-[10px] text-blue-500">覆盖值以蓝色标记</span>
         </div>
+      )}
+
+      {/* State preview thumbnail strip */}
+      {node && nodeId && editorStore.activeScreen && (
+        <StatePreviewStrip
+          nodeId={nodeId}
+          screen={editorStore.activeScreen}
+          assets={editorStore.project?.componentAssets ?? []}
+          globalStates={editorStore.currentGlobalStates}
+          allNodeStates={allStates}
+          currentState={currentCustom ?? currentInteraction}
+          onStateSelect={(stateName) => {
+            const isInteraction = INTERACTION_STATES.some((s) => s.value === stateName);
+            if (isInteraction) {
+              if (currentCustom) handleCustomSelect(null);
+              handleInteractionClick(stateName);
+            } else {
+              handleCustomSelect(stateName);
+            }
+          }}
+        />
       )}
     </div>
   );
