@@ -364,7 +364,11 @@ function NodeRenderer({
       />
     );
   } else {
-    const activeStateDef = node.states?.find((s) => s.name === node.activeState);
+    // Determine which state to use for childrenVisibility:
+    // Priority 1: interactionForNode (from interactionPreview) — used in panorama/preview
+    // Priority 2: node.activeState — actual schema state
+    const stateNameForVisibility = interactionForNode ?? node.activeState;
+    const activeStateDef = node.states?.find((s) => s.name === stateNameForVisibility);
     const cvMap = activeStateDef?.childrenVisibility;
 
     children = node.children?.map((child) => {
@@ -486,4 +490,3 @@ function GhostWrapper({
     </div>
   );
 }
-
