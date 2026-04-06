@@ -50,7 +50,7 @@ export const PropsTab = observer(function PropsTab() {
     : undefined;
   const mergedProps = { ...baseProps, ...(stateProps ?? {}) };
 
-  const overriddenPropKeys = useMemo(
+  const _overriddenPropKeys = useMemo(
     () => new Set(Object.keys(stateProps ?? {})),
     [stateProps],
   );

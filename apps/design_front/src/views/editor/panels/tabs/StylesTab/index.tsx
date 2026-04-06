@@ -154,7 +154,7 @@ export const StylesTab = observer(function StylesTab() {
     }
   };
 
-  const handleResetProperty = (key: string) => {
+  const _handleResetProperty = (key: string) => {
     if (effectiveState === 'default') return;
     const ids = allSelectedIds.length > 1 ? allSelectedIds : [nodeId];
     for (const nid of ids) {
@@ -165,7 +165,7 @@ export const StylesTab = observer(function StylesTab() {
     }
   };
 
-  const canReset = effectiveState !== 'default';
+  const _canReset = effectiveState !== 'default';
 
   return (
     <div className="flex flex-col gap-0.5 p-2 text-xs">

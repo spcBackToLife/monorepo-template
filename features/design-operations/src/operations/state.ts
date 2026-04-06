@@ -190,6 +190,7 @@ export function executeUpdateState(
         styles: oldStyles,
         props: oldProps,
         transition: oldTransition,
+        childrenStates: oldChildrenStates,
       },
     },
   };

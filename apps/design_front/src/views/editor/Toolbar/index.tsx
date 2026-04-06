@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Select, Button, Typography, Segmented, Dropdown, Switch, Tooltip, App as AntdApp } from 'antd';
-import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
 import { toJS } from 'mobx';
@@ -267,6 +267,13 @@ export const Toolbar = observer(function Toolbar() {
           }}
           title="全景视图（查看所有状态）"
         />
+        <Tooltip title="产品全景 PRD + 交互链路图">
+          <Button
+            type="text"
+            icon={<FileTextOutlined />}
+            onClick={() => navigate('blueprint')}
+          />
+        </Tooltip>
         <Button
           type="text"
           icon={<UndoOutlined />}
