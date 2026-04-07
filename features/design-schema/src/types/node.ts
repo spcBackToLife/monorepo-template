@@ -4,6 +4,44 @@ import type { ComponentEvent } from './event';
 import type { DomainStateVariable, DomainStateBinding } from './domainState';
 import type { EnvironmentStateBinding } from './environment';
 
+// ===== Animation Config =====
+
+/** CSS keyframe definition */
+export interface CSSKeyframeSchema {
+  /** Offset from 0 to 1 (0% – 100%) */
+  offset: number;
+  /** CSS property key→value pairs */
+  styles: Record<string, string>;
+}
+
+/** CSS animation configuration */
+export interface CSSAnimationConfigSchema {
+  name: string;
+  duration: string;
+  timingFunction: string;
+  delay?: string;
+  iterationCount?: string | number;
+  direction?: 'normal' | 'reverse' | 'alternate' | 'alternate-reverse';
+  fillMode?: 'none' | 'forwards' | 'backwards' | 'both';
+  keyframes: CSSKeyframeSchema[];
+}
+
+/** External animation resource configuration (Lottie/PAG/Rive/GIF) */
+export interface ExternalAnimationConfigSchema {
+  type: 'lottie' | 'pag' | 'rive' | 'gif';
+  /** asset:// URL or remote URL */
+  src: string;
+  autoplay?: boolean;
+  loop?: boolean;
+  speed?: number;
+}
+
+/** Structured animation config stored on a ComponentNode */
+export interface AnimationConfig {
+  css?: CSSAnimationConfigSchema;
+  external?: ExternalAnimationConfigSchema;
+}
+
 // ===== Node Types =====
 
 /** Primitive HTML element types that map directly to DOM tags */
@@ -103,4 +141,11 @@ export interface ComponentNode {
   domainStateBindings?: DomainStateBinding[];
   /** Bindings that define how this node responds to environment variable values */
   environmentBindings?: EnvironmentStateBinding[];
+
+  // ----- Material / Animation -----
+
+  /** Structured animation config (CSS keyframes + external animation resources) */
+  animation?: AnimationConfig;
+  /** Associated material project ID (links to a material-editor project) */
+  materialProjectId?: string;
 }

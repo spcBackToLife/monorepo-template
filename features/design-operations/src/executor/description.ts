@@ -619,5 +619,18 @@ export function getAvailableOperations(): OperationDescription[] {
         { name: 'annotationId', type: 'string', required: true, description: 'ID of the annotation to remove' },
       ],
     },
+
+    // ===== Material Design Operations =====
+    {
+      type: 'applyMaterialDesign',
+      description: 'Apply material design changes (gradient, shadow, filter, animation, canvas export) to a node in a single atomic operation. Combines style updates, prop updates, and material project association.',
+      category: 'material',
+      params: [
+        { name: 'nodeId', type: 'string', required: true, description: 'ID of the target node to apply material design to' },
+        { name: 'styleUpdates', type: 'CSSProperties', required: false, description: 'CSS style updates to apply (e.g., background, boxShadow, filter, animation)' },
+        { name: 'propUpdates', type: 'object', required: false, description: 'Component prop updates to apply (e.g., src for image, data-animation for animation resources)' },
+        { name: 'materialProjectId', type: 'string', required: false, description: 'Material editor project ID to associate with this node' },
+      ],
+    },
   ];
 }

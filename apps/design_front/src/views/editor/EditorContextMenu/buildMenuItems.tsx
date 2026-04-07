@@ -85,7 +85,7 @@ export function handleEditorContextMenuClick(
   }
 
   if (key === 'asset') {
-    message.info('素材设计器将在资产 Phase 接入');
+    editorStore.openMaterialEditor(targetNodeId);
     return;
   }
 

@@ -9,6 +9,7 @@ import { OperationsModule } from './operations/operations.module';
 import { AssetsModule } from './assets/assets.module';
 import { DatasourcesModule } from './modules/datasources/datasources.module';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
+import { MaterialsModule } from './modules/materials/materials.module';
 import { SnapshotsModule } from './modules/snapshots/snapshots.module';
 
 @Module({
@@ -25,6 +26,7 @@ import { SnapshotsModule } from './modules/snapshots/snapshots.module';
     AssetsModule,
     DatasourcesModule,
     FileUploadModule,
+    MaterialsModule,
     SnapshotsModule,
   ],
   controllers: [AppController],

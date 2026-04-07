@@ -3,15 +3,17 @@ import { editorStore, type LeftPanelView } from '@/stores/editor';
 import { PageView } from './PageView';
 import { ElementView } from './ElementView';
 import { DataView } from './DataView';
+import { MaterialEditorPanel } from '../MaterialEditor';
 
 const VIEWS: { key: LeftPanelView; label: string; icon: string }[] = [
   { key: 'pages', label: '页面', icon: '📄' },
   { key: 'elements', label: '元素', icon: '🌳' },
   { key: 'data', label: '数据', icon: '📊' },
+  { key: 'materials', label: '素材', icon: '🎨' },
 ];
 
 /**
- * Phase 4：左侧产品导航器 — 页面 / 元素 / 数据 三视图
+ * Phase 4：左侧产品导航器 — 页面 / 元素 / 数据 / 素材 四视图
  */
 export const LeftPanel = observer(function LeftPanel() {
   const view = editorStore.leftPanelView;
@@ -42,6 +44,11 @@ export const LeftPanel = observer(function LeftPanel() {
         {view === 'pages' && <PageView />}
         {view === 'elements' && <ElementView />}
         {view === 'data' && <DataView />}
+        {view === 'materials' && (
+          <div className="h-full overflow-y-auto">
+            <MaterialEditorPanel />
+          </div>
+        )}
       </div>
     </div>
   );

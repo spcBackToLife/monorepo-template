@@ -17,6 +17,7 @@ import { registerComponentPropsTools } from './tools/component-props-tools.js';
 import { registerSnapshotTools } from './tools/snapshot-tools.js';
 import { registerBatchTool } from './tools/batch.js';
 import { registerComponentRecipeTools } from './tools/component-recipes.js';
+import { registerMaterialTools } from './tools/material-tools.js';
 
 // Resources
 import { registerResources } from './resources/index.js';
@@ -69,6 +70,7 @@ registerComponentPropsTools(server);
 registerSnapshotTools(server);
 registerBatchTool(server);
 registerComponentRecipeTools(server);
+registerMaterialTools(server);
 
 // ===== Register all resources =====
 

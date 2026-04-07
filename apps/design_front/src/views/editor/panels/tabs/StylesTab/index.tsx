@@ -679,6 +679,15 @@ function BackgroundEditor({
         options={['cover', 'contain', 'auto', '100% 100%']}
         onChange={(v) => onChange('backgroundSize', v)}
       />
+
+      {/* 高级编辑入口 → 打开素材编辑器浮层弹窗 */}
+      <button
+        type="button"
+        className="w-full h-6 mt-1 text-[10px] text-blue-500 border border-blue-200 rounded hover:bg-blue-50 hover:border-blue-400 transition-colors"
+        onClick={() => editorStore.openMaterialEditor(null, 'gradient')}
+      >
+        🎨 高级编辑（渐变 / 阴影 / 滤镜 / 素材库）
+      </button>
     </div>
   );
 }

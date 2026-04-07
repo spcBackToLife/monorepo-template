@@ -6,6 +6,10 @@ export type {
   LayoutConstraints,
   TemplateRef,
   ComponentNode,
+  CSSKeyframeSchema,
+  CSSAnimationConfigSchema,
+  ExternalAnimationConfigSchema,
+  AnimationConfig,
 } from './node';
 export type { ComponentState } from './state';
 export type {

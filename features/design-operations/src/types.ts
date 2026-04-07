@@ -810,6 +810,21 @@ export interface RemoveAnnotationOp {
   };
 }
 
+// -- Material Design Operations --
+
+export interface ApplyMaterialDesignOp {
+  type: 'applyMaterialDesign';
+  params: {
+    nodeId: string;
+    /** Batch style updates (gradient, shadow, filter, animation, etc.) */
+    styleUpdates?: Partial<CSSProperties>;
+    /** Batch prop updates (src, data-animation, etc.) */
+    propUpdates?: Record<string, unknown>;
+    /** Material project ID to associate with this node */
+    materialProjectId?: string;
+  };
+}
+
 // ===== Union Type =====
 
 /** All possible operations */
@@ -888,7 +903,8 @@ export type Operation =
   | SwitchMockScenarioOp
   | SetChildVisibilityOp
   | AddAnnotationOp
-  | RemoveAnnotationOp;
+  | RemoveAnnotationOp
+  | ApplyMaterialDesignOp;
 
 /** All operation type strings */
 export type OperationType = Operation['type'];

@@ -109,6 +109,9 @@ import {
   executeRemoveAnnotation,
 } from '../operations/annotation';
 import {
+  executeApplyMaterialDesign,
+} from '../operations/material';
+import {
   executeAddApiEndpoint,
   executeRemoveApiEndpoint,
   executeUpdateApiEndpoint,
@@ -455,6 +458,10 @@ export class OperationExecutor {
       case 'removeAnnotation':
         return executeRemoveAnnotation(project, op.params);
 
+      // Material design operations
+      case 'applyMaterialDesign':
+        return executeApplyMaterialDesign(project, op.params);
+
       default:
         return {
           project,
@@ -543,6 +550,9 @@ export class OperationExecutor {
 
       case '_restoreChildVisibility':
         return this.restoreChildVisibility(project, inv.params as any);
+
+      case '_restoreMaterialDesign':
+        return this.restoreMaterialDesign(project, inv.params as any);
 
       default:
         // Regular operations can be used as inverse too (e.g., moveElement, setActiveState)
@@ -1284,6 +1294,63 @@ export class OperationExecutor {
     return {
       project: newProject,
       result: { success: true, description: `Restored child visibility`, affectedNodeIds: [params.parentNodeId] },
+      inverse: { type: 'noop', params: {} } as InverseData,
+    };
+  }
+
+  private restoreMaterialDesign(
+    project: DesignProject,
+    params: {
+      nodeId: string;
+      restoreStyles: Record<string, any>;
+      removeStyleKeys: string[];
+      restoreProps: Record<string, any>;
+      removePropKeys: string[];
+      restoreMaterialProjectId: string | undefined;
+      hadMaterialProjectId: boolean;
+    },
+  ) {
+    const newProject = deepClone(project);
+    let node: ComponentNode | undefined;
+    for (const screen of newProject.screens) {
+      node = findNodeById(screen.rootNode, params.nodeId);
+      if (node) break;
+    }
+
+    if (!node) {
+      return {
+        project,
+        result: { success: false, description: 'Cannot restore material design: node not found', affectedNodeIds: [] },
+        inverse: { type: 'noop', params: {} } as InverseData,
+      };
+    }
+
+    // Restore styles: remove newly added keys, then restore old values
+    for (const key of params.removeStyleKeys) {
+      delete (node.styles as any)[key];
+    }
+    Object.assign(node.styles, params.restoreStyles);
+
+    // Restore props: remove newly added keys, then restore old values
+    for (const key of params.removePropKeys) {
+      delete node.props[key];
+    }
+    Object.assign(node.props, params.restoreProps);
+
+    // Restore materialProjectId
+    if (params.hadMaterialProjectId) {
+      if (params.restoreMaterialProjectId !== undefined) {
+        node.materialProjectId = params.restoreMaterialProjectId;
+      } else {
+        delete node.materialProjectId;
+      }
+    }
+
+    newProject.updatedAt = new Date().toISOString();
+
+    return {
+      project: newProject,
+      result: { success: true, description: `Restored material design on ${params.nodeId}`, affectedNodeIds: [params.nodeId] },
       inverse: { type: 'noop', params: {} } as InverseData,
     };
   }

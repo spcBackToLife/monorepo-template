@@ -81,7 +81,7 @@ export interface EditorStateContext {
   lockedDomain: { variableName: string } | null;
 }
 
-export type LeftPanelView = 'pages' | 'elements' | 'data';
+export type LeftPanelView = 'pages' | 'elements' | 'data' | 'materials';
 
 export class EditorStore {
   /** The operation executor holding immutable project state */
@@ -171,6 +171,11 @@ export class EditorStore {
 
   /** 代码分屏视图开关 */
   codeSplitView = false;
+
+  /** 素材编辑器弹窗状态（右键菜单"设计素材…" / 属性面板"高级编辑"打开） */
+  materialEditorOpen = false;
+  materialEditorTargetNodeId: string | null = null;
+  materialEditorInitTab: 'gradient' | 'shadow' | 'filter' | 'canvas' | 'animation' | 'assets' = 'gradient';
 
   /** 最近一次复制到内存的节点 JSON（与系统剪贴板同步写入，供粘贴） */
   clipboardSubtreeJson: string | null = null;
@@ -692,6 +697,22 @@ export class EditorStore {
     this.showCanvasContextBar = show;
   }
 
+  /** 打开素材编辑器弹窗（右键菜单 / 高级编辑按钮） */
+  openMaterialEditor(nodeId?: string | null, tab?: 'gradient' | 'shadow' | 'filter' | 'canvas' | 'animation' | 'assets'): void {
+    runInAction(() => {
+      this.materialEditorOpen = true;
+      this.materialEditorTargetNodeId = nodeId ?? this.selectedNodeIds[0] ?? null;
+      if (tab) this.materialEditorInitTab = tab;
+    });
+  }
+
+  /** 关闭素材编辑器弹窗 */
+  closeMaterialEditor(): void {
+    runInAction(() => {
+      this.materialEditorOpen = false;
+    });
+  }
+
   /** Multi-select: add or remove from selection */
   toggleSelect(nodeId: string): void {
     const idx = this.selectedNodeIds.indexOf(nodeId);
@@ -927,6 +948,9 @@ export class EditorStore {
     this.viewportOverflow = false;
     this.clipboardSubtreeJson = null;
     this.styleClipboard = null;
+    this.materialEditorOpen = false;
+    this.materialEditorTargetNodeId = null;
+    this.materialEditorInitTab = 'gradient';
   }
 
   private enqueuePersist(op: Operation, fingerprint: string, forceImmediate = false): void {

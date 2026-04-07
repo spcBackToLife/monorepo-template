@@ -16,7 +16,6 @@ import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import type { ToolType } from '@/stores/editor';
 import { ComponentLibrary } from '../panels/ComponentLibrary';
-import { MediaMaterialsPanel } from '../panels/MediaMaterialsPanel';
 import { SaveTemplateToolbarButton } from '../panels/SaveTemplate';
 import './bottomToolbar.css';
 
@@ -28,7 +27,6 @@ import './bottomToolbar.css';
 export const BottomToolbar = observer(function BottomToolbar() {
   const { message } = AntdApp.useApp();
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [materialsOpen, setMaterialsOpen] = useState(false);
   const activeTool = editorStore.activeTool;
   /** 供 observer 订阅；与快捷键 C 联动打开组件库 */
   const componentLibraryOpenNonce = editorStore.componentLibraryOpenNonce;
@@ -231,11 +229,11 @@ export const BottomToolbar = observer(function BottomToolbar() {
           </Dropdown>
           {toolBtn('annotation', <CommentOutlined />, '注释', 'A')}
           <SaveTemplateToolbarButton />
-          <Tooltip title="素材">
+          <Tooltip title="素材编辑器 (渐变/阴影/滤镜/画布/动画)">
             <button
               type="button"
               className="bottom-toolbar__btn"
-              onClick={() => setMaterialsOpen(true)}
+              onClick={() => editorStore.openMaterialEditor(null, 'gradient')}
             >
               <PictureOutlined />
             </button>
@@ -267,17 +265,6 @@ export const BottomToolbar = observer(function BottomToolbar() {
         <div className="bottom-toolbar-library-wrap">
           <ComponentLibrary embedded onClose={() => setLibraryOpen(false)} />
         </div>
-      </Modal>
-
-      <Modal
-        title="素材"
-        open={materialsOpen}
-        onCancel={() => setMaterialsOpen(false)}
-        footer={null}
-        width={420}
-        destroyOnClose
-      >
-        <MediaMaterialsPanel />
       </Modal>
     </>
   );

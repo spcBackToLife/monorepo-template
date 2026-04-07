@@ -70,6 +70,7 @@ export type {
   DuplicateTemplateOp,
   AddAnnotationOp,
   RemoveAnnotationOp,
+  ApplyMaterialDesignOp,
   SetNodeVisibilityWhenOp,
   SetNodeLockedOp,
   SetNodeVisibleOp,
@@ -209,6 +210,10 @@ export {
   executeAddAnnotation,
   executeRemoveAnnotation,
 } from './operations/annotation';
+
+export {
+  executeApplyMaterialDesign,
+} from './operations/material';
 
 export {
   executeAddApiEndpoint,

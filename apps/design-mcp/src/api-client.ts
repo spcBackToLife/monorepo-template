@@ -179,3 +179,33 @@ export async function getSnapshotJob(
 ): Promise<unknown> {
   return request(`/api/projects/${projectId}/snapshots/jobs/${jobId}`);
 }
+
+// ===== Materials =====
+
+export async function searchMaterials(
+  projectId: string,
+  options?: { category?: string; search?: string },
+): Promise<unknown> {
+  const params: Record<string, string> = {};
+  if (options?.category) params.category = options.category;
+  if (options?.search) params.search = options.search;
+  return request(`/api/projects/${projectId}/materials`, { params });
+}
+
+export async function getMaterial(
+  projectId: string,
+  materialId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}`);
+}
+
+export async function updateMaterialMeta(
+  projectId: string,
+  materialId: string,
+  data: { originalName?: string; category?: string; tags?: string[] },
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/meta`, {
+    method: 'PUT',
+    body: data,
+  });
+}

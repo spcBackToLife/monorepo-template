@@ -16,6 +16,7 @@ import { PanelResizer } from './panels/PanelResizer';
 import { BottomToolbar } from './BottomToolbar';
 import { PreviewBar } from './PreviewBar';
 import { AiOperationToast } from './AiOperationToast';
+import { MaterialEditorModal } from './panels/MaterialEditor/MaterialEditorModal';
 import './editor.css';
 
 // Re-export EditorShell as EditorPage for backward compatibility with route config
@@ -82,6 +83,7 @@ export const EditorWorkspace = observer(function EditorWorkspace() {
         )}
       </div>
       <AiOperationToast />
+      <MaterialEditorModal />
     </div>
   );
 });
