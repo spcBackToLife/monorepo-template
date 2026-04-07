@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { App as AntdApp } from 'antd';
 import { observer } from 'mobx-react-lite';
-import { resolveAssetUrl } from '@globallink/design-engine';
 import { editorStore } from '@/stores/editor';
 import { PropBindingsEditorModal } from './PropBindingsEditorModal';
 import { ComponentAssetDetailModal } from './ComponentAssetDetailModal';
@@ -230,7 +229,7 @@ export const ComponentLibrary = observer(function ComponentLibrary({
                     <div className="w-full h-16 bg-gray-50 rounded flex items-center justify-center">
                       {template.thumbnail ? (
                         <img
-                          src={resolveAssetUrl(template.thumbnail)}
+                          src={template.thumbnail}
                           alt={template.name}
                           className="w-full h-full object-contain rounded"
                         />

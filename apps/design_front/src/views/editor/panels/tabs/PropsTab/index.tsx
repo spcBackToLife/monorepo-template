@@ -10,7 +10,6 @@ import {
   type ComponentPropDefinition,
   type PrimitiveNodeType,
 } from '@globallink/design-schema';
-import { resolveAssetUrl } from '@globallink/design-engine';
 import { API_BASE } from '@/api/client';
 import { NumericInput } from '../../../controls/NumericInput';
 import { ColorPicker } from '../../../controls/ColorPicker';
@@ -660,7 +659,7 @@ function TextContentSection({ nodeType, nodeId, children }: TextContentSectionPr
 }
 
 
-/** 图片 URL + 本地上传 → asset://uploads/… */
+/** 图片 URL + 本地上传 → /uploads/… */
 function ImagePropField({
   label,
   value,
@@ -689,8 +688,7 @@ function ImagePropField({
     });
     const data = (await res.json()) as { url?: string };
     if (!res.ok || !data.url) return;
-    const path = data.url.replace(/^\//, '');
-    onChange(`asset://${path}`);
+    onChange(data.url);
   };
 
   return (
@@ -701,7 +699,7 @@ function ImagePropField({
           type="text"
           className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
           value={String(value ?? '')}
-          placeholder="URL 或 asset://uploads/…"
+          placeholder="URL 或 /uploads/…"
           onChange={(e) => onChange(e.target.value)}
         />
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => void upload(e)} />
@@ -718,7 +716,7 @@ function ImagePropField({
       {typeof value === 'string' && value.length > 0 && (
         <div className="ml-[68px]">
           <img
-            src={resolveAssetUrl(value)}
+            src={String(value ?? '')}
             alt={label}
             className="w-full max-h-24 object-contain rounded border border-gray-200 bg-gray-50"
             onError={(err) => {

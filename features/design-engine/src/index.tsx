@@ -24,6 +24,7 @@ export { mergeStateMaps } from './styles/mergeStateMaps';
 
 // ===== Asset Resolution =====
 export { resolveComponentInstance } from './assets/resolveInstance';
+/** @deprecated No longer needed — asset URLs are now stored as direct relative paths */
 export { resolveAssetUrl } from './assets/resolveAssetUrl';
 
 // ===== Data Binding & Context =====

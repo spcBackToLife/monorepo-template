@@ -1,7 +1,6 @@
 import type { CSSProperties, ComponentNode } from '@globallink/design-schema';
 import type { DataContext } from '../data/resolveExpression';
 import { hasExpression, resolveExpression } from '../data/resolveExpression';
-import { resolveAssetUrl } from '../assets/resolveAssetUrl';
 
 /**
  * Convert design-schema CSSProperties to React.CSSProperties.
@@ -24,13 +23,6 @@ const UNITLESS_PROPERTIES = new Set([
   'gridColumn',
   'gridRow',
 ]);
-
-/** Resolve `url(asset://uploads/...)` → `url(/uploads/...)` in CSS string values */
-function resolveAssetUrls(value: string): string {
-  return value.replace(/url\(\s*(["']?)(asset:\/\/[^"')]+)\1\s*\)/g, (_match, _quote, assetUri) => {
-    return `url(${resolveAssetUrl(assetUri)})`;
-  });
-}
 
 /**
  * Resolve design-schema CSSProperties into React-compatible CSSProperties.
@@ -74,8 +66,6 @@ export function resolveStyles(styles: CSSProperties, dataContext?: DataContext):
     if (typeof value === 'number' && !UNITLESS_PROPERTIES.has(key)) {
       // Convert numeric values to px strings for dimensional properties
       resolved[key] = value === 0 ? 0 : `${value}px`;
-    } else if (typeof value === 'string' && value.includes('asset://')) {
-      resolved[key] = resolveAssetUrls(value);
     } else {
       resolved[key] = value;
     }

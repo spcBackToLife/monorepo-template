@@ -567,8 +567,7 @@ function BgImageInput({ value, onChange }: { value: string; onChange: (v: string
     });
     const data = (await res.json()) as { url?: string };
     if (!res.ok || !data.url) return;
-    const path = data.url.replace(/^\//, '');
-    onChange(`url(asset://${path})`);
+    onChange(`url(${data.url})`);
   }, [projectId, onChange]);
 
   return (
@@ -577,7 +576,7 @@ function BgImageInput({ value, onChange }: { value: string; onChange: (v: string
         type="text"
         className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
         value={value}
-        placeholder="url(asset://uploads/…)"
+        placeholder="url(/uploads/…)"
         onChange={(e) => onChange(e.target.value)}
       />
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => void upload(e)} />

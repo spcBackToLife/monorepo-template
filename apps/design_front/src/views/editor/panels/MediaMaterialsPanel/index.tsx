@@ -8,7 +8,6 @@ import { API_BASE } from '@/api/client';
 
 interface AssetItem {
   url: string;
-  assetRef: string;
   name: string;
 }
 
@@ -32,7 +31,6 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
         if (cancelled) return;
         const list = (data.assets ?? []).map((a) => ({
           url: a.url,
-          assetRef: `asset://${a.url.replace(/^\//, '')}`,
           name: a.filename,
         }));
         setItems(list);
@@ -61,11 +59,9 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
         message.error('上传失败');
         return;
       }
-      const path = data.url.replace(/^\//, '');
-      const assetRef = `asset://${path}`;
       setItems((prev) => [
         ...prev,
-        { url: data.url!, assetRef, name: file.name },
+        { url: data.url!, name: file.name },
       ]);
       message.success('上传成功');
     },
@@ -103,7 +99,7 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
 
   /** 将素材应用到当前选中的元素 */
   const applyToSelected = useCallback(
-    (assetRef: string) => {
+    (imageUrl: string) => {
       const nodeId = editorStore.selectedNodeIds[0];
       if (!nodeId) {
         message.warning('请先选中一个元素');
@@ -114,12 +110,12 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
       if (node.type === 'img') {
         editorStore.execute({
           type: 'updateComponentProps',
-          params: { nodeId, props: { src: assetRef } },
+          params: { nodeId, props: { src: imageUrl } },
         });
       } else {
         editorStore.execute({
           type: 'updateStyle',
-          params: { nodeId, styles: { backgroundImage: `url(${assetRef})`, backgroundSize: 'cover' } },
+          params: { nodeId, styles: { backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover' } },
         });
       }
       message.success('已应用');
@@ -130,7 +126,7 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
   return (
     <div className="p-3 text-xs space-y-2">
       <p className="text-[10px] text-gray-500 leading-relaxed">
-        上传图片后，点击 <CheckOutlined style={{ fontSize: 10 }} /> 可直接应用到选中元素，或复制 <code className="text-purple-600">asset://</code> 引用手动粘贴。
+        上传图片后，点击 <CheckOutlined style={{ fontSize: 10 }} /> 可直接应用到选中元素。
       </p>
       <label className="block">
         <span className="sr-only">上传文件</span>
@@ -165,21 +161,21 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
               )}
               <div className="flex-1 min-w-0">
                 <div className="truncate text-gray-700">{it.name}</div>
-                <code className="text-[10px] text-gray-500 break-all block">{it.assetRef}</code>
+                <code className="text-[10px] text-gray-500 break-all block">{it.url}</code>
               </div>
               <Button
                 type="text"
                 size="small"
                 icon={<CopyOutlined />}
-                onClick={() => copy(it.assetRef)}
-                title="复制 asset:// 引用"
+                onClick={() => copy(it.url)}
+                title="复制路径"
               />
               {isImage(it.name) && (
                 <Button
                   type="text"
                   size="small"
                   icon={<CheckOutlined />}
-                  onClick={() => applyToSelected(it.assetRef)}
+                  onClick={() => applyToSelected(it.url)}
                   title="应用到选中元素"
                 />
               )}

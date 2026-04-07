@@ -576,7 +576,7 @@ export function getAvailableOperations(): OperationDescription[] {
           type: 'object',
           required: true,
           description:
-            'Partial update: name, category, tags, description, thumbnail (URL/base64/asset://), propBindings (array of { propKey, targetNodePath, targetField, targetKey })',
+            'Partial update: name, category, tags, description, thumbnail (URL or /uploads/… path), propBindings (array of { propKey, targetNodePath, targetField, targetKey })',
         },
       ],
     },

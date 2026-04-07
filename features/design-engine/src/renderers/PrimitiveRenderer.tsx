@@ -1,6 +1,5 @@
 import React from 'react';
 import type { ComponentNode } from '@globallink/design-schema';
-import { resolveAssetUrl } from '../assets/resolveAssetUrl';
 import { encodeNodeInstanceKey, useListInstancePath } from '../renderer/ListInstanceContext';
 
 export interface PrimitiveRendererProps {
@@ -47,7 +46,7 @@ export function PrimitiveRenderer({
       return (
         <img
           {...commonProps}
-          src={resolveAssetUrl(resolvedProps.src)}
+          src={String(resolvedProps.src ?? '')}
           alt={resolvedProps.alt as string ?? ''}
           loading={(resolvedProps.loading as 'lazy' | 'eager') ?? 'lazy'}
         />

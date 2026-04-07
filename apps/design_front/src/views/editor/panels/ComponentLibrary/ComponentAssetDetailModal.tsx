@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { App as AntdApp, Modal, Button, Input } from 'antd';
 import { observer } from 'mobx-react-lite';
-import { resolveAssetUrl } from '@globallink/design-engine';
 import { editorStore } from '@/stores/editor';
 import { API_BASE } from '@/api/client';
 
@@ -25,7 +24,7 @@ function parseTags(s: string): string[] {
 }
 
 /**
- * W6-062：组件资产详情（元数据 + 版本时间）与缩略图（URL / 上传到 asset://）。
+ * W6-062：组件资产详情（元数据 + 版本时间）与缩略图上传。
  */
 export const ComponentAssetDetailModal = observer(function ComponentAssetDetailModal({
   templateId,
@@ -84,9 +83,8 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
       message.error('上传失败');
       return;
     }
-    const path = data.url.replace(/^\//, '');
-    setThumbnail(`asset://${path}`);
-    message.success('已设为缩略图引用');
+    setThumbnail(data.url);
+    message.success('已设为缩略图');
   };
 
   const buildPatch = (): Record<string, unknown> | null => {
@@ -223,7 +221,7 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
               <div className="w-20 h-20 rounded border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
                 {thumbnail.trim() ? (
                   <img
-                    src={resolveAssetUrl(thumbnail)}
+                    src={thumbnail}
                     alt=""
                     className="max-w-full max-h-full object-contain"
                   />
@@ -235,7 +233,7 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
                 <Input
                   size="small"
                   className="font-mono text-[11px]"
-                  placeholder="https… 或 asset://uploads/…"
+                  placeholder="https… 或 /uploads/…"
                   value={thumbnail}
                   onChange={(e) => setThumbnail(e.target.value)}
                 />
@@ -264,7 +262,7 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
                   }}
                 />
                 <p className="text-[10px] text-gray-400 leading-relaxed m-0">
-                  上传文件会写入项目 uploads，并自动填入 <code className="font-mono">asset://</code> 引用。
+                  上传文件会写入项目 uploads 目录，自动填入路径。
                 </p>
               </div>
             </div>
