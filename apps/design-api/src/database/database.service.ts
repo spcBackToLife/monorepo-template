@@ -111,6 +111,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+
+    // ===== 素材编辑器工程文件表 =====
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS material_design_projects (
+        id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        project_id            UUID NOT NULL REFERENCES design_projects(id) ON DELETE CASCADE,
+        target_node_id        VARCHAR(255),
+        name                  VARCHAR(255) NOT NULL,
+        canvas_width          INTEGER NOT NULL,
+        canvas_height         INTEGER NOT NULL,
+        canvas_json           JSONB NOT NULL,
+        background_color      VARCHAR(50) NOT NULL DEFAULT '#ffffff',
+        reference_frame_width  INTEGER,
+        reference_frame_height INTEGER,
+        file_version          INTEGER NOT NULL DEFAULT 3,
+        thumbnail_url         TEXT,
+        exported_material_id  VARCHAR(255),
+        tags                  TEXT[],
+        version               INTEGER NOT NULL DEFAULT 1,
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mdp_project
+        ON material_design_projects(project_id);
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mdp_target_node
+        ON material_design_projects(project_id, target_node_id);
+    `);
   }
 
   getPool(): Pool {

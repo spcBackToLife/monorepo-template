@@ -28,7 +28,8 @@
     "bezier-easing": "^3.0.0",
     "chroma-js": "^3.2.0",
     "fabric": "^6.6.1",
-    "lottie-web": "^5.13.0"
+    "lottie-web": "^5.13.0",
+    "paper": "^0.12.18"
   },
   "devDependencies": {
     "@types/chroma-js": "^3.1.2",

@@ -161,6 +161,62 @@ export type {
   BooleanOpType,
 } from './canvas/BooleanOps';
 
+// ===== Phase F: 参考框系统 =====
+export {
+  ReferenceFrame,
+  computeWorkspaceSize,
+} from './canvas/ReferenceFrame';
+export type {
+  ReferenceFrameConfig,
+} from './canvas/ReferenceFrame';
+
+// ===== Phase G: 智能对齐线 =====
+export {
+  SmartGuideEngine,
+} from './canvas/SmartGuides';
+export type {
+  SmartGuide,
+  SmartGuideConfig,
+} from './canvas/SmartGuides';
+
+// ===== Phase H: 对齐与分布 =====
+export {
+  alignObjects,
+  distributeObjects,
+  ALIGN_LABELS,
+  DISTRIBUTE_LABELS,
+} from './canvas/AlignDistribute';
+export type {
+  AlignType,
+  DistributeType,
+  AlignRelativeTo,
+} from './canvas/AlignDistribute';
+
+// ===== Phase I: 矢量布尔运算 =====
+export {
+  performVectorBooleanOp,
+  isPaperJsAvailable,
+  VECTOR_BOOLEAN_OP_LABELS,
+} from './canvas/VectorBooleanOps';
+export type {
+  VectorBooleanOpType,
+} from './canvas/VectorBooleanOps';
+
+// ===== Phase J: 路径高级操作 =====
+export {
+  outlineStroke,
+  offsetPath,
+  simplifyPath,
+  smoothPath,
+  reversePath,
+  breakApart,
+  joinPaths,
+  PATH_OPERATION_LABELS,
+} from './canvas/PathOperations';
+export type {
+  PathOperationType,
+} from './canvas/PathOperations';
+
 // ===== Phase 5: CSS 动画编辑器 =====
 export {
   CSSAnimationEditorManager,

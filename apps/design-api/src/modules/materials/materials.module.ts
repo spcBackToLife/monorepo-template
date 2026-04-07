@@ -23,6 +23,7 @@ import { LocalStorageProvider } from './storage/local-storage.provider';
       useClass: LocalStorageProvider,
     },
   ],
+  // DatabaseService 由 @Global() DatabaseModule 自动注入
   exports: [MaterialsService, MaterialProjectsService, 'STORAGE_PROVIDER'],
 })
 export class MaterialsModule {}

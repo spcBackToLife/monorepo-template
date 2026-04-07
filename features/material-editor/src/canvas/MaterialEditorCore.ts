@@ -46,6 +46,10 @@ import { HistoryManager } from './HistoryManager';
 import type { CanvasFilterConfig } from './CanvasFilters';
 import { applyNoise, applyPixelate, applySharpen, applyEmboss } from './CanvasFilters';
 import { performBooleanOp, type BooleanOpType } from './BooleanOps';
+import { ReferenceFrame, computeWorkspaceSize, type ReferenceFrameConfig } from './ReferenceFrame';
+import { SmartGuideEngine, type SmartGuideConfig } from './SmartGuides';
+import { alignObjects, distributeObjects, type AlignType, type DistributeType, type AlignRelativeTo } from './AlignDistribute';
+import { performVectorBooleanOp, type VectorBooleanOpType } from './VectorBooleanOps';
 
 /**
  * 钢笔工具锚点 — 支持贝塞尔曲线控制手柄
@@ -98,7 +102,7 @@ export const BLEND_MODE_LABELS: Record<BlendMode, string> = {
 
 /** 工程文件格式 */
 export interface CanvasProjectFile {
-  version: 2;
+  version: 2 | 3;
   name: string;
   canvasWidth: number;
   canvasHeight: number;
@@ -106,6 +110,9 @@ export interface CanvasProjectFile {
   backgroundColor: string;
   createdAt: string;
   updatedAt: string;
+  /** v3: 参考框尺寸（参考框模式下保存元素实际尺寸） */
+  referenceFrameWidth?: number;
+  referenceFrameHeight?: number;
 }
 
 /** 星形顶点生成 */
@@ -153,12 +160,24 @@ function createRegularPolygonPoints(
 export interface MaterialEditorCoreConfig {
   /** 画布容器 DOM 元素 */
   container: HTMLCanvasElement;
-  /** 画布宽度 */
+  /** 画布宽度（参考框模式下为参考框宽度） */
   width: number;
-  /** 画布高度 */
+  /** 画布高度（参考框模式下为参考框高度） */
   height: number;
   /** 事件回调 */
   events?: Partial<CanvasEditorEvents>;
+
+  // ===== Phase F: 参考框模式 =====
+  /** 是否启用参考框模式（默认 true） */
+  referenceFrameEnabled?: boolean;
+  /** 参考框配置 */
+  referenceFrameConfig?: Partial<ReferenceFrameConfig>;
+
+  // ===== Phase G: 智能对齐线 =====
+  /** 是否启用智能对齐线（默认 true） */
+  smartGuidesEnabled?: boolean;
+  /** 智能对齐线配置 */
+  smartGuidesConfig?: Partial<SmartGuideConfig>;
 }
 
 export class MaterialEditorCore {
@@ -186,6 +205,16 @@ export class MaterialEditorCore {
   private gridSnapEnabled = true;
   private gridSnapSize = 10;
 
+  // ===== Phase F: 参考框 =====
+  private referenceFrame: ReferenceFrame | null = null;
+  private referenceFrameEnabled: boolean;
+  /** 参考框的元素实际尺寸（区别于画布工作区尺寸） */
+  private elementWidth: number;
+  private elementHeight: number;
+
+  // ===== Phase G: 智能对齐线 =====
+  private smartGuideEngine: SmartGuideEngine | null = null;
+
   // ===== C.1: 钢笔工具状态（支持贝塞尔曲线） =====
   /** 钢笔锚点数组 — 每个锚点含坐标和可选的控制手柄 */
   private penAnchors: PenAnchor[] = [];
@@ -206,12 +235,33 @@ export class MaterialEditorCore {
 
   constructor(config: MaterialEditorCoreConfig) {
     this.events = config.events ?? {};
+    this.referenceFrameEnabled = config.referenceFrameEnabled !== false;
+    this.elementWidth = config.width;
+    this.elementHeight = config.height;
+
+    // Phase F: 参考框模式 — 计算工作区尺寸
+    let canvasW: number;
+    let canvasH: number;
+
+    if (this.referenceFrameEnabled) {
+      const ws = computeWorkspaceSize(config.width, config.height);
+      canvasW = ws.canvasWidth;
+      canvasH = ws.canvasHeight;
+    } else {
+      canvasW = config.width;
+      canvasH = config.height;
+    }
 
     // 初始化 Fabric.js Canvas
+    // 防御：React StrictMode 下 effect 双重执行，同一 canvas 元素可能已被 Fabric 标记
+    const el = config.container as HTMLCanvasElement & { __fabric?: FabricCanvas };
+    if (el.__fabric) {
+      try { el.__fabric.dispose(); } catch { /* ignore */ }
+    }
     this.canvas = new FabricCanvas(config.container, {
-      width: config.width,
-      height: config.height,
-      backgroundColor: '#ffffff',
+      width: canvasW,
+      height: canvasH,
+      backgroundColor: this.referenceFrameEnabled ? '#f0f1f3' : '#ffffff',
       preserveObjectStacking: true,
       selection: true,
       renderOnAddRemove: true,
@@ -225,11 +275,38 @@ export class MaterialEditorCore {
     // 初始化栅格吸附
     this.setupSnapToGrid();
 
+    // Phase F: 创建参考框
+    if (this.referenceFrameEnabled) {
+      this.referenceFrame = new ReferenceFrame(this.canvas, {
+        width: config.width,
+        height: config.height,
+        ...config.referenceFrameConfig,
+      });
+    }
+
+    // Phase G: 初始化智能对齐线
+    if (config.smartGuidesEnabled !== false) {
+      this.smartGuideEngine = new SmartGuideEngine(
+        this.canvas,
+        config.smartGuidesConfig,
+        this.referenceFrame ?? undefined,
+      );
+    }
+
     // C.1.2: 路径编辑模式（双击路径进入编辑）
     this.setupPathEditMode();
 
     // 保存初始状态
     this.saveState();
+
+    // 初始化后自动选中参考框背景矩形，方便用户操作
+    if (this.referenceFrame) {
+      const bgRect = this.referenceFrame.getInnerBgRect();
+      if (bgRect) {
+        this.canvas.setActiveObject(bgRect);
+        this.canvas.renderAll();
+      }
+    }
   }
 
   // ===== 画布事件 =====
@@ -278,6 +355,10 @@ export class MaterialEditorCore {
   private setupSnapToGrid(): void {
     this.canvas.on('object:moving', (e) => {
       if (!this.gridSnapEnabled || !e.target) return;
+      // Phase G: 如果智能对齐线已经处理了吸附，则跳过网格吸附
+      // 智能对齐线引擎在同一个 object:moving 事件中优先执行
+      if (this.smartGuideEngine?.isEnabled()) return;
+
       const obj = e.target;
       const grid = this.gridSnapSize;
       obj.set({
@@ -648,7 +729,7 @@ export class MaterialEditorCore {
 
   // ===== 图层操作 =====
 
-  /** 获取所有图层对象（用于图层面板） */
+  /** 获取所有图层对象（用于图层面板，排除不可交互的辅助元素，但保留参考框背景） */
   getLayers(): Array<{
     id: string;
     name: string;
@@ -658,7 +739,15 @@ export class MaterialEditorCore {
     opacity: number;
     blendMode: string;
   }> {
-    const objects = this.canvas.getObjects();
+    const objects = this.canvas.getObjects().filter((obj) => {
+      // 排除辅助元素（虚线边框、四角标记、智能对齐线等）
+      // 但保留参考框背景矩形（它是真正的画布元素）
+      if (ReferenceFrame.isFrameHelper(obj)) return false;
+      const name = (obj as unknown as Record<string, string>).name;
+      // 排除钢笔工具辅助元素等其他 __ 前缀对象（参考框背景的名字是"参考框"，不带 __）
+      if (typeof name === 'string' && name.startsWith('__')) return false;
+      return true;
+    });
     return objects.map((obj, idx) => ({
       id: String(idx),
       name: this.getObjectName(obj),
@@ -730,13 +819,18 @@ export class MaterialEditorCore {
     }
   }
 
-  /** 删除选中对象 */
+  /** 删除选中对象（参考框背景不可删除） */
   deleteSelected(): void {
     const active = this.canvas.getActiveObject();
     if (!active) return;
 
+    // 参考框背景矩形不可删除
+    if (ReferenceFrame.isFrameBg(active)) return;
+
     if (active instanceof ActiveSelection) {
-      const objects = active.getObjects();
+      const objects = active.getObjects().filter(
+        (obj) => !ReferenceFrame.isFrameBg(obj),
+      );
       this.canvas.discardActiveObject();
       for (const obj of objects) {
         this.canvas.remove(obj);
@@ -840,7 +934,21 @@ export class MaterialEditorCore {
   }
 
   /** 导出为 PNG Data URL */
-  exportPNG(options?: { multiplier?: number; format?: string }): string {
+  exportPNG(options?: { multiplier?: number; format?: string; clipToFrame?: boolean }): string {
+    const clipToFrame = options?.clipToFrame !== false && this.referenceFrame;
+
+    if (clipToFrame && this.referenceFrame) {
+      const clip = this.referenceFrame.getClipRect();
+      return this.canvas.toDataURL({
+        format: (options?.format ?? 'png') as 'png' | 'jpeg' | 'webp',
+        multiplier: options?.multiplier ?? 2,
+        left: clip.x,
+        top: clip.y,
+        width: clip.width,
+        height: clip.height,
+      });
+    }
+
     return this.canvas.toDataURL({
       format: (options?.format ?? 'png') as 'png' | 'jpeg' | 'webp',
       multiplier: options?.multiplier ?? 2,
@@ -894,13 +1002,22 @@ export class MaterialEditorCore {
   }
 
   setBackgroundColor(color: string): void {
-    this.canvas.backgroundColor = color;
-    this.canvas.renderAll();
+    // 设置参考框内部背景色（而非整个canvas背景）
+    if (this.referenceFrame) {
+      this.referenceFrame.setInnerBackground(color);
+    } else {
+      this.canvas.backgroundColor = color;
+      this.canvas.renderAll();
+    }
     this.saveState();
     this.events.contentChanged?.();
   }
 
   getBackgroundColor(): string {
+    // 获取参考框内部背景色
+    if (this.referenceFrame) {
+      return this.referenceFrame.getInnerBackground();
+    }
     return (this.canvas.backgroundColor ?? '#ffffff') as string;
   }
 
@@ -908,7 +1025,9 @@ export class MaterialEditorCore {
 
   selectAll(): void {
     this.canvas.discardActiveObject();
-    const objects = this.canvas.getObjects().filter((o) => o.selectable);
+    const objects = this.canvas.getObjects().filter((o) =>
+      o.selectable && !ReferenceFrame.isFrameBg(o) && !ReferenceFrame.isFrameHelper(o),
+    );
     if (objects.length > 0) {
       const sel = new ActiveSelection(objects, { canvas: this.canvas });
       this.canvas.setActiveObject(sel);
@@ -1309,36 +1428,211 @@ export class MaterialEditorCore {
 
   /**
    * 对选中的两个对象执行布尔运算
-   * 结果会替换原来的两个对象
+   *
+   * Phase I: 优先使用矢量布尔运算，失败时回退到像素合成
+   *
+   * 特殊处理 — 参考框参与布尔运算：
+   *   当选中的两个对象中有一个是参考框背景时，不直接用参考框本身参与运算，
+   *   而是创建一个与参考框外形完全一致（位置/宽高/圆角/填充色）的临时替身矩形，
+   *   用替身参与运算。运算完成后：
+   *     - 参考框保持不变（不被删除/替换）
+   *     - 只删除另一个非参考框的对象
+   *     - 运算结果作为新元素添加到画布
    */
-  async performBooleanOp(operation: BooleanOpType): Promise<boolean> {
+  async performBooleanOp(operation: BooleanOpType | VectorBooleanOpType): Promise<boolean> {
     const activeObjects = this.canvas.getActiveObjects();
     if (activeObjects.length !== 2) return false;
 
-    const [objA, objB] = activeObjects;
-    const resultDataURL = performBooleanOp(this.canvas, objA, objB, operation);
-    if (!resultDataURL) return false;
+    // 关键：先取消 ActiveSelection，使所有对象恢复到世界坐标系
+    // 否则 ActiveSelection 内的对象的 calcTransformMatrix() 会返回
+    // 相对于选区 group 的变换矩阵，与新创建的 proxyRect 不在同一坐标系
+    this.canvas.discardActiveObject();
 
-    try {
-      // 移除原始对象
+    let [objA, objB] = activeObjects;
+
+    // ——— 检测参考框参与布尔运算 ———
+    const isAFrameBg = ReferenceFrame.isFrameBg(objA);
+    const isBFrameBg = ReferenceFrame.isFrameBg(objB);
+
+    // 两个都是参考框（不应该出现，但做防御）
+    if (isAFrameBg && isBFrameBg) return false;
+
+    // 标记参考框参与，并创建替身
+    const frameBgInvolved = isAFrameBg || isBFrameBg;
+    let proxyRect: FabricObject | null = null;
+    /** 非参考框的那个对象（用于运算后删除） */
+    let otherObj: FabricObject | null = null;
+
+    if (frameBgInvolved && this.referenceFrame) {
+      proxyRect = this.referenceFrame.createProxyRect();
+      if (!proxyRect) return false;
+
+      if (isAFrameBg) {
+        // objA 是参考框 → 用替身代替 objA
+        otherObj = objB;
+        objA = proxyRect;
+      } else {
+        // objB 是参考框 → 用替身代替 objB
+        otherObj = objA;
+        objB = proxyRect;
+      }
+    }
+
+    // ——— 执行布尔运算（矢量优先，像素回退） ———
+    const result = await this._executeBooleanOp(objA, objB, operation);
+
+    if (result) {
       this.canvas.discardActiveObject();
-      this.canvas.remove(objA);
-      this.canvas.remove(objB);
 
-      // 从结果 DataURL 创建图片对象
-      const resultImg = await FabricImage.fromURL(resultDataURL);
-      (resultImg as unknown as Record<string, string>).name = `布尔(${operation})`;
+      if (frameBgInvolved && otherObj) {
+        // 参考框模式：只删除非参考框的对象，参考框保留
+        this.canvas.remove(otherObj);
+      } else {
+        // 普通模式：两个对象都删除
+        this.canvas.remove(objA);
+        this.canvas.remove(objB);
+      }
 
-      this.canvas.add(resultImg);
-      this.canvas.setActiveObject(resultImg);
+      if (Array.isArray(result)) {
+        for (const obj of result) {
+          this.canvas.add(obj);
+          obj.setCoords();
+        }
+        if (result.length > 0) {
+          this.canvas.setActiveObject(result[0]);
+        }
+      } else {
+        this.canvas.add(result);
+        result.setCoords();
+        this.canvas.setActiveObject(result);
+      }
+
       this.canvas.renderAll();
       this.saveState();
       this.events.contentChanged?.();
-
       return true;
-    } catch {
-      return false;
     }
+
+    return false;
+  }
+
+  /**
+   * 内部布尔运算执行（矢量优先，像素回退）
+   * 抽取出来复用，不涉及画布对象的增删
+   */
+  private async _executeBooleanOp(
+    objA: FabricObject,
+    objB: FabricObject,
+    operation: BooleanOpType | VectorBooleanOpType,
+  ): Promise<FabricObject | FabricObject[] | null> {
+    // Phase I: 优先尝试矢量布尔运算
+    try {
+      const result = await performVectorBooleanOp(
+        this.canvas,
+        objA,
+        objB,
+        operation as VectorBooleanOpType,
+      );
+      if (result) return result;
+    } catch {
+      // 矢量运算失败，继续回退到像素合成
+    }
+
+    // 回退到像素合成（不支持 divide）
+    if (operation === 'divide') return null;
+
+    const pixelResult = performBooleanOp(this.canvas, objA, objB, operation as BooleanOpType);
+    if (!pixelResult) return null;
+
+    try {
+      const resultImg = await FabricImage.fromURL(pixelResult.dataURL);
+      // 将图片定位到正确的位置
+      resultImg.set({
+        left: pixelResult.left,
+        top: pixelResult.top,
+      });
+      resultImg.setCoords();
+      (resultImg as unknown as Record<string, string>).name = `布尔(${operation})`;
+      return resultImg;
+    } catch {
+      return null;
+    }
+  }
+
+  // ================================================================
+  // Phase F: 参考框操作
+  // ================================================================
+
+  /** 获取参考框实例 */
+  getReferenceFrame(): ReferenceFrame | null {
+    return this.referenceFrame;
+  }
+
+  /** 获取参考框裁切区域 */
+  getReferenceFrameClipRect(): { x: number; y: number; width: number; height: number } | null {
+    return this.referenceFrame?.getClipRect() ?? null;
+  }
+
+  /** 更新参考框尺寸 */
+  resizeReferenceFrame(width: number, height: number): void {
+    if (!this.referenceFrame) return;
+    this.elementWidth = width;
+    this.elementHeight = height;
+    this.referenceFrame.resize(width, height);
+    this.canvas.renderAll();
+  }
+
+  /** 获取元素实际尺寸（参考框尺寸） */
+  getElementSize(): { width: number; height: number } {
+    return { width: this.elementWidth, height: this.elementHeight };
+  }
+
+  /** 是否启用了参考框模式 */
+  isReferenceFrameEnabled(): boolean {
+    return this.referenceFrameEnabled;
+  }
+
+  // ================================================================
+  // Phase G: 智能对齐线操作
+  // ================================================================
+
+  /** 启用/禁用智能对齐线 */
+  setSmartGuidesEnabled(enabled: boolean): void {
+    this.smartGuideEngine?.setEnabled(enabled);
+  }
+
+  /** 获取智能对齐线启用状态 */
+  isSmartGuidesEnabled(): boolean {
+    return this.smartGuideEngine?.isEnabled() ?? false;
+  }
+
+  // ================================================================
+  // Phase H: 对齐与分布操作
+  // ================================================================
+
+  /**
+   * 对齐选中的对象
+   * @param type — 对齐类型
+   * @param relativeTo — 相对于选区 或 相对于参考框
+   */
+  alignSelected(type: AlignType, relativeTo: AlignRelativeTo = 'selection'): void {
+    const objects = this.canvas.getActiveObjects();
+    if (objects.length < 1) return;
+    alignObjects(this.canvas, objects, type, relativeTo, this.referenceFrame ?? undefined);
+    this.saveState();
+    this.events.contentChanged?.();
+  }
+
+  /**
+   * 等间距分布选中的对象
+   * @param type — 分布类型
+   */
+  distributeSelected(type: DistributeType): void {
+    const objects = this.canvas.getActiveObjects();
+    if (objects.length < 3) return;
+    distributeObjects(this.canvas, objects, type);
+    this.saveState();
+    this.events.contentChanged?.();
   }
 
   // ===== 图层蒙版（裁切蒙版） =====
@@ -1447,7 +1741,7 @@ export class MaterialEditorCore {
    */
   saveProject(name?: string): CanvasProjectFile {
     return {
-      version: 2,
+      version: 3,
       name: name ?? '未命名工程',
       canvasWidth: this.canvas.getWidth(),
       canvasHeight: this.canvas.getHeight(),
@@ -1455,6 +1749,8 @@ export class MaterialEditorCore {
       backgroundColor: (this.canvas.backgroundColor ?? '#ffffff') as string,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      referenceFrameWidth: this.elementWidth,
+      referenceFrameHeight: this.elementHeight,
     };
   }
 
@@ -1462,6 +1758,12 @@ export class MaterialEditorCore {
    * 从工程文件恢复
    */
   async loadProject(project: CanvasProjectFile): Promise<void> {
+    // v2 → v3 兼容：旧工程文件没有参考框尺寸，使用画布尺寸作为参考框
+    if (project.version === 2) {
+      project.referenceFrameWidth = project.canvasWidth;
+      project.referenceFrameHeight = project.canvasHeight;
+    }
+
     // 恢复画布尺寸
     this.canvas.setDimensions({
       width: project.canvasWidth,
@@ -1474,6 +1776,15 @@ export class MaterialEditorCore {
     // 恢复内容
     await this.canvas.loadFromJSON(project.canvasJSON);
     this.canvas.renderAll();
+
+    // 恢复参考框
+    if (this.referenceFrameEnabled && project.referenceFrameWidth && project.referenceFrameHeight) {
+      this.elementWidth = project.referenceFrameWidth;
+      this.elementHeight = project.referenceFrameHeight;
+      if (this.referenceFrame) {
+        this.referenceFrame.resize(project.referenceFrameWidth, project.referenceFrameHeight);
+      }
+    }
 
     // 重置历史
     this.historyManager.clear();
@@ -2380,6 +2691,8 @@ export class MaterialEditorCore {
 
   /** 销毁 */
   destroy(): void {
+    this.referenceFrame?.dispose();
+    this.smartGuideEngine?.dispose();
     this.historyManager.clear();
     this.canvas.dispose();
   }

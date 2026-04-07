@@ -38,8 +38,8 @@ import {
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
-import type { MaterialToolType, BlendMode, BooleanOpType } from '@globallink/material-editor';
-import { MaterialEditorCore, BLEND_MODES } from '@globallink/material-editor';
+import type { MaterialToolType, BlendMode, BooleanOpType, AlignType, DistributeType } from '@globallink/material-editor';
+import { MaterialEditorCore, BLEND_MODES, computeWorkspaceSize } from '@globallink/material-editor';
 import { LeftToolbar } from './LeftToolbar';
 import type { ActiveTool, EffectToolType } from './LeftToolbar';
 import { RightPropertyPanel } from './RightPropertyPanel';
@@ -50,6 +50,7 @@ import type { LayerInfo } from './LayerPanel';
 import { ExportBar } from './ExportBar';
 import { CanvasGrid } from './CanvasGrid';
 import { CanvasRuler, RULER_SIZE } from './CanvasRuler';
+import { materialProjectApi } from '@/api/materialProject';
 
 /** 面板尺寸常量 */
 const MODAL_WIDTH = 1060;
@@ -178,16 +179,22 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
   const [showGrid, setShowGrid] = useState(true);
   const [showRuler, setShowRuler] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
+  const [smartGuidesEnabled, setSmartGuidesEnabled] = useState(true);
 
   // ===== B.2.3: 画布尺寸手动调整 =====
   const [customCanvasW, setCustomCanvasW] = useState<number | null>(null);
   const [customCanvasH, setCustomCanvasH] = useState<number | null>(null);
 
-  // 最终画布尺寸：手动值优先，否则用自动解析值
+  // 最终画布尺寸：手动值优先，否则用自动解析值（= 元素参考框尺寸）
   const finalCanvasSize = useMemo(() => ({
     width: customCanvasW ?? canvasSize.width,
     height: customCanvasH ?? canvasSize.height,
   }), [customCanvasW, customCanvasH, canvasSize]);
+
+  // 工作区尺寸（Fabric.js 实际画布尺寸）：参考框居中放置在更大的工作区中
+  const workspaceSize = useMemo(() => {
+    return computeWorkspaceSize(finalCanvasSize.width, finalCanvasSize.height);
+  }, [finalCanvasSize.width, finalCanvasSize.height]);
 
   // ===== 选中对象状态 =====
   const [selectionCount, setSelectionCount] = useState(0);
@@ -196,6 +203,9 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
 
   // ===== 图层状态 =====
   const [layers, setLayers] = useState<LayerInfo[]>([]);
+
+  // ===== 素材工程持久化状态 =====
+  const [materialProjectId, setMaterialProjectId] = useState<string | null>(null);
   const [selectedLayerIdx, setSelectedLayerIdx] = useState(-1);
 
   // ===== 拖拽逻辑 =====
@@ -238,35 +248,32 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
     };
   }, []);
 
-  // Escape 关闭（仅在非绘制状态时）
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        // 如果正在钢笔绘制或路径编辑，Escape 由快捷键处理器处理，不关闭弹窗
-        const editor = editorRef.current;
-        if (editor && (editor.isPenDrawing || editor.isPathEditing)) return;
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // Escape 关闭弹窗的逻辑已合并到下方键盘快捷键处理器中，避免多个监听器之间的状态竞争
 
   // ===== 初始化 Fabric.js 画布 =====
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const editor = new MaterialEditorCore({
+    // 先创建一个 editorRef 临时变量，让回调在构造期间也能安全访问
+    // （构造函数中 setActiveObject 会触发 selection:created，此时 editor 变量尚未赋值完成）
+    const editorInstance = new MaterialEditorCore({
       container: canvasRef.current,
       width: finalCanvasSize.width,
       height: finalCanvasSize.height,
+      // Phase F: 参考框模式
+      referenceFrameEnabled: true,
+      // Phase G: 智能对齐线
+      smartGuidesEnabled: true,
       events: {
         selectionChanged: (objects) => {
           setSelectionCount(objects.length);
           if (objects.length === 1) {
             const obj = objects[0];
+            // 检查是否选中了参考框背景矩形（名称 = "参考框"）
+            const objName = (obj as unknown as Record<string, string>).name;
+            const isFrameBg = objName === '参考框';
             setSelectedObject({
-              type: obj.type ?? '',
+              type: isFrameBg ? '__frame_bg__' : (obj.type ?? ''),
               fill: typeof obj.fill === 'string' ? obj.fill : undefined,
               stroke: typeof obj.stroke === 'string' ? obj.stroke : undefined,
               strokeWidth: obj.strokeWidth,
@@ -279,14 +286,22 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
               scaleX: obj.scaleX,
               scaleY: obj.scaleY,
             });
-            setBlendMode(editor.getBlendMode());
+            // 使用 editorRef.current 而非局部变量 editor，
+            // 因为构造函数内 setActiveObject 会在 editor 赋值完成前触发此回调
+            const ed = editorRef.current;
+            if (ed) {
+              setBlendMode(ed.getBlendMode());
+            }
           } else {
             setSelectedObject(null);
             setBlendMode('normal');
           }
         },
         contentChanged: () => {
-          setLayers(editor.getLayers());
+          const ed = editorRef.current;
+          if (ed) {
+            setLayers(ed.getLayers());
+          }
         },
         toolChanged: (tool) => {
           setActiveTool(tool);
@@ -301,11 +316,40 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
       },
     });
 
-    editorRef.current = editor;
+    // 立即赋值 ref，这样后续若有延迟触发的事件回调也能正确访问
+    editorRef.current = editorInstance;
+    const editor = editorInstance;
     setLayers(editor.getLayers());
 
     // 同步 snap 状态
     editor.setGridSnap(snapEnabled);
+
+    // 自动尝试从数据库加载关联节点的素材工程
+    const projectId = editorStore.project?.id;
+    if (projectId && targetNodeId) {
+      materialProjectApi.findByNode(projectId, targetNodeId).then((record) => {
+        if (record && record.canvasJSON) {
+          setMaterialProjectId(record.id);
+          // 恢复工程
+          void editor.loadProject({
+            version: (record.fileVersion ?? 3) as 2 | 3,
+            name: record.name,
+            canvasWidth: record.canvasWidth,
+            canvasHeight: record.canvasHeight,
+            canvasJSON: record.canvasJSON as object,
+            backgroundColor: record.backgroundColor ?? '#ffffff',
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            referenceFrameWidth: record.referenceFrameWidth ?? undefined,
+            referenceFrameHeight: record.referenceFrameHeight ?? undefined,
+          }).then(() => {
+            message.info('已加载素材工程', 2);
+          });
+        }
+      }).catch(() => {
+        // 查找失败不影响正常使用
+      });
+    }
 
     return () => {
       editor.destroy();
@@ -363,13 +407,27 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
 
       // C.1: 钢笔工具快捷键
       if (editor.isPenDrawing) {
-        if (e.key === 'Escape') { e.preventDefault(); editor.cancelPenPath(); return; }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          // ESC = 完成路径并退出钢笔工具（保留已绘制内容），而非删除
+          editor.finalizePenPath(false);
+          return;
+        }
         if (e.key === 'Enter') { e.preventDefault(); editor.finalizePenPath(false); return; }
       }
 
       // C.1.2: 路径编辑模式 — Escape 退出
       if (editor.isPathEditing) {
-        if (e.key === 'Escape') { e.preventDefault(); editor.exitPathEditMode(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); editor.exitPathEditMode(); return; }
+      }
+
+      // Escape — 未在钢笔/路径编辑中时，关闭素材编辑器弹窗
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onClose();
+        return;
       }
 
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); editor.undo(); }
@@ -380,6 +438,27 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
       if ((e.metaKey || e.ctrlKey) && e.key === 'g' && !e.shiftKey) { e.preventDefault(); editor.groupSelected(); }
       if ((e.metaKey || e.ctrlKey) && e.key === 'g' && e.shiftKey) { e.preventDefault(); editor.ungroupSelected(); }
       if ((e.metaKey || e.ctrlKey) && e.key === 'v') { void handleClipboardPaste(); }
+
+      // Phase I: 布尔运算快捷键 (⌘⇧U/S/I/E)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey) {
+        const boolOps: Record<string, 'union' | 'subtract' | 'intersect' | 'exclude'> = {
+          u: 'union', s: 'subtract', i: 'intersect', e: 'exclude',
+        };
+        const op = boolOps[e.key.toLowerCase()];
+        if (op) { e.preventDefault(); void editor.performBooleanOp(op); return; }
+      }
+
+      // Phase H: 对齐快捷键 (⌘Alt+方向键)
+      if ((e.metaKey || e.ctrlKey) && e.altKey) {
+        const alignMap: Record<string, AlignType> = {
+          ArrowLeft: 'align-left',
+          ArrowRight: 'align-right',
+          ArrowUp: 'align-top',
+          ArrowDown: 'align-bottom',
+        };
+        const alignType = alignMap[e.key];
+        if (alignType) { e.preventDefault(); editor.alignSelected(alignType); return; }
+      }
 
       // 工具快捷键
       if (!e.metaKey && !e.ctrlKey) {
@@ -400,7 +479,7 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onClose]);
 
   // ===== 工具切换处理 =====
   const handleToolChange = useCallback((tool: ActiveTool) => {
@@ -551,33 +630,43 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
                 <span>点击起点闭合 / Enter 完成 / Esc 取消</span>
               </div>
             )}
-            {/* 画布主体 */}
-            <div className="flex-1 overflow-auto flex items-center justify-center p-3 relative">
+            {/* 画布主体 — 使用工作区尺寸（比参考框大），参考框居中 */}
+            <div className="flex-1 overflow-auto flex items-center justify-center p-3 relative"
+              style={{ background: '#e8e8e8' }}
+            >
               <div
-                className="relative bg-white shadow-md rounded"
+                className="relative shadow-md rounded"
                 style={{
-                  width: finalCanvasSize.width * zoom,
-                  height: finalCanvasSize.height * zoom,
+                  width: workspaceSize.canvasWidth * zoom,
+                  height: workspaceSize.canvasHeight * zoom,
                   marginTop: showRuler ? RULER_SIZE : 0,
                   marginLeft: showRuler ? RULER_SIZE : 0,
+                  background: '#f0f1f3',
+                  overflow: 'visible',  // 让标尺（absolute top:-20px）不被裁切
                 }}
               >
-                {/* B.3.1: 标尺 */}
+                {/* B.3.1: 标尺 — 覆盖整个工作区 */}
                 <CanvasRuler
-                  width={finalCanvasSize.width}
-                  height={finalCanvasSize.height}
+                  width={workspaceSize.canvasWidth}
+                  height={workspaceSize.canvasHeight}
                   zoom={zoom}
                   visible={showRuler}
                 />
-                {/* 栅格叠加 */}
+                {/* 栅格叠加 — 覆盖整个工作区，参考框区域用灰色边框标示 */}
                 <CanvasGrid
-                  width={finalCanvasSize.width}
-                  height={finalCanvasSize.height}
+                  width={workspaceSize.canvasWidth}
+                  height={workspaceSize.canvasHeight}
                   zoom={zoom}
                   visible={showGrid}
+                  referenceFrame={{
+                    x: workspaceSize.frameX,
+                    y: workspaceSize.frameY,
+                    width: finalCanvasSize.width,
+                    height: finalCanvasSize.height,
+                  }}
                 />
-                {/* Fabric.js 画布 */}
-                <canvas ref={canvasRef} />
+                {/* Fabric.js 画布 — z-index:1 在栅格(z:2,pointer-events:none)之下，但栅格透明不阻挡交互 */}
+                <canvas ref={canvasRef} style={{ position: 'relative', zIndex: 1 }} />
               </div>
             </div>
 
@@ -624,10 +713,89 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
                 </Tooltip>
               )}
 
+              {/* Phase H: 对齐按钮组（选中 2+ 对象时显示） */}
+              {selectionCount >= 2 && (
+                <>
+                  <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                  <Tooltip title="左对齐">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.alignSelected('align-left')}>
+                      ⇤
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="水平居中">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.alignSelected('align-center-h')}>
+                      ⇔
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="右对齐">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.alignSelected('align-right')}>
+                      ⇥
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="顶对齐">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.alignSelected('align-top')}>
+                      ⤒
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="垂直居中">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.alignSelected('align-center-v')}>
+                      ⇕
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="底对齐">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.alignSelected('align-bottom')}>
+                      ⤓
+                    </Button>
+                  </Tooltip>
+                  {/* 相对参考框对齐 */}
+                  <Tooltip title="相对参考框水平居中">
+                    <Button size="small" type="text" className="text-[11px] px-1 text-orange-500" onClick={() => editorRef.current?.alignSelected('align-center-h', 'frame')}>
+                      ⊞
+                    </Button>
+                  </Tooltip>
+                </>
+              )}
+              {/* Phase H: 分布按钮（选中 3+ 对象时显示） */}
+              {selectionCount >= 3 && (
+                <>
+                  <Tooltip title="水平等间距">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.distributeSelected('distribute-h')}>
+                      ⋯
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="垂直等间距">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => editorRef.current?.distributeSelected('distribute-v')}>
+                      ⋮
+                    </Button>
+                  </Tooltip>
+                </>
+              )}
+              {/* Phase I: 布尔运算按钮组（选中 2 对象时） */}
+              {selectionCount === 2 && (
+                <>
+                  <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                  <Tooltip title="合并 (⌘⇧U)">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => void editorRef.current?.performBooleanOp('union')}>⊕</Button>
+                  </Tooltip>
+                  <Tooltip title="减去 (⌘⇧S)">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => void editorRef.current?.performBooleanOp('subtract')}>⊖</Button>
+                  </Tooltip>
+                  <Tooltip title="相交 (⌘⇧I)">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => void editorRef.current?.performBooleanOp('intersect')}>⊗</Button>
+                  </Tooltip>
+                  <Tooltip title="排除 (⌘⇧E)">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => void editorRef.current?.performBooleanOp('exclude')}>⊘</Button>
+                  </Tooltip>
+                  <Tooltip title="分割">
+                    <Button size="small" type="text" className="text-[11px] px-1" onClick={() => void editorRef.current?.performBooleanOp('divide')}>⊞</Button>
+                  </Tooltip>
+                </>
+              )}
+
               <span className="flex-1" />
 
-              {/* B.2.3: 画布尺寸手动调整 */}
-              <Tooltip title="画布宽度">
+              {/* B.2.3: 参考框/画布尺寸手动调整 */}
+              <Tooltip title="参考框宽度（元素实际宽度）">
                 <input
                   type="number"
                   className="w-12 h-5 text-[10px] text-center border border-gray-200 rounded bg-gray-50 focus:border-blue-400 focus:outline-none"
@@ -638,12 +806,16 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v) && v >= 50 && v <= 2000) {
                       setCustomCanvasW(v);
+                      // 参考框模式下同步更新参考框尺寸
+                      if (editorRef.current?.isReferenceFrameEnabled()) {
+                        editorRef.current.resizeReferenceFrame(v, finalCanvasSize.height);
+                      }
                     }
                   }}
                 />
               </Tooltip>
               <span className="text-[9px] text-gray-300">×</span>
-              <Tooltip title="画布高度">
+              <Tooltip title="参考框高度（元素实际高度）">
                 <input
                   type="number"
                   className="w-12 h-5 text-[10px] text-center border border-gray-200 rounded bg-gray-50 focus:border-blue-400 focus:outline-none"
@@ -654,6 +826,10 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v) && v >= 50 && v <= 2000) {
                       setCustomCanvasH(v);
+                      // 参考框模式下同步更新参考框尺寸
+                      if (editorRef.current?.isReferenceFrameEnabled()) {
+                        editorRef.current.resizeReferenceFrame(finalCanvasSize.width, v);
+                      }
                     }
                   }}
                 />
@@ -673,6 +849,21 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
                     editorRef.current?.setGridSnap(next);
                   }}
                   className={snapEnabled ? 'text-blue-500' : 'text-gray-400'}
+                />
+              </Tooltip>
+
+              {/* Phase G: 智能对齐线开关 */}
+              <Tooltip title={smartGuidesEnabled ? '关闭智能对齐线' : '开启智能对齐线'}>
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<BlockOutlined />}
+                  onClick={() => {
+                    const next = !smartGuidesEnabled;
+                    setSmartGuidesEnabled(next);
+                    editorRef.current?.setSmartGuidesEnabled(next);
+                  }}
+                  className={smartGuidesEnabled ? 'text-pink-500' : 'text-gray-400'}
                 />
               </Tooltip>
 
@@ -735,6 +926,8 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
           targetNodeId={targetNodeId}
           editorRef={editorRef}
           onClose={onClose}
+          materialProjectId={materialProjectId}
+          onProjectSaved={(id) => setMaterialProjectId(id)}
         />
       </div>
       </ConfigProvider>

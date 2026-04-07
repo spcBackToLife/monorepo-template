@@ -115,12 +115,16 @@ function ObjectPropsPanel({
   const typeLabel: Record<string, string> = {
     rect: '矩形', ellipse: '椭圆', polygon: '多边形', line: '线段',
     path: '路径', textbox: '文字', image: '图片', group: '组', circle: '圆形',
+    __frame_bg__: '参考框背景',
   };
+
+  // 如果选中的是参考框背景，只显示填充色编辑器
+  const isFrameBg = obj.type === '__frame_bg__';
 
   return (
     <>
       {/* 图层属性 */}
-      <SectionTitle title="图层属性" />
+      <SectionTitle title={isFrameBg ? '参考框' : '图层属性'} />
 
       <PropRow label="类型">
         <span className="text-[11px] text-gray-700 font-medium">
@@ -128,197 +132,225 @@ function ObjectPropsPanel({
         </span>
       </PropRow>
 
-      {/* 填充 & 描边 */}
+      {/* 填充色 — 参考框背景和普通对象都显示 */}
       <PropRow label="填充">
         <ColorPicker
           size="small"
-          value={obj.fill ?? '#000000'}
+          value={obj.fill ?? '#ffffff'}
           onChange={(_, hex) => onPropertyChange({ fill: hex })}
           showText
           format="hex"
         />
       </PropRow>
 
-      <PropRow label="描边">
-        <div className="flex items-center gap-1">
-          <ColorPicker
-            size="small"
-            value={obj.stroke ?? '#000000'}
-            onChange={(_, hex) => onPropertyChange({ stroke: hex })}
-          />
-          <InputNumber
-            size="small"
-            min={0}
-            max={20}
-            value={obj.strokeWidth ?? 0}
-            onChange={(v) => v != null && onPropertyChange({ strokeWidth: v })}
-            style={{ width: 52 }}
-            suffix="px"
-          />
-        </div>
-      </PropRow>
-
-      {/* 矩形圆角 */}
-      {obj.type === 'rect' && (
-        <PropRow label="圆角">
-          <InputNumber
-            size="small"
-            min={0}
-            max={200}
-            value={obj.rx ?? 0}
-            onChange={(v) => v != null && onPropertyChange({ rx: v, ry: v })}
-            style={{ width: '100%' }}
-            suffix="px"
-          />
-        </PropRow>
-      )}
-
-      {/* 文字属性 */}
-      {obj.type === 'textbox' && (
+      {/* 参考框背景只显示填充色和透明度 */}
+      {isFrameBg && (
         <>
-          <Divider className="my-1.5" />
-          <PropRow label="字号">
-            <InputNumber
-              size="small"
-              min={8}
-              max={200}
-              value={obj.fontSize ?? 24}
-              onChange={(v) => v != null && onPropertyChange({ fontSize: v })}
-              style={{ width: '100%' }}
+          <PropRow label="透明">
+            <Slider
+              min={0}
+              max={1}
+              step={0.05}
+              value={obj.opacity ?? 1}
+              onChange={(v) => onPropertyChange({ opacity: v })}
             />
           </PropRow>
-          <PropRow label="字体">
-            <Select
-              size="small"
-              value={obj.fontFamily ?? 'Arial, sans-serif'}
-              onChange={(v) => onPropertyChange({ fontFamily: v })}
-              options={[
-                { value: 'Arial, sans-serif', label: 'Arial' },
-                { value: 'Helvetica, sans-serif', label: 'Helvetica' },
-                { value: 'Georgia, serif', label: 'Georgia' },
-                { value: 'PingFang SC, sans-serif', label: '苹方' },
-                { value: 'Microsoft YaHei, sans-serif', label: '微软雅黑' },
-              ]}
-              style={{ width: '100%' }}
-              popupMatchSelectWidth={false}
-            />
-          </PropRow>
-          <PropRow label="粗细">
-            <Select
-              size="small"
-              value={String(obj.fontWeight ?? 'normal')}
-              onChange={(v) => onPropertyChange({ fontWeight: v })}
-              options={[
-                { value: 'normal', label: '常规' },
-                { value: 'bold', label: '粗体' },
-                { value: '100', label: '100' },
-                { value: '300', label: '300' },
-                { value: '500', label: '500' },
-                { value: '700', label: '700' },
-                { value: '900', label: '900' },
-              ]}
-              style={{ width: '100%' }}
-              popupMatchSelectWidth={false}
-            />
-          </PropRow>
+          <div className="text-[10px] text-gray-400 mt-2 space-y-1">
+            <p>参考框代表元素的实际区域，是画布最底层的元素。</p>
+            <p>✅ 可修改填充色、透明度</p>
+            <p>✅ 可与其他元素做布尔运算</p>
+            <p>✅ 导出时只导出此区域的内容</p>
+            <p>❌ 不可移动/缩放/删除</p>
+          </div>
         </>
       )}
 
-      {/* 通用属性 */}
-      <SectionTitle title="通用属性" />
+      {/* 以下属性仅普通对象显示 */}
+      {!isFrameBg && (
+        <>
+          {/* 描边 */}
+          <PropRow label="描边">
+            <div className="flex items-center gap-1">
+              <ColorPicker
+                size="small"
+                value={obj.stroke ?? '#000000'}
+                onChange={(_, hex) => onPropertyChange({ stroke: hex })}
+              />
+              <InputNumber
+                size="small"
+                min={0}
+                max={20}
+                value={obj.strokeWidth ?? 0}
+                onChange={(v) => v != null && onPropertyChange({ strokeWidth: v })}
+                style={{ width: 52 }}
+                suffix="px"
+              />
+            </div>
+          </PropRow>
 
-      <PropRow label="透明">
-        <Slider
-          min={0}
-          max={1}
-          step={0.05}
-          value={obj.opacity ?? 1}
-          onChange={(v) => onPropertyChange({ opacity: v })}
-        />
-      </PropRow>
+          {/* 矩形圆角 */}
+          {obj.type === 'rect' && (
+            <PropRow label="圆角">
+              <InputNumber
+                size="small"
+                min={0}
+                max={200}
+                value={obj.rx ?? 0}
+                onChange={(v) => v != null && onPropertyChange({ rx: v, ry: v })}
+                style={{ width: '100%' }}
+                suffix="px"
+              />
+            </PropRow>
+          )}
 
-      <PropRow label="混合">
-        <Select
-          size="small"
-          value={blendMode}
-          onChange={onBlendModeChange}
-          options={BLEND_MODES.map((m) => ({
-            value: m,
-            label: BLEND_MODE_LABELS[m],
-          }))}
-          style={{ width: '100%' }}
-          popupMatchSelectWidth={false}
-        />
-      </PropRow>
+          {/* 文字属性 */}
+          {obj.type === 'textbox' && (
+            <>
+              <Divider className="my-1.5" />
+              <PropRow label="字号">
+                <InputNumber
+                  size="small"
+                  min={8}
+                  max={200}
+                  value={obj.fontSize ?? 24}
+                  onChange={(v) => v != null && onPropertyChange({ fontSize: v })}
+                  style={{ width: '100%' }}
+                />
+              </PropRow>
+              <PropRow label="字体">
+                <Select
+                  size="small"
+                  value={obj.fontFamily ?? 'Arial, sans-serif'}
+                  onChange={(v) => onPropertyChange({ fontFamily: v })}
+                  options={[
+                    { value: 'Arial, sans-serif', label: 'Arial' },
+                    { value: 'Helvetica, sans-serif', label: 'Helvetica' },
+                    { value: 'Georgia, serif', label: 'Georgia' },
+                    { value: 'PingFang SC, sans-serif', label: '苹方' },
+                    { value: 'Microsoft YaHei, sans-serif', label: '微软雅黑' },
+                  ]}
+                  style={{ width: '100%' }}
+                  popupMatchSelectWidth={false}
+                />
+              </PropRow>
+              <PropRow label="粗细">
+                <Select
+                  size="small"
+                  value={String(obj.fontWeight ?? 'normal')}
+                  onChange={(v) => onPropertyChange({ fontWeight: v })}
+                  options={[
+                    { value: 'normal', label: '常规' },
+                    { value: 'bold', label: '粗体' },
+                    { value: '100', label: '100' },
+                    { value: '300', label: '300' },
+                    { value: '500', label: '500' },
+                    { value: '700', label: '700' },
+                    { value: '900', label: '900' },
+                  ]}
+                  style={{ width: '100%' }}
+                  popupMatchSelectWidth={false}
+                />
+              </PropRow>
+            </>
+          )}
 
-      {/* 变换 */}
-      <SectionTitle title="变换" />
+          {/* 通用属性 */}
+          <SectionTitle title="通用属性" />
 
-      <PropRow label="旋转">
-        <InputNumber
-          size="small"
-          min={-360}
-          max={360}
-          value={Math.round(obj.angle ?? 0)}
-          onChange={(v) => v != null && onPropertyChange({ angle: v })}
-          style={{ width: '100%' }}
-          suffix="°"
-        />
-      </PropRow>
+          <PropRow label="透明">
+            <Slider
+              min={0}
+              max={1}
+              step={0.05}
+              value={obj.opacity ?? 1}
+              onChange={(v) => onPropertyChange({ opacity: v })}
+            />
+          </PropRow>
 
-      <PropRow label="缩放">
-        <div className="flex gap-1">
-          <InputNumber
-            size="small"
-            min={1}
-            max={500}
-            value={Math.round((obj.scaleX ?? 1) * 100)}
-            onChange={(v) => v != null && onPropertyChange({ scaleX: v / 100, scaleY: v / 100 })}
-            style={{ flex: 1 }}
-            suffix="%"
-          />
-        </div>
-      </PropRow>
+          <PropRow label="混合">
+            <Select
+              size="small"
+              value={blendMode}
+              onChange={onBlendModeChange}
+              options={BLEND_MODES.map((m) => ({
+                value: m,
+                label: BLEND_MODE_LABELS[m],
+              }))}
+              style={{ width: '100%' }}
+              popupMatchSelectWidth={false}
+            />
+          </PropRow>
 
-      <PropRow label="位移">
-        <div className="flex gap-1">
-          <InputNumber
-            size="small"
-            value={Math.round(obj.left ?? 0)}
-            onChange={(v) => v != null && onPropertyChange({ left: v })}
-            style={{ flex: 1 }}
-            prefix={<span className="text-[9px] text-gray-300">X</span>}
-          />
-          <InputNumber
-            size="small"
-            value={Math.round(obj.top ?? 0)}
-            onChange={(v) => v != null && onPropertyChange({ top: v })}
-            style={{ flex: 1 }}
-            prefix={<span className="text-[9px] text-gray-300">Y</span>}
-          />
-        </div>
-      </PropRow>
+          {/* 变换 */}
+          <SectionTitle title="变换" />
 
-      <PropRow label="尺寸">
-        <div className="flex gap-1">
-          <InputNumber
-            size="small"
-            min={1}
-            value={Math.round(obj.width ?? 0)}
-            onChange={(v) => v != null && onPropertyChange({ width: v })}
-            style={{ flex: 1 }}
-            prefix={<span className="text-[9px] text-gray-300">W</span>}
-          />
-          <InputNumber
-            size="small"
-            min={1}
-            value={Math.round(obj.height ?? 0)}
-            onChange={(v) => v != null && onPropertyChange({ height: v })}
-            style={{ flex: 1 }}
-            prefix={<span className="text-[9px] text-gray-300">H</span>}
-          />
-        </div>
-      </PropRow>
+          <PropRow label="旋转">
+            <InputNumber
+              size="small"
+              min={-360}
+              max={360}
+              value={Math.round(obj.angle ?? 0)}
+              onChange={(v) => v != null && onPropertyChange({ angle: v })}
+              style={{ width: '100%' }}
+              suffix="°"
+            />
+          </PropRow>
+
+          <PropRow label="缩放">
+            <div className="flex gap-1">
+              <InputNumber
+                size="small"
+                min={1}
+                max={500}
+                value={Math.round((obj.scaleX ?? 1) * 100)}
+                onChange={(v) => v != null && onPropertyChange({ scaleX: v / 100, scaleY: v / 100 })}
+                style={{ flex: 1 }}
+                suffix="%"
+              />
+            </div>
+          </PropRow>
+
+          <PropRow label="位移">
+            <div className="flex gap-1">
+              <InputNumber
+                size="small"
+                value={Math.round(obj.left ?? 0)}
+                onChange={(v) => v != null && onPropertyChange({ left: v })}
+                style={{ flex: 1 }}
+                prefix={<span className="text-[9px] text-gray-300">X</span>}
+              />
+              <InputNumber
+                size="small"
+                value={Math.round(obj.top ?? 0)}
+                onChange={(v) => v != null && onPropertyChange({ top: v })}
+                style={{ flex: 1 }}
+                prefix={<span className="text-[9px] text-gray-300">Y</span>}
+              />
+            </div>
+          </PropRow>
+
+          <PropRow label="尺寸">
+            <div className="flex gap-1">
+              <InputNumber
+                size="small"
+                min={1}
+                value={Math.round(obj.width ?? 0)}
+                onChange={(v) => v != null && onPropertyChange({ width: v })}
+                style={{ flex: 1 }}
+                prefix={<span className="text-[9px] text-gray-300">W</span>}
+              />
+              <InputNumber
+                size="small"
+                min={1}
+                value={Math.round(obj.height ?? 0)}
+                onChange={(v) => v != null && onPropertyChange({ height: v })}
+                style={{ flex: 1 }}
+                prefix={<span className="text-[9px] text-gray-300">H</span>}
+              />
+            </div>
+          </PropRow>
+        </>
+      )}
     </>
   );
 }
@@ -590,8 +622,8 @@ function FillPanel({
 
   return (
     <>
-      {/* 画布背景色 — 问题3修复：颜色作用于画布预览而非直接保存到元素 */}
-      <SectionTitle title="画布背景" />
+      {/* 参考框背景色 — 设置的是参考框（元素框）内部的背景色 */}
+      <SectionTitle title="参考框背景" />
       <div className="space-y-2">
         <PropRow label="背景色">
           <ColorPicker
@@ -606,7 +638,7 @@ function FillPanel({
           />
         </PropRow>
         <div className="text-[10px] text-gray-400">
-          设置画布的背景色，在画布上实时预览效果。导出时将包含此背景。
+          设置参考框（元素区域）的背景色。点击参考框也可选中它来修改属性。
         </div>
       </div>
 

@@ -14,6 +14,9 @@ export function useKeyboardShortcuts() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // 素材编辑器打开时，全局快捷键全部跳过（由素材编辑器自己处理）
+      if (editorStore.materialEditorOpen) return;
+
       if (editorStore.previewMode && e.key === 'Escape') {
         e.preventDefault();
         editorStore.setPreviewMode(false);

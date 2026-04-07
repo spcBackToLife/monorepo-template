@@ -38,20 +38,32 @@ const OP_TO_COMPOSITE: Record<BooleanOpType, GlobalCompositeOperation> = {
 /**
  * 对两个 Fabric.js 对象执行布尔运算，返回结果 DataURL
  *
+ * 改进版：只在两个对象的联合包围盒区域内操作，
+ * 然后裁切到实际有像素内容的最小区域，
+ * 返回包含位置信息的结果。
+ *
  * @param canvas — Fabric.js Canvas 实例（用于获取尺寸）
  * @param objA — 第一个对象
  * @param objB — 第二个对象
  * @param operation — 布尔运算类型
- * @returns 结果 PNG DataURL
+ * @returns 结果对象，包含 dataURL 和位置信息，失败返回 null
  */
 export function performBooleanOp(
   canvas: FabricCanvas,
   objA: FabricObject,
   objB: FabricObject,
   operation: BooleanOpType,
-): string | null {
-  const width = canvas.getWidth();
-  const height = canvas.getHeight();
+): { dataURL: string; left: number; top: number; width: number; height: number } | null {
+  // 使用两个对象的联合包围盒，而非整个画布尺寸
+  const bbox = getUnionBoundingBox(objA, objB);
+  // 添加安全边距
+  const padding = 2;
+  const offsetX = Math.floor(bbox.left - padding);
+  const offsetY = Math.floor(bbox.top - padding);
+  const width = Math.ceil(bbox.width + padding * 2);
+  const height = Math.ceil(bbox.height + padding * 2);
+
+  if (width <= 0 || height <= 0) return null;
 
   // 创建离屏 Canvas A
   const canvasA = createOffscreenCanvas(width, height);
@@ -68,11 +80,11 @@ export function performBooleanOp(
   const resultCtx = resultCanvas.getContext('2d');
   if (!resultCtx) return null;
 
-  // 渲染对象 A 到离屏 Canvas
-  renderObjectToCanvas(ctxA, objA, width, height);
+  // 渲染对象 A 到离屏 Canvas（平移以适应包围盒偏移）
+  renderObjectToCanvas(ctxA, objA, width, height, offsetX, offsetY);
 
   // 渲染对象 B 到离屏 Canvas
-  renderObjectToCanvas(ctxB, objB, width, height);
+  renderObjectToCanvas(ctxB, objB, width, height, offsetX, offsetY);
 
   // 在结果 Canvas 上执行布尔运算
   // 先绘制 A
@@ -82,7 +94,17 @@ export function performBooleanOp(
   resultCtx.globalCompositeOperation = OP_TO_COMPOSITE[operation];
   resultCtx.drawImage(canvasB, 0, 0);
 
-  return resultCanvas.toDataURL('image/png');
+  // 裁切到实际有内容的最小区域
+  const trimmed = trimCanvas(resultCanvas, resultCtx);
+  if (!trimmed) return null;
+
+  return {
+    dataURL: trimmed.dataURL,
+    left: offsetX + trimmed.x,
+    top: offsetY + trimmed.y,
+    width: trimmed.width,
+    height: trimmed.height,
+  };
 }
 
 /**
@@ -116,21 +138,75 @@ function createOffscreenCanvas(width: number, height: number): HTMLCanvasElement
   return canvas;
 }
 
-/** 将 Fabric 对象渲染到 2D 上下文 */
+/** 将 Fabric 对象渲染到 2D 上下文（支持偏移，使坐标对齐包围盒区域） */
 function renderObjectToCanvas(
   ctx: CanvasRenderingContext2D,
   obj: FabricObject,
   _width: number,
   _height: number,
+  offsetX = 0,
+  offsetY = 0,
 ): void {
   ctx.save();
 
-  // 获取对象的变换矩阵
-  const m = obj.calcTransformMatrix();
-  ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+  // 平移以补偿包围盒偏移
+  // 注意：不要手动 ctx.transform(m[...])，因为 Fabric.js 的 obj.render(ctx)
+  // 内部会调用 this.transform(ctx) 自动应用完整的变换矩阵
+  ctx.translate(-offsetX, -offsetY);
 
-  // 渲染对象
+  // 渲染对象（Fabric 内部会自动应用对象的变换矩阵）
   obj.render(ctx);
 
   ctx.restore();
+}
+
+/**
+ * 裁切 canvas 到实际有像素内容的最小矩形
+ * 返回裁切后的 dataURL 及在原 canvas 中的位置
+ */
+function trimCanvas(
+  sourceCanvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+): { dataURL: string; x: number; y: number; width: number; height: number } | null {
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  let hasContent = false;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const alpha = data[(y * w + x) * 4 + 3];
+      if (alpha > 0) {
+        hasContent = true;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (!hasContent) return null;
+
+  const trimW = maxX - minX + 1;
+  const trimH = maxY - minY + 1;
+
+  if (trimW <= 0 || trimH <= 0) return null;
+
+  const trimmedCanvas = createOffscreenCanvas(trimW, trimH);
+  const trimmedCtx = trimmedCanvas.getContext('2d');
+  if (!trimmedCtx) return null;
+
+  trimmedCtx.drawImage(sourceCanvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+
+  return {
+    dataURL: trimmedCanvas.toDataURL('image/png'),
+    x: minX,
+    y: minY,
+    width: trimW,
+    height: trimH,
+  };
 }
