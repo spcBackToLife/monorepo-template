@@ -26,7 +26,8 @@ design_docs/
 │   │   ├── 08-layer-tree/             组件树与页面管理
 │   │   ├── 09-interaction-bindding/   交互与事件系统
 │   │   ├── 10-preview-mode/           预览与测试
-│   │   └── 11-collaboration/          协作与同步
+│   │   ├── 11-collaboration/          协作与同步
+│   │   └── 12-material-editor/        🆕 素材编辑器：图形绘制、图层合成、CSS动画、素材管理
 │   └── component-assets.md          - 组件资产体系（原子元素、资产库、飞轮）
 │
 ├── 03-tech/                         ← 技术方案（按模块拆分，各自独立阅读）

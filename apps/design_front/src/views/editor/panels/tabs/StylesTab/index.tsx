@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Empty } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
+import { API_BASE } from '@/api/client';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { NumericInput } from '../../../controls/NumericInput';
 import { ColorPicker } from '../../../controls/ColorPicker';
@@ -549,6 +550,49 @@ function layersToStyles(layers: BgLayer[]): { backgroundColor?: string; backgrou
   };
 }
 
+/** 背景图片输入：文本框 + 上传按钮 */
+function BgImageInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const projectId = editorStore.project?.id;
+
+  const upload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !projectId) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${API_BASE}/projects/${projectId}/assets/upload`, {
+      method: 'POST',
+      body: fd,
+    });
+    const data = (await res.json()) as { url?: string };
+    if (!res.ok || !data.url) return;
+    const path = data.url.replace(/^\//, '');
+    onChange(`url(asset://${path})`);
+  }, [projectId, onChange]);
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
+        value={value}
+        placeholder="url(asset://uploads/…)"
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => void upload(e)} />
+      <button
+        type="button"
+        className="flex-shrink-0 px-1.5 py-0.5 text-[10px] border border-gray-200 rounded hover:bg-gray-50"
+        disabled={!projectId}
+        onClick={() => fileRef.current?.click()}
+      >
+        上传
+      </button>
+    </div>
+  );
+}
+
 function BackgroundEditor({
   styles,
   onChange,
@@ -606,6 +650,8 @@ function BackgroundEditor({
           </div>
           {layer.type === 'solid' ? (
             <ColorPicker label="颜色" value={layer.value} onChange={(v) => updateLayer(idx, v)} />
+          ) : layer.type === 'image' ? (
+            <BgImageInput value={layer.value} onChange={(v) => updateLayer(idx, v)} />
           ) : (
             <input
               type="text"

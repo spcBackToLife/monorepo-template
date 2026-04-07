@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { App as AntdApp, Button, Spin } from 'antd';
-import { CopyOutlined, DeleteOutlined } from '@ant-design/icons';
+import { CopyOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
+import { findNodeInScreens } from '@globallink/design-operations';
 import { API_BASE } from '@/api/client';
 
 interface AssetItem {
@@ -100,10 +101,36 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
 
   const isImage = (name: string) => /\.(png|jpe?g|gif|webp|svg|ico)$/i.test(name);
 
+  /** 将素材应用到当前选中的元素 */
+  const applyToSelected = useCallback(
+    (assetRef: string) => {
+      const nodeId = editorStore.selectedNodeIds[0];
+      if (!nodeId) {
+        message.warning('请先选中一个元素');
+        return;
+      }
+      const node = findNodeInScreens(editorStore.screens, nodeId);
+      if (!node) return;
+      if (node.type === 'img') {
+        editorStore.execute({
+          type: 'updateComponentProps',
+          params: { nodeId, props: { src: assetRef } },
+        });
+      } else {
+        editorStore.execute({
+          type: 'updateStyle',
+          params: { nodeId, styles: { backgroundImage: `url(${assetRef})`, backgroundSize: 'cover' } },
+        });
+      }
+      message.success('已应用');
+    },
+    [message],
+  );
+
   return (
     <div className="p-3 text-xs space-y-2">
       <p className="text-[10px] text-gray-500 leading-relaxed">
-        图片等控件可在 src 中粘贴下列 <code className="text-purple-600">asset://uploads/…</code> 引用。
+        上传图片后，点击 <CheckOutlined style={{ fontSize: 10 }} /> 可直接应用到选中元素，或复制 <code className="text-purple-600">asset://</code> 引用手动粘贴。
       </p>
       <label className="block">
         <span className="sr-only">上传文件</span>
@@ -147,6 +174,15 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
                 onClick={() => copy(it.assetRef)}
                 title="复制 asset:// 引用"
               />
+              {isImage(it.name) && (
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  onClick={() => applyToSelected(it.assetRef)}
+                  title="应用到选中元素"
+                />
+              )}
               <Button
                 type="text"
                 size="small"

@@ -477,8 +477,9 @@ React DOM 渲染层（SchemaRenderer）
 | 09 | [交互与事件](./09-interaction-bindding/README.md) | 如何在设计阶段定义真实的交互行为？ | 事件绑定、页面跳转 |
 | 10 | [预览与验证](./10-preview-mode/README.md) | 如何验证产品的真实交互效果？ | 预览模式、交互执行 |
 | 11 | [协作与同步](./11-collaboration/README.md) | 如何让人和 AI 实时协作构建？ | MCP 同步、WebSocket |
-| 12 | [页面生命周期](./12-page-lifecycle/README.md) | 如何描述页面在各生命阶段的行为？ | screenEnter/Exit、滚动、可见性 |
-| 13 | [状态全景视图](./13-panorama-view/README.md) | 如何一眼看到所有状态的表现？ | 组件全景、页面全景矩阵 |
+| 12 | [素材编辑器](./12-material-editor/README.md) | 如何创作和管理视觉素材（图形/渐变/动画）？ | Fabric.js、图层合成、CSS 动画编辑 |
+| 13 | [页面生命周期](./13-page-lifecycle/README.md) | 如何描述页面在各生命阶段的行为？ | screenEnter/Exit、滚动、可见性 |
+| 14 | [状态全景视图](./14-panorama-view/README.md) | 如何一眼看到所有状态的表现？ | 组件全景、页面全景矩阵 |
 
 ---
 

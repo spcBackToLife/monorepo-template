@@ -1,4 +1,5 @@
 import { useLayoutEffect, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Menu } from 'antd';
 import type { MenuProps } from 'antd';
 
@@ -63,7 +64,7 @@ export function EditorContextMenuPortal({ open, x, y, items, onClose, onMenuClic
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <>
       <div
         role="presentation"
@@ -95,6 +96,7 @@ export function EditorContextMenuPortal({ open, x, y, items, onClose, onMenuClic
           }}
         />
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
