@@ -59,6 +59,12 @@ import {
   type BooleanOpType,
   type AlignmentType,
 } from '@globallink/material-operations';
+import {
+  materialEditorSync,
+  type MaterialOperationEnvelope,
+} from '@/services/MaterialEditorSyncManager';
+import { materialProjectApi } from '@/api/materialProject';
+import { API_BASE } from '@/api/client';
 import { LeftToolbar } from './LeftToolbar';
 import type { ActiveTool, EffectToolType } from './LeftToolbar';
 import { RightPropertyPanel } from './RightPropertyPanel';
@@ -160,6 +166,11 @@ interface InnerProps {
 
 /**
  * MaterialEditorModalInner — 创建 SVG 引擎 Provider + 三栏布局
+ *
+ * v2 MCP 集成：
+ *   1. 挂载时自动创建/查找后端素材工程（materialProjectId）
+ *   2. 连接 WS SyncManager 接收 MCP 远程操作
+ *   3. 本地操作通过 onOperation/onBatch 回调同步到后端
  */
 const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
   targetNodeId,
@@ -183,23 +194,198 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
     ),
   );
 
+  // 后端素材工程 ID（创建后赋值）
+  const [materialProjectId, setMaterialProjectId] = useState<string | null>(null);
+  const materialProjectIdRef = useRef<string | null>(null);
+
+  // 挂载时自动创建/查找后端素材工程 + 连接 WS
+  useEffect(() => {
+    const projectId = editorStore.project?.id;
+    if (!projectId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        let mpId: string | null = null;
+
+        // 如果有 targetNodeId，先查找是否已有关联的素材工程
+        if (targetNodeId) {
+          const existing = await materialProjectApi.findByNode(projectId, targetNodeId);
+          if (existing && !cancelled) {
+            mpId = existing.id;
+          }
+        }
+
+        // 没有现有工程则创建新的
+        if (!mpId && !cancelled) {
+          const nodeName = selectedStyles?.nodeName ?? '素材';
+          const created = await materialProjectApi.create(projectId, {
+            name: `${nodeName}-素材`,
+            targetNodeId: targetNodeId ?? undefined,
+            canvasWidth: componentSize.width,
+            canvasHeight: componentSize.height,
+            canvasJSON: {},
+            referenceFrameWidth: componentSize.width,
+            referenceFrameHeight: componentSize.height,
+          });
+          mpId = created.id;
+        }
+
+        if (cancelled || !mpId) return;
+
+        materialProjectIdRef.current = mpId;
+        setMaterialProjectId(mpId);
+
+        // 连接 WS 同步 — 传入 materialId
+        materialEditorSync.connect(projectId, mpId);
+        console.log(`[MaterialEditorModal] Connected to material project: ${mpId}`);
+      } catch (err) {
+        console.error('[MaterialEditorModal] Failed to create/find material project:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      materialEditorSync.disconnect();
+    };
+  }, [targetNodeId, componentSize.width, componentSize.height, selectedStyles?.nodeName]);
+
+  // 本地操作同步回调 — 发送到后端
+  const handleOperation = useCallback((op: MaterialOperation, _result: unknown) => {
+    if (materialProjectIdRef.current) {
+      materialEditorSync.sendOperation(op);
+    }
+  }, []);
+
+  const handleBatch = useCallback((ops: MaterialOperation[], _results: unknown[]) => {
+    if (materialProjectIdRef.current) {
+      materialEditorSync.sendBatch(ops);
+    }
+  }, []);
+
+  const handleUndoRedo = useCallback((direction: 'undo' | 'redo', _result: unknown) => {
+    const projectId = editorStore.project?.id;
+    const mpId = materialProjectIdRef.current;
+    if (!projectId || !mpId) return;
+
+    fetch(`${API_BASE}/projects/${projectId}/materials/${mpId}/operations/${direction}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ author: 'user' }),
+    }).catch((err) => {
+      console.error(`[MaterialEditorModal] Failed to ${direction}:`, err);
+    });
+  }, []);
+
   return (
-    <MaterialEditorProvider initialProject={initialSchema}>
+    <MaterialEditorProvider
+      initialProject={initialSchema}
+      onOperation={handleOperation}
+      onBatch={handleBatch}
+      onUndoRedo={handleUndoRedo}
+    >
+      <SyncBridge materialProjectId={materialProjectId} />
       <ModalContent
         targetNodeId={targetNodeId}
         onClose={onClose}
         selectedStyles={selectedStyles}
         componentSize={componentSize}
+        materialProjectId={materialProjectId}
       />
     </MaterialEditorProvider>
   );
 });
+
+/**
+ * SyncBridge — WS 同步桥接组件（必须在 MaterialEditorProvider 内部）
+ *
+ * 职责：
+ *   1. 挂载时从后端加载完整 Schema，将后端对象合并到前端本地 Context
+ *   2. 监听 WS 远程操作 → execute 到本地 Context → SVG 自动重渲染
+ *   3. 监听 undo/redo 事件 → 重新加载 Schema
+ *
+ * 这是 MCP 远程操作实时反映到弹窗画布的关键。
+ */
+function SyncBridge({ materialProjectId }: { materialProjectId: string | null }) {
+  const { execute, state, setProject } = useMaterialEditor();
+
+  // 挂载时从后端加载已有对象，合并到前端本地 Context
+  useEffect(() => {
+    if (!materialProjectId) return;
+    const projectId = editorStore.project?.id;
+    if (!projectId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/projects/${projectId}/materials/${materialProjectId}/schema`,
+        );
+        if (!res.ok || cancelled) return;
+        const backendSchema = await res.json() as MaterialProjectSchema;
+
+        // 后端有对象时，合并到前端本地 Schema
+        const backendObjects = backendSchema.objects ?? [];
+        if (backendObjects.length > 0 && !cancelled) {
+          // 使用前端的画布设置（大画布 + 默认框），但把后端的对象 execute 进来
+          for (const obj of backendObjects) {
+            execute({
+              type: 'me:addObject',
+              params: { objectId: obj.id, object: obj },
+            });
+          }
+          console.log(`[SyncBridge] Loaded ${backendObjects.length} objects from backend`);
+        }
+      } catch (err) {
+        console.error('[SyncBridge] Failed to load backend schema:', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [materialProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!materialProjectId) return;
+
+    // 监听远程操作 → execute 到本地 Context
+    const unsubOp = materialEditorSync.onOperation((envelope: MaterialOperationEnvelope) => {
+      execute(envelope.operation);
+    });
+
+    // 监听 undo/redo 事件 → 重新加载 Schema
+    const unsubUndo = materialEditorSync.onUndo(async (event) => {
+      try {
+        const projectId = editorStore.project?.id;
+        if (!projectId || !event.materialId) return;
+        const res = await fetch(
+          `${API_BASE}/projects/${projectId}/materials/${event.materialId}/schema`,
+        );
+        if (res.ok) {
+          const schema = await res.json() as MaterialProjectSchema;
+          window.dispatchEvent(new CustomEvent('material-schema-reload', { detail: schema }));
+        }
+      } catch (err) {
+        console.error('[SyncBridge] Failed to reload schema after undo:', err);
+      }
+    });
+
+    return () => {
+      unsubOp();
+      unsubUndo();
+    };
+  }, [materialProjectId, execute]);
+
+  return null;
+}
 
 interface ModalContentProps {
   targetNodeId: string | null;
   onClose: () => void;
   selectedStyles: ReturnType<typeof useTargetNodeStyles>;
   componentSize: { width: number; height: number };
+  materialProjectId?: string | null;
 }
 
 /**
@@ -210,6 +396,7 @@ function ModalContent({
   onClose,
   selectedStyles,
   componentSize,
+  materialProjectId,
 }: ModalContentProps) {
   const { message } = AntdApp.useApp();
   const {
@@ -256,9 +443,6 @@ function ModalContent({
       scaleY: obj.scaleY,
     };
   }, [selectedIds, getSelectedObjects]);
-
-  // ===== 素材工程持久化状态 =====
-  const [materialProjectId, setMaterialProjectId] = useState<string | null>(null);
 
   // ===== 拖拽逻辑 =====
   const panelRef = useRef<HTMLDivElement>(null);
@@ -688,7 +872,6 @@ function ModalContent({
             targetNodeId={targetNodeId}
             onClose={onClose}
             materialProjectId={materialProjectId}
-            onProjectSaved={(id) => setMaterialProjectId(id)}
           />
         </div>
       </ConfigProvider>

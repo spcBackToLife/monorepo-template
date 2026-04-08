@@ -37,6 +37,9 @@ import * as api from '../api-client.js';
  * === 素材画布 · 撤销/重做 ===
  *   me_undo / me_redo
  *
+ * === 素材画布 · 高级绘图 ===
+ *   me_draw_arcs / me_clear_objects
+ *
  * === CSS 工具（纯计算，无需画布） ===
  *   me_generate_gradient_css / me_generate_shadow_css / me_generate_filter_css
  *   me_generate_animation_css
@@ -153,6 +156,107 @@ export function registerMaterialTools(server: McpServer): void {
   );
 
   // ╔══════════════════════════════════════════════╗
+  // ║  素材工程管理（创建/列表/查询/删除）            ║
+  // ╚══════════════════════════════════════════════╝
+
+  server.registerTool(
+    'me_create_project',
+    {
+      description:
+        '创建一个素材编辑工程（持久化到后端数据库）。创建后返回 materialId，后续所有画布操作（me_add_object 等）都需要传入此 ID。' +
+        '可选择关联一个设计 Schema 节点（targetNodeId），也可不关联作为独立素材工程。' +
+        '创建成功后前端素材编辑器会自动连接 WebSocket 同步。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        name: z.string().describe('工程名称（如"按钮背景"、"卡片装饰"）'),
+        targetNodeId: z.string().optional().describe('关联的设计 Schema 节点 ID（可选，关联后可将素材应用到该节点）'),
+        canvasWidth: z.number().positive().optional().describe('画布宽度（px，默认 600）'),
+        canvasHeight: z.number().positive().optional().describe('画布高度（px，默认 400）'),
+        backgroundColor: z.string().optional().describe('画布背景色（默认 #ffffff）'),
+        referenceFrameWidth: z.number().positive().optional().describe('参考框宽度（组件实际尺寸，默认等于画布宽度）'),
+        referenceFrameHeight: z.number().positive().optional().describe('参考框高度（组件实际尺寸，默认等于画布高度）'),
+        tags: z.array(z.string()).optional().describe('标签列表'),
+      },
+    },
+    async ({ projectId, name, targetNodeId, canvasWidth, canvasHeight, backgroundColor, referenceFrameWidth, referenceFrameHeight, tags }) => {
+      const result = await api.createMaterialProject(projectId, {
+        name,
+        targetNodeId,
+        canvasWidth: canvasWidth ?? 600,
+        canvasHeight: canvasHeight ?? 400,
+        backgroundColor,
+        referenceFrameWidth,
+        referenceFrameHeight,
+        tags,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_list_projects',
+    {
+      description:
+        '列出项目下的所有素材工程（摘要信息：ID、名称、尺寸、缩略图等）。' +
+        '可按关联节点或关键词过滤。用于查找现有素材工程的 materialId。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        targetNodeId: z.string().optional().describe('按关联节点过滤'),
+        search: z.string().optional().describe('按名称关键词搜索'),
+      },
+    },
+    async ({ projectId, targetNodeId, search }) => {
+      const result = await api.listMaterialProjects(projectId, { targetNodeId, search });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_get_project',
+    {
+      description: '获取素材工程的详细信息（含画布 JSON、背景色、关联节点等）。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        materialProjectId: z.string().describe('素材工程 ID'),
+      },
+    },
+    async ({ projectId, materialProjectId }) => {
+      const result = await api.getMaterialProject(projectId, materialProjectId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_find_project_by_node',
+    {
+      description: '按关联的设计 Schema 节点 ID 查找素材工程。如果该节点已有素材工程则返回详情，否则返回 { found: false }。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('设计 Schema 节点 ID'),
+      },
+    },
+    async ({ projectId, nodeId }) => {
+      const result = await api.findMaterialProjectByNode(projectId, nodeId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_delete_project',
+    {
+      description: '删除素材工程（不可恢复）。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        materialProjectId: z.string().describe('要删除的素材工程 ID'),
+      },
+    },
+    async ({ projectId, materialProjectId }) => {
+      await api.deleteMaterialProject(projectId, materialProjectId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: '素材工程已删除' }) }] };
+    },
+  );
+
+  // ╔══════════════════════════════════════════════╗
   // ║  素材画布 · Schema 与信息                       ║
   // ╚══════════════════════════════════════════════╝
 
@@ -168,6 +272,67 @@ export function registerMaterialTools(server: McpServer): void {
     async ({ projectId, materialId }) => {
       const result = await api.getMaterialSchema(projectId, materialId);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_get_canvas_info',
+    {
+      description:
+        '获取素材工程的画布信息摘要，包括：\n' +
+        '  - 后端画布尺寸（canvasWidth/canvasHeight — 即组件原始尺寸）\n' +
+        '  - 前端画布尺寸（frontendCanvasWidth/frontendCanvasHeight — 前端自动放大后的尺寸）\n' +
+        '  - 参考框（默认框）在前端画布中的精确坐标（referenceFrameX/Y）\n' +
+        '  - 背景色、对象数量等\n\n' +
+        '这是通过 MCP 操作画布前必须调用的工具。\n' +
+        '返回的 referenceFrameX/Y 就是 me_add_object 中应该使用的 x/y 坐标，\n' +
+        '这样对象就会出现在参考框内部。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        materialId: z.string().describe('素材工程 ID'),
+      },
+    },
+    async ({ projectId, materialId }) => {
+      const schema = await api.getMaterialSchema(projectId, materialId) as Record<string, unknown>;
+      const backendW = (schema.canvasWidth as number) ?? 600;
+      const backendH = (schema.canvasHeight as number) ?? 400;
+      const refFrame = schema.referenceFrame as { enabled?: boolean; width?: number; height?: number } | undefined;
+      const refW = refFrame?.width ?? backendW;
+      const refH = refFrame?.height ?? backendH;
+
+      // 前端 createMaterialProject 的计算逻辑
+      const CANVAS_MIN_PADDING = 400;
+      const frontendW = Math.max(1200, refW + CANVAS_MIN_PADDING * 2);
+      const frontendH = Math.max(900, refH + CANVAS_MIN_PADDING * 2);
+      const frameX = (frontendW - refW) / 2;
+      const frameY = (frontendH - refH) / 2;
+
+      const objects = (schema.objects as unknown[]) ?? [];
+      const info = {
+        // 后端存储的画布尺寸（= 组件原始尺寸）
+        backendCanvasWidth: backendW,
+        backendCanvasHeight: backendH,
+        // 前端自动放大后的画布尺寸
+        frontendCanvasWidth: frontendW,
+        frontendCanvasHeight: frontendH,
+        // 参考框（默认框）尺寸
+        referenceFrameWidth: refW,
+        referenceFrameHeight: refH,
+        referenceFrameEnabled: refFrame?.enabled ?? true,
+        // ⭐ 关键：参考框在前端画布中的位置 — 用这个作为 me_add_object 的 x/y
+        referenceFrameX: frameX,
+        referenceFrameY: frameY,
+        // 画布背景色
+        backgroundColor: schema.backgroundColor ?? '#ffffff',
+        // 对象统计
+        objectCount: objects.length,
+        defaultElementId: schema.defaultElementId ?? null,
+        // 操作提示
+        _hint: `在参考框内画对象时，设置 x=${frameX}, y=${frameY}, width=${refW}, height=${refH}。` +
+               `pathData 中使用局部坐标 (0,0)~(${refW},${refH})。` +
+               `注意背景色是 ${schema.backgroundColor ?? '#ffffff'}，请选择对比色作为 stroke。`,
+      };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(info, null, 2) }] };
     },
   );
 
@@ -243,7 +408,15 @@ export function registerMaterialTools(server: McpServer): void {
     'me_add_object',
     {
       description:
-        '在素材画布上添加对象：矩形(rect)、椭圆(ellipse)、多边形(polygon)、星形(star)、路径(path)、线段(line)、文字(textbox)、图片(image)。可指定位置、尺寸、填充、描边等属性。',
+        '在素材画布上添加对象。支持类型：矩形(rect)、椭圆(ellipse)、多边形(polygon)、星形(star)、路径(path)、线段(line)、文字(textbox)、图片(image)。\n\n' +
+        '⚠️ 坐标系说明：\n' +
+        '  - x/y 是对象在前端画布坐标系中的位置（不是后端画布坐标）\n' +
+        '  - 要让对象出现在参考框内，先调用 me_get_canvas_info 获取 referenceFrameX/Y，用它们作为 x/y\n' +
+        '  - pathData 中的坐标是相对于对象 (x,y) 的局部坐标，范围 0~width / 0~height\n' +
+        '  - SVG 坐标系：Y轴向下，(0,0)=左上角，(width,height)=右下角\n\n' +
+        '⚠️ 颜色提示：\n' +
+        '  - 默认背景色是 #ffffff（白色），请勿使用白色或浅色 stroke\n' +
+        '  - 推荐 stroke 颜色：#1a3ab4(深蓝) #32c896(青绿) #333333(深灰) #d4389a(品红)',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         materialId: z.string().describe('素材工程 ID'),
@@ -318,7 +491,7 @@ export function registerMaterialTools(server: McpServer): void {
     async ({ projectId, materialId, objectId, updates }) => {
       const result = await api.executeMaterialOperation(projectId, materialId, {
         type: 'me:updateObject',
-        params: { objectId, updates },
+        params: { objectId, props: updates },
       });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
@@ -645,6 +818,184 @@ export function registerMaterialTools(server: McpServer): void {
     async ({ projectId, materialId }) => {
       const result = await api.materialRedo(projectId, materialId);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  // ╔══════════════════════════════════════════════╗
+  // ║  素材画布 · 高级绘图（自动处理坐标/颜色）       ║
+  // ╚══════════════════════════════════════════════╝
+
+  server.registerTool(
+    'me_draw_arcs',
+    {
+      description:
+        '在参考框内绘制一组发散弧线（装饰性曲线效果）。自动处理坐标转换和颜色选择。\n\n' +
+        '弧线从参考框的一个角落发散到对边，常用于制作 UI 装饰背景。\n' +
+        '此工具自动计算参考框位置、路径坐标、颜色渐变，无需手动指定 x/y 或 pathData。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        materialId: z.string().describe('素材工程 ID'),
+        count: z.number().min(2).max(30).optional().describe('弧线数量（默认 12）'),
+        origin: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']).optional()
+          .describe('弧线起始角（默认 top-left，弧线从该角发散到对角方向）'),
+        colorStart: z.string().optional().describe('起始颜色（CSS 格式，默认 #1a3ab4 深蓝）'),
+        colorEnd: z.string().optional().describe('结束颜色（CSS 格式，默认 #32c896 青绿）'),
+        strokeWidth: z.number().optional().describe('描边宽度（默认 1.5）'),
+        opacity: z.number().min(0).max(1).optional().describe('透明度（默认 0.85）'),
+      },
+    },
+    async ({ projectId, materialId, count, origin, colorStart, colorEnd, strokeWidth: sw, opacity }) => {
+      // 1. 获取画布信息，计算参考框位置
+      const schema = await api.getMaterialSchema(projectId, materialId) as Record<string, unknown>;
+      const backendW = (schema.canvasWidth as number) ?? 600;
+      const backendH = (schema.canvasHeight as number) ?? 400;
+      const refFrame = schema.referenceFrame as { width?: number; height?: number } | undefined;
+      const W = refFrame?.width ?? backendW;
+      const H = refFrame?.height ?? backendH;
+
+      const PADDING = 400;
+      const cw = Math.max(1200, W + PADDING * 2);
+      const ch = Math.max(900, H + PADDING * 2);
+      const frameX = (cw - W) / 2;
+      const frameY = (ch - H) / 2;
+
+      const N = count ?? 12;
+      const orig = origin ?? 'top-left';
+      const c1 = colorStart ?? '#1a3ab4';
+      const c2 = colorEnd ?? '#32c896';
+      const sWidth = sw ?? 1.5;
+      const alpha = opacity ?? 0.85;
+
+      // 2. 解析颜色插值
+      const parseHex = (hex: string) => {
+        const h = hex.replace('#', '');
+        return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+      };
+      const rgb1 = parseHex(c1);
+      const rgb2 = parseHex(c2);
+
+      // 3. 生成弧线并批量添加
+      const operations: unknown[] = [];
+      for (let i = 0; i < N; i++) {
+        const t = N > 1 ? i / (N - 1) : 0;
+        const r = Math.round(rgb1[0]! + (rgb2[0]! - rgb1[0]!) * t);
+        const g = Math.round(rgb1[1]! + (rgb2[1]! - rgb1[1]!) * t);
+        const b = Math.round(rgb1[2]! + (rgb2[2]! - rgb1[2]!) * t);
+        const color = `rgba(${r},${g},${b},${alpha})`;
+
+        // 计算路径：根据起始角确定方向
+        let pathData: string;
+        const spread = 0.3 + 0.7 * t; // 弧线展开程度
+
+        switch (orig) {
+          case 'top-left':
+            // 从左上角发散到右下方
+            pathData = `M 0 0 Q ${(W * (0.1 + t * 0.35)).toFixed(1)} ${(H * spread).toFixed(1)} ${(W * spread).toFixed(1)} ${(H * (0.05 + t * 0.9)).toFixed(1)}`;
+            break;
+          case 'top-right':
+            // 从右上角发散到左下方
+            pathData = `M ${W} 0 Q ${(W * (0.9 - t * 0.35)).toFixed(1)} ${(H * spread).toFixed(1)} ${(W * (1 - spread)).toFixed(1)} ${(H * (0.05 + t * 0.9)).toFixed(1)}`;
+            break;
+          case 'bottom-left':
+            // 从左下角发散到右上方
+            pathData = `M 0 ${H} Q ${(W * (0.1 + t * 0.35)).toFixed(1)} ${(H * (1 - spread)).toFixed(1)} ${(W * spread).toFixed(1)} ${(H * (0.95 - t * 0.9)).toFixed(1)}`;
+            break;
+          case 'bottom-right':
+            // 从右下角发散到左上方
+            pathData = `M ${W} ${H} Q ${(W * (0.9 - t * 0.35)).toFixed(1)} ${(H * (1 - spread)).toFixed(1)} ${(W * (1 - spread)).toFixed(1)} ${(H * (0.95 - t * 0.9)).toFixed(1)}`;
+            break;
+        }
+
+        operations.push({
+          type: 'me:addObject',
+          params: {
+            object: {
+              type: 'path',
+              name: `arc-${String(i + 1).padStart(2, '0')}`,
+              x: frameX,
+              y: frameY,
+              width: W,
+              height: H,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+              fill: null,
+              stroke: color,
+              strokeWidth: sWidth,
+              opacity: 1,
+              blendMode: 'normal',
+              visible: true,
+              locked: false,
+              pathData,
+            },
+          },
+        });
+      }
+
+      // 用批量接口一次性添加
+      const result = await api.executeMaterialBatch(projectId, materialId, operations);
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            success: true,
+            message: `已在参考框 (${frameX},${frameY}) 内绘制 ${N} 条弧线`,
+            origin: orig,
+            referenceFrame: { x: frameX, y: frameY, width: W, height: H },
+            colorRange: `${c1} → ${c2}`,
+            ...(result as Record<string, unknown>),
+          }, null, 2),
+        }],
+      };
+    },
+  );
+
+  server.registerTool(
+    'me_clear_objects',
+    {
+      description:
+        '清除素材工程中的所有对象（保留默认框/参考框）。\n' +
+        '这是重置画布的安全方式，比逐个删除更高效。\n' +
+        '如果设置 includeDefault=true 则连默认框也删除。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        materialId: z.string().describe('素材工程 ID'),
+        includeDefault: z.boolean().optional().describe('是否同时删除默认框（默认 false）'),
+      },
+    },
+    async ({ projectId, materialId, includeDefault }) => {
+      // 获取当前所有对象
+      const schema = await api.getMaterialSchema(projectId, materialId) as Record<string, unknown>;
+      const objects = (schema.objects as Array<{ id: string; name?: string }>) ?? [];
+      const defaultId = schema.defaultElementId as string | undefined;
+
+      const toDelete = objects.filter(o => includeDefault || o.id !== defaultId);
+
+      if (toDelete.length === 0) {
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: '画布已经是空的', deletedCount: 0 }) }] };
+      }
+
+      // 使用批量操作一次性删除
+      const operations = toDelete.map(o => ({
+        type: 'me:removeObject',
+        params: { objectId: o.id },
+      }));
+
+      const result = await api.executeMaterialBatch(projectId, materialId, operations);
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            success: true,
+            message: `已删除 ${toDelete.length} 个对象`,
+            deletedCount: toDelete.length,
+            keptDefault: !includeDefault && defaultId ? true : false,
+            ...(result as Record<string, unknown>),
+          }, null, 2),
+        }],
+      };
     },
   );
 

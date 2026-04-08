@@ -210,6 +210,81 @@ export async function updateMaterialMeta(
   });
 }
 
+// ===== Material Projects (素材工程 CRUD) =====
+
+/**
+ * 创建素材工程（持久化到数据库）
+ *
+ * 创建后返回 materialProjectId，可用于后续 MCP 操作和 WS 同步。
+ */
+export async function createMaterialProject(
+  projectId: string,
+  data: {
+    name: string;
+    targetNodeId?: string;
+    canvasWidth: number;
+    canvasHeight: number;
+    canvasJSON?: Record<string, unknown>;
+    backgroundColor?: string;
+    referenceFrameWidth?: number;
+    referenceFrameHeight?: number;
+    tags?: string[];
+  },
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-projects`, {
+    method: 'POST',
+    body: {
+      ...data,
+      canvasJSON: data.canvasJSON ?? {},
+    },
+  });
+}
+
+/**
+ * 列出素材工程（摘要，不含 canvasJSON）
+ */
+export async function listMaterialProjects(
+  projectId: string,
+  options?: { targetNodeId?: string; search?: string },
+): Promise<unknown> {
+  const params: Record<string, string> = {};
+  if (options?.targetNodeId) params.targetNodeId = options.targetNodeId;
+  if (options?.search) params.search = options.search;
+  return request(`/api/projects/${projectId}/material-projects`, { params });
+}
+
+/**
+ * 获取素材工程详情（含完整 canvasJSON）
+ */
+export async function getMaterialProject(
+  projectId: string,
+  materialProjectId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-projects/${materialProjectId}`);
+}
+
+/**
+ * 按关联节点查找素材工程
+ */
+export async function findMaterialProjectByNode(
+  projectId: string,
+  nodeId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-projects/by-node/${nodeId}`);
+}
+
+/**
+ * 删除素材工程
+ */
+export async function deleteMaterialProject(
+  projectId: string,
+  materialProjectId: string,
+): Promise<void> {
+  await request(`/api/projects/${projectId}/material-projects/${materialProjectId}`, {
+    method: 'DELETE',
+  });
+}
+
 // ===== Material Editor Actions =====
 
 /**

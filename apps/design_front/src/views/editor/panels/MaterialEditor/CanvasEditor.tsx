@@ -157,19 +157,51 @@ function CanvasToolbar() {
     {
       key: 'applyBg',
       label: '🎯 应用为元素背景 (SVG)',
-      onClick: () => {
+      onClick: async () => {
         const nodeId = editorStore.selectedNodeIds[0];
         if (!nodeId) { message.warning('请先选中一个元素'); return; }
-        // 从 SVG 渲染器导出
+        // 裁剪参考框区域导出 SVG
         const svgEl = document.querySelector('.material-renderer-svg') as SVGSVGElement | null;
         if (!svgEl) return;
-        const svgString = new XMLSerializer().serializeToString(svgEl);
-        const encoded = `url("data:image/svg+xml,${encodeURIComponent(svgString)}")`;
-        editorStore.execute({
-          type: 'updateStyle',
-          params: { nodeId, styles: { backgroundImage: encoded, backgroundSize: 'cover' } },
-        });
-        message.success('画布已应用为元素背景');
+        const { canvasWidth: cw, canvasHeight: ch, referenceFrame: rf } = project;
+        const clone = svgEl.cloneNode(true) as SVGSVGElement;
+        if (rf?.enabled) {
+          const fx = (cw - rf.width) / 2;
+          const fy = (ch - rf.height) / 2;
+          clone.setAttribute('viewBox', `${fx} ${fy} ${rf.width} ${rf.height}`);
+          clone.setAttribute('width', String(rf.width));
+          clone.setAttribute('height', String(rf.height));
+        }
+        clone.style.cssText = '';
+        clone.removeAttribute('style');
+        const svgString = new XMLSerializer().serializeToString(clone);
+
+        // 上传为独立资产而非内联 data URI
+        const projectId = editorStore.project?.id;
+        if (projectId) {
+          try {
+            const blob = new Blob([svgString], { type: 'image/svg+xml' });
+            const file = new File([blob], 'canvas-export.svg', { type: 'image/svg+xml' });
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch(`${API_BASE}/projects/${projectId}/materials/upload`, {
+              method: 'POST',
+              body: formData,
+            });
+            if (response.ok) {
+              const uploaded = await response.json() as { url: string };
+              editorStore.execute({
+                type: 'updateStyle',
+                params: { nodeId, styles: { backgroundImage: `url("${uploaded.url}")`, backgroundSize: 'cover' } },
+              });
+              message.success('画布已应用为元素背景');
+            } else {
+              message.error('上传失败');
+            }
+          } catch {
+            message.error('应用失败');
+          }
+        }
       },
     },
     { type: 'divider' as const },
@@ -179,7 +211,18 @@ function CanvasToolbar() {
       onClick: () => {
         const svgEl = document.querySelector('.material-renderer-svg') as SVGSVGElement | null;
         if (!svgEl) return;
-        const svgString = new XMLSerializer().serializeToString(svgEl);
+        const { canvasWidth: cw, canvasHeight: ch, referenceFrame: rf } = project;
+        const clone = svgEl.cloneNode(true) as SVGSVGElement;
+        if (rf?.enabled) {
+          const fx = (cw - rf.width) / 2;
+          const fy = (ch - rf.height) / 2;
+          clone.setAttribute('viewBox', `${fx} ${fy} ${rf.width} ${rf.height}`);
+          clone.setAttribute('width', String(rf.width));
+          clone.setAttribute('height', String(rf.height));
+        }
+        clone.style.cssText = '';
+        clone.removeAttribute('style');
+        const svgString = new XMLSerializer().serializeToString(clone);
         downloadBlob(new Blob([svgString], { type: 'image/svg+xml' }), 'material.svg');
         message.success('SVG 已导出');
       },
@@ -190,7 +233,18 @@ function CanvasToolbar() {
       onClick: async () => {
         const svgEl = document.querySelector('.material-renderer-svg') as SVGSVGElement | null;
         if (!svgEl) return;
-        const svgString = new XMLSerializer().serializeToString(svgEl);
+        const { canvasWidth: cw, canvasHeight: ch, referenceFrame: rf } = project;
+        const clone = svgEl.cloneNode(true) as SVGSVGElement;
+        if (rf?.enabled) {
+          const fx = (cw - rf.width) / 2;
+          const fy = (ch - rf.height) / 2;
+          clone.setAttribute('viewBox', `${fx} ${fy} ${rf.width} ${rf.height}`);
+          clone.setAttribute('width', String(rf.width));
+          clone.setAttribute('height', String(rf.height));
+        }
+        clone.style.cssText = '';
+        clone.removeAttribute('style');
+        const svgString = new XMLSerializer().serializeToString(clone);
         await navigator.clipboard.writeText(svgString);
         message.success('SVG 代码已复制');
       },
@@ -305,6 +359,8 @@ function SyncedCanvas() {
     const projectId = editorStore.project?.id;
     if (!projectId) return;
 
+    // TODO: 独立画布编辑器也应该有 materialProjectId，暂时使用项目级订阅
+    // 后续可通过 URL 参数或 editorStore 传入 materialProjectId
     materialEditorSync.connect(projectId);
 
     // 监听远程操作 → execute 到本地 Context
