@@ -11,6 +11,7 @@
   "dependencies": {
     "@globallink/design-operations": "workspace:*",
     "@globallink/design-schema": "workspace:*",
+    "@globallink/material-operations": "workspace:*",
     "@nestjs/common": "^11.0.12",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.12",

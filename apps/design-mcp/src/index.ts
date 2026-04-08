@@ -25,6 +25,7 @@ import { registerDatasourceResources } from './resources/datasource-resources.js
 import { registerDomainStateResources } from './resources/domain-state-resources.js';
 import { registerEnvironmentStateResources } from './resources/environment-state-resources.js';
 import { registerTemplateResources } from './resources/template-resources.js';
+import { registerMaterialResources } from './resources/material-resources.js';
 
 const server = new McpServer({
   name: '@globallink/design-mcp',
@@ -79,6 +80,7 @@ registerDatasourceResources(server);
 registerDomainStateResources(server);
 registerEnvironmentStateResources(server);
 registerTemplateResources(server);
+registerMaterialResources(server);
 
 // ===== Start =====
 

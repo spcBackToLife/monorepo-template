@@ -209,3 +209,142 @@ export async function updateMaterialMeta(
     body: data,
   });
 }
+
+// ===== Material Editor Actions =====
+
+/**
+ * 素材编辑器 v2 操作系统 — 执行单条操作
+ *
+ * 与 executeOperation() 完全同构，但路由指向素材操作端点。
+ */
+export async function executeMaterialOperation(
+  projectId: string,
+  materialId: string,
+  operation: unknown,
+  author?: string,
+  fingerprint?: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/operations`, {
+    method: 'POST',
+    body: {
+      operation,
+      author: author ?? 'ai:mcp',
+      fingerprint,
+    },
+  });
+}
+
+/**
+ * 素材编辑器 v2 操作系统 — 批量执行操作
+ */
+export async function executeMaterialBatch(
+  projectId: string,
+  materialId: string,
+  operations: unknown[],
+  author?: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/operations/batch`, {
+    method: 'POST',
+    body: {
+      operations,
+      author: author ?? 'ai:mcp',
+    },
+  });
+}
+
+/**
+ * 素材编辑器 v2 操作系统 — 增量拉取操作日志
+ */
+export async function getMaterialOperationsSince(
+  projectId: string,
+  materialId: string,
+  since: number,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/operations`, {
+    params: { since: String(since) },
+  });
+}
+
+/**
+ * 素材编辑器 v2 操作系统 — 撤销
+ */
+export async function materialUndo(
+  projectId: string,
+  materialId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/operations/undo`, {
+    method: 'POST',
+    body: { author: 'ai:mcp' },
+  });
+}
+
+/**
+ * 素材编辑器 v2 操作系统 — 重做
+ */
+export async function materialRedo(
+  projectId: string,
+  materialId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/operations/redo`, {
+    method: 'POST',
+    body: { author: 'ai:mcp' },
+  });
+}
+
+/**
+ * 素材编辑器 v2 操作系统 — 获取完整 Schema
+ */
+export async function getMaterialSchema(
+  projectId: string,
+  materialId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/materials/${materialId}/schema`);
+}
+
+/**
+ * 素材编辑器统一操作接口（旧版，兼容期间保留）。
+ *
+ * @deprecated 使用 executeMaterialOperation() 代替
+ */
+export async function materialEditorAction(
+  projectId: string,
+  action: string,
+  params: Record<string, unknown>,
+  options?: { materialProjectId?: string; fingerprint?: string },
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-editor/${action}`, {
+    method: 'POST',
+    body: {
+      params,
+      materialProjectId: options?.materialProjectId,
+      author: 'ai:mcp',
+      fingerprint: options?.fingerprint,
+    },
+  });
+}
+
+/**
+ * 获取素材编辑器工程数据（用于 MCP Resource 读取）。
+ */
+export async function getMaterialEditorProject(
+  projectId: string,
+  materialId?: string,
+): Promise<unknown> {
+  const params: Record<string, string> = {};
+  if (materialId) params.materialId = materialId;
+  return request(`/api/projects/${projectId}/material-editor/project`, { params });
+}
+
+/**
+ * 获取素材编辑器所有预设（渐变、动画、纹理、阴影）。
+ */
+export async function getMaterialEditorPresets(): Promise<unknown> {
+  return request('/api/material-editor/presets');
+}
+
+/**
+ * 获取素材编辑器能力清单（可用操作列表及其参数说明）。
+ */
+export async function getMaterialEditorCapabilities(): Promise<unknown> {
+  return request('/api/material-editor/capabilities');
+}

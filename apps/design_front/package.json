@@ -16,6 +16,8 @@
     "@globallink/design-operations": "workspace:*",
     "@globallink/design-schema": "workspace:*",
     "@globallink/material-editor": "workspace:*",
+    "@globallink/material-engine": "workspace:*",
+    "@globallink/material-operations": "workspace:*",
     "@rive-app/canvas": "^2.37.0",
     "@tanstack/react-virtual": "^3.13.23",
     "@xyflow/react": "^12.10.2",

@@ -142,6 +142,65 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_mdp_target_node
         ON material_design_projects(project_id, target_node_id);
     `);
+
+    // Migrate: add v2 操作系统所需字段到 material_design_projects（幂等）
+    await this.pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'material_design_projects' AND column_name = 'current_version'
+        ) THEN
+          ALTER TABLE material_design_projects ADD COLUMN current_version INTEGER NOT NULL DEFAULT 0;
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'material_design_projects' AND column_name = 'latest_snapshot'
+        ) THEN
+          ALTER TABLE material_design_projects ADD COLUMN latest_snapshot INTEGER NOT NULL DEFAULT 0;
+        END IF;
+      END $$;
+    `);
+
+    // ===== 素材操作日志表（与 design_operations 同构） =====
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS material_operations (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        project_id    UUID NOT NULL REFERENCES design_projects(id) ON DELETE CASCADE,
+        material_id   UUID NOT NULL REFERENCES material_design_projects(id) ON DELETE CASCADE,
+        seq           INTEGER NOT NULL,
+        operation     JSONB NOT NULL,
+        fingerprint   VARCHAR(100),
+        author        VARCHAR(10) DEFAULT 'user',
+        author_id     VARCHAR(100),
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(material_id, seq)
+      );
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mat_ops_material_seq
+        ON material_operations(material_id, seq);
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mat_ops_project
+        ON material_operations(project_id);
+    `);
+
+    // ===== 素材快照表（与 design_snapshots 同构） =====
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS material_snapshots (
+        id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        project_id    UUID NOT NULL REFERENCES design_projects(id) ON DELETE CASCADE,
+        material_id   UUID NOT NULL REFERENCES material_design_projects(id) ON DELETE CASCADE,
+        version       INTEGER NOT NULL,
+        schema        JSONB NOT NULL,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mat_snap_material_version
+        ON material_snapshots(material_id, version);
+    `);
   }
 
   getPool(): Pool {
