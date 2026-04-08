@@ -464,6 +464,8 @@ export class MaterialEditorService {
         rec.id,
         rec.projectId,
         rec.name,
+        rec.referenceFrameWidth || rec.canvasWidth,
+        rec.referenceFrameHeight || rec.canvasHeight,
         rec.canvasWidth,
         rec.canvasHeight,
       );

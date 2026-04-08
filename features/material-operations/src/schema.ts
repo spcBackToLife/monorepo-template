@@ -107,6 +107,8 @@ export interface MaterialObject {
   innerRatio?: number;
   /** SVG path d 属性 */
   pathData?: string;
+  /** SVG fill-rule（布尔运算合并路径使用） */
+  fillRule?: 'nonzero' | 'evenodd';
   /** line 起点 X */
   x1?: number;
   /** line 起点 Y */
@@ -182,6 +184,13 @@ export interface MaterialProjectSchema {
   /** 对象列表（有序，索引 = 图层堆叠顺序，从底到顶） */
   objects: MaterialObject[];
 
+  /**
+   * 默认元素 ID — 组件自带的那个框。
+   * 该元素可以被选中、设置背景色等，但不能移动/缩放/删除。
+   * 布尔运算时不直接操作它，而是在同位置生成克隆体参与运算。
+   */
+  defaultElementId?: string;
+
   /** 数据版本号（每次操作递增） */
   version: number;
 
@@ -193,28 +202,72 @@ export interface MaterialProjectSchema {
 
 // ===== 工厂函数 =====
 
-/** 创建空的素材工程 */
+/** 画布最小边距 — 画布至少比参考框每边多出这些像素 */
+const CANVAS_MIN_PADDING = 400;
+
+/** 创建空的素材工程
+ * @param id 工程 ID
+ * @param projectId 关联的项目 ID
+ * @param name 工程名称
+ * @param componentWidth 组件/参考框宽度
+ * @param componentHeight 组件/参考框高度
+ * @param canvasWidth 可选：画布宽度（默认自动计算 = 组件尺寸 + 边距）
+ * @param canvasHeight 可选：画布高度（默认自动计算）
+ */
 export function createMaterialProject(
   id: string,
   projectId: string,
   name: string,
-  width: number = 200,
-  height: number = 200,
+  componentWidth: number = 200,
+  componentHeight: number = 200,
+  canvasWidth?: number,
+  canvasHeight?: number,
 ): MaterialProjectSchema {
   const now = new Date().toISOString();
+  // 画布至少比组件大 CANVAS_MIN_PADDING*2，且不小于 600×400
+  const cw = canvasWidth ?? Math.max(1200, componentWidth + CANVAS_MIN_PADDING * 2);
+  const ch = canvasHeight ?? Math.max(900, componentHeight + CANVAS_MIN_PADDING * 2);
+
+  // 默认元素 — 组件自带的框，居中放置在画布上
+  const defaultElementId = `default_${id}`;
+  const frameX = (cw - componentWidth) / 2;
+  const frameY = (ch - componentHeight) / 2;
+  const defaultElement: MaterialObject = {
+    id: defaultElementId,
+    type: 'rect',
+    name: '组件默认框',
+    x: frameX,
+    y: frameY,
+    width: componentWidth,
+    height: componentHeight,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    fill: '#ffffff',
+    stroke: null,
+    strokeWidth: 0,
+    opacity: 1,
+    blendMode: 'normal',
+    visible: true,
+    locked: false, // 可选中但受限
+    rx: 0,
+    ry: 0,
+  };
+
   return {
     id,
     projectId,
     name,
-    canvasWidth: width,
-    canvasHeight: height,
+    canvasWidth: cw,
+    canvasHeight: ch,
     backgroundColor: '#ffffff',
     referenceFrame: {
       enabled: true,
-      width,
-      height,
+      width: componentWidth,
+      height: componentHeight,
     },
-    objects: [],
+    objects: [defaultElement],
+    defaultElementId,
     version: 0,
     createdAt: now,
     updatedAt: now,

@@ -59,13 +59,13 @@ import {
   getAcceptedExtensions,
   hexToLottieColor,
   lottieColorToHex,
-} from '@globallink/material-editor';
+} from '@globallink/material-operations';
 import type {
   AnimationResourceType,
   AnimationFileInfo,
   LottieEditableInfo,
   ExternalAnimationConfig,
-} from '@globallink/material-editor';
+} from '@globallink/material-operations';
 import { editorStore } from '@/stores/editor';
 
 // ===== 主组件：AnimationResourceEditor =====

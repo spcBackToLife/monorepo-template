@@ -67,7 +67,8 @@ const TOOL_ITEMS: { key: MaterialToolType; icon: string; label: string }[] = [
   { key: 'polygon', icon: '⬡', label: '多边形 (P)' },
   { key: 'star', icon: '★', label: '星形 (S)' },
   { key: 'line', icon: '╱', label: '线段 (L)' },
-  { key: 'path', icon: '✏', label: '铅笔 (B)' },
+  { key: 'path', icon: '✒', label: '钢笔 (C) — 贝塞尔曲线' },
+  { key: 'pencil', icon: '✏', label: '铅笔 (B) — 自由绘制' },
   { key: 'text', icon: 'T', label: '文字 (T)' },
   { key: 'image', icon: '🖼', label: '导入图片 (I)' },
 ];

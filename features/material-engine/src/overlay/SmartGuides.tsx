@@ -117,7 +117,7 @@ export function SmartGuides({ enabled = false }: SmartGuidesProps) {
       }
     }
 
-    // 画布中心对齐
+    // 画布中心对齐（= 参考框中心）
     if (Math.abs(selCenterX - canvasWidth / 2) < SNAP_THRESHOLD) {
       lines.push({
         type: 'vertical',
@@ -133,6 +133,43 @@ export function SmartGuides({ enabled = false }: SmartGuidesProps) {
         start: 0,
         end: canvasWidth,
       });
+    }
+
+    // 参考框边缘对齐
+    const { referenceFrame } = project;
+    if (referenceFrame?.enabled) {
+      const frameX = (canvasWidth - referenceFrame.width) / 2;
+      const frameY = (canvasHeight - referenceFrame.height) / 2;
+      const frameR = frameX + referenceFrame.width;
+      const frameB = frameY + referenceFrame.height;
+
+      const frameXEdges = [frameX, frameR];
+      const frameYEdges = [frameY, frameB];
+
+      for (const fx of frameXEdges) {
+        for (const selVal of [selPoints.left, selPoints.right, selPoints.centerX]) {
+          if (Math.abs(selVal - fx) < SNAP_THRESHOLD) {
+            lines.push({
+              type: 'vertical',
+              position: fx,
+              start: 0,
+              end: canvasHeight,
+            });
+          }
+        }
+      }
+      for (const fy of frameYEdges) {
+        for (const selVal of [selPoints.top, selPoints.bottom, selPoints.centerY]) {
+          if (Math.abs(selVal - fy) < SNAP_THRESHOLD) {
+            lines.push({
+              type: 'horizontal',
+              position: fy,
+              start: 0,
+              end: canvasWidth,
+            });
+          }
+        }
+      }
     }
 
     // 去重
@@ -158,7 +195,7 @@ export function SmartGuides({ enabled = false }: SmartGuidesProps) {
         pointerEvents: 'none',
         overflow: 'visible',
       }}
-      viewBox={`${-panX / zoom} ${-panY / zoom} ${project.canvasWidth} ${project.canvasHeight}`}
+      viewBox={`0 0 ${project.canvasWidth} ${project.canvasHeight}`}
       xmlns="http://www.w3.org/2000/svg"
     >
       {guides.map((line, i) =>

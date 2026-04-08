@@ -48,6 +48,15 @@ import {
 import {
   executeUpdateText,
 } from '../operations/text';
+import {
+  executeBooleanOp,
+  executeUndoBooleanOp,
+} from '../operations/boolean';
+import {
+  executeAlignObjects,
+  executeDistributeObjects,
+  executeRestorePositions,
+} from '../operations/align';
 
 type DispatchResult = {
   project: MaterialProjectSchema;
@@ -243,6 +252,16 @@ export class MaterialOperationExecutor {
       case 'me:updateText':
         return executeUpdateText(project, op.params);
 
+      // 布尔运算
+      case 'me:booleanOp':
+        return executeBooleanOp(project, op.params);
+
+      // 对齐/分布
+      case 'me:alignObjects':
+        return executeAlignObjects(project, op.params);
+      case 'me:distributeObjects':
+        return executeDistributeObjects(project, op.params);
+
       default: {
         const _exhaustive: never = op;
         return {
@@ -265,6 +284,16 @@ export class MaterialOperationExecutor {
         result: { success: true, description: 'No-op', affectedObjectIds: [] },
         inverse: { type: 'noop', params: {} },
       };
+    }
+
+    // 布尔运算的反向操作
+    if (inverse.type === 'me:undoBooleanOp') {
+      return executeUndoBooleanOp(project, inverse.params as Parameters<typeof executeUndoBooleanOp>[1]);
+    }
+
+    // 对齐/分布的反向操作 — 恢复位置
+    if (inverse.type === 'me:restorePositions') {
+      return executeRestorePositions(project, inverse.params as Parameters<typeof executeRestorePositions>[1]);
     }
 
     // 将 InverseData 构造为 MaterialOperation 并 dispatch

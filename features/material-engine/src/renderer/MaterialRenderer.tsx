@@ -14,7 +14,6 @@
  *       <ShadowDefs />
  *     </defs>
  *     <rect id="canvas-bg" ... />
- *     {referenceFrame && <rect id="ref-frame" ... />}
  *     {objects.map(obj => <ObjectRenderer />)}
  *   </svg>
  */
@@ -40,7 +39,7 @@ export function MaterialRenderer({
   onCanvasClick,
 }: MaterialRendererProps) {
   const { state, setSelected, setHovered } = useMaterialEditor();
-  const { project, selectedIds, zoom, panX, panY } = state;
+  const { project, selectedIds, zoom } = state;
 
   // 点击对象 → 选中
   const handleObjectMouseDown = useCallback(
@@ -88,7 +87,7 @@ export function MaterialRenderer({
     [setSelected, onCanvasClick],
   );
 
-  const { canvasWidth, canvasHeight, backgroundColor, referenceFrame, objects } = project;
+  const { canvasWidth, canvasHeight, backgroundColor, objects } = project;
 
   // 收集所有对象（含 group 子对象）以提取渐变和阴影
   const allObjects = flattenObjects(objects);
@@ -102,7 +101,7 @@ export function MaterialRenderer({
         height: canvasHeight * zoom,
         overflow: 'visible',
       }}
-      viewBox={`${-panX / zoom} ${-panY / zoom} ${canvasWidth} ${canvasHeight}`}
+      viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
       xmlns="http://www.w3.org/2000/svg"
       onMouseDown={handleCanvasMouseDown}
     >
@@ -122,21 +121,7 @@ export function MaterialRenderer({
         data-canvas-bg="true"
       />
 
-      {/* 参考框 */}
-      {referenceFrame.enabled && (
-        <rect
-          x={(canvasWidth - referenceFrame.width) / 2}
-          y={(canvasHeight - referenceFrame.height) / 2}
-          width={referenceFrame.width}
-          height={referenceFrame.height}
-          fill="none"
-          stroke="#1677ff"
-          strokeWidth={1 / zoom}
-          strokeDasharray={`${4 / zoom} ${2 / zoom}`}
-          opacity={0.5}
-          pointerEvents="none"
-        />
-      )}
+      {/* 参考框边界由 CanvasGrid 叠加层负责绘制 */}
 
       {/* 对象层（从底到顶） */}
       {objects.map((obj) => (

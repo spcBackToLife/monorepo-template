@@ -63,6 +63,15 @@ export function executeRemoveObject(
   project: MaterialProjectSchema,
   params: RemoveObjectOp['params'],
 ): ExecResult {
+  // 保护默认元素不被删除
+  if (project.defaultElementId && params.objectId === project.defaultElementId) {
+    return {
+      project,
+      result: { success: false, description: 'Cannot remove the default element', affectedObjectIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const newProject = deepClone(project);
   const idx = findObjectIndex(newProject.objects, params.objectId);
 
@@ -111,14 +120,22 @@ export function executeUpdateObject(
 
   const obj = newProject.objects[idx]!;
 
+  // 默认元素：不允许修改位置和尺寸属性（但允许样式属性）
+  const isDefault = project.defaultElementId && params.objectId === project.defaultElementId;
+  const protectedKeys = ['x', 'y', 'width', 'height', 'scaleX', 'scaleY', 'rotation'];
+
   // 记录旧值用于反向操作
   const oldProps: Record<string, unknown> = {};
   for (const key of Object.keys(params.props)) {
+    if (isDefault && protectedKeys.includes(key)) continue;
     oldProps[key] = (obj as unknown as Record<string, unknown>)[key];
   }
 
-  // 应用新值
-  Object.assign(obj, params.props);
+  // 应用新值（跳过默认元素的受保护属性）
+  for (const key of Object.keys(params.props)) {
+    if (isDefault && protectedKeys.includes(key)) continue;
+    (obj as unknown as Record<string, unknown>)[key] = (params.props as unknown as Record<string, unknown>)[key];
+  }
   // 不允许修改 id 和 type
   obj.id = params.objectId;
 

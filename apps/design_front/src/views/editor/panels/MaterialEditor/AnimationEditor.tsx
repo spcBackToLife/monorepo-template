@@ -45,13 +45,13 @@ import {
   bezierToCSS,
   ANIMATABLE_CSS_PROPERTIES,
   TRANSFORM_PRESETS,
-} from '@globallink/material-editor';
+} from '@globallink/material-operations';
 import type {
   CSSAnimationConfig,
   CSSKeyframe,
   AnimationPreset,
   BezierControlPoints,
-} from '@globallink/material-editor';
+} from '@globallink/material-operations';
 import { editorStore } from '@/stores/editor';
 
 // ===== 预览尺寸 =====

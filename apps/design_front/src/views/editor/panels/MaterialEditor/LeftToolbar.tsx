@@ -12,7 +12,7 @@
  */
 import { Tooltip } from 'antd';
 import type { ReactNode } from 'react';
-import type { MaterialToolType } from '@globallink/material-editor';
+import type { MaterialToolType } from '@globallink/material-engine';
 
 /** 效果工具类型 */
 export type EffectToolType = 'gradient' | 'fill' | 'mask' | 'filter' | 'shadow';

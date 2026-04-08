@@ -20,8 +20,8 @@ import {
   parseBoxShadow,
   parseTextShadow,
   SHADOW_PRESETS,
-} from '@globallink/material-editor';
-import type { ShadowConfig } from '@globallink/material-editor';
+} from '@globallink/material-operations';
+import type { ShadowConfig } from '@globallink/material-operations';
 import { editorStore } from '@/stores/editor';
 
 interface ShadowEditorProps {

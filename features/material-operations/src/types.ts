@@ -166,6 +166,48 @@ export interface UpdateTextOp {
   };
 }
 
+// ===== 布尔运算 =====
+
+/** 布尔运算类型 */
+export type BooleanOpType = 'union' | 'subtract' | 'intersect' | 'exclude';
+
+export interface BooleanOpOp {
+  type: 'me:booleanOp';
+  params: {
+    /** 目标对象 ID（A） */
+    targetId: string;
+    /** 工具对象 ID（B） */
+    toolId: string;
+    /** 运算类型 */
+    opType: BooleanOpType;
+    /** 结果对象的预生成 ID（确定性重放） */
+    resultId?: string;
+    /** 默认元素克隆体的预生成 ID */
+    cloneId?: string;
+  };
+}
+
+// ===== 对齐 / 分布 =====
+
+/** 对齐方向 */
+export type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+
+export interface AlignObjectsOp {
+  type: 'me:alignObjects';
+  params: {
+    objectIds: string[];
+    alignment: AlignmentType;
+  };
+}
+
+export interface DistributeObjectsOp {
+  type: 'me:distributeObjects';
+  params: {
+    objectIds: string[];
+    axis: 'horizontal' | 'vertical';
+  };
+}
+
 // ===== 联合类型 =====
 
 export type MaterialOperation =
@@ -193,7 +235,12 @@ export type MaterialOperation =
   | GroupObjectsOp
   | UngroupObjectsOp
   // 文字
-  | UpdateTextOp;
+  | UpdateTextOp
+  // 布尔运算
+  | BooleanOpOp
+  // 对齐/分布
+  | AlignObjectsOp
+  | DistributeObjectsOp;
 
 /** 所有操作类型字符串 */
 export type MaterialOperationType = MaterialOperation['type'];

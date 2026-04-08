@@ -22,9 +22,8 @@ import {
   gradientToCSS,
   parseGradientCSS,
   GRADIENT_PRESETS,
-} from '@globallink/material-editor';
-import type { GradientLayerConfig, ColorStop, GradientType } from '@globallink/material-editor';
-import type { MaterialEditorCore } from '@globallink/material-editor';
+} from '@globallink/material-operations';
+import type { GradientLayerConfig, ColorStop, GradientType } from '@globallink/material-operations';
 import { editorStore } from '@/stores/editor';
 
 interface GradientEditorProps {
@@ -32,8 +31,6 @@ interface GradientEditorProps {
   currentBackground?: string;
   /** 应用渐变到选中节点后的回调 */
   onApply?: (css: string) => void;
-  /** D.1.1: 素材编辑器引擎引用 — 将渐变直接应用到 Fabric.js 选中对象 */
-  editorRef?: React.RefObject<MaterialEditorCore | null>;
 }
 
 /**
@@ -49,7 +46,7 @@ function tryParseExistingGradient(bg?: string): GradientLayerConfig | null {
   return null;
 }
 
-export function GradientEditor({ currentBackground, onApply, editorRef }: GradientEditorProps) {
+export function GradientEditor({ currentBackground, onApply }: GradientEditorProps) {
   const { message } = AntdApp.useApp();
   const [gradientType, setGradientType] = useState<GradientType>('linear');
   const [angle, setAngle] = useState(135);
@@ -135,21 +132,6 @@ export function GradientEditor({ currentBackground, onApply, editorRef }: Gradie
     if (cfg.centerX != null) setCenterX(cfg.centerX);
     if (cfg.centerY != null) setCenterY(cfg.centerY);
   }, []);
-
-  // D.1.1: 应用渐变到画布上选中的 Fabric.js 对象
-  const applyToCanvasObject = useCallback(() => {
-    const editor = editorRef?.current;
-    if (!editor) {
-      message.info('仅在素材编辑器画布模式下可用');
-      return;
-    }
-    if (gradientType === 'radial' || gradientType === 'conic') {
-      editor.setRadialGradientFill(colorStops, centerX, centerY);
-    } else {
-      editor.setLinearGradientFill(colorStops, angle);
-    }
-    message.success('渐变已应用到画布对象');
-  }, [editorRef, gradientType, colorStops, angle, centerX, centerY, message]);
 
   const applyToElement = useCallback(() => {
     const nodeId = editorStore.selectedNodeIds[0];
@@ -316,16 +298,6 @@ export function GradientEditor({ currentBackground, onApply, editorRef }: Gradie
 
       {/* 操作按钮 */}
       <div className="flex flex-wrap gap-1.5 pt-1 border-t border-gray-100">
-        {editorRef && (
-          <Button
-            size="small"
-            type="primary"
-            icon={<CheckOutlined />}
-            onClick={applyToCanvasObject}
-          >
-            填充到对象
-          </Button>
-        )}
         <Button
           size="small"
           type="primary"

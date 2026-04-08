@@ -56,6 +56,9 @@ export {
 // ===== Overlay =====
 export { SelectionOverlay } from './overlay/SelectionOverlay';
 export { SmartGuides } from './overlay/SmartGuides';
+export { CanvasGrid } from './overlay/CanvasGrid';
+export { CanvasRuler, RULER_SIZE } from './overlay/CanvasRuler';
+export { LayerPanel } from './overlay/LayerPanel';
 
 // ===== Hooks =====
 export { useMaterialSync } from './hooks/useMaterialSync';

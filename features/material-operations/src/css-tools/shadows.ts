@@ -4,7 +4,7 @@
  * 提供 box-shadow 和 text-shadow 的解析和生成。
  */
 
-import type { ShadowConfig } from '../types';
+import type { ShadowConfig } from './types';
 
 /** 将阴影配置数组转为 CSS box-shadow 字符串 */
 export function shadowsToCSS(shadows: ShadowConfig[]): {

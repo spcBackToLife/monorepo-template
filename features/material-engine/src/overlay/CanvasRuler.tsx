@@ -1,30 +1,33 @@
 /**
- * 画布标尺组件
+ * CanvasRuler — 画布标尺组件
  *
  * 在画布区域顶部和左侧显示像素刻度标尺。
  * 跟随缩放同步缩放刻度，pointer-events: none 不阻挡交互。
  *
- * 对照 ROADMAP B.3.1
+ * 结构：
+ *   ┌──┬─────────────────────┐
+ *   │■ │  水平标尺 (顶部)     │
+ *   ├──┼─────────────────────┤
+ *   │垂│                     │
+ *   │直│     画布区域         │
+ *   │标│                     │
+ *   │尺│                     │
+ *   └──┴─────────────────────┘
  */
 import { useMemo } from 'react';
+import { useMaterialEditor } from '../context/MaterialEditorContext';
 
 interface CanvasRulerProps {
-  /** 画布宽度 (px) */
-  width: number;
-  /** 画布高度 (px) */
-  height: number;
-  /** 当前缩放倍率 */
-  zoom: number;
   /** 是否显示 */
   visible?: boolean;
 }
 
 /** 标尺高度/宽度常量 */
-const RULER_SIZE = 20;
+export const RULER_SIZE = 20;
 
 /** 根据缩放级别动态计算合适的刻度间距 */
 function getTickInterval(zoom: number): { minor: number; major: number; labelEvery: number } {
-  const baseSize = 50 / zoom; // 屏幕上 50px 对应的画布像素
+  const baseSize = 50 / zoom;
   if (baseSize <= 10) return { minor: 1, major: 5, labelEvery: 10 };
   if (baseSize <= 25) return { minor: 5, major: 25, labelEvery: 50 };
   if (baseSize <= 60) return { minor: 10, major: 50, labelEvery: 100 };
@@ -145,45 +148,49 @@ function VerticalRuler({ height, zoom }: { height: number; zoom: number }) {
   );
 }
 
-export function CanvasRuler({ width, height, zoom, visible = true }: CanvasRulerProps) {
+export function CanvasRuler({ visible = true }: CanvasRulerProps) {
+  const { state } = useMaterialEditor();
+  const { project, zoom } = state;
+  const { canvasWidth, canvasHeight } = project;
+
   if (!visible) return null;
 
   return (
     <>
-      {/* 顶部水平标尺 — 绝对定位在画布上方 */}
+      {/* 顶部水平标尺 */}
       <div
-        className="absolute"
         style={{
+          position: 'absolute',
           top: -RULER_SIZE,
           left: 0,
-          width: width * zoom,
+          width: canvasWidth * zoom,
           height: RULER_SIZE,
           pointerEvents: 'none',
           zIndex: 10,
         }}
       >
-        <HorizontalRuler width={width} zoom={zoom} />
+        <HorizontalRuler width={canvasWidth} zoom={zoom} />
       </div>
 
-      {/* 左侧垂直标尺 — 绝对定位在画布左侧 */}
+      {/* 左侧垂直标尺 */}
       <div
-        className="absolute"
         style={{
+          position: 'absolute',
           top: 0,
           left: -RULER_SIZE,
           width: RULER_SIZE,
-          height: height * zoom,
+          height: canvasHeight * zoom,
           pointerEvents: 'none',
           zIndex: 10,
         }}
       >
-        <VerticalRuler height={height} zoom={zoom} />
+        <VerticalRuler height={canvasHeight} zoom={zoom} />
       </div>
 
       {/* 左上角小方块 */}
       <div
-        className="absolute"
         style={{
+          position: 'absolute',
           top: -RULER_SIZE,
           left: -RULER_SIZE,
           width: RULER_SIZE,
@@ -198,5 +205,3 @@ export function CanvasRuler({ width, height, zoom, visible = true }: CanvasRuler
     </>
   );
 }
-
-export { RULER_SIZE };

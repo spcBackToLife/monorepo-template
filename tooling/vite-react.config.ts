@@ -5,20 +5,22 @@ export interface BaseViteConfigOptions {
 }
 
 export function createBaseViteConfig({ appDir }: BaseViteConfigOptions) {
-  /** dev 直连源码，改 engine / editor 无需每次手动 build；生产/CI 仍以包 dist 为准 */
+  /** dev 直连源码，改 engine 无需每次手动 build；生产/CI 仍以包 dist 为准 */
   const designEngineSrc = path.resolve(appDir, '../../features/design-engine/src/index.tsx');
-  const materialEditorSrc = path.resolve(appDir, '../../features/material-editor/src/index.ts');
+  const materialEngineSrc = path.resolve(appDir, '../../features/material-engine/src/index.tsx');
+  const materialOperationsSrc = path.resolve(appDir, '../../features/material-operations/src/index.ts');
 
   return {
     resolve: {
       alias: [
         { find: '@', replacement: path.resolve(appDir, 'src') },
         { find: '@globallink/design-engine', replacement: designEngineSrc },
-        { find: '@globallink/material-editor', replacement: materialEditorSrc },
+        { find: '@globallink/material-engine', replacement: materialEngineSrc },
+        { find: '@globallink/material-operations', replacement: materialOperationsSrc },
       ],
     },
     optimizeDeps: {
-      exclude: ['@globallink/design-engine', '@globallink/material-editor'],
+      exclude: ['@globallink/design-engine', '@globallink/material-engine', '@globallink/material-operations'],
     },
     css: {
       preprocessorOptions: {

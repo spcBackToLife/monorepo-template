@@ -36,7 +36,8 @@ export type MaterialToolType =
   | 'polygon'
   | 'star'
   | 'line'
-  | 'path'
+  | 'path'     // 钢笔工具 — 单击放锚点，拖拽出贝塞尔曲线控制手柄
+  | 'pencil'   // 铅笔工具 — 自由绘制
   | 'text'
   | 'image';
 

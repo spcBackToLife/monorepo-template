@@ -4,7 +4,7 @@
  * 提供 CSS filter 的解析和生成功能。
  */
 
-import type { FilterConfig, CSSFilterType } from '../types';
+import type { FilterConfig, CSSFilterType } from './types';
 
 /** 默认滤镜值（还原到无效果时的值） */
 export const FILTER_DEFAULTS: Record<CSSFilterType, string> = {

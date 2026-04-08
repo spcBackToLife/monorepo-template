@@ -10,7 +10,7 @@ import type {
   GradientType,
   ColorStop,
   GradientPreset,
-} from '../types';
+} from './types';
 
 // ===== CSS 渐变生成 =====
 

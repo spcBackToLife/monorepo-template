@@ -56,6 +56,13 @@ export type {
   UngroupObjectsOp,
   // 文字
   UpdateTextOp,
+  // 布尔运算
+  BooleanOpOp,
+  BooleanOpType,
+  // 对齐/分布
+  AlignObjectsOp,
+  DistributeObjectsOp,
+  AlignmentType,
   // 联合
   MaterialOperation,
   MaterialOperationType,
@@ -75,3 +82,6 @@ export {
   findObjectById,
   findObjectIndex,
 } from './utils';
+
+// ===== CSS Tools (migrated from @globallink/material-editor) =====
+export * from './css-tools';

@@ -150,7 +150,11 @@ export const ObjectRenderer = memo(function ObjectRenderer({
     case 'path':
       return (
         <g {...commonGroupProps}>
-          <path d={obj.pathData ?? ''} {...commonShapeProps} />
+          <path
+            d={obj.pathData ?? ''}
+            fillRule={obj.fillRule ?? undefined}
+            {...commonShapeProps}
+          />
         </g>
       );
 

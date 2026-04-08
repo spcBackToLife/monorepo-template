@@ -21,8 +21,8 @@ import {
   FILTER_DEFAULTS,
   FILTER_RANGES,
   FILTER_LABELS,
-} from '@globallink/material-editor';
-import type { FilterConfig, CSSFilterType } from '@globallink/material-editor';
+} from '@globallink/material-operations';
+import type { FilterConfig, CSSFilterType } from '@globallink/material-operations';
 import { editorStore } from '@/stores/editor';
 
 interface FilterEditorProps {
