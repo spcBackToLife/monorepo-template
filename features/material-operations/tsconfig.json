@@ -9,7 +9,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "target": "ES2020",
-    "lib": ["ES2021"],
+    "lib": ["ES2021", "DOM"],
     "sourceMap": true,
     "rootDir": "src",
     "noEmitOnError": true

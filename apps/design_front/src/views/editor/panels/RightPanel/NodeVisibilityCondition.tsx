@@ -221,7 +221,7 @@ export const NodeVisibilityCondition = observer(function NodeVisibilityCondition
 
 function StateRow({
   row,
-  _showBaselineDivider,
+  showBaselineDivider: _showBaselineDivider,
   onToggle,
   onReset,
 }: {

@@ -39,9 +39,7 @@ export interface MaterialOperationRow {
 }
 
 /**
- * 素材编辑器操作服务
- *
- * v2 改造：后端是数据唯一真相来源
+ * 素材编辑器操作服务 — 后端是数据唯一真相来源
  *
  * 数据流：
  *   MCP/前端 → REST/WS → execute() → MaterialOperationExecutor 执行
@@ -64,7 +62,7 @@ export class MaterialEditorService {
   ) {}
 
   // ===================================================================
-  // 核心操作 API — 与 design-api OperationsService 同构
+  // 核心操作 API
   // ===================================================================
 
   /**

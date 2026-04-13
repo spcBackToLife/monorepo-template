@@ -10,7 +10,7 @@ import { MaterialEditorService } from './material-editor.service';
 import type { MaterialOperation } from '@globallink/material-operations';
 
 /**
- * 素材编辑器 API — v2 操作系统
+ * 素材编辑器 API
  *
  * 与 OperationsController（设计编辑器）完全同构。
  *
@@ -24,17 +24,13 @@ import type { MaterialOperation } from '@globallink/material-operations';
  *
  *   GET  /api/material-editor/presets                                     预设查询
  *   GET  /api/material-editor/capabilities                                能力清单
- *
- * 旧端点（兼容期间保留，逐步废弃）：
- *   POST /api/projects/:projectId/material-editor/:action                 旧 action 广播
- *   GET  /api/projects/:projectId/material-editor/project                 旧工程数据
  */
 @Controller()
 export class MaterialEditorController {
   constructor(private readonly service: MaterialEditorService) {}
 
   // ===================================================================
-  // v2 操作系统端点（与 OperationsController 同构）
+  // 操作系统端点（与 OperationsController 同构）
   // ===================================================================
 
   /**

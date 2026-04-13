@@ -1,12 +1,10 @@
 /**
  * useMaterialSync — 素材编辑器 WebSocket 同步 Hook
  *
- * v2 改造：接收 `me:operation` 类型化操作事件，
+ * 接收 `me:operation` 类型化操作事件，
  * 用 MaterialOperationExecutor 重放操作更新本地 Schema。
  *
- * 与旧版 MaterialEditorSyncManager 的区别：
- *   - 旧版：接收字符串 action → 映射到 Fabric.js 方法
- *   - 新版：接收 MaterialOperation → Executor.execute() → Schema 更新 → SVG 自动重渲染
+ * 接收 MaterialOperation → Executor.execute() → Schema 更新 → SVG 自动重渲染
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { io, type Socket } from 'socket.io-client';

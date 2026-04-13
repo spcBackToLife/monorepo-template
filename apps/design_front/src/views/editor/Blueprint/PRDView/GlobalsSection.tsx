@@ -1,4 +1,3 @@
-import { _Tag } from 'antd';
 import type { GlobalsAnalysis } from '../types';
 
 interface Props {

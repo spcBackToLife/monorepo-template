@@ -143,7 +143,32 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ON material_design_projects(project_id, target_node_id);
     `);
 
-    // Migrate: add v2 操作系统所需字段到 material_design_projects（幂等）
+    // ===== 素材槽位关联表（节点 ↔ 素材工程多对多） =====
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS node_material_slots (
+        id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        project_id            UUID NOT NULL REFERENCES design_projects(id) ON DELETE CASCADE,
+        node_id               VARCHAR(255) NOT NULL,
+        slot_name             VARCHAR(100) NOT NULL DEFAULT 'default',
+        material_project_id   UUID NOT NULL REFERENCES material_design_projects(id) ON DELETE CASCADE,
+        sort_order            INTEGER NOT NULL DEFAULT 0,
+        css_target            VARCHAR(100) DEFAULT 'background-image',
+        is_active             BOOLEAN NOT NULL DEFAULT true,
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(project_id, node_id, slot_name)
+      );
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_nms_project_node
+        ON node_material_slots(project_id, node_id);
+    `);
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_nms_material_project
+        ON node_material_slots(material_project_id);
+    `);
+
+    // Migrate: add 操作系统所需字段到 material_design_projects（幂等）
     await this.pool.query(`
       DO $$
       BEGIN

@@ -10,6 +10,7 @@ import {
   buildEditorContextMenuItems,
   EditorContextMenuPortal,
   handleEditorContextMenuClick,
+  preloadMaterialSlots,
 } from '../../EditorContextMenu';
 import './nodeTreePanel.css';
 
@@ -439,7 +440,10 @@ export const NewNodeTree = observer(function NewNodeTree() {
   );
 
   const handleRowContextMenu = useCallback((nodeId: string, clientX: number, clientY: number) => {
-    setTreeContextMenu({ x: clientX, y: clientY, nodeId });
+    // 先预加载素材槽位数据再展示菜单（确保已有素材能显示）
+    void preloadMaterialSlots(nodeId).finally(() => {
+      setTreeContextMenu({ x: clientX, y: clientY, nodeId });
+    });
   }, []);
 
   /** W1-014：画布或其它地方选中节点时，展开祖先并使行滚动到可见区 */

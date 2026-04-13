@@ -133,8 +133,8 @@ function NodeDetail({
 
 function EdgeDetail({
   edge,
-  _analysis,
-  _onViewInPRD,
+  analysis: _analysis,
+  onViewInPRD: _onViewInPRD,
 }: {
   edge: FlowEdge;
   analysis: BlueprintAnalysis;

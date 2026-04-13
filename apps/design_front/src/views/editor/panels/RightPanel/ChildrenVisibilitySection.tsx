@@ -64,7 +64,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
   isEditingDefault,
   defaultStateDef,
   activeStateDef,
-  _hasCustomStates,
+  hasCustomStates: _hasCustomStates,
 }: {
   child: ComponentNode;
   parentNode: ComponentNode;

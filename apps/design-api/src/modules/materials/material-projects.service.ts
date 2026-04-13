@@ -231,6 +231,20 @@ export class MaterialProjectsService {
   }
 
   /**
+   * 根据 targetNodeId 查找所有关联工程（一对多）
+   */
+  async findAllByTargetNode(projectId: string, targetNodeId: string): Promise<MaterialProjectRecord[]> {
+    const pool = this.db.getPool();
+    const result = await pool.query<MaterialProjectRow>(
+      `SELECT * FROM material_design_projects
+       WHERE project_id = $1 AND target_node_id = $2
+       ORDER BY updated_at DESC`,
+      [projectId, targetNodeId],
+    );
+    return result.rows.map(rowToRecord);
+  }
+
+  /**
    * 更新工程
    */
   async update(

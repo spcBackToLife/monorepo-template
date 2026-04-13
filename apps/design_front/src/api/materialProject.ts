@@ -3,6 +3,8 @@
  *
  * 与后端 /api/projects/:projectId/material-projects 接口对接。
  * 负责素材工程的 CRUD 和导出素材上传。
+ *
+ * 素材槽位 API — 管理节点与素材工程的多对多关联。
  */
 import { apiJson, API_BASE } from '@/api/client';
 import { authStore } from '@/stores/auth';
@@ -66,6 +68,28 @@ export interface UpdateMaterialProjectParams {
   tags?: string[];
 }
 
+/** 素材槽位记录 */
+export interface MaterialSlotRecord {
+  id: string;
+  projectId: string;
+  nodeId: string;
+  slotName: string;
+  materialProjectId: string;
+  sortOrder: number;
+  cssTarget: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 槽位 + 素材工程联合信息 */
+export interface MaterialSlotWithProject extends MaterialSlotRecord {
+  materialProjectName: string;
+  thumbnailUrl: string | null;
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
 // ===== API 方法 =====
 
 export const materialProjectApi = {
@@ -92,7 +116,7 @@ export const materialProjectApi = {
     );
   },
 
-  /** 按关联节点查找工程 */
+  /** 按关联节点查找工程（返回最近一个，向后兼容） */
   async findByNode(
     projectId: string,
     nodeId: string,
@@ -103,6 +127,17 @@ export const materialProjectApi = {
     );
     if ('found' in resp && resp.found === false) return null;
     return resp;
+  },
+
+  /** 按关联节点查找所有工程（一对多） */
+  async findAllByNode(
+    projectId: string,
+    nodeId: string,
+  ): Promise<MaterialProjectDetail[]> {
+    return apiJson<MaterialProjectDetail[]>(
+      `/projects/${projectId}/material-projects/all-by-node/${nodeId}`,
+      { token: token() },
+    );
   },
 
   /** 创建工程 */
@@ -207,5 +242,86 @@ export const materialProjectApi = {
     }
 
     return res.json() as Promise<{ thumbnailUrl: string }>;
+  },
+};
+
+// ===== 素材槽位 API =====
+
+export const materialSlotApi = {
+  /** 查询节点的所有槽位 */
+  async findByNode(
+    projectId: string,
+    nodeId: string,
+  ): Promise<MaterialSlotWithProject[]> {
+    return apiJson<MaterialSlotWithProject[]>(
+      `/projects/${projectId}/material-slots/by-node/${nodeId}`,
+      { token: token() },
+    );
+  },
+
+  /** 查询节点指定槽位 */
+  async findSlot(
+    projectId: string,
+    nodeId: string,
+    slotName: string,
+  ): Promise<MaterialSlotWithProject | null> {
+    const resp = await apiJson<MaterialSlotWithProject & { found?: boolean }>(
+      `/projects/${projectId}/material-slots/by-node/${nodeId}/${slotName}`,
+      { token: token() },
+    );
+    if ('found' in resp && resp.found === false) return null;
+    return resp;
+  },
+
+  /** 创建槽位 */
+  async create(
+    projectId: string,
+    data: {
+      nodeId: string;
+      slotName?: string;
+      materialProjectId: string;
+      sortOrder?: number;
+      cssTarget?: string;
+      isActive?: boolean;
+    },
+  ): Promise<MaterialSlotRecord> {
+    return apiJson<MaterialSlotRecord>(
+      `/projects/${projectId}/material-slots`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+        token: token(),
+      },
+    );
+  },
+
+  /** 更新槽位 */
+  async update(
+    projectId: string,
+    slotId: string,
+    data: {
+      slotName?: string;
+      materialProjectId?: string;
+      sortOrder?: number;
+      cssTarget?: string;
+      isActive?: boolean;
+    },
+  ): Promise<MaterialSlotRecord> {
+    return apiJson<MaterialSlotRecord>(
+      `/projects/${projectId}/material-slots/${slotId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+        token: token(),
+      },
+    );
+  },
+
+  /** 删除槽位 */
+  async remove(projectId: string, slotId: string): Promise<void> {
+    await apiJson(`/projects/${projectId}/material-slots/${slotId}`, {
+      method: 'DELETE',
+      token: token(),
+    });
   },
 };

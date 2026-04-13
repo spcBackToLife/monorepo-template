@@ -1,2 +1,2 @@
-export { buildEditorContextMenuItems, handleEditorContextMenuClick } from './buildMenuItems';
+export { buildEditorContextMenuItems, handleEditorContextMenuClick, preloadMaterialSlots } from './buildMenuItems';
 export { EditorContextMenuPortal } from './ContextMenuPortal';

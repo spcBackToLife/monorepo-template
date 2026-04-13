@@ -1,4 +1,4 @@
-import { useLayoutEffect, useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu } from 'antd';
 import type { MenuProps } from 'antd';
@@ -15,19 +15,55 @@ type Props = {
 /**
  * 固定定位的右键菜单层：点击遮罩或 Escape 关闭。
  * 支持自动调整位置以避免超出视口边界。
+ *
+ * ⚠️ 遮罩使用 mousedown 关闭，不能用 click —— 因为 Ant Design 的
+ * SubMenu popup 是渲染在 body 下的独立 DOM 节点，鼠标从主菜单移向
+ * 子菜单时会穿过遮罩层。如果用 onClick 则子菜单永远无法 hover 进入。
  */
 export function EditorContextMenuPortal({ open, x, y, items, onClose, onMenuClick }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPos, setAdjustedPos] = useState({ x, y });
 
+  // 判断 mousedown 目标是否在菜单 / 子菜单弹层内
+  const isInsideMenu = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    // 主菜单容器
+    if (menuRef.current?.contains(target)) return true;
+    // Antd SubMenu popup 渲染在 body 下，class 包含 ant-menu-submenu-popup
+    const popup = target.closest('.ant-menu-submenu-popup, .ant-menu');
+    return !!popup;
+  }, []);
+
   useEffect(() => {
     if (!open) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
+
+    // 全局 mousedown：点击菜单/子菜单外部 → 关闭
+    const onMouseDown = (e: MouseEvent) => {
+      if (!isInsideMenu(e.target)) {
+        onClose();
+      }
+    };
+
+    // 全局右键：任何位置右键都关闭（让新的右键菜单接管）
+    const onContextMenu = (e: MouseEvent) => {
+      if (!isInsideMenu(e.target)) {
+        onClose();
+      }
+    };
+
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+    window.addEventListener('mousedown', onMouseDown, true);
+    window.addEventListener('contextmenu', onContextMenu, true);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mousedown', onMouseDown, true);
+      window.removeEventListener('contextmenu', onContextMenu, true);
+    };
+  }, [open, onClose, isInsideMenu]);
 
   // 计算菜单位置，避免超出视口 (useLayoutEffect 确保在浏览器绘制前调整位置)
   useLayoutEffect(() => {
@@ -38,25 +74,21 @@ export function EditorContextMenuPortal({ open, x, y, items, onClose, onMenuClic
 
     // 获取菜单的实际尺寸
     const rect = menuRef.current.getBoundingClientRect();
-    const menuWidth = rect.width || 200; // 默认宽度
-    const menuHeight = rect.height || 300; // 默认高度
+    const menuWidth = rect.width || 200;
+    const menuHeight = rect.height || 300;
 
     // 获取视口尺寸
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    // 计算调整后的位置
     let adjustedX = x;
     let adjustedY = y;
 
-    // 处理右边界
     if (x + menuWidth > viewportWidth) {
-      adjustedX = Math.max(0, viewportWidth - menuWidth - 8); // 留 8px 边距
+      adjustedX = Math.max(0, viewportWidth - menuWidth - 8);
     }
-
-    // 处理下边界
     if (y + menuHeight > viewportHeight) {
-      adjustedY = Math.max(0, viewportHeight - menuHeight - 8); // 留 8px 边距
+      adjustedY = Math.max(0, viewportHeight - menuHeight - 8);
     }
 
     setAdjustedPos({ x: adjustedX, y: adjustedY });
@@ -65,38 +97,25 @@ export function EditorContextMenuPortal({ open, x, y, items, onClose, onMenuClic
   if (!open) return null;
 
   return createPortal(
-    <>
-      <div
-        role="presentation"
-        aria-hidden
-        style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-        onClick={onClose}
-        onContextMenu={(e) => {
-          e.preventDefault();
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        left: adjustedPos.x,
+        top: adjustedPos.y,
+        zIndex: 9999,
+      }}
+    >
+      <Menu
+        mode="vertical"
+        selectable={false}
+        items={items}
+        onClick={(info) => {
+          onMenuClick?.(info);
           onClose();
         }}
       />
-      <div
-        ref={menuRef}
-        style={{
-          position: 'fixed',
-          left: adjustedPos.x,
-          top: adjustedPos.y,
-          zIndex: 9999,
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Menu
-          mode="vertical"
-          selectable={false}
-          items={items}
-          onClick={(info) => {
-            onMenuClick?.(info);
-            onClose();
-          }}
-        />
-      </div>
-    </>,
+    </div>,
     document.body,
   );
 }

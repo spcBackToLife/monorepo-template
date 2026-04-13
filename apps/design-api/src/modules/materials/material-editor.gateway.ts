@@ -13,7 +13,7 @@ import type { MaterialOperation } from '@globallink/material-operations';
 import { MaterialEditorService } from './material-editor.service';
 
 /**
- * 素材操作广播 envelope — WS 消息格式（v2 操作系统）
+ * 素材操作广播 envelope — WS 消息格式
  *
  * 前端收到后，用 MaterialOperationExecutor 重放操作更新本地 Schema，
  * 然后由 MaterialRenderer 重新渲染 SVG。
@@ -121,7 +121,7 @@ export class MaterialEditorGateway
   /**
    * 客户端通过 WS 发送素材操作
    *
-   * v2 改造：前端操作也经后端 Executor 执行+持久化+广播，
+   * 前端操作也经后端 Executor 执行+持久化+广播，
    * 与 MCP 的 REST 路径完全一致，保证单一数据真相来源。
    */
   @SubscribeMessage('me:operation')

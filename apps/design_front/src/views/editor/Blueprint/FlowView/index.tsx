@@ -14,7 +14,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { Checkbox } from 'antd';
 import type { DesignProject } from '@globallink/design-schema';
-import type { BlueprintAnalysis, FlowEdgeType, _FlowGraphData } from '../types';
+import type { BlueprintAnalysis, FlowEdgeType } from '../types';
 import { buildFlowGraph } from '../SchemaAnalyzer';
 import { ScreenFlowNode } from './ScreenFlowNode';
 import { StateFlowNode } from './StateFlowNode';

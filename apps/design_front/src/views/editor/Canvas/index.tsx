@@ -39,6 +39,7 @@ import {
   buildEditorContextMenuItems,
   EditorContextMenuPortal,
   handleEditorContextMenuClick,
+  preloadMaterialSlots,
 } from '../EditorContextMenu';
 import { collectNodeIdsWithEvents } from '../utils/collectNodeIdsWithEvents';
 import { collectNodeIdsWithListBinding } from '../utils/collectNodeIdsWithListBinding';
@@ -394,7 +395,16 @@ export const Canvas = observer(function Canvas() {
       const map = mergeCanvasCoordinateMap(container);
       const logical = screenToContainerLogical(container, e.clientX, e.clientY);
       const nodeId = hitTest(map, logical.x, logical.y);
-      setContextMenu({ x: e.clientX, y: e.clientY, nodeId });
+      const cx = e.clientX;
+      const cy = e.clientY;
+      // 先预加载素材槽位数据再展示菜单（确保已有素材能显示）
+      if (nodeId) {
+        void preloadMaterialSlots(nodeId).finally(() => {
+          setContextMenu({ x: cx, y: cy, nodeId });
+        });
+      } else {
+        setContextMenu({ x: cx, y: cy, nodeId });
+      }
     },
     [mergeCanvasCoordinateMap],
   );

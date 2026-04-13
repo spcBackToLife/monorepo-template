@@ -62,7 +62,7 @@ export class MaterialProjectsController {
     return this.service.findAll(projectId, { targetNodeId, search });
   }
 
-  /** 按关联节点查找工程 */
+  /** 按关联节点查找工程（返回最近一个，向后兼容） */
   @Get('by-node/:nodeId')
   async findByNode(
     @Param('projectId') projectId: string,
@@ -70,6 +70,15 @@ export class MaterialProjectsController {
   ) {
     const record = await this.service.findByTargetNode(projectId, nodeId);
     return record ?? { found: false };
+  }
+
+  /** 按关联节点查找所有工程（一对多） */
+  @Get('all-by-node/:nodeId')
+  async findAllByNode(
+    @Param('projectId') projectId: string,
+    @Param('nodeId') nodeId: string,
+  ) {
+    return this.service.findAllByTargetNode(projectId, nodeId);
   }
 
   /** 获取工程详情（含完整 canvasJSON） */

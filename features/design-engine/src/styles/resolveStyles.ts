@@ -71,6 +71,20 @@ export function resolveStyles(styles: CSSProperties, dataContext?: DataContext):
     }
   }
 
+  // mask-image 需要 -webkit- 前缀（Chrome/Safari）
+  if (resolved.maskImage && !resolved.WebkitMaskImage) {
+    resolved.WebkitMaskImage = resolved.maskImage;
+  }
+  if (resolved.maskSize && !resolved.WebkitMaskSize) {
+    resolved.WebkitMaskSize = resolved.maskSize;
+  }
+  if (resolved.maskRepeat && !resolved.WebkitMaskRepeat) {
+    resolved.WebkitMaskRepeat = resolved.maskRepeat;
+  }
+  if (resolved.maskPosition && !resolved.WebkitMaskPosition) {
+    resolved.WebkitMaskPosition = resolved.maskPosition;
+  }
+
   return resolved as React.CSSProperties;
 }
 

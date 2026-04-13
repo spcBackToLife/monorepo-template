@@ -63,7 +63,7 @@ import {
   materialEditorSync,
   type MaterialOperationEnvelope,
 } from '@/services/MaterialEditorSyncManager';
-import { materialProjectApi } from '@/api/materialProject';
+import { materialProjectApi, materialSlotApi } from '@/api/materialProject';
 import { API_BASE } from '@/api/client';
 import { LeftToolbar } from './LeftToolbar';
 import type { ActiveTool, EffectToolType } from './LeftToolbar';
@@ -167,7 +167,7 @@ interface InnerProps {
 /**
  * MaterialEditorModalInner — 创建 SVG 引擎 Provider + 三栏布局
  *
- * v2 MCP 集成：
+ * MCP 集成：
  *   1. 挂载时自动创建/查找后端素材工程（materialProjectId）
  *   2. 连接 WS SyncManager 接收 MCP 远程操作
  *   3. 本地操作通过 onOperation/onBatch 回调同步到后端
@@ -197,31 +197,118 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
   // 后端素材工程 ID（创建后赋值）
   const [materialProjectId, setMaterialProjectId] = useState<string | null>(null);
   const materialProjectIdRef = useRef<string | null>(null);
+  /** 防止 useEffect 重复执行时并发创建多个工程 */
+  const initializingRef = useRef(false);
 
   // 挂载时自动创建/查找后端素材工程 + 连接 WS
   useEffect(() => {
     const projectId = editorStore.project?.id;
     if (!projectId) return;
+    // 防止并发初始化（React StrictMode / 依赖变化导致重复执行）
+    if (initializingRef.current) return;
+    initializingRef.current = true;
 
     let cancelled = false;
+
+    // 从 store 中读取直接指定的 materialProjectId
+    const directProjectId = editorStore.materialEditorProjectId;
+    const slotName = editorStore.materialEditorSlotName;
+    const forceCreate = editorStore.materialEditorForceCreate;
+    const cssTarget = editorStore.materialEditorCssTarget;
+
+    /**
+     * 根据已有槽位列表自动生成不重复的槽位名。
+     * 规则：default → material-2 → material-3 → ...
+     */
+    const generateSlotName = (existingSlots: { slotName: string }[]): string => {
+      const names = new Set(existingSlots.map((s) => s.slotName));
+      if (!names.has('default')) return 'default';
+      let idx = 2;
+      while (names.has(`material-${idx}`)) idx++;
+      return `material-${idx}`;
+    };
 
     (async () => {
       try {
         let mpId: string | null = null;
 
-        // 如果有 targetNodeId，先查找是否已有关联的素材工程
-        if (targetNodeId) {
-          const existing = await materialProjectApi.findByNode(projectId, targetNodeId);
-          if (existing && !cancelled) {
-            mpId = existing.id;
+        // ── 强制新建模式：直接创建新工程 + 新槽位 ──
+        if (forceCreate && targetNodeId && !cancelled) {
+          // 先查现有槽位，用于生成不重复的名称
+          const existingSlots = await materialSlotApi.findByNode(projectId, targetNodeId);
+          const newSlotName = generateSlotName(existingSlots);
+          const nodeName = selectedStyles?.nodeName ?? '素材';
+
+          const created = await materialProjectApi.create(projectId, {
+            name: `${nodeName}-${newSlotName}`,
+            targetNodeId: targetNodeId,
+            canvasWidth: componentSize.width,
+            canvasHeight: componentSize.height,
+            canvasJSON: {},
+            referenceFrameWidth: componentSize.width,
+            referenceFrameHeight: componentSize.height,
+          });
+          mpId = created.id;
+
+          // 创建新槽位关联
+          if (!cancelled) {
+            try {
+              await materialSlotApi.create(projectId, {
+                nodeId: targetNodeId,
+                slotName: newSlotName,
+                materialProjectId: mpId,
+                cssTarget: cssTarget ?? 'background-image',
+              });
+            } catch {
+              // 忽略
+            }
           }
         }
 
-        // 没有现有工程则创建新的
+        // ── 优先使用直接指定的素材工程 ID ──
+        if (!mpId && directProjectId) {
+          mpId = directProjectId;
+        }
+
+        // ── 查找节点的槽位 ──
+        if (!mpId && targetNodeId && !cancelled) {
+          const slots = await materialSlotApi.findByNode(projectId, targetNodeId);
+          if (slots.length > 0 && !cancelled) {
+            // 有槽位 → 用第一个活跃槽位的素材工程（或指定 slotName 的）
+            const targetSlot = slotName
+              ? slots.find((s) => s.slotName === slotName)
+              : slots.find((s) => s.isActive) ?? slots[0];
+            if (targetSlot) {
+              mpId = targetSlot.materialProjectId;
+            }
+          }
+        }
+
+        // ── 向后兼容：如果槽位表为空，检查旧的 target_node_id 直接关联 ──
+        if (!mpId && targetNodeId && !cancelled) {
+          const existing = await materialProjectApi.findByNode(projectId, targetNodeId);
+          if (existing && !cancelled) {
+            mpId = existing.id;
+            // 自动迁移：为旧关联创建默认槽位
+            try {
+              await materialSlotApi.create(projectId, {
+                nodeId: targetNodeId,
+                slotName: 'default',
+                materialProjectId: existing.id,
+                cssTarget: 'background-image',
+              });
+            } catch {
+              // 槽位已存在，忽略
+            }
+          }
+        }
+
+        // ── 没有任何现有工程则创建新的 + 自动创建默认槽位 ──
         if (!mpId && !cancelled) {
           const nodeName = selectedStyles?.nodeName ?? '素材';
+          const newSlotName = slotName ?? 'default';
           const created = await materialProjectApi.create(projectId, {
-            name: `${nodeName}-素材`,
+            name: `${nodeName}-${newSlotName}`,
             targetNodeId: targetNodeId ?? undefined,
             canvasWidth: componentSize.width,
             canvasHeight: componentSize.height,
@@ -230,6 +317,20 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
             referenceFrameHeight: componentSize.height,
           });
           mpId = created.id;
+
+          // 自动创建槽位关联
+          if (targetNodeId && !cancelled) {
+            try {
+              await materialSlotApi.create(projectId, {
+                nodeId: targetNodeId,
+                slotName: newSlotName,
+                materialProjectId: mpId,
+                cssTarget: cssTarget ?? 'background-image',
+              });
+            } catch {
+              // 槽位已存在，忽略
+            }
+          }
         }
 
         if (cancelled || !mpId) return;
@@ -247,6 +348,7 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
 
     return () => {
       cancelled = true;
+      initializingRef.current = false;
       materialEditorSync.disconnect();
     };
   }, [targetNodeId, componentSize.width, componentSize.height, selectedStyles?.nodeName]);
@@ -326,17 +428,17 @@ function SyncBridge({ materialProjectId }: { materialProjectId: string | null })
         if (!res.ok || cancelled) return;
         const backendSchema = await res.json() as MaterialProjectSchema;
 
-        // 后端有对象时，合并到前端本地 Schema
+        // 后端有对象时，用 setProject 整体替换前端 Schema（避免重复添加）
         const backendObjects = backendSchema.objects ?? [];
         if (backendObjects.length > 0 && !cancelled) {
-          // 使用前端的画布设置（大画布 + 默认框），但把后端的对象 execute 进来
-          for (const obj of backendObjects) {
-            execute({
-              type: 'me:addObject',
-              params: { objectId: obj.id, object: obj },
-            });
-          }
-          console.log(`[SyncBridge] Loaded ${backendObjects.length} objects from backend`);
+          // 合并策略：用前端的大画布设置 + 后端的对象列表
+          const mergedSchema: MaterialProjectSchema = {
+            ...state.project,                     // 前端的画布/参考框配置
+            objects: backendObjects,               // 后端的对象列表（唯一真相来源）
+            version: backendSchema.version,        // 后端版本号
+          };
+          setProject(mergedSchema);
+          console.log(`[SyncBridge] Loaded ${backendObjects.length} objects from backend (setProject)`);
         }
       } catch (err) {
         console.error('[SyncBridge] Failed to load backend schema:', err);
@@ -872,6 +974,7 @@ function ModalContent({
             targetNodeId={targetNodeId}
             onClose={onClose}
             materialProjectId={materialProjectId}
+            cssTarget={editorStore.materialEditorCssTarget}
           />
         </div>
       </ConfigProvider>

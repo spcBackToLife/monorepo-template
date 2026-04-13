@@ -176,6 +176,14 @@ export class EditorStore {
   materialEditorOpen = false;
   materialEditorTargetNodeId: string | null = null;
   materialEditorInitTab: 'gradient' | 'shadow' | 'filter' | 'canvas' | 'animation' | 'assets' = 'gradient';
+  /** 指定打开的素材工程 ID（为 null 时自动查找/创建） */
+  materialEditorProjectId: string | null = null;
+  /** 指定打开的槽位名称（为 null 时默认使用 'default'） */
+  materialEditorSlotName: string | null = null;
+  /** 强制新建素材工程（跳过所有查找逻辑，直接创建新工程 + 新槽位） */
+  materialEditorForceCreate = false;
+  /** 素材导出的 CSS 目标属性（如 background-image, props.src 等） */
+  materialEditorCssTarget: string | null = null;
 
   /** 最近一次复制到内存的节点 JSON（与系统剪贴板同步写入，供粘贴） */
   clipboardSubtreeJson: string | null = null;
@@ -698,10 +706,18 @@ export class EditorStore {
   }
 
   /** 打开素材编辑器弹窗（右键菜单 / 高级编辑按钮） */
-  openMaterialEditor(nodeId?: string | null, tab?: 'gradient' | 'shadow' | 'filter' | 'canvas' | 'animation' | 'assets'): void {
+  openMaterialEditor(
+    nodeId?: string | null,
+    tab?: 'gradient' | 'shadow' | 'filter' | 'canvas' | 'animation' | 'assets',
+    options?: { materialProjectId?: string; slotName?: string; forceCreate?: boolean; cssTarget?: string },
+  ): void {
     runInAction(() => {
       this.materialEditorOpen = true;
       this.materialEditorTargetNodeId = nodeId ?? this.selectedNodeIds[0] ?? null;
+      this.materialEditorProjectId = options?.materialProjectId ?? null;
+      this.materialEditorSlotName = options?.slotName ?? null;
+      this.materialEditorForceCreate = options?.forceCreate ?? false;
+      this.materialEditorCssTarget = options?.cssTarget ?? null;
       if (tab) this.materialEditorInitTab = tab;
     });
   }
@@ -710,6 +726,10 @@ export class EditorStore {
   closeMaterialEditor(): void {
     runInAction(() => {
       this.materialEditorOpen = false;
+      this.materialEditorProjectId = null;
+      this.materialEditorSlotName = null;
+      this.materialEditorForceCreate = false;
+      this.materialEditorCssTarget = null;
     });
   }
 
@@ -951,6 +971,10 @@ export class EditorStore {
     this.materialEditorOpen = false;
     this.materialEditorTargetNodeId = null;
     this.materialEditorInitTab = 'gradient';
+    this.materialEditorProjectId = null;
+    this.materialEditorSlotName = null;
+    this.materialEditorForceCreate = false;
+    this.materialEditorCssTarget = null;
   }
 
   private enqueuePersist(op: Operation, fingerprint: string, forceImmediate = false): void {

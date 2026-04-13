@@ -311,6 +311,9 @@ export const StylesTab = observer(function StylesTab() {
         <BackgroundEditor styles={styles} onChange={handleChange} />
       </CollapsibleSection>
 
+      {/* 5b. Mask */}
+      <MaskSection styles={styles} onChange={handleChange} nodeId={nodeId} />
+
       {/* 6. Border */}
       <CollapsibleSection title="边框">
         <div className="flex flex-col gap-1.5">
@@ -419,6 +422,9 @@ export const StylesTab = observer(function StylesTab() {
           <TransitionEditor value={styles.transition ?? ''} onChange={(v) => handleChange('transition', v)} />
         </div>
       </CollapsibleSection>
+
+      {/* 9. Other styles (未被其他分区覆盖的属性) */}
+      <OtherStylesSection styles={styles} onChange={handleChange} />
     </div>
   );
 });
@@ -689,6 +695,166 @@ function BackgroundEditor({
         🎨 高级编辑（渐变 / 阴影 / 滤镜 / 素材库）
       </button>
     </div>
+  );
+}
+
+/* ── Other Styles Section ── */
+
+/** 已在其他分区中展示的属性 key 集合 */
+const KNOWN_STYLE_KEYS = new Set([
+  // Layout
+  'display', 'flexDirection', 'justifyContent', 'alignItems', 'flexWrap', 'gap', 'overflow',
+  // Size
+  'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
+  // Spacing
+  'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'margin',
+  'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'padding',
+  // Position
+  'position', 'top', 'right', 'bottom', 'left', 'zIndex',
+  // Background
+  'backgroundColor', 'backgroundImage', 'backgroundSize', 'backgroundRepeat', 'backgroundPosition', 'background',
+  // Mask (handled by MaskSection)
+  'maskImage', 'WebkitMaskImage', 'maskSize', 'WebkitMaskSize', 'maskRepeat', 'WebkitMaskRepeat', 'maskPosition', 'WebkitMaskPosition',
+  // Border
+  'borderWidth', 'borderStyle', 'borderColor', 'borderRadius',
+  // Typography
+  'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'textAlign', 'textDecoration', 'color',
+  // Effects
+  'opacity', 'boxShadow', 'filter', 'cursor', 'transform', 'transition',
+]);
+
+function OtherStylesSection({
+  styles,
+  onChange,
+}: {
+  styles: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+}) {
+  const otherEntries = Object.entries(styles).filter(
+    ([key, value]) => value && value !== '' && !KNOWN_STYLE_KEYS.has(key),
+  );
+
+  if (otherEntries.length === 0) return null;
+
+  return (
+    <CollapsibleSection title={`其他 (${otherEntries.length})`}>
+      <div className="flex flex-col gap-1">
+        {otherEntries.map(([key, value]) => (
+          <div key={key} className="flex items-center gap-1 text-xs">
+            <span className="text-purple-600 font-mono text-[10px] w-20 text-right flex-shrink-0 truncate" title={key}>{key}</span>
+            <input
+              type="text"
+              className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
+              value={value}
+              onChange={(e) => onChange(key, e.target.value)}
+            />
+            <button
+              type="button"
+              className="text-gray-300 hover:text-red-400 text-[10px] flex-shrink-0"
+              onClick={() => onChange(key, '')}
+              title="清除此属性"
+            >×</button>
+          </div>
+        ))}
+      </div>
+    </CollapsibleSection>
+  );
+}
+
+/* ── Mask Section ── */
+
+function MaskSection({
+  styles,
+  onChange,
+  nodeId,
+}: {
+  styles: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  nodeId: string;
+}) {
+  const maskValue = styles.maskImage || styles.WebkitMaskImage || '';
+  const hasMask = !!maskValue;
+
+  if (!hasMask) return null;
+
+  const maskSize = styles.maskSize || styles.WebkitMaskSize || 'cover';
+  const maskRepeat = styles.maskRepeat || styles.WebkitMaskRepeat || 'no-repeat';
+  const maskPosition = styles.maskPosition || styles.WebkitMaskPosition || 'center';
+
+  const handleRemoveMask = () => {
+    onChange('maskImage', '');
+    onChange('WebkitMaskImage', '');
+    onChange('maskSize', '');
+    onChange('WebkitMaskSize', '');
+    onChange('maskRepeat', '');
+    onChange('WebkitMaskRepeat', '');
+    onChange('maskPosition', '');
+    onChange('WebkitMaskPosition', '');
+  };
+
+  const handleEditMask = () => {
+    editorStore.openMaterialEditor(nodeId, 'canvas', { cssTarget: 'mask-image' });
+  };
+
+  return (
+    <CollapsibleSection title="遮罩" defaultOpen>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-gray-500 w-8 text-right flex-shrink-0">图片</span>
+          <input
+            type="text"
+            className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono truncate"
+            value={maskValue}
+            readOnly
+            title={maskValue}
+          />
+          <button
+            type="button"
+            className="flex-shrink-0 px-1.5 py-0.5 text-[10px] text-red-500 border border-red-200 rounded hover:bg-red-50"
+            onClick={handleRemoveMask}
+            title="移除遮罩"
+          >
+            ×
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
+          <SelectField
+            label="尺寸"
+            value={maskSize}
+            options={['cover', 'contain', 'auto', '100% 100%']}
+            onChange={(v) => {
+              onChange('maskSize', v);
+              onChange('WebkitMaskSize', v);
+            }}
+          />
+          <SelectField
+            label="重复"
+            value={maskRepeat}
+            options={['no-repeat', 'repeat', 'repeat-x', 'repeat-y']}
+            onChange={(v) => {
+              onChange('maskRepeat', v);
+              onChange('WebkitMaskRepeat', v);
+            }}
+          />
+          <SelectField
+            label="位置"
+            value={maskPosition}
+            options={['center', 'top', 'bottom', 'left', 'right', 'top left', 'top right', 'bottom left', 'bottom right']}
+            onChange={(v) => {
+              onChange('maskPosition', v);
+              onChange('WebkitMaskPosition', v);
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          className="w-full h-6 text-[10px] text-purple-500 border border-purple-200 rounded hover:bg-purple-50 hover:border-purple-400 transition-colors"
+          onClick={handleEditMask}
+        >
+          🎭 编辑遮罩素材
+        </button>
+      </div>
+    </CollapsibleSection>
   );
 }
 

@@ -85,7 +85,7 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
       if (currentIndex < objects.length - 1) {
         execute({
           type: 'me:reorderObject',
-          params: { objectId: objId, newIndex: currentIndex + 1 },
+          params: { objectId: objId, direction: 'forward' },
         });
       }
     },
@@ -98,7 +98,7 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
       if (currentIndex > 0) {
         execute({
           type: 'me:reorderObject',
-          params: { objectId: objId, newIndex: currentIndex - 1 },
+          params: { objectId: objId, direction: 'backward' },
         });
       }
     },

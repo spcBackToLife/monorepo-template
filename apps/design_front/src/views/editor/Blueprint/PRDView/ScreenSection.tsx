@@ -208,7 +208,7 @@ function ModuleSection({ module: mod, index, screen, assets, viewport, onViewInF
 
 // ===== Detailed Element Card =====
 
-function DetailedElementCard({ element: el, screen, assets, viewport, _onViewInFlow }: {
+function DetailedElementCard({ element: el, screen, assets, viewport, onViewInFlow: _onViewInFlow }: {
   element: ElementSpec; screen: Screen;
   assets: ComponentTemplate[]; viewport: { width: number; height: number };
   onViewInFlow: (edgeId: string) => void;

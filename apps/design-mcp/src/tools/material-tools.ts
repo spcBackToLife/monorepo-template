@@ -3,12 +3,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
 
 /**
- * Material Editor MCP Tools — 素材编辑器完整操作集（v2 操作系统）
+ * Material Editor MCP Tools — 素材编辑器完整操作集
  *
- * v2 改造核心变化：
- *   - 所有画布操作走 executeMaterialOperation()，发送类型化 MaterialOperation
- *   - 后端是数据唯一真相来源（MCP 不再依赖前端在线）
- *   - 每个操作都需要 materialId（素材工程 ID）
+ * 所有画布操作走 executeMaterialOperation()，发送类型化 MaterialOperation。
+ * 后端是数据唯一真相来源（MCP 不依赖前端在线）。
+ * 每个操作都需要 materialId（素材工程 ID）。
  *
  * 按能力域分组：
  *
@@ -229,7 +228,9 @@ export function registerMaterialTools(server: McpServer): void {
   server.registerTool(
     'me_find_project_by_node',
     {
-      description: '按关联的设计 Schema 节点 ID 查找素材工程。如果该节点已有素材工程则返回详情，否则返回 { found: false }。',
+      description:
+        '按关联的设计 Schema 节点 ID 查找素材工程（返回最近一个，向后兼容）。\n' +
+        '如果该节点有多个素材工程，请使用 me_find_slots_by_node 查看完整列表。',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         nodeId: z.string().describe('设计 Schema 节点 ID'),
@@ -238,6 +239,116 @@ export function registerMaterialTools(server: McpServer): void {
     async ({ projectId, nodeId }) => {
       const result = await api.findMaterialProjectByNode(projectId, nodeId);
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_find_all_projects_by_node',
+    {
+      description:
+        '按关联的设计 Schema 节点 ID 查找所有素材工程（一对多）。\n' +
+        '返回该节点关联的所有素材工程列表。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('设计 Schema 节点 ID'),
+      },
+    },
+    async ({ projectId, nodeId }) => {
+      const result = await api.findAllMaterialProjectsByNode(projectId, nodeId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  // ╔══════════════════════════════════════════════╗
+  // ║  素材槽位管理（节点 ↔ 素材工程多对多关联）      ║
+  // ╚══════════════════════════════════════════════╝
+
+  server.registerTool(
+    'me_find_slots_by_node',
+    {
+      description:
+        '查询节点的所有素材槽位（含素材工程摘要）。\n' +
+        '每个槽位代表节点的一个素材用途（如 default=默认背景, hover=悬浮态, decoration=装饰层等）。\n' +
+        '返回数组，每项包含 slotName、materialProjectId、cssTarget、isActive 等信息。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('设计 Schema 节点 ID'),
+      },
+    },
+    async ({ projectId, nodeId }) => {
+      const result = await api.findSlotsByNode(projectId, nodeId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_create_slot',
+    {
+      description:
+        '为节点创建素材槽位 — 将素材工程绑定到节点的某个用途上。\n' +
+        '同一节点的同名槽位不可重复（如已有 default 槽位，不能再创建 default）。\n\n' +
+        '常用槽位名称：\n' +
+        '  - default：默认背景素材\n' +
+        '  - hover：悬浮态素材\n' +
+        '  - active：激活态素材\n' +
+        '  - decoration：装饰层\n' +
+        '  - dark-theme：暗色主题\n' +
+        '  - before / after：伪元素装饰',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        nodeId: z.string().describe('设计 Schema 节点 ID'),
+        materialProjectId: z.string().describe('要绑定的素材工程 ID'),
+        slotName: z.string().optional().describe('槽位名称（默认 "default"）'),
+        sortOrder: z.number().optional().describe('排序序号（默认 0，越小越靠前）'),
+        cssTarget: z.string().optional().describe('CSS 目标属性（默认 "background-image"）'),
+        isActive: z.boolean().optional().describe('是否激活（默认 true）'),
+      },
+    },
+    async ({ projectId, nodeId, materialProjectId, slotName, sortOrder, cssTarget, isActive }) => {
+      const result = await api.createSlot(projectId, {
+        nodeId,
+        materialProjectId,
+        slotName,
+        sortOrder,
+        cssTarget,
+        isActive,
+      });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_update_slot',
+    {
+      description: '更新素材槽位的属性（名称、绑定的素材工程、排序、CSS 目标、激活状态）。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        slotId: z.string().describe('槽位 ID'),
+        slotName: z.string().optional().describe('新槽位名称'),
+        materialProjectId: z.string().optional().describe('新绑定的素材工程 ID'),
+        sortOrder: z.number().optional().describe('新排序序号'),
+        cssTarget: z.string().optional().describe('新 CSS 目标属性'),
+        isActive: z.boolean().optional().describe('是否激活'),
+      },
+    },
+    async ({ projectId, slotId, ...data }) => {
+      const result = await api.updateSlot(projectId, slotId, data);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    'me_delete_slot',
+    {
+      description: '删除素材槽位（解除节点与素材工程的关联，不删除素材工程本身）。',
+      inputSchema: {
+        projectId: z.string().describe('项目 ID'),
+        slotId: z.string().describe('要删除的槽位 ID'),
+      },
+    },
+    async ({ projectId, slotId }) => {
+      await api.deleteSlot(projectId, slotId);
+      return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true, message: '槽位已删除' }) }] };
     },
   );
 

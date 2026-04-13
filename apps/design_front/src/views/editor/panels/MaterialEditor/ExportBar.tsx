@@ -24,8 +24,10 @@ import {
 } from '@ant-design/icons';
 import { useMaterialEditor } from '@globallink/material-engine';
 import { editorStore } from '@/stores/editor';
+import { findNodeInScreens } from '@globallink/design-operations';
 import { API_BASE } from '@/api/client';
 import { materialProjectApi } from '@/api/materialProject';
+import { getCssTargetLabel, getExportFormat } from '@/views/editor/EditorContextMenu/buildMenuItems';
 
 interface ExportBarProps {
   targetNodeId: string | null;
@@ -34,6 +36,8 @@ interface ExportBarProps {
   materialProjectId?: string | null;
   /** 工程保存后的回调 */
   onProjectSaved?: (id: string) => void;
+  /** 素材的 CSS 目标属性（决定导出方式和写入位置） */
+  cssTarget?: string | null;
 }
 
 /** 下载 Blob */
@@ -138,14 +142,19 @@ function downloadDataURL(dataURL: string, filename: string): void {
   a.click();
 }
 
-export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectSaved }: ExportBarProps) {
+export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectSaved, cssTarget }: ExportBarProps) {
   const { message } = AntdApp.useApp();
   const { state } = useMaterialEditor();
   const { project } = state;
   const { referenceFrame, canvasWidth, canvasHeight } = project;
   const [applying, setApplying] = useState(false);
 
-  // ===== 应用到元素（核心优化：上传资产 → URL 引用） =====
+  // 解析 cssTarget → 决定导出策略
+  const effectiveCssTarget = cssTarget ?? 'background-image';
+  const isPropTarget = effectiveCssTarget.startsWith('props.');
+  const exportFormat = getExportFormat(effectiveCssTarget);
+
+  // ===== 应用到元素（根据 cssTarget 智能决定） =====
   const handleApplyToElement = useCallback(async () => {
     if (!targetNodeId) {
       message.warning('请先选中一个元素');
@@ -160,45 +169,41 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
 
     setApplying(true);
     try {
-      // 查找目标节点类型
-      const node = editorStore.screens
-        .flatMap((s) => s.nodes ?? [])
-        .find((n) => n.id === targetNodeId);
-
-      const isImg = node?.type === 'img';
-
-      if (isImg) {
-        // img 元素：导出 PNG 并上传
+      if (isPropTarget) {
+        // ── Props 目标（如 img.src、组件的 image props）→ 导出 PNG ──
+        const propKey = effectiveCssTarget.replace('props.', '');
         const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, 2);
         if (!dataUrl) { message.error('PNG 导出失败'); return; }
 
         if (materialProjectId) {
-          // 有素材工程 → 上传到素材工程存储，得到 URL
           const blob = await dataUrlToBlob(dataUrl);
           const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.png');
           editorStore.execute({
             type: 'applyMaterialDesign',
             params: {
               nodeId: targetNodeId,
-              propUpdates: { src: result.url },
+              propUpdates: { [propKey]: result.url },
               materialProjectId,
             },
           });
         } else {
-          // 无素材工程 → 回退：直接用 dataUrl（体积较小的 PNG）
           editorStore.execute({
             type: 'updateComponentProps',
-            params: { nodeId: targetNodeId, props: { src: dataUrl } },
+            params: { nodeId: targetNodeId, props: { [propKey]: dataUrl } },
           });
         }
-        message.success('已应用为图片');
-      } else {
-        // 非 img 元素：导出 SVG 并上传
+        message.success(`已应用到 ${propKey}`);
+
+      } else if (effectiveCssTarget.startsWith('::') && effectiveCssTarget.includes('.background')) {
+        // ── 伪元素目标（::before / ::after）→ 导出 SVG，提示用户需手动处理 ──
+        // 注：CSS 伪元素无法通过 JS 直接操作，需通过 CSS 变量 / class 间接实现
         const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
         if (!svgString) { message.error('SVG 导出失败'); return; }
 
+        // 暂时将 SVG 存为 CSS 变量，后续渲染器可读取
+        const pseudoName = effectiveCssTarget.startsWith('::before') ? 'before' : 'after';
+
         if (materialProjectId) {
-          // 有素材工程 → 上传 SVG 到后端存储，得到 URL 引用
           const blob = new Blob([svgString], { type: 'image/svg+xml' });
           const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.svg');
           editorStore.execute({
@@ -206,14 +211,68 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
             params: {
               nodeId: targetNodeId,
               styleUpdates: {
-                backgroundImage: `url("${result.url}")`,
-                backgroundSize: 'cover',
+                [`--${pseudoName}-bg`]: `url("${result.url}")`,
+              } as Record<string, string>,
+              materialProjectId,
+            },
+          });
+        } else {
+          const encodedSvg = `url("data:image/svg+xml,${encodeURIComponent(svgString)}")`;
+          editorStore.execute({
+            type: 'updateStyle',
+            params: {
+              nodeId: targetNodeId,
+              styles: { [`--${pseudoName}-bg`]: encodedSvg } as Record<string, string>,
+            },
+          });
+        }
+        message.success(`已应用到 ${pseudoName} 装饰（CSS 变量 --${pseudoName}-bg）`);
+
+      } else {
+        // ── CSS 属性目标（background-image / border-image / mask-image）──
+        const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
+        if (!svgString) { message.error('SVG 导出失败'); return; }
+
+        // 将 CSS 属性名转为 camelCase（用于 JS styles 对象）
+        const cssPropCamel = effectiveCssTarget.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+
+        // 根据不同 CSS 属性决定附加样式
+        const additionalStyles: Record<string, string> = {};
+        if (effectiveCssTarget === 'background-image') {
+          additionalStyles.backgroundSize = 'cover';
+        } else if (effectiveCssTarget === 'mask-image') {
+          // mask-image 需要 -webkit- 前缀（Chrome/Safari）和配套尺寸属性
+          additionalStyles.maskSize = 'cover';
+          additionalStyles.WebkitMaskSize = 'cover';
+          additionalStyles.maskRepeat = 'no-repeat';
+          additionalStyles.WebkitMaskRepeat = 'no-repeat';
+          additionalStyles.maskPosition = 'center';
+          additionalStyles.WebkitMaskPosition = 'center';
+        }
+
+        /** mask-image 需要同时写标准属性和 -webkit- 前缀 */
+        const buildMaskStyles = (urlValue: string): Record<string, string> => {
+          if (effectiveCssTarget !== 'mask-image') return {};
+          return { WebkitMaskImage: urlValue };
+        };
+
+        if (materialProjectId) {
+          const blob = new Blob([svgString], { type: 'image/svg+xml' });
+          const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.svg');
+          const urlValue = `url("${result.url}")`;
+          editorStore.execute({
+            type: 'applyMaterialDesign',
+            params: {
+              nodeId: targetNodeId,
+              styleUpdates: {
+                [cssPropCamel]: urlValue,
+                ...buildMaskStyles(urlValue),
+                ...additionalStyles,
               },
               materialProjectId,
             },
           });
         } else {
-          // 无素材工程 → 回退：上传到通用素材存储
           const blob = new Blob([svgString], { type: 'image/svg+xml' });
           const file = new File([blob], 'material-export.svg', { type: 'image/svg+xml' });
           const formData = new FormData();
@@ -225,13 +284,15 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
           });
           if (response.ok) {
             const uploaded = await response.json() as { url: string };
+            const urlValue = `url("${uploaded.url}")`;
             editorStore.execute({
               type: 'updateStyle',
               params: {
                 nodeId: targetNodeId,
                 styles: {
-                  backgroundImage: `url("${uploaded.url}")`,
-                  backgroundSize: 'cover',
+                  [cssPropCamel]: urlValue,
+                  ...buildMaskStyles(urlValue),
+                  ...additionalStyles,
                 },
               },
             });
@@ -240,7 +301,19 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
             return;
           }
         }
-        message.success('已应用为背景');
+
+        const targetLabel = getCssTargetLabel(effectiveCssTarget);
+        message.success(`已应用到${targetLabel}`);
+
+        // 遮罩特别提示：节点需要有背景色/背景图才能看到 mask 效果
+        if (effectiveCssTarget === 'mask-image') {
+          const node = findNodeInScreens(editorStore.screens, targetNodeId);
+          const st = node?.styles as Record<string, string> | undefined;
+          const hasBg = st?.backgroundColor || st?.backgroundImage || st?.background;
+          if (!hasBg) {
+            message.info('提示：遮罩需要节点有背景色或背景图才能看到效果，请先设置背景', 5);
+          }
+        }
       }
     } catch (err) {
       console.error('[ExportBar] Apply to element failed:', err);
@@ -248,7 +321,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
     } finally {
       setApplying(false);
     }
-  }, [targetNodeId, materialProjectId, referenceFrame, canvasWidth, canvasHeight, message]);
+  }, [targetNodeId, materialProjectId, referenceFrame, canvasWidth, canvasHeight, message, effectiveCssTarget, isPropTarget]);
 
   // 保存为项目素材
   const handleSaveAsMaterial = useCallback(async () => {
@@ -342,7 +415,9 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
     <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50">
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] text-gray-400">
-          {targetNodeId ? '编辑效果将应用到选中元素' : '独立创作模式'}
+          {targetNodeId
+            ? `应用目标：${getCssTargetLabel(effectiveCssTarget)} · ${exportFormat === 'png' ? 'PNG' : 'SVG'} 格式`
+            : '独立创作模式'}
         </span>
       </div>
 

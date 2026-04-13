@@ -274,6 +274,16 @@ export async function findMaterialProjectByNode(
 }
 
 /**
+ * 按关联节点查找所有素材工程（一对多）
+ */
+export async function findAllMaterialProjectsByNode(
+  projectId: string,
+  nodeId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-projects/all-by-node/${nodeId}`);
+}
+
+/**
  * 删除素材工程
  */
 export async function deleteMaterialProject(
@@ -288,7 +298,7 @@ export async function deleteMaterialProject(
 // ===== Material Editor Actions =====
 
 /**
- * 素材编辑器 v2 操作系统 — 执行单条操作
+ * 执行单条素材编辑器操作
  *
  * 与 executeOperation() 完全同构，但路由指向素材操作端点。
  */
@@ -310,7 +320,7 @@ export async function executeMaterialOperation(
 }
 
 /**
- * 素材编辑器 v2 操作系统 — 批量执行操作
+ * 批量执行素材编辑器操作
  */
 export async function executeMaterialBatch(
   projectId: string,
@@ -328,7 +338,7 @@ export async function executeMaterialBatch(
 }
 
 /**
- * 素材编辑器 v2 操作系统 — 增量拉取操作日志
+ * 增量拉取素材编辑器操作日志
  */
 export async function getMaterialOperationsSince(
   projectId: string,
@@ -341,7 +351,7 @@ export async function getMaterialOperationsSince(
 }
 
 /**
- * 素材编辑器 v2 操作系统 — 撤销
+ * 素材编辑器撤销
  */
 export async function materialUndo(
   projectId: string,
@@ -354,7 +364,7 @@ export async function materialUndo(
 }
 
 /**
- * 素材编辑器 v2 操作系统 — 重做
+ * 素材编辑器重做
  */
 export async function materialRedo(
   projectId: string,
@@ -367,7 +377,7 @@ export async function materialRedo(
 }
 
 /**
- * 素材编辑器 v2 操作系统 — 获取完整 Schema
+ * 获取素材编辑器完整 Schema
  */
 export async function getMaterialSchema(
   projectId: string,
@@ -422,4 +432,79 @@ export async function getMaterialEditorPresets(): Promise<unknown> {
  */
 export async function getMaterialEditorCapabilities(): Promise<unknown> {
   return request('/api/material-editor/capabilities');
+}
+
+// ===== Material Slots (素材槽位 CRUD) =====
+
+/**
+ * 查询节点的所有素材槽位（含素材工程摘要）
+ */
+export async function findSlotsByNode(
+  projectId: string,
+  nodeId: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-slots/by-node/${nodeId}`);
+}
+
+/**
+ * 查询节点指定槽位
+ */
+export async function findSlot(
+  projectId: string,
+  nodeId: string,
+  slotName: string,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-slots/by-node/${nodeId}/${slotName}`);
+}
+
+/**
+ * 创建素材槽位
+ */
+export async function createSlot(
+  projectId: string,
+  data: {
+    nodeId: string;
+    slotName?: string;
+    materialProjectId: string;
+    sortOrder?: number;
+    cssTarget?: string;
+    isActive?: boolean;
+  },
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-slots`, {
+    method: 'POST',
+    body: data,
+  });
+}
+
+/**
+ * 更新素材槽位
+ */
+export async function updateSlot(
+  projectId: string,
+  slotId: string,
+  data: {
+    slotName?: string;
+    materialProjectId?: string;
+    sortOrder?: number;
+    cssTarget?: string;
+    isActive?: boolean;
+  },
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-slots/${slotId}`, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+/**
+ * 删除素材槽位
+ */
+export async function deleteSlot(
+  projectId: string,
+  slotId: string,
+): Promise<void> {
+  await request(`/api/projects/${projectId}/material-slots/${slotId}`, {
+    method: 'DELETE',
+  });
 }

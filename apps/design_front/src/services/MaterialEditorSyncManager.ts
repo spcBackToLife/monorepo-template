@@ -1,11 +1,11 @@
 /**
- * MaterialEditorSyncManager — 素材编辑器实时同步管理器（v2 操作系统）
+ * MaterialEditorSyncManager — 素材编辑器实时同步管理器
  *
  * 连接 design-api 的 `/ws/material-editor` 命名空间，
  * 接收来自 MCP 或其他客户端的类型化 MaterialOperation，
  * 在本地 Context 中执行操作触发 SVG 重渲染。
  *
- * v2 数据流：
+ * 数据流：
  *   MCP/其他客户端 → REST/WS → MaterialEditorService.execute()
  *                  → WS 广播 me:operation
  *                  → 本 SyncManager 接收
@@ -18,7 +18,7 @@ import type { MaterialOperation } from '@globallink/material-operations';
 const WS_BASE = import.meta.env.VITE_WS_BASE ?? 'http://127.0.0.1:3001';
 
 /**
- * v2 操作信封 — WS 消息格式
+ * 操作信封 — WS 消息格式
  */
 export interface MaterialOperationEnvelope {
   fingerprint: string;
@@ -31,7 +31,7 @@ export interface MaterialOperationEnvelope {
 }
 
 /**
- * v2 undo 事件
+ * undo 事件
  */
 export interface MaterialUndoEvent {
   projectId: string;
@@ -88,7 +88,7 @@ export class MaterialEditorSyncManager {
   /**
    * 通过 WS 发送操作到后端执行
    *
-   * v2 流程：前端操作也经后端 Executor 执行+持久化+广播，
+   * 前端操作经后端 Executor 执行+持久化+广播，
    * 保证单一数据真相来源。
    */
   sendOperation(
@@ -173,7 +173,7 @@ export class MaterialEditorSyncManager {
 
     this.socket.on('connect', () => {
       this.connected = true;
-      console.log('[MaterialEditorSync] Connected (v2 operations)');
+      console.log('[MaterialEditorSync] Connected');
 
       // 订阅素材编辑器操作流
       this.socket?.emit('me:subscribe', {
@@ -193,12 +193,12 @@ export class MaterialEditorSyncManager {
       console.log('[MaterialEditorSync] Disconnected');
     });
 
-    // v2 操作事件
+    // 操作事件
     this.socket.on('me:operation', (envelope: MaterialOperationEnvelope) => {
       this.handleOperation(envelope);
     });
 
-    // v2 undo/redo 事件
+    // undo/redo 事件
     this.socket.on('me:undo', (event: MaterialUndoEvent) => {
       this.lastSeq = Math.max(this.lastSeq, event.seq);
       this.undoHandlers.forEach((h) => h(event));

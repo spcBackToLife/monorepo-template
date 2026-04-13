@@ -1,7 +1,7 @@
 /**
- * 素材编辑画布（v2 SVG 渲染引擎）
+ * 素材编辑画布（SVG 渲染引擎）
  *
- * 替换原有 Fabric.js Canvas 2D 实现，改用 SVG MaterialRenderer。
+ * 使用 SVG MaterialRenderer 渲染。
  * 架构与设计编辑器完全同构：Schema → SVG DOM 自研渲染。
  *
  * 数据流：

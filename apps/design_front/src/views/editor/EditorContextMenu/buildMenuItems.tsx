@@ -1,6 +1,181 @@
 import type { MenuProps } from 'antd';
 import type { MessageInstance } from 'antd/es/message/interface';
 import { editorStore } from '@/stores/editor';
+import { materialSlotApi, materialProjectApi, type MaterialSlotWithProject } from '@/api/materialProject';
+import { findNodeInScreens } from '@globallink/design-operations';
+import { getElementProps } from '@globallink/design-schema';
+import type { PrimitiveNodeType, ComponentNode } from '@globallink/design-schema';
+
+// ===== 素材应用目标 (Material Apply Target) =====
+
+/** 素材可应用的目标描述 */
+export interface MaterialApplyTarget {
+  /** 唯一值，存入 slot.cssTarget。格式：CSS 属性名 或 props.xxx */
+  value: string;
+  /** 用户可读标签 */
+  label: string;
+  /** 菜单图标 */
+  icon: string;
+  /** 导出方式：svg → 写为 url("...svg")；png → 写为图片 URL */
+  exportFormat: 'svg' | 'png';
+}
+
+/** 通用 CSS 属性目标（所有元素都有） */
+const CSS_STYLE_TARGETS: MaterialApplyTarget[] = [
+  { value: 'background-image', label: '背景', icon: '🎨', exportFormat: 'svg' },
+  { value: 'border-image', label: '边框', icon: '🔲', exportFormat: 'svg' },
+  { value: 'mask-image', label: '遮罩', icon: '🎭', exportFormat: 'svg' },
+  { value: '::before.background', label: '前装饰 (::before)', icon: '✨', exportFormat: 'svg' },
+  { value: '::after.background', label: '后装饰 (::after)', icon: '💫', exportFormat: 'svg' },
+];
+
+/** 元素特有的 Prop 目标（根据 type 推断） */
+const ELEMENT_PROP_TARGETS: Record<string, MaterialApplyTarget[]> = {
+  img: [{ value: 'props.src', label: '图片源 (src)', icon: '🖼️', exportFormat: 'png' }],
+};
+
+/**
+ * 根据节点获取所有可用的素材应用目标。
+ *
+ * 优先级：元素特有 Props > 通用 CSS 属性
+ * - img → [props.src, background-image, border-image, ...]
+ * - div → [background-image, border-image, mask-image, ...]
+ * - component:xxx → 从模板 propDefinitions 中提取 type=image 的 props + 通用 CSS
+ */
+export function getAvailableTargets(nodeOrType: ComponentNode | string): MaterialApplyTarget[] {
+  const targets: MaterialApplyTarget[] = [];
+
+  const node = typeof nodeOrType === 'string' ? undefined : nodeOrType;
+  const nodeType = typeof nodeOrType === 'string' ? nodeOrType : nodeOrType.type;
+
+  // 1. 元素特有的 Prop 目标
+  if (nodeType.startsWith('component:')) {
+    // 组件实例：通过 templateRef 找到模板，提取 type=image 的 propDefinitions
+    const templateId = node?.templateRef?.templateId;
+    if (templateId) {
+      const template = editorStore.project?.componentAssets?.find(
+        (t) => t.id === templateId,
+      );
+      if (template?.propDefinitions) {
+        for (const pd of template.propDefinitions) {
+          if (pd.type === 'image') {
+            targets.push({
+              value: `props.${pd.key}`,
+              label: `${pd.label} (${pd.key})`,
+              icon: '🖼️',
+              exportFormat: 'png',
+            });
+          }
+        }
+      }
+    }
+  } else if (ELEMENT_PROP_TARGETS[nodeType]) {
+    targets.push(...ELEMENT_PROP_TARGETS[nodeType]);
+  } else {
+    // 检查元素属性注册表中是否有 image 类型的 prop
+    const propDefs = getElementProps(nodeType as PrimitiveNodeType);
+    for (const p of propDefs) {
+      if (p.type === 'image') {
+        targets.push({
+          value: `props.${p.key}`,
+          label: `${p.label} (${p.key})`,
+          icon: '🖼️',
+          exportFormat: 'png',
+        });
+      }
+    }
+  }
+
+  // 2. 通用 CSS 属性目标
+  targets.push(...CSS_STYLE_TARGETS);
+
+  return targets;
+}
+
+/** 根据 cssTarget 值获取用户可读标签 */
+export function getCssTargetLabel(cssTarget: string): string {
+  // 先从静态表中查
+  const all = [...Object.values(ELEMENT_PROP_TARGETS).flat(), ...CSS_STYLE_TARGETS];
+  const opt = all.find((o) => o.value === cssTarget);
+  if (opt) return `${opt.icon} ${opt.label}`;
+  // 动态 props 目标（如组件的 props.avatarSrc）
+  if (cssTarget.startsWith('props.')) {
+    return `🖼️ ${cssTarget.replace('props.', '')}`;
+  }
+  return cssTarget;
+}
+
+/** 根据 cssTarget 值获取简短标签 */
+function getCssTargetShortLabel(cssTarget: string): string {
+  const all = [...Object.values(ELEMENT_PROP_TARGETS).flat(), ...CSS_STYLE_TARGETS];
+  const opt = all.find((o) => o.value === cssTarget);
+  if (opt) return opt.label;
+  if (cssTarget.startsWith('props.')) {
+    return cssTarget.replace('props.', '');
+  }
+  return cssTarget;
+}
+
+/** 根据 cssTarget 值获取导出格式 */
+export function getExportFormat(cssTarget: string): 'svg' | 'png' {
+  // props 目标一律导出 PNG
+  if (cssTarget.startsWith('props.')) return 'png';
+  const all = [...Object.values(ELEMENT_PROP_TARGETS).flat(), ...CSS_STYLE_TARGETS];
+  const opt = all.find((o) => o.value === cssTarget);
+  return opt?.exportFormat ?? 'svg';
+}
+
+// ===== 缓存 =====
+
+/** 缓存已查询的槽位信息（避免每次打开菜单都查询） */
+let _cachedSlotsNodeId: string | null = null;
+let _cachedSlots: MaterialSlotWithProject[] = [];
+
+/**
+ * 预加载节点的素材槽位（在右键菜单打开前调用）
+ *
+ * 向后兼容：如果槽位表为空，还会检查旧的 material_design_projects.target_node_id
+ * 直接关联方式。若发现旧关联，自动迁移到槽位表并写入缓存，确保已有素材在右键菜单中可见。
+ */
+export async function preloadMaterialSlots(targetNodeId: string): Promise<void> {
+  const projectId = editorStore.project?.id;
+  if (!projectId) return;
+  try {
+    let slots = await materialSlotApi.findByNode(projectId, targetNodeId);
+
+    // 向后兼容：槽位表为空时，检查旧的 target_node_id 直接关联
+    if (slots.length === 0) {
+      const legacyProjects = await materialProjectApi.findAllByNode(projectId, targetNodeId);
+      if (legacyProjects.length > 0) {
+        // 自动迁移：为每个旧关联的素材工程创建默认槽位
+        for (let i = 0; i < legacyProjects.length; i++) {
+          const lp = legacyProjects[i];
+          const slotName = i === 0 ? 'default' : `material-${i + 1}`;
+          try {
+            await materialSlotApi.create(projectId, {
+              nodeId: targetNodeId,
+              slotName,
+              materialProjectId: lp.id,
+              cssTarget: 'background-image',
+            });
+          } catch {
+            // 槽位已存在，忽略
+          }
+        }
+        // 重新查询完整的槽位数据（含素材工程联合信息）
+        slots = await materialSlotApi.findByNode(projectId, targetNodeId);
+      }
+    }
+
+    _cachedSlots = slots;
+    _cachedSlotsNodeId = targetNodeId;
+  } catch {
+    _cachedSlots = [];
+    _cachedSlotsNodeId = targetNodeId;
+  }
+}
+
+// ===== 菜单构建 =====
 
 /** 画布 / 节点树共用的右键菜单项（01-canvas §十、08-layer-tree MVP） */
 export function buildEditorContextMenuItems(
@@ -18,6 +193,58 @@ export function buildEditorContextMenuItems(
 
   const isRoot = targetNodeId === _rootNodeId;
 
+  // 构建素材子菜单 — 已有素材 + 添加新素材入口
+  const slots = _cachedSlotsNodeId === targetNodeId ? _cachedSlots : [];
+
+  // 根据节点类型动态获取可用目标
+  const node = findNodeInScreens(editorStore.screens, targetNodeId);
+  const availableTargets = getAvailableTargets(node ?? 'div');
+
+  // 已有素材 → 用户看到 CSS 用途 + 素材名 + 尺寸，点击编辑
+  const existingItems: NonNullable<MenuProps['items']> = slots.map((slot) => ({
+    key: `asset:edit:${slot.id}:${slot.materialProjectId}:${slot.cssTarget}`,
+    label: `${getCssTargetLabel(slot.cssTarget)} — ${slot.materialProjectName}${slot.isActive ? '' : '（未激活）'}`,
+  }));
+
+  // 已占用的 cssTarget 集合 — 避免重复创建同类型
+  const usedTargets = new Set(slots.map((s) => s.cssTarget));
+
+  // "添加素材…" 子菜单 — 列出尚未占用的目标属性
+  const addTargetItems: NonNullable<MenuProps['items']> = availableTargets
+    .filter((opt) => !usedTargets.has(opt.value))
+    .map((opt) => ({
+      key: `asset:add:${opt.value}`,
+      label: `${opt.icon} ${opt.label} (${opt.value})`,
+    }));
+
+  // 如果所有预设都已占用，提供自定义入口
+  if (addTargetItems.length === 0) {
+    addTargetItems.push({
+      key: 'asset:add:custom',
+      label: '+ 自定义 CSS 属性…',
+    });
+  }
+
+  // 组装子菜单
+  const children: NonNullable<MenuProps['items']> = [];
+
+  if (existingItems.length > 0) {
+    children.push(...existingItems);
+    children.push({ type: 'divider' as const });
+  }
+
+  children.push({
+    key: 'asset:add-group',
+    label: '+ 添加素材…',
+    children: addTargetItems,
+  });
+
+  const assetMenuItem: NonNullable<MenuProps['items']>[number] = {
+    key: 'asset',
+    label: '设计素材…',
+    children,
+  };
+
   return [
     { key: 'copy', label: '复制', extra: '⌘C' },
     { key: 'dup', label: '复制副本', disabled: isRoot, extra: '⌘D' },
@@ -33,9 +260,11 @@ export function buildEditorContextMenuItems(
     { key: 'resetStyles', label: '重置样式' },
     { type: 'divider' },
     { key: 'wrap', label: '包裹为容器', disabled: isRoot },
-    { key: 'asset', label: '设计素材…' },
+    assetMenuItem,
   ];
 }
+
+// ===== 菜单点击处理 =====
 
 export function handleEditorContextMenuClick(
   key: string,
@@ -84,8 +313,33 @@ export function handleEditorContextMenuClick(
     return;
   }
 
-  if (key === 'asset') {
-    editorStore.openMaterialEditor(targetNodeId);
+  // ── 素材操作 ──
+
+  // 编辑已有素材
+  if (key.startsWith('asset:edit:')) {
+    const parts = key.split(':');
+    const materialProjectId = parts[3];
+    const cssTarget = parts.slice(4).join(':'); // cssTarget 可能包含冒号如 ::before.background
+    editorStore.openMaterialEditor(targetNodeId, undefined, { materialProjectId, cssTarget });
+    return;
+  }
+
+  // 添加新素材（指定目标属性）
+  if (key.startsWith('asset:add:')) {
+    const cssTarget = key.replace('asset:add:', '');
+    if (cssTarget === 'custom') {
+      editorStore.openMaterialEditor(targetNodeId, undefined, {
+        forceCreate: true,
+        cssTarget: 'background-image',
+      });
+    } else {
+      const label = getCssTargetShortLabel(cssTarget);
+      editorStore.openMaterialEditor(targetNodeId, undefined, {
+        forceCreate: true,
+        cssTarget,
+        slotName: label,
+      });
+    }
     return;
   }
 

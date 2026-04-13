@@ -1,19 +1,10 @@
 import type {
-  _DesignProject,
   Screen,
   ComponentNode,
-  _ComponentState,
-  _ComponentEvent,
-  _EventAction,
   EventTrigger,
   DomainStateVariable,
-  _DomainStateBinding,
   EnvironmentVariable,
-  _EnvironmentStateBinding,
-  _DataSource,
-  _ApiEndpoint,
   ComponentTemplate,
-  _CSSProperties,
 } from '@globallink/design-schema';
 
 // ===== Top-level Analysis =====

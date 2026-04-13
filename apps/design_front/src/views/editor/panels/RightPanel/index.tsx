@@ -15,7 +15,7 @@ import { DomainStateResponseSection } from './DomainStateResponseSection';
 import { ChildrenStateBindings } from './ChildrenStateBindings';
 
 /**
- * 右侧面板 v2 — 按产品设计重写。
+ * 右侧面板 — 按产品设计重写。
  *
  * 结构：
  *   A. 元素头部（固定） — 类型 + 名称 + 锁定/可见
