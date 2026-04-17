@@ -39,6 +39,11 @@
     "enquirer": "2.4.1"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["sharp", "esbuild"]
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "canvas"
+    ],
+    "ignoredBuiltDependencies": []
   }
 }

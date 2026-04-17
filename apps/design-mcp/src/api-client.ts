@@ -1,8 +1,4 @@
-/**
- * API Client for MCP Server → design-api REST communication.
- *
- * All MCP tools call design-api through this client.
- */
+import { ApiHttpError } from './tools/helpers/toolResponse.js';
 
 const BASE_URL = process.env.DESIGN_API_URL ?? 'http://localhost:3001';
 
@@ -34,7 +30,7 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API ${method} ${path} failed (${res.status}): ${text}`);
+    throw new ApiHttpError(res.status, path, method, text);
   }
 
   // Handle 204 No Content
@@ -143,14 +139,38 @@ export async function getDataSource(
   return request(`/api/projects/${projectId}/screens/${screenId}/datasources/${dataSourceId}`);
 }
 
-// ===== File Upload =====
+// ===== File Upload (multipart) =====
 
+/**
+ * Upload exported material PNG to the export endpoint.
+ * Uses multipart/form-data as required by FileInterceptor.
+ */
+export async function uploadExportedMaterial(
+  projectId: string,
+  materialProjectId: string,
+  pngBuffer: Buffer | ArrayBuffer,
+  filename?: string,
+): Promise<unknown> {
+  const url = `${BASE_URL}/api/projects/${projectId}/material-projects/${materialProjectId}/export`;
+  const form = new FormData();
+  const blob = new Blob([pngBuffer], { type: 'image/png' });
+  form.append('file', blob, filename ?? 'material-export.png');
+
+  const res = await fetch(url, { method: 'POST', body: form });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Upload export failed (${res.status}): ${text}`);
+  }
+
+  return res.json();
+}
+
+/** Legacy placeholder — prefer uploadExportedMaterial() */
 export async function uploadFile(
   projectId: string,
   filePath: string,
 ): Promise<unknown> {
-  // Note: File upload requires multipart form data; this is a placeholder
-  // for use in contexts where fetch FormData is available.
   return request(`/api/projects/${projectId}/assets/upload`, {
     method: 'POST',
     body: { filePath },
@@ -508,3 +528,24 @@ export async function deleteSlot(
     method: 'DELETE',
   });
 }
+
+// Default export for compatibility with dynamic import().default patterns used in domain tools
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const apiClient = {
+  getProject, listProjects, deleteProject,
+  executeOperation, executeBatch, getOperationsSince, undo,
+  listAssets, createAsset, updateAsset, deleteAsset,
+  listDataSources, getDataSource, uploadFile,
+  generateSnapshots, getSnapshotJob,
+  searchMaterials, getMaterial, updateMaterialMeta,
+  createMaterialProject, listMaterialProjects, getMaterialProject,
+  findMaterialProjectByNode, findAllMaterialProjectsByNode, deleteMaterialProject,
+  executeMaterialOperation, executeMaterialBatch, getMaterialOperationsSince,
+  materialUndo, materialRedo, getMaterialSchema,
+  materialEditorAction, getMaterialEditorProject,
+  getMaterialEditorPresets, getMaterialEditorCapabilities,
+  findSlotsByNode, findSlot, createSlot, updateSlot, deleteSlot,
+  uploadExportedMaterial,
+};
+// eslint-disable-next-line import/no-default-export
+export { apiClient as default };

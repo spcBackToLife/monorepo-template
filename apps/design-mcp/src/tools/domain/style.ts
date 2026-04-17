@@ -1,0 +1,52 @@
+/**
+ * 样式操作 — 合并原 3 个工具为 1 个
+ * 原：update_style / reset_style / batch_update_style
+ */
+import { z } from 'zod';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { registerDomainTool } from '../helpers/registerDomainTool.js';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import * as api from '../../api-client.js';
+
+export function registerStyleTools(server: McpServer): void {
+  registerDomainTool(server, 'style', 'CSS 样式修改与批量操作', {
+    update: {
+      description: '修改指定元素的 CSS 样式（backgroundColor/fontSize/padding/display/flexDirection 等）',
+      schema: z.object({
+        projectId: z.string(), nodeId: z.string(),
+        styles: z.record(z.string(), z.union([z.string(), z.number()])).describe('CSS 属性键值对'),
+      }),
+      handler: async (p) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api2 = await import('../../api-client.js');
+        const result = await api2.default.executeOperation(p.projectId, { type: 'updateStyle', params: { nodeId: p.nodeId, styles: p.styles } });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    },
+    reset: {
+      description: '重置（删除）某些 CSS 属性，恢复默认值',
+      schema: z.object({ projectId: z.string(), nodeId: z.string(), properties: z.array(z.string()) }),
+      handler: async (p) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api2 = await import('../../api-client.js');
+        const result = await api2.default.executeOperation(p.projectId, { type: 'resetStyle', params: { nodeId: p.nodeId, properties: p.properties } });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    },
+    batch_update: {
+      description: '批量更新多个节点的样式',
+      schema: z.object({
+        projectId: z.string(),
+        updates: z.array(z.object({
+          nodeId: z.string(), styles: z.record(z.string(), z.union([z.string(), z.number()])),
+        })),
+      }),
+      handler: async (p) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api2 = await import('../../api-client.js');
+        const result = await api2.default.executeOperation(p.projectId, { type: 'batchUpdateStyle', params: { updates: p.updates } });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    },
+  });
+}

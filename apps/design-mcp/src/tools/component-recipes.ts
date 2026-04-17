@@ -4,6 +4,7 @@ import type { Operation } from '@globallink/design-operations';
 import type { ComponentEvent } from '@globallink/design-schema';
 import { generateNodeId } from '@globallink/design-schema';
 import * as api from '../api-client.js';
+import { makeToolError } from './helpers/toolResponse.js';
 
 /** 与当前编辑器主色（Ant Design Primary）一致的默认主按钮样式体系 */
 const PRIMARY_DEFAULT_STYLES = {
@@ -33,7 +34,7 @@ export function registerComponentRecipeTools(server: McpServer): void {
     'create_primary_button',
     {
       description:
-        '在指定父节点下创建「主按钮」: 默认/hover/pressed/focus 视觉状态（配色对齐编辑器 #1677ff 体系），并绑定 hover·focus·blur 的 setState 便于画布预览。预览模式另可通过 CSS 伪类看到 pressed(:active)、focus(:focus)。',
+        '⚠️ 仅用于【从零创建】新的纯色主按钮。如果目标按钮已经存在（如已有素材按钮需要加状态），请用 visual_state 工具的 add/update/reset_style 操作。\n\n在指定父节点下创建「主按钮」: 默认/hover/pressed/focus 视觉状态（配色对齐编辑器 #1677ff 体系，纯色填充），并绑定 hover·focus·blur 的 setState 便于画布预览。',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         parentId: z.string().describe('父节点 ID（如 screen.rootNode）'),
@@ -45,117 +46,121 @@ export function registerComponentRecipeTools(server: McpServer): void {
       },
     },
     async ({ projectId, parentId, label, variant }) => {
-      const btnId = generateNodeId();
-      const text = label ?? '按钮';
-      const isOutline = variant === 'outline';
+      try {
+        const btnId = generateNodeId();
+        const text = label ?? '按钮';
+        const isOutline = variant === 'outline';
 
-      const base = isOutline
-        ? {
-            ...PRIMARY_DEFAULT_STYLES,
-            backgroundColor: 'transparent',
-            color: '#1677ff',
-            border: '1px solid #1677ff',
-            boxShadow: 'none',
-          }
-        : { ...PRIMARY_DEFAULT_STYLES };
+        const base = isOutline
+          ? {
+              ...PRIMARY_DEFAULT_STYLES,
+              backgroundColor: 'transparent',
+              color: '#1677ff',
+              border: '1px solid #1677ff',
+              boxShadow: 'none',
+            }
+          : { ...PRIMARY_DEFAULT_STYLES };
 
-      const hoverStyles = isOutline
-        ? {
-            backgroundColor: 'rgba(22, 119, 255, 0.06)',
-            color: '#4096ff',
-            borderColor: '#4096ff',
-          }
-        : { backgroundColor: '#4096ff' };
+        const hoverStyles = isOutline
+          ? {
+              backgroundColor: 'rgba(22, 119, 255, 0.06)',
+              color: '#4096ff',
+              borderColor: '#4096ff',
+            }
+          : { backgroundColor: '#4096ff' };
 
-      const pressedStyles = isOutline
-        ? {
-            backgroundColor: 'rgba(22, 119, 255, 0.15)',
-            color: '#0958d9',
-            borderColor: '#0958d9',
-            transform: 'scale(0.98)',
-          }
-        : { backgroundColor: '#0958d9', transform: 'scale(0.98)' };
+        const pressedStyles = isOutline
+          ? {
+              backgroundColor: 'rgba(22, 119, 255, 0.15)',
+              color: '#0958d9',
+              borderColor: '#0958d9',
+              transform: 'scale(0.98)',
+            }
+          : { backgroundColor: '#0958d9', transform: 'scale(0.98)' };
 
-      const focusStyles = {
-        boxShadow: '0 0 0 2px #ffffff, 0 0 0 4px rgba(22, 119, 255, 0.24)',
-      };
+        const focusStyles = {
+          boxShadow: '0 0 0 2px #ffffff, 0 0 0 4px rgba(22, 119, 255, 0.24)',
+        };
 
-      const hoverIn: ComponentEvent = {
-        trigger: 'hover',
-        description: '悬停 → hover 态（mouseleave 由预览引擎还原为 default）',
-        actions: [{ type: 'setState', targetId: btnId, state: 'hover' }],
-      };
-      const focusIn: ComponentEvent = {
-        trigger: 'focus',
-        description: '聚焦 → focus 态',
-        actions: [{ type: 'setState', targetId: btnId, state: 'focus' }],
-      };
-      const blurOut: ComponentEvent = {
-        trigger: 'blur',
-        description: '失焦 → default',
-        actions: [{ type: 'setState', targetId: btnId, state: 'default' }],
-      };
+        const hoverIn: ComponentEvent = {
+          trigger: 'hover',
+          description: '悬停 → hover 态（mouseleave 由预览引擎还原为 default）',
+          actions: [{ type: 'setState', targetId: btnId, state: 'hover' }],
+        };
+        const focusIn: ComponentEvent = {
+          trigger: 'focus',
+          description: '聚焦 → focus 态',
+          actions: [{ type: 'setState', targetId: btnId, state: 'focus' }],
+        };
+        const blurOut: ComponentEvent = {
+          trigger: 'blur',
+          description: '失焦 → default',
+          actions: [{ type: 'setState', targetId: btnId, state: 'default' }],
+        };
 
-      const operations: Operation[] = [
-        {
-          type: 'addElement',
-          params: {
-            parentId,
-            tag: 'button',
-            elementId: btnId,
-            props: { text },
-            styles: base,
-          },
-        },
-        {
-          type: 'addState',
-          params: {
-            nodeId: btnId,
-            stateName: 'hover',
-            styles: hoverStyles,
-            transition: STATE_TRANSITION,
-          },
-        },
-        {
-          type: 'addState',
-          params: {
-            nodeId: btnId,
-            stateName: 'pressed',
-            styles: pressedStyles,
-            transition: { duration: 120, easing: 'ease-out', properties: ['background-color', 'transform'] },
-          },
-        },
-        {
-          type: 'addState',
-          params: {
-            nodeId: btnId,
-            stateName: 'focus',
-            styles: focusStyles,
-            transition: STATE_TRANSITION,
-          },
-        },
-        { type: 'addEvent', params: { nodeId: btnId, event: hoverIn } },
-        { type: 'addEvent', params: { nodeId: btnId, event: focusIn } },
-        { type: 'addEvent', params: { nodeId: btnId, event: blurOut } },
-      ];
-
-      const result = await api.executeBatch(projectId, operations);
-      return {
-        content: [
+        const operations: Operation[] = [
           {
-            type: 'text' as const,
-            text: JSON.stringify(
-              {
-                nodeId: btnId,
-                message: '主按钮已创建：含 hover / pressed(CSS :active) / focus 状态与预览事件',
-                batchResult: result,
-              },
-              null,
-              2,
-            ),
+            type: 'addElement',
+            params: {
+              parentId,
+              tag: 'button',
+              elementId: btnId,
+              props: { text },
+              styles: base,
+            },
           },
-        ],
-      };
+          {
+            type: 'addState',
+            params: {
+              nodeId: btnId,
+              stateName: 'hover',
+              styles: hoverStyles,
+              transition: STATE_TRANSITION,
+            },
+          },
+          {
+            type: 'addState',
+            params: {
+              nodeId: btnId,
+              stateName: 'pressed',
+              styles: pressedStyles,
+              transition: { duration: 120, easing: 'ease-out', properties: ['background-color', 'transform'] },
+            },
+          },
+          {
+            type: 'addState',
+            params: {
+              nodeId: btnId,
+              stateName: 'focus',
+              styles: focusStyles,
+              transition: STATE_TRANSITION,
+            },
+          },
+          { type: 'addEvent', params: { nodeId: btnId, event: hoverIn } },
+          { type: 'addEvent', params: { nodeId: btnId, event: focusIn } },
+          { type: 'addEvent', params: { nodeId: btnId, event: blurOut } },
+        ];
+
+        const result = await api.executeBatch(projectId, operations);
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  nodeId: btnId,
+                  message: '主按钮已创建：含 hover / pressed(CSS :active) / focus 状态与预览事件',
+                  batchResult: result,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return makeToolError('create_primary_button', undefined, err);
+      }
     },
   );
 }

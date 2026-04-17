@@ -169,12 +169,17 @@ export function executeAddNavigation(
   const affectedIds: string[] = [params.nodeId];
 
   // If targetScreenId is "new", auto-create a new screen
+  // Service 层 ensureDeterministicIds() 可能通过 _generatedScreenId / _generatedRootNodeId 预填充了 ID
   if (targetScreenId === 'new') {
+    const p = params as Record<string, unknown>;
+    const screenId = (p._generatedScreenId as string) || generateScreenId();
+    const rootNodeId = (p._generatedRootNodeId as string) || generateNodeId();
+
     const newScreen = {
-      id: generateScreenId(),
+      id: screenId,
       name: `Screen ${newProject.screens.length + 1}`,
       rootNode: {
-        id: generateNodeId(),
+        id: rootNodeId,
         type: 'div' as const,
         styles: {
           display: 'flex',

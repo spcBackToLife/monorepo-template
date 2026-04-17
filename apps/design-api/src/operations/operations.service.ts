@@ -13,10 +13,77 @@ import {
   type Operation,
   type OperationResult,
 } from '@globallink/design-operations';
+import { generateNodeId, generateScreenId, generateId } from '@globallink/design-schema';
 import type { DesignProject } from '@globallink/design-schema';
 
 /** 每隔多少次操作自动创建快照 */
 const SNAPSHOT_INTERVAL = 100;
+
+/**
+ * 事件溯源确定性保证：
+ *
+ * 事件溯源（Event Sourcing）的核心不变量是：同一组操作日志，无论重放多少次，
+ * 必须得到完全相同的结果。如果某个操作在执行时调用了随机 ID 生成器（如
+ * generateNodeId / generateScreenId），而该 ID 没有被写回 operation.params，
+ * 那么每次重放都会生成不同的 UUID → 节点"找不到"、删除失败、ID 漂移等 bug。
+ *
+ * 本函数在 Service 层（存入 DB 前）统一预填充所有可能缺失的确定性 ID，
+ * 确保 DB 中存储的 operation 天然包含完整信息，executor 重放时直接使用即可。
+ *
+ * 覆盖场景：
+ * - addElement: params.elementId 缺失时预生成
+ * - duplicateElement: 克隆树需要确定性 ID
+ * - addScreen: params.screenId / params.rootNodeId 缺失时预生成
+ * - addEvent: targetScreenId === 'new' 时自动创建 screen 的 ID
+ * - addDomainState: id 缺失
+ * - addEnvironmentState: id 缺失
+ */
+function ensureDeterministicIds(operation: Operation): void {
+  const p = (operation.params ?? {}) as Record<string, unknown>;
+
+  switch (operation.type) {
+    case 'addElement': {
+      if (!p.elementId) {
+        p.elementId = generateNodeId();
+      }
+      break;
+    }
+
+    case 'duplicateElement': {
+      // duplicateElement 内部会遍历克隆树对每个节点重新生成随机 ID
+      // 必须预先生成并写入 params，让 executor 能读到并复用
+      if (!p.newElementId) {
+        p.newElementId = generateNodeId();
+      }
+      break;
+    }
+
+    case 'addScreen': {
+      if (!p.screenId) p.screenId = generateScreenId();
+      if (!p.rootNodeId) p.rootNodeId = generateNodeId();
+      break;
+    }
+
+    case 'addEvent': {
+      // targetScreenId === 'new' 时，event 操作会自动创建一个新 screen
+      if (p.targetScreenId === 'new') {
+        p._generatedScreenId = generateScreenId(); // 预生成 screen ID
+        p._generatedRootNodeId = generateNodeId(); // 预生成 root node ID
+      }
+      break;
+    }
+
+    case 'addDomainState':
+    case 'addEnvironmentState': {
+      if (!p._id) p._id = generateId();
+      break;
+    }
+
+    default:
+      // 其他操作类型不涉及随机实体创建，无需处理
+      break;
+  }
+}
 
 export interface OperationRow {
   id: string;
@@ -69,6 +136,10 @@ export class OperationsService {
 
     const { current_version } = projResult.rows[0]!;
     const newSeq = current_version + 1;
+
+    // ⚠️ 确定性 ID 预处理：在执行前、存入 DB 前，预填充所有随机生成的 ID
+    // 确保 DB 中的 operation 日志包含完整信息，重放时天然一致
+    ensureDeterministicIds(operation);
 
     // 先验证操作可执行
     const project = await this.projects.findOne(projectId);
@@ -130,6 +201,11 @@ export class OperationsService {
       }
 
       const { current_version } = projResult.rows[0]!;
+
+      // ⚠️ 确定性 ID 预处理：批量操作中每个操作都预填充随机 ID
+      for (const op of operations) {
+        ensureDeterministicIds(op);
+      }
 
       // 先验证所有操作可执行
       const project = await this.projects.findOne(projectId);

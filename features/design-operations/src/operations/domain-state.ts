@@ -84,7 +84,7 @@ export function executeAddDomainState(
   }
 
   list.push({
-    id: generateId(),
+    id: (params as Record<string, unknown>)._id as string ?? generateId(),
     name: params.name,
     label: params.label,
     values: params.values,

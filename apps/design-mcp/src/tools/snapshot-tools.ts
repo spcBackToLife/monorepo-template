@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
+import { makeToolError } from './helpers/toolResponse.js';
 
 /**
  * Task 4.7.3 — Snapshot MCP Tools
@@ -28,14 +29,18 @@ export function registerSnapshotTools(server: McpServer): void {
       },
     },
     async ({ projectId, screenIds, viewportIds, format }) => {
-      const result = await api.generateSnapshots(projectId, {
-        screenIds,
-        viewportIds,
-        format,
-      });
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
-      };
+      try {
+        const result = await api.generateSnapshots(projectId, {
+          screenIds,
+          viewportIds,
+          format,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return makeToolError('generate_snapshots', undefined, err);
+      }
     },
   );
 }

@@ -361,8 +361,13 @@ export function executeDuplicateElement(
   const cloned = deepClone(originalNode);
 
   // Regenerate all IDs in the cloned tree
+  // 根节点 ID 由 Service 层 ensureDeterministicIds() 通过 params.newElementId 预填充，
+  // 子节点仍用随机生成（子树内部一致性由重放时相同遍历顺序保证）
+  const rootId = (params as Record<string, unknown>).newElementId as string | undefined;
+  let isFirst = true;
   walkTree(cloned, (n) => {
-    n.id = generateNodeId();
+    n.id = isFirst && rootId ? rootId : generateNodeId();
+    isFirst = false;
   });
 
   // Insert right after the original

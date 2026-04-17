@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Operation } from '@globallink/design-operations';
 import * as api from '../api-client.js';
+import { makeToolError } from './helpers/toolResponse.js';
 
 /**
  * 暴露 design-api batch 端点，便于 MCP 客户端自行编排多步（无需为每种场景单独做工具）。
@@ -20,10 +21,14 @@ export function registerBatchTool(server: McpServer): void {
       },
     },
     async ({ projectId, operations }) => {
-      const result = await api.executeBatch(projectId, operations as Operation[]);
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
-      };
+      try {
+        const result = await api.executeBatch(projectId, operations as Operation[]);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (err) {
+        return makeToolError('execute_operations_batch', undefined, err);
+      }
     },
   );
 }
