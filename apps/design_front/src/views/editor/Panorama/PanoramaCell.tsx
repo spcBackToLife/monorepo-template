@@ -1,5 +1,6 @@
 import type { ComponentTemplate, Screen } from '@globallink/design-schema';
 import { SchemaRenderer, type InteractionPreview } from '@globallink/design-engine';
+import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 
 interface PanoramaCellProps {
   screen: Screen;
@@ -77,6 +78,7 @@ export function PanoramaCell({
               screen={screen}
               assets={assets}
               globalStates={globalStates}
+              staticAssetOrigin={getEditorStaticAssetOrigin()}
               interactionPreview={interactionPreview}
               hideGhostNodes
               editorCanvasOptimize={false}
@@ -159,6 +161,7 @@ export function PanoramaCell({
             screen={screen}
             assets={assets}
             globalStates={globalStates}
+            staticAssetOrigin={getEditorStaticAssetOrigin()}
             interactionPreview={interactionPreview}
             hideGhostNodes
           />

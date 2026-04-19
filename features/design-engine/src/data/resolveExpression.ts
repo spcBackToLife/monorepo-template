@@ -1,8 +1,85 @@
+import type { Screen } from '@globallink/design-schema';
+
 export interface DataContext {
   data: Record<string, unknown>;
   item?: unknown;
   index?: number;
   parent?: DataContext;
+}
+
+/**
+ * 合并当前屏所有「已加载」数据源的活跃场景数据（与 SchemaRenderer / 预览一致）。
+ */
+export function mergeLoadedScreenData(screen: Screen): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const ds of screen.dataSources ?? []) {
+    if (ds.activePhase !== 'loaded') continue;
+    const scenario = (ds.scenarios ?? []).find((s) => s.id === ds.activeScenarioId);
+    if (scenario?.data && typeof scenario.data === 'object' && !Array.isArray(scenario.data)) {
+      Object.assign(merged, scenario.data as Record<string, unknown>);
+    }
+  }
+  return merged;
+}
+
+/**
+ * 轮播/分页：当 Mock 或 API 提供 `data.slides`（对象数组），且画布存在页码领域态时，
+ * 自动注入 `data.slide` 为当前项、`data.slideIndex` 为数字下标。
+ * 页码变量名（择先）：`slideIndex` → `carouselIndex` → `welcomePagerIndex`。
+ * 文案绑定写 `{{data.slide.title}}` 等，随分页与接口数据联动，无需写死三套节点。
+ */
+export function injectCarouselSlice(
+  mergedData: Record<string, unknown>,
+  globalStates: Record<string, string>,
+): Record<string, unknown> {
+  const slides = mergedData.slides;
+  if (!Array.isArray(slides) || slides.length === 0) {
+    return mergedData;
+  }
+  const indexKeys = ['slideIndex', 'carouselIndex', 'welcomePagerIndex'] as const;
+  let idx = 0;
+  for (const k of indexKeys) {
+    const raw = globalStates[k];
+    if (raw !== undefined && raw !== '') {
+      const n = parseInt(raw, 10);
+      if (!Number.isNaN(n)) {
+        idx = n;
+        break;
+      }
+    }
+  }
+  idx = Math.max(0, Math.min(slides.length - 1, idx));
+  const row = slides[idx];
+  const slide =
+    row && typeof row === 'object' && !Array.isArray(row)
+      ? { ...(row as Record<string, unknown>) }
+      : {};
+  return { ...mergedData, slide, slideIndex: idx };
+}
+
+/** 构建画布/预览用的 DataContext（含轮播切片） */
+export function buildScreenDataContext(
+  screen: Screen,
+  globalStates: Record<string, string>,
+  currentDataSourceId?: string,
+): DataContext {
+  let base: Record<string, unknown>;
+  if (currentDataSourceId) {
+    const ds = (screen.dataSources ?? []).find((s) => s.id === currentDataSourceId);
+    if (ds && ds.activePhase === 'loaded') {
+      const scenario = (ds.scenarios ?? []).find((s) => s.id === ds.activeScenarioId);
+      const raw = scenario?.data;
+      base =
+        raw && typeof raw === 'object' && !Array.isArray(raw)
+          ? { ...(raw as Record<string, unknown>) }
+          : {};
+    } else {
+      base = {};
+    }
+  } else {
+    base = mergeLoadedScreenData(screen);
+  }
+  return { data: injectCarouselSlice(base, globalStates) };
 }
 
 /**
@@ -51,9 +128,15 @@ function resolveBindingContent(content: string, context: DataContext): unknown {
     result = navigatePath(context.data, pathPart);
   }
 
-  if (result === undefined && defaultPart !== undefined) {
-    const stripped = defaultPart.replace(/^["'](.*)["']$/, '$1');
-    return stripped;
+  if (defaultPart !== undefined) {
+    const missing =
+      result === undefined ||
+      result === null ||
+      (typeof result === 'string' && result.trim() === '');
+    if (missing) {
+      const stripped = defaultPart.replace(/^["'](.*)["']$/, '$1');
+      return stripped;
+    }
   }
 
   return result;
@@ -84,9 +167,9 @@ export function resolveExpression(expression: string, context: DataContext): unk
   });
 }
 
-/** Check if a string contains data binding expressions */
+/** Check if a string contains data绑定（须与 resolveExpression 一致，支持换行） */
 export function hasExpression(value: unknown): boolean {
-  return typeof value === 'string' && /\{\{.+?\}\}/.test(value);
+  return typeof value === 'string' && /\{\{[\s\S]+?\}\}/.test(value);
 }
 
 /** Resolve all expressions in a props object */

@@ -28,6 +28,7 @@ import { findNodeInScreens } from '@globallink/design-operations';
 import { API_BASE } from '@/api/client';
 import { materialProjectApi } from '@/api/materialProject';
 import { getCssTargetLabel, getExportFormat } from '@/views/editor/EditorContextMenu/buildMenuItems';
+import { stripMaterialSvgExportChrome } from '@/views/editor/panels/MaterialEditor/stripMaterialSvgExportChrome';
 
 interface ExportBarProps {
   targetNodeId: string | null;
@@ -84,6 +85,8 @@ function exportCroppedSvg(
   // 移除前端交互相关的内联样式（overflow: visible 等）
   clone.style.cssText = '';
   clone.removeAttribute('style');
+
+  stripMaterialSvgExportChrome(clone);
 
   return new XMLSerializer().serializeToString(clone);
 }
@@ -239,7 +242,11 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
         // 根据不同 CSS 属性决定附加样式
         const additionalStyles: Record<string, string> = {};
         if (effectiveCssTarget === 'background-image') {
-          additionalStyles.backgroundSize = 'cover';
+          // contain：整图落在盒内，避免 cover + 白底 SVG 与内容裁切后只剩一条线
+          additionalStyles.backgroundSize = 'contain';
+          additionalStyles.backgroundColor = 'transparent';
+          additionalStyles.backgroundRepeat = 'no-repeat';
+          additionalStyles.backgroundPosition = 'center center';
         } else if (effectiveCssTarget === 'mask-image') {
           // mask-image 需要 -webkit- 前缀（Chrome/Safari）和配套尺寸属性
           additionalStyles.maskSize = 'cover';

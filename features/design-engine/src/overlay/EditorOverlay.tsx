@@ -99,35 +99,6 @@ function drawListBindingBadges(
   }
 }
 
-/** W5：有交互事件的节点右上角闪电标记（与 09 文档一致） */
-function drawInteractionEventBadges(
-  ctx: CanvasRenderingContext2D,
-  map: CoordinateMap,
-  nodeIds: string[],
-): void {
-  const idSet = new Set(nodeIds);
-  for (const [, entry] of map) {
-    if (!idSet.has(entry.nodeId)) continue;
-    const r = entry.rect;
-    const bx = r.x + r.width - 22;
-    const by = r.y + 4;
-    ctx.save();
-    ctx.fillStyle = 'rgba(251, 191, 36, 0.95)';
-    ctx.strokeStyle = '#b45309';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(bx + 9, by + 9, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#78350f';
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⚡', bx + 9, by + 9);
-    ctx.restore();
-  }
-}
-
 function drawAlignmentGuides(
   ctx: CanvasRenderingContext2D,
   guides: AlignmentGuide[],
@@ -261,8 +232,6 @@ export interface EditorOverlayProps {
   onNodeDoubleClick?: (nodeId: string) => void;
   /** 非文本节点双击：例如在容器内插入文案（由宿主实现） */
   onNonTextDoubleClick?: (nodeId: string) => void;
-  /** 存在交互事件的节点 id（画布闪电角标） */
-  nodeIdsWithInteractionEvents?: string[];
   /** 配置了 __listData 列表绑定的节点 id（画布 ≡ 角标） */
   nodeIdsWithListBinding?: string[];
   /** W7-023：画布上不可选/拖/缩放的节点（含祖先锁定子树） */
@@ -312,7 +281,6 @@ export function EditorOverlay({
   showGridOverlay = false,
   onNodeDoubleClick,
   onNonTextDoubleClick,
-  nodeIdsWithInteractionEvents = [],
   nodeIdsWithListBinding = [],
   lockedNodeIds,
   annotationNodeIds,
@@ -435,10 +403,6 @@ export function EditorOverlay({
       drawListBindingBadges(ctx, map, nodeIdsWithListBinding);
     }
 
-    if (nodeIdsWithInteractionEvents.length > 0) {
-      drawInteractionEventBadges(ctx, map, nodeIdsWithInteractionEvents);
-    }
-
     // Draw resize handles for single selection
     if (selectedNodeIds.length === 1 && !isDragging) {
       const rect = getRectForInteraction(
@@ -478,7 +442,6 @@ export function EditorOverlay({
       [];
     drawAlignmentGuides(ctx, activeGuides, logicalW, logicalH);
   }, [
-    nodeIdsWithInteractionEvents,
     nodeIdsWithListBinding,
     selectedNodeIds,
     hoveredNodeId,

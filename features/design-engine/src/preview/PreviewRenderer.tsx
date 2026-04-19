@@ -6,8 +6,10 @@ import { resolveNodeStyles } from '../styles/resolveStyles';
 import { resolveNodeProps } from '../styles/resolveProps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContext';
+import { StaticAssetOriginProvider, useStaticAssetOrigin } from '../renderer/StaticAssetOriginContext';
+import { rewriteMediaSrc, rewriteStyleObjectUrls } from '../assets/rewriteLocalAssetRefs';
 import type { DataContext } from '../data/resolveExpression';
-import { hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
+import { buildScreenDataContext, hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
 import { ListRenderer } from '../data/ListRenderer';
 import {
   EventExecutionEngine,
@@ -31,6 +33,8 @@ export interface PreviewRendererProps {
   embedded?: boolean;
   /** 宿主调用此函数以触发 navigateBack 生命周期事件；返回 true 表示已处理（阻止默认后退） */
   onNavigateBackRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  /** 与 SchemaRenderer.staticAssetOrigin 一致：补全 `/uploads/` 等资源 URL */
+  staticAssetOrigin?: string;
 }
 
 /**
@@ -46,70 +50,43 @@ export function PreviewRenderer({
   onSwitchDataSourcePhase,
   embedded = false,
   onNavigateBackRef,
+  staticAssetOrigin,
 }: PreviewRendererProps) {
-  const activeDataContext: DataContext = useMemo(
-    () => buildDataContextFromScreen(screen, currentDataSet),
-    [screen, currentDataSet],
-  );
-
   return (
-    <DataContextProvider value={activeDataContext}>
-      <PreviewInteractiveShell
-        screen={screen}
-        assets={assets}
-        globalStates={globalStates}
-        onNavigate={onNavigate}
-        onSwitchDataSourcePhase={onSwitchDataSourcePhase}
-        embedded={embedded}
-        onNavigateBackRef={onNavigateBackRef}
-      />
-    </DataContextProvider>
+    <PreviewInteractiveShell
+      screen={screen}
+      assets={assets}
+      globalStates={globalStates}
+      currentDataSet={currentDataSet}
+      onNavigate={onNavigate}
+      onSwitchDataSourcePhase={onSwitchDataSourcePhase}
+      embedded={embedded}
+      onNavigateBackRef={onNavigateBackRef}
+      staticAssetOrigin={staticAssetOrigin}
+    />
   );
-}
-
-/** 合并所有数据源中处于 loaded 相且对应活跃场景的数据（替代旧 dataSets / activeDataSetId） */
-function getActiveData(screen: Screen): Record<string, unknown> {
-  const mergedData: Record<string, unknown> = {};
-  for (const ds of screen.dataSources ?? []) {
-    if (ds.activePhase !== 'loaded') continue;
-    const scenarios = ds.scenarios ?? [];
-    const scenario = scenarios.find((s) => s.id === ds.activeScenarioId);
-    if (scenario?.data != null && typeof scenario.data === 'object') {
-      Object.assign(mergedData, scenario.data);
-    }
-  }
-  return mergedData;
-}
-
-function buildDataContextFromScreen(screen: Screen, currentDataSourceId?: string): DataContext {
-  const sources = screen.dataSources ?? [];
-  if (currentDataSourceId) {
-    const ds = sources.find((s) => s.id === currentDataSourceId);
-    if (ds && ds.activePhase === 'loaded') {
-      const scenarios = ds.scenarios ?? [];
-      const scenario = scenarios.find((s) => s.id === ds.activeScenarioId);
-      return { data: { ...(scenario?.data ?? {}) } };
-    }
-  }
-  return { data: getActiveData(screen) };
 }
 
 function PreviewInteractiveShell({
   screen,
   assets,
   globalStates,
+  currentDataSet,
   onNavigate,
   onSwitchDataSourcePhase,
   embedded,
   onNavigateBackRef,
+  staticAssetOrigin,
 }: {
   screen: Screen;
   assets: ComponentTemplate[];
   globalStates: Record<string, string>;
+  currentDataSet?: string;
   onNavigate?: (screenId: string, animation?: TransitionAnimation) => void;
   onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
   embedded: boolean;
   onNavigateBackRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
+  staticAssetOrigin?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef(new EventExecutionEngine());
@@ -150,6 +127,11 @@ function PreviewInteractiveShell({
   useEffect(() => {
     setRuntimeGlobals({ ...globalStates });
   }, [globalStates]);
+
+  const previewDataContext: DataContext = useMemo(
+    () => buildScreenDataContext(screen, runtimeGlobals, currentDataSet),
+    [screen, runtimeGlobals, currentDataSet],
+  );
 
   useEffect(() => {
     pseudoRef.current.inject(screen.rootNode);
@@ -333,40 +315,44 @@ function PreviewInteractiveShell({
 
   const fillViewport = embedded;
   return (
-    <div
-      data-preview-root
-      style={{
-        width: '100%',
-        minHeight: '100%',
-        ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
-        backgroundColor: embedded ? 'transparent' : '#2C2C2C',
-        position: 'relative' as const,
-        overflow: embedded ? 'hidden' : 'auto',
-      }}
-    >
-      <div
-        ref={rootRef}
-        data-screen-id={screen.id}
-        style={{
-          width: '100%',
-          minHeight: '100%',
-          ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
-          backgroundColor: screen.backgroundColor,
-          position: 'relative' as const,
-        }}
-      >
-        <PreviewNodeRenderer
-          node={screen.rootNode}
-          rootNodeId={screen.rootNode.id}
-          assets={assets}
-          globalStates={runtimeGlobals}
-          onNavigate={onNavigate}
-          previewHiddenIds={previewHiddenIds}
-          runtimeNodeStates={runtimeNodeStates}
-        />
-        <ToastRenderer toasts={toasts} onDismiss={dismissToast} />
+    <StaticAssetOriginProvider origin={staticAssetOrigin}>
+      <DataContextProvider value={previewDataContext}>
+        <div
+          data-preview-root
+          style={{
+            width: '100%',
+            minHeight: '100%',
+            ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
+            backgroundColor: embedded ? 'transparent' : '#2C2C2C',
+            position: 'relative' as const,
+            overflow: embedded ? 'hidden' : 'auto',
+          }}
+        >
+        <div
+          ref={rootRef}
+          data-screen-id={screen.id}
+          style={{
+            width: '100%',
+            minHeight: '100%',
+            ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
+            backgroundColor: screen.backgroundColor,
+            position: 'relative' as const,
+          }}
+        >
+          <PreviewNodeRenderer
+            node={screen.rootNode}
+            rootNodeId={screen.rootNode.id}
+            assets={assets}
+            globalStates={runtimeGlobals}
+            onNavigate={onNavigate}
+            previewHiddenIds={previewHiddenIds}
+            runtimeNodeStates={runtimeNodeStates}
+          />
+          <ToastRenderer toasts={toasts} onDismiss={dismissToast} />
+        </div>
       </div>
-    </div>
+      </DataContextProvider>
+    </StaticAssetOriginProvider>
   );
 }
 
@@ -429,6 +415,7 @@ function PreviewNodeRenderer({
   isListItem = false,
 }: PreviewNodeRendererProps) {
   const dataContext = useDataContext();
+  const staticOrigin = useStaticAssetOrigin();
 
   const node = isComponentInstanceType(rawNode.type)
     ? resolveComponentInstance(rawNode, assets)
@@ -484,10 +471,22 @@ function PreviewNodeRenderer({
     reactStyles = applyListItemStyleOverrides(reactStyles);
   }
 
+  if (staticOrigin) {
+    reactStyles = rewriteStyleObjectUrls(
+      reactStyles as Record<string, unknown>,
+      staticOrigin,
+    ) as React.CSSProperties;
+  }
+
   const previewStyles: React.CSSProperties = {
     ...reactStyles,
     pointerEvents: 'auto',
   };
+
+  const propsForRender =
+    staticOrigin && effectiveNode.type === 'img' && typeof resolvedProps.src === 'string'
+      ? { ...resolvedProps, src: rewriteMediaSrc(resolvedProps.src, staticOrigin) ?? resolvedProps.src }
+      : resolvedProps;
 
   // Render children — if this node has __listData, repeat children per list item
   let children: React.ReactNode;
@@ -542,7 +541,7 @@ function PreviewNodeRenderer({
   }
 
   return (
-    <PrimitiveRenderer node={effectiveNode} style={previewStyles} resolvedProps={resolvedProps} interactive>
+    <PrimitiveRenderer node={effectiveNode} style={previewStyles} resolvedProps={propsForRender} interactive>
       {children}
     </PrimitiveRenderer>
   );

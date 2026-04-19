@@ -12,6 +12,36 @@ import * as api from '../../api-client.js';
 // ── 服务端渲染辅助函数 ──
 
 /**
+ * 将 group 递归展开为「画布绝对坐标」的扁平对象列表。
+ * Schema 里子对象的 x/y 相对组原点；服务端 renderObject 不处理 group，此前整组会漏画。
+ */
+function expandMaterialGroupsForServerRender(
+  objects: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  const walk = (list: Array<Record<string, unknown>>, parentX: number, parentY: number) => {
+    for (const raw of list) {
+      const t = String(raw.type ?? '');
+      if (t === 'group') {
+        const gx = Number(raw.x ?? 0) + parentX;
+        const gy = Number(raw.y ?? 0) + parentY;
+        const kids = (raw.children as Array<Record<string, unknown>> | undefined) ?? [];
+        walk(kids, gx, gy);
+      } else {
+        const o = { ...raw };
+        o.x = Number(o.x ?? o.left ?? 0) + parentX;
+        o.y = Number(o.y ?? o.top ?? 0) + parentY;
+        if (o.left != null) o.left = Number(o.left) + parentX;
+        if (o.top != null) o.top = Number(o.top) + parentY;
+        out.push(o);
+      }
+    }
+  };
+  walk(objects, 0, 0);
+  return out;
+}
+
+/**
  * 将 canvasJSON 中的对象渲染到 Canvas 2D context。
  *
  * 支持：rect、ellipse、circle、polygon、star、path、line、textbox、image、group
@@ -32,13 +62,15 @@ async function renderObject(
   const stroke = obj.stroke as string|undefined;
   const strokeWidth = Number(obj.strokeWidth??(stroke?1:0));
   const opacity = Number(obj.opacity??1);
-  const angle = (Number(obj.angle??0) * Math.PI) / 180;
+  const angleDeg = Number(obj.angle ?? obj.rotation ?? 0);
+  const angle = (angleDeg * Math.PI) / 180;
   const originX = String(obj.originX??'left');
   const originY = String(obj.originY??'top');
   const scaleX = Number(obj.scaleX??1);
   const scaleY = Number(obj.scaleY??1);
 
   if(opacity===0) return; // 完全透明，跳过
+  if(obj.visible===false) return;
 
   ctx.save();
   ctx.globalAlpha=opacity;
@@ -102,9 +134,16 @@ async function renderObject(
       break;
     }
     case 'path':{
-      const pd=(obj.path as string)??'';
+      // 素材 Schema 使用 pathData（与 ObjectRenderer 一致）；旧数据可能用 path
+      const pd=String(obj.pathData ?? obj.path ?? '');
       renderSVGPath(ctx,pd,ox,oy,width,height);
-      ctx.fill();if(strokeWidth>0)ctx.stroke();
+      const hasFill =
+        fill &&
+        fill !== 'null' &&
+        fill !== 'none' &&
+        fill !== 'transparent';
+      if(hasFill) ctx.fill();
+      if(strokeWidth>0 && stroke && stroke!=='null' && stroke!=='none') ctx.stroke();
       break;
     }
     case 'line':{
@@ -657,13 +696,20 @@ export function registerCanvasTools(server: McpServer): void {
       description: [
         '服务端导出素材为 PNG 并应用到设计节点（MCP 独有能力）。',
         '',
-        '完整流程：get_schema → Node.js Canvas 渲染(2x) → PNG → multipart 上传 → applyMaterialDesign',
+        '完整流程：get_schema → 按参考框裁剪渲染 → PNG → 上传 → applyMaterialDesign → **写入 node_material_slots 槽位** → 更新素材工程 targetNodeId',
         '',
-        '⚠️ 关键知识（AI 必读，避免踩坑）：',
-        '- getMaterialSchema 用的是 /materials/{id}/schema（返回 objects 数组），不是 /material-projects/{id}（canvasJSON 可能为空）',
-        '- 前端渲染素材靠 backgroundImage CSS 属性，不是 exportedMaterialId 字段',
-        '- 正确操作类型是 applyMaterialDesign（和前端 ExportBar "应用到元素" 一致），不是 updateStyle',
+        '⚠️ 绑定约定（沉淀到 MCP，与前端「设计素材… / 添加素材」一致）：',
+        '- **Schema 节点上的 materialProjectId + 背景样式** 只表示「画什么」；可编辑入口依赖 **素材槽位 API**：`POST /material-slots`（nodeId + materialProjectId + cssTarget=background-image）。',
+        '- 仅 `execute_operations_batch` 里手写 `applyMaterialDesign` 而不建槽位 → 右键「设计素材…」可能打不开或行为异常；**请优先用本 action**，或手动调 `material-slots` API。',
+        '- 导出 PNG 的尺寸 = **referenceFrame 宽×高**（不是整张大画布），避免 div 里 `contain` 把波形缩成一角。',
+        '',
+        '⚠️ 其他要点：',
+        '- getMaterialSchema 用 /materials/{id}/schema；正确操作类型是 applyMaterialDesign（与 ExportBar 一致），不是 updateStyle',
         '- nodeId 必传，否则只导出不应用',
+        '',
+        '**透明 / 导出注意**：PNG 保留 alpha；JPEG 无透明。导出前画布背景建议 transparent，避免默认大框不透明白底导致 PNG 整块发白。',
+        '',
+        '**与编辑器不一致时的表现**：此前服务端渲染未读 `pathData`（只读 `path`）、未展开 `group` 子对象、未读 `rotation`（只读 `angle`），会导致 MCP 导出「空白/缺一块」，而你在前端点「应用」走 SVG 序列化则正常。',
       ].join('\n'),
       schema: z.object({
         projectId: z.string().describe('项目 ID'),
@@ -696,20 +742,40 @@ export function registerCanvasTools(server: McpServer): void {
           return{content:[{type:'text',text:JSON.stringify({error:`canvas 模块不可用: ${(e as Error).message}`,hint:'运行 pnpm rebuild canvas 后重试'},null,2)}]};
         }
 
-        // 3. 创建 Canvas 并渲染
-        const w = Math.round(cw*scale);
-        const h = Math.round(ch*scale);
+        // 3. 计算坐标偏移（前端画布坐标 → 后端局部坐标）
+        //    schema 中对象的 x/y 是前端大画布坐标，需要减去 referenceFrame 偏移才能正确渲染到 cw×ch 画布上
+        const rf = schema.referenceFrame as {width?:number;height?:number}|undefined;
+        const rw = rf?.width ?? cw;
+        const rh = rf?.height ?? ch;
+        const P = 400;
+        const fw = Math.max(1200, rw + P*2);
+        const fh = Math.max(900, rh + P*2);
+        const rfx = (fw - rw) / 2;
+        const rfy = (fh - rh) / 2;
+
+        // 导出像素尺寸 = **参考框**（与 Schema 里承载 div 的宽高一致），避免整张大画布塞进小 div 后 `contain` 缩成一条
+        const w = Math.round(rw * scale);
+        const h = Math.round(rh * scale);
         const cv = createCanvas(w,h);
         const ctx = cv.getContext('2d');
         ctx.scale(scale,scale);
 
-        if(bg&&bg!=='transparent'){
-          ctx.fillStyle=bg;
-          ctx.fillRect(0,0,cw,ch);
+        if(bg && bg !== 'transparent'){
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, rw, rh);
         }
 
-        for(const obj of objects){
-          await renderObject(ctx,obj,cw,ch);
+        // 🔒 将每个对象从「前端画布坐标」转换为「参考框内局部坐标」后再渲染到 rw×rh 画布
+        const flatObjects = expandMaterialGroupsForServerRender(objects);
+        for(const rawObj of flatObjects){
+          // 浅拷贝，避免修改原 schema 对象
+          const obj = { ...rawObj };
+          if(obj.x != null) obj.x = Number(obj.x) - rfx;
+          if(obj.y != null) obj.y = Number(obj.y) - rfy;
+          // fabric.js 也可能用 left/top 字段
+          if(obj.left != null) obj.left = Number(obj.left) - rfx;
+          if(obj.top != null) obj.top = Number(obj.top) - rfy;
+          await renderObject(ctx, obj, rw, rh);
         }
 
         // 4. 导出 Buffer
@@ -733,8 +799,8 @@ export function registerCanvasTools(server: McpServer): void {
             nodeId,
             styleUpdates:{
               backgroundImage:`url("${imgUrl}")`,
-              backgroundSize:'cover',
-              backgroundPosition:'center',
+              backgroundSize:'100% 100%',
+              backgroundPosition:'center center',
               backgroundRepeat:'no-repeat',
               backgroundColor:'transparent',
             },
@@ -742,13 +808,27 @@ export function registerCanvasTools(server: McpServer): void {
           },
         });
 
+        let slotBinding: { ok: boolean; action?: string; slotId?: string; error?: string } = { ok: false };
+        try{
+          slotBinding = await api.ensureMaterialNodeBinding(projectId, nodeId, materialId);
+        }catch(e){
+          slotBinding = { ok: false, error: (e as Error).message };
+        }
+
+        try{
+          await api.updateMaterialProject(projectId, materialId, { targetNodeId: nodeId });
+        }catch{
+          // 非致命：部分环境可能无写权限
+        }
+
         const result = {
           success:true,
-          message:`✅ 素材已导出 (${format}, ${w}×${h}, ${buf.length}B) 并应用到节点 ${nodeId}`,
+          message:`✅ 素材已导出 (${format}, ${w}×${h} ref ${rw}×${rh}, ${buf.length}B) 并应用到节点 ${nodeId}`,
           imageUrl:imgUrl,
           assetId:(uploadResult as Record<string,unknown>).assetId,
           operationApplied:'applyMaterialDesign' as string,
           applyResult,
+          slotBinding,
         };
         return { content: [{ type:'text' as const, text: JSON.stringify(result, null, 2) }] };
       },

@@ -17,12 +17,18 @@ import * as api from '../../api-client.js';
 export function registerElementTools(server: McpServer): void {
   registerDomainTool(server, 'element', '元素增删改查、移动复制、包裹解包、重命名、可见性锁定等操作', {
     add: {
-      description: '在指定父节点下添加一个 HTML 原子元素（div/button/img/input 等），可设置初始样式和属性',
+      description:
+        '在指定父节点下添加一个 HTML 原子元素（div/button/img/input 等），可设置初始样式和属性。' +
+        '叶子文案请用 props.textContent（推荐）或 props.children 字符串（含 {{data.*}}）；' +
+        '勿把可见文字只写在树 children 却留空 props——与画布/渲染器约定一致。',
       schema: z.object({
         projectId: z.string(), parentId: z.string(),
         tag: z.string().describe('div/span/p/h1-h3/button/input/textarea/select/img/a/ul/ol/li/nav/header/footer/section/main'),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
-        props: z.record(z.string(), z.unknown()).optional(),
+        props: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe('例: { textContent: "标题" } 或 { children: "{{data.x}}" }；p/h/span/button 等会渲染上述字段'),
         position: z.number().optional(),
       }),
       handler: async (p) => {
@@ -73,7 +79,9 @@ export function registerElementTools(server: McpServer): void {
       },
     },
     insert_subtree: {
-      description: '在父节点下插入一棵完整的节点子树',
+      description:
+        '在父节点下插入一棵完整的节点子树。文本节点：props.textContent 或 props.children（字符串，可含 {{data.*}}）；' +
+        '勿仅用树 children 数组承载纯文案（与 SchemaRenderer 一致）。',
       schema: z.object({ projectId: z.string(), parentId: z.string(), subtree: z.record(z.string(), z.unknown()), position: z.number().optional() }),
       handler: async (p) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

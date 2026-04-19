@@ -56,6 +56,7 @@ import {
   type MaterialOperationEnvelope,
 } from '@/services/MaterialEditorSyncManager';
 import { API_BASE } from '@/api/client';
+import { stripMaterialSvgExportChrome } from '@/views/editor/panels/MaterialEditor/stripMaterialSvgExportChrome';
 
 // ===== 工具栏配置 =====
 
@@ -174,6 +175,7 @@ function CanvasToolbar() {
         }
         clone.style.cssText = '';
         clone.removeAttribute('style');
+        stripMaterialSvgExportChrome(clone);
         const svgString = new XMLSerializer().serializeToString(clone);
 
         // 上传为独立资产而非内联 data URI
@@ -192,7 +194,16 @@ function CanvasToolbar() {
               const uploaded = await response.json() as { url: string };
               editorStore.execute({
                 type: 'updateStyle',
-                params: { nodeId, styles: { backgroundImage: `url("${uploaded.url}")`, backgroundSize: 'cover' } },
+                params: {
+                  nodeId,
+                  styles: {
+                    backgroundImage: `url("${uploaded.url}")`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center center',
+                    backgroundColor: 'transparent',
+                  },
+                },
               });
               message.success('画布已应用为元素背景');
             } else {
@@ -222,6 +233,7 @@ function CanvasToolbar() {
         }
         clone.style.cssText = '';
         clone.removeAttribute('style');
+        stripMaterialSvgExportChrome(clone);
         const svgString = new XMLSerializer().serializeToString(clone);
         downloadBlob(new Blob([svgString], { type: 'image/svg+xml' }), 'material.svg');
         message.success('SVG 已导出');
@@ -244,6 +256,7 @@ function CanvasToolbar() {
         }
         clone.style.cssText = '';
         clone.removeAttribute('style');
+        stripMaterialSvgExportChrome(clone);
         const svgString = new XMLSerializer().serializeToString(clone);
         await navigator.clipboard.writeText(svgString);
         message.success('SVG 代码已复制');

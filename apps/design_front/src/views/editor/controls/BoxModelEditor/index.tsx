@@ -90,7 +90,7 @@ function BoxInput({ className, value, onChange }: BoxInputProps) {
   const [editing, setEditing] = useState(false);
   const [localVal, setLocalVal] = useState(value);
 
-  const displayVal = value ? value.replace(/px$/, '') : '-';
+  const displayVal = (typeof value === 'string' && value) ? value.replace(/px$/, '') : '-';
 
   const commit = useCallback(() => {
     setEditing(false);
@@ -127,7 +127,7 @@ function BoxInput({ className, value, onChange }: BoxInputProps) {
     <span
       className={`${className} text-[10px] text-gray-500 cursor-pointer hover:text-blue-500 px-0.5`}
       onClick={() => {
-        setLocalVal(value ? value.replace(/px$/, '') : '');
+        setLocalVal((typeof value === 'string' && value) ? value.replace(/px$/, '') : '');
         setEditing(true);
       }}
     >

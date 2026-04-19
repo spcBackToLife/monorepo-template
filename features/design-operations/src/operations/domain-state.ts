@@ -32,6 +32,9 @@ function getDomainStateList(
     if (!screen) {
       return { error: `Screen ${ownerId} not found` };
     }
+    if (!screen.domainStates) {
+      screen.domainStates = [];
+    }
     return { list: screen.domainStates };
   }
   const node = findNodeInProject(project, ownerId);

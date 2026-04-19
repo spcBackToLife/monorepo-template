@@ -41,21 +41,21 @@ export function registerMaterialProjectTools(server: McpServer): void {
     },
     get: {
       description: '获取素材工程详细信息（含画布 JSON）',
-      schema: z.object({ projectId: z.string(), materialProjectId: z.string() }),
+      schema: z.object({ projectId: z.string(), materialId: z.string() }),
       handler: async (p) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
-        const result = await api2.default.getMaterialProject(p.projectId, p.materialProjectId);
+        const result = await api2.default.getMaterialProject(p.projectId, p.materialId);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     delete: {
       description: '删除素材工程（不可恢复）',
-      schema: z.object({ projectId: z.string(), materialProjectId: z.string() }),
+      schema: z.object({ projectId: z.string(), materialId: z.string() }),
       handler: async (p) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
-        await api2.default.deleteMaterialProject(p.projectId, p.materialProjectId);
+        await api2.default.deleteMaterialProject(p.projectId, p.materialId);
         return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true }) }] };
       },
     },

@@ -5,6 +5,7 @@ import type { ComponentNode, ComponentTemplate, Screen } from '@globallink/desig
 import { SchemaRenderer } from '@globallink/design-engine';
 import type { ScreenAnalysis, ModuleSpec, ElementSpec } from '../types';
 import { buildIsolatedScreen } from '../../Panorama/PanoramaPage';
+import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 
 interface Props {
   screenAnalysis: ScreenAnalysis;
@@ -282,7 +283,7 @@ function MiniPagePreview({ screen, assets, viewport, scale = 0.25 }: {
       background: screen.backgroundColor || '#fff',
     }}>
       <div style={{ width: viewport.width, height: viewport.height, transform: `scale(${scale})`, transformOrigin: 'top left', pointerEvents: 'none' }}>
-        <SchemaRenderer screen={screen} assets={assets} hideGhostNodes editorCanvasOptimize={false} />
+        <SchemaRenderer screen={screen} assets={assets} staticAssetOrigin={getEditorStaticAssetOrigin()} hideGhostNodes editorCanvasOptimize={false} />
       </div>
     </div>
   );
@@ -305,7 +306,7 @@ function MiniNodePreview({ node, screen, assets, viewport, maxWidth = 300 }: {
       background: screen.backgroundColor || '#fff', maxWidth, padding: 8,
     }}>
       <div style={{ pointerEvents: 'none', maxWidth: maxWidth - 16 }}>
-        <SchemaRenderer screen={isolated} assets={assets} hideGhostNodes editorCanvasOptimize={false} />
+        <SchemaRenderer screen={isolated} assets={assets} staticAssetOrigin={getEditorStaticAssetOrigin()} hideGhostNodes editorCanvasOptimize={false} />
       </div>
     </div>
   );

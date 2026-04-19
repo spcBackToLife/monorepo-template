@@ -12,7 +12,7 @@ export function registerBatchTool(server: McpServer): void {
     'execute_operations_batch',
     {
       description:
-        '在同一请求中原子执行多条 Operation（与前端 POST .../operations/batch 一致）。建议优先用 create_primary_button 等配方工具；复杂编排再用本工具。',
+        '在同一请求中原子执行多条 Operation（与前端 POST .../operations/batch 一致）。若要把素材工程绑定到某 div 且可在编辑器里打开「设计素材…」，除 applyMaterialDesign 外还须写入 **material-slots**（推荐直接用 canvas.export_and_apply，会自动建槽位）。',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         operations: z

@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface NumericInputProps {
-  value: string;
+  /** Schema 里常见为 number（如 fontSize: 17），需与 string 统一 */
+  value: string | number;
   onChange: (value: string) => void;
   label?: string;
   unit?: string;
@@ -31,9 +32,11 @@ export function NumericInput({
   disabled = false,
   isOverridden = false,
 }: NumericInputProps) {
-  const [localValue, setLocalValue] = useState(value);
+  const toStr = (v: string | number) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+  const [localValue, setLocalValue] = useState(() => toStr(value));
   const [selectedUnit, setSelectedUnit] = useState(() => {
-    const match = value.match(/(px|%|em|rem|vw|vh|auto)$/);
+    const s = toStr(value);
+    const match = s.match(/(px|%|em|rem|vw|vh|auto)$/);
     return match ? match[1] : defaultUnit;
   });
   const [showUnits, setShowUnits] = useState(false);
@@ -43,8 +46,9 @@ export function NumericInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setLocalValue(value);
-    const match = value.match(/(px|%|em|rem|vw|vh|auto)$/);
+    const s = toStr(value);
+    setLocalValue(s);
+    const match = s.match(/(px|%|em|rem|vw|vh|auto)$/);
     if (match) setSelectedUnit(match[1]);
   }, [value]);
 

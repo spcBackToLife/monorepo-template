@@ -3,7 +3,7 @@ import { App as AntdApp, Empty, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { generateId } from '@globallink/design-schema';
-import type { DataSource, ApiEndpoint, HttpMethod, MockScenario } from '@globallink/design-schema';
+import type { DataSource, ApiEndpoint, HttpMethod, MockScenario, Screen } from '@globallink/design-schema';
 
 /**
  * 页面数据面板 — 重写版
@@ -57,14 +57,14 @@ export const DataTab = observer(function DataTab() {
     <div className="flex flex-col gap-0.5 p-2 text-xs">
       {/* 说明 */}
       <div className="px-1 pb-2 text-[10px] text-gray-500 leading-snug border-b border-gray-100 mb-1">
-        在下方编辑当前页面的 Mock 数据（JSON 对象）。<br />
+        在下方编辑当前页面的 Mock 数据（JSON 对象）；展示为<strong>所有已加载数据源</strong>的合并结果，保存时写入<strong>第一个数据源</strong>的当前场景。<br />
         画布上用 <code className="text-purple-600 bg-purple-50 px-0.5 rounded">{'{{data.字段名}}'}</code> 引用。<br />
         例如填 <code className="text-purple-600 bg-purple-50 px-0.5 rounded">{'{ "tasks": [...] }'}</code>，
         画布上写 <code className="text-purple-600 bg-purple-50 px-0.5 rounded">{'{{data.tasks}}'}</code>。
       </div>
 
       {/* JSON 编辑器 */}
-      <PageDataEditor screenId={screen.id} dataSource={activeDs} />
+      <PageDataEditor screenId={screen.id} screen={screen} dataSource={activeDs} />
 
       {/* 接口定义 */}
       <ApiEndpointsSection screenId={screen.id} />
@@ -82,23 +82,33 @@ export const DataTab = observer(function DataTab() {
 // 页面数据编辑器（合并了旧 JsonEditorSection）
 // ===================================================================
 
-function getActiveData(ds: DataSource): Record<string, unknown> {
-  const scenarios = ds.scenarios ?? [];
-  return scenarios.find((s) => s.id === ds.activeScenarioId)?.data ?? {};
+/** 合并当前屏所有「已加载」数据源的活跃场景数据，供 JSON 预览（与画布 getActiveData 一致） */
+function mergeLoadedScenarioData(screen: Screen): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const ds of screen.dataSources ?? []) {
+    if (ds.activePhase !== 'loaded') continue;
+    const sc = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
+    if (sc?.data && typeof sc.data === 'object' && !Array.isArray(sc.data)) {
+      Object.assign(merged, sc.data);
+    }
+  }
+  return merged;
 }
 
 type DataEditorView = 'tree' | 'json';
 
 const PageDataEditor = observer(function PageDataEditor({
   screenId,
+  screen,
   dataSource,
 }: {
   screenId: string;
+  screen: Screen;
   dataSource: DataSource;
 }) {
   const { message } = AntdApp.useApp();
   const [view, setView] = useState<DataEditorView>('json');
-  const activeData = getActiveData(dataSource);
+  const activeData = mergeLoadedScenarioData(screen);
   const scenarioId = dataSource.activeScenarioId;
   const [jsonText, setJsonText] = useState(() => JSON.stringify(activeData, null, 2));
   const [error, setError] = useState<string | null>(null);

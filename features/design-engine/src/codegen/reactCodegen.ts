@@ -6,6 +6,16 @@ export interface CodegenOptions {
   includeEvents?: boolean;
 }
 
+/** 与 PrimitiveRenderer 一致：textContent / text / props.children（字符串） */
+function pickInlinePropText(props: Record<string, unknown> | undefined): string | undefined {
+  if (!props) return undefined;
+  const a = props.textContent ?? props.text;
+  if (typeof a === 'string' || typeof a === 'number') return String(a);
+  const c = props.children;
+  if (typeof c === 'string' || typeof c === 'number') return String(c);
+  return undefined;
+}
+
 export function generateReactCode(screen: Screen, options: CodegenOptions = {}): string {
   const { format = 'react-tsx', includeStyles = true, includeEvents = true } = options;
 
@@ -102,12 +112,12 @@ function renderNode(
     }
   }
 
-  const textContent = (node.props as Record<string, unknown>)?.textContent;
+  const inlineText = pickInlinePropText(node.props as Record<string, unknown> | undefined);
 
   const children = node.children ?? [];
   const attrStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
 
-  if (children.length === 0 && (textContent === undefined || textContent === null || textContent === '')) {
+  if (children.length === 0 && (inlineText === undefined || inlineText === '')) {
     return `${pad}<${tag}${attrStr} />`;
   }
 
@@ -116,10 +126,7 @@ function renderNode(
     .map((c) => renderNode(c, indent + 2, includeStyles, includeEvents, _stateNodes))
     .filter(Boolean);
 
-  const textStr =
-    textContent !== undefined && textContent !== null && textContent !== ''
-      ? String(textContent)
-      : '';
+  const textStr = inlineText !== undefined && inlineText !== '' ? inlineText : '';
 
   if (textStr && childLines.length === 0) {
     return `${pad}<${tag}${attrStr}>${escapeJsxText(textStr)}</${tag}>`;
@@ -149,12 +156,11 @@ function renderHTMLNode(node: ComponentNode, indent: number, includeStyles: bool
     if (styleStr) attrs.push(`style="${escapeHtmlAttr(styleStr)}"`);
   }
 
-  const textContent = (node.props as Record<string, unknown>)?.textContent;
+  const inlineText = pickInlinePropText(node.props as Record<string, unknown> | undefined);
   const children = node.children ?? [];
   const attrStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
 
-  const hasText =
-    textContent !== undefined && textContent !== null && String(textContent).length > 0;
+  const hasText = inlineText !== undefined && inlineText.length > 0;
 
   if (children.length === 0 && !hasText) {
     const selfClosing = ['img', 'input', 'br', 'hr'].includes(tag);
@@ -166,7 +172,7 @@ function renderHTMLNode(node: ComponentNode, indent: number, includeStyles: bool
     .map((c) => renderHTMLNode(c, indent + 2, includeStyles))
     .filter(Boolean);
 
-  const textStr = hasText ? escapeHtmlText(String(textContent)) : '';
+  const textStr = hasText ? escapeHtmlText(String(inlineText)) : '';
 
   return [
     `${pad}<${tag}${attrStr}>`,

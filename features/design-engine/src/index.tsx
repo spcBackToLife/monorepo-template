@@ -26,9 +26,22 @@ export { mergeStateMaps } from './styles/mergeStateMaps';
 export { resolveComponentInstance } from './assets/resolveInstance';
 /** @deprecated No longer needed — asset URLs are now stored as direct relative paths */
 export { resolveAssetUrl } from './assets/resolveAssetUrl';
+export {
+  rewriteCssUrlValues,
+  rewriteStyleObjectUrls,
+  rewriteMediaSrc,
+} from './assets/rewriteLocalAssetRefs';
+export { StaticAssetOriginProvider, useStaticAssetOrigin } from './renderer/StaticAssetOriginContext';
 
 // ===== Data Binding & Context =====
-export { resolveExpression, hasExpression, resolvePropsExpressions } from './data/resolveExpression';
+export {
+  resolveExpression,
+  hasExpression,
+  resolvePropsExpressions,
+  mergeLoadedScreenData,
+  injectCarouselSlice,
+  buildScreenDataContext,
+} from './data/resolveExpression';
 export type { DataContext } from './data/resolveExpression';
 export { DataContextProvider, useDataContext } from './data/DataContext';
 export { ListRenderer } from './data/ListRenderer';

@@ -25,15 +25,37 @@ function findNodeById(node: ComponentNode, id: string): ComponentNode | undefine
 /**
  * 为组件全景构造一个只包含目标组件的临时 Screen。
  *
- * 不能直接把目标组件当 rootNode——SchemaRenderer 会给 rootNode 强制
- * height:100%/width:100%，导致按钮之类的小组件撑满整个视口。
+ * 核心设计决策：
+ * - 不能直接把目标组件当 rootNode（SchemaRenderer 会给 rootNode 强制 height:100%/width:100%）
+ * - 需要创建 wrapper 作为 rootNode
  *
- * 解决方案：创建一个固定宽度的 wrapper div 作为 rootNode，目标组件作为唯一子节点。
- * wrapper 宽度与视口宽度相同，这样 width:100% 的子组件能正常展示。
- * wrapper 高度 auto 让内容自适应。
+ * 关键修复：目标组件可能带有来自页面的绝对定位（如 position:absolute; top:200px），
+ * 这些坐标在脱离页面上下文后毫无意义，会导致组件渲染到容器外面。
+ * 因此需要将定位方式调整为相对定位并重置偏移量。
  */
 export function buildIsolatedScreen(screen: Screen, targetNode: ComponentNode, viewportWidth = 375): Screen {
   const wrapperId = `__panorama_wrapper_${targetNode.id}`;
+
+  // 浅拷贝目标节点，避免修改原 schema 数据
+  const isolatedNode = { ...targetNode };
+
+  // 如果目标组件使用绝对/固定定位，重置为相对定位 + 居中显示
+  const pos = (isolatedNode.styles?.position as string) ?? '';
+  if (pos === 'absolute' || pos === 'fixed') {
+    isolatedNode.styles = {
+      ...isolatedNode.styles,
+      position: 'relative',
+      top: undefined as unknown as string | undefined,
+      left: undefined as unknown as string | undefined,
+      bottom: undefined as unknown as string | undefined,
+      right: undefined as unknown as string | undefined,
+    };
+  }
+
+  // 计算合理的 wrapper 宽度：取组件自身宽度和视口宽度的较小值 + 适量 padding
+  const nodeW = parsePx(isolatedNode.styles?.width);
+  const wrapperW = nodeW ? Math.min(nodeW + 64, viewportWidth) : viewportWidth;
+
   const wrapperNode: ComponentNode = {
     id: wrapperId,
     type: 'div',
@@ -41,16 +63,18 @@ export function buildIsolatedScreen(screen: Screen, targetNode: ComponentNode, v
     styles: {
       display: 'flex',
       flexDirection: 'column',
-      alignItems: 'stretch',
-      width: `${viewportWidth}px`,
+      alignItems: 'center',       // 居中显示组件（不再 stretch 撑满）
+      justifyContent: 'center',
+      width: `${wrapperW}px`,
       height: 'auto',
       minHeight: 'auto',
-      padding: '16px',
+      padding: '24px',            // 适当内边距
       margin: '0',
       background: 'transparent',
+      boxSizing: 'border-box',
     },
     props: {},
-    children: [targetNode],
+    children: [isolatedNode],
     states: [],
     activeState: 'default',
     visible: true,
@@ -63,6 +87,15 @@ export function buildIsolatedScreen(screen: Screen, targetNode: ComponentNode, v
     rootNode: wrapperNode,
     backgroundColor: 'transparent',
   };
+}
+
+/** 从 CSS 值中提取 px 数字，如 "280px" → 280, "100%" → null；纯数字按 px 处理 */
+function parsePx(val: string | number | undefined): number | null {
+  if (val == null) return null;
+  if (typeof val === 'number' && Number.isFinite(val)) return val;
+  if (typeof val !== 'string') return null;
+  const m = val.match(/^(\d+(?:\.\d+)?)px$/);
+  return m ? Number(m[1]) : null;
 }
 
 /**

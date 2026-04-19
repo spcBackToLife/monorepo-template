@@ -16,6 +16,28 @@ export interface PrimitiveRendererProps {
 }
 
 /**
+ * 叶子文案在 schema 里常见写法：`props.textContent` / `props.text`（推荐），
+ * 或 **`props.children` 存字符串**（含 `{{data.*}}`，且树 `children[]` 为空）。
+ * 解析顺序：textContent → text → props.children；均未定义时再回退到树子节点。
+ */
+function readInlineTextFromProps(resolvedProps: Record<string, unknown>): string | undefined {
+  const a = resolvedProps.textContent ?? resolvedProps.text;
+  if (typeof a === 'string' || typeof a === 'number') return String(a);
+  const c = resolvedProps.children;
+  if (typeof c === 'string' || typeof c === 'number') return String(c);
+  return undefined;
+}
+
+function resolvedInlineOrTreeChildren(
+  resolvedProps: Record<string, unknown>,
+  treeChildren: React.ReactNode,
+): React.ReactNode {
+  const inline = readInlineTextFromProps(resolvedProps);
+  if (inline !== undefined) return inline;
+  return treeChildren;
+}
+
+/**
  * Renders a primitive node type as its corresponding HTML element.
  *
  * Maps the node's `type` (div, button, img, etc.) to a real HTML element,
@@ -36,9 +58,6 @@ export function PrimitiveRenderer({
     'data-node-type': node.type,
     style,
   };
-
-  // textContent（数据绑定）优先于 text（静态默认值），兼容两种写法
-  const textValue = (resolvedProps.textContent ?? resolvedProps.text) as string | undefined;
 
   switch (node.type) {
     // --- Self-closing / void elements ---
@@ -135,15 +154,15 @@ export function PrimitiveRenderer({
 
     // --- Text elements ---
     case 'h1':
-      return <h1 {...commonProps}>{textValue ?? children}</h1>;
+      return <h1 {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</h1>;
     case 'h2':
-      return <h2 {...commonProps}>{textValue ?? children}</h2>;
+      return <h2 {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</h2>;
     case 'h3':
-      return <h3 {...commonProps}>{textValue ?? children}</h3>;
+      return <h3 {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</h3>;
     case 'p':
-      return <p {...commonProps}>{textValue ?? children}</p>;
+      return <p {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</p>;
     case 'span':
-      return <span {...commonProps}>{textValue ?? children}</span>;
+      return <span {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</span>;
     case 'a':
       return (
         <a
@@ -153,7 +172,7 @@ export function PrimitiveRenderer({
           rel={resolvedProps.rel as string}
           onClick={(e) => e.preventDefault()}
         >
-          {textValue ?? children}
+          {resolvedInlineOrTreeChildren(resolvedProps, children)}
         </a>
       );
 
@@ -165,7 +184,7 @@ export function PrimitiveRenderer({
           disabled={resolvedProps.disabled as boolean}
           type="button"
         >
-          {textValue ?? children}
+          {resolvedInlineOrTreeChildren(resolvedProps, children)}
         </button>
       );
     case 'nav':
@@ -183,7 +202,7 @@ export function PrimitiveRenderer({
     case 'ol':
       return <ol {...commonProps}>{children}</ol>;
     case 'li':
-      return <li {...commonProps}>{textValue ?? children}</li>;
+      return <li {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</li>;
 
     case 'annotation':
       return (
@@ -205,6 +224,6 @@ export function PrimitiveRenderer({
 
     // --- Default: div ---
     default:
-      return <div {...commonProps}>{children}</div>;
+      return <div {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</div>;
   }
 }

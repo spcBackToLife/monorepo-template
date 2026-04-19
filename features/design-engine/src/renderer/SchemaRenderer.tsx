@@ -8,11 +8,13 @@ import { mergeStateMaps } from '../styles/mergeStateMaps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContext';
 import type { DataContext } from '../data/resolveExpression';
-import { hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
+import { buildScreenDataContext, hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
 import { ListRenderer } from '../data/ListRenderer';
 import type { CoordinateMap } from '../overlay/coordinateMap';
 import { buildSchemaLayoutMap, expandCullRect } from '../overlay/schemaLayoutMap';
 import { SchemaVirtualizeContext, shouldVirtualizeCullNode, useSchemaVirtualize } from './SchemaVirtualizeContext';
+import { StaticAssetOriginProvider, useStaticAssetOrigin } from './StaticAssetOriginContext';
+import { rewriteMediaSrc, rewriteStyleObjectUrls } from '../assets/rewriteLocalAssetRefs';
 
 /** W6-042：编辑画布上对单个节点临时叠加交互状态（不写入 Schema） */
 export type InteractionPreview = { nodeId: string; state: string };
@@ -57,6 +59,11 @@ export interface SchemaRendererProps {
   virtualizeMarginPx?: number;
   /** 宿主预计算的布局图（与 EditorOverlay coordinateLayoutFallback 同源） */
   schemaLayoutMap?: CoordinateMap | null;
+  /**
+   * 静态资源根（如 `http://127.0.0.1:3001`），用于把 `url("/uploads/...")`、`/uploads/...` 补成绝对地址。
+   * 不传则不做重写（依赖宿主同源代理等）。
+   */
+  staticAssetOrigin?: string;
 }
 
 /**
@@ -88,9 +95,12 @@ export function SchemaRenderer({
   virtualizeViewportHeight,
   virtualizeMarginPx = 240,
   schemaLayoutMap: schemaLayoutMapProp = null,
+  staticAssetOrigin,
 }: SchemaRendererProps) {
-  // Build data context from active dataset if not provided externally
-  const activeDataContext: DataContext = dataContext ?? buildDataContextFromScreen(screen);
+  const activeDataContext: DataContext = useMemo(
+    () => dataContext ?? buildScreenDataContext(screen, globalStates),
+    [dataContext, screen, globalStates],
+  );
 
   const virtualizeCtx = useMemo(() => {
     const vw = virtualizeViewportWidth ?? 375;
@@ -136,54 +146,37 @@ export function SchemaRenderer({
       : (screen.backgroundColor ?? 'transparent');
 
   return (
-    <DataContextProvider value={activeDataContext}>
-      <SchemaVirtualizeContext.Provider value={virtualizeCtx}>
-        <div
-          data-screen-id={screen.id}
-          style={{
-            width: '100%',
-            minHeight: '100%',
-            height: '100%',
-            boxSizing: 'border-box',
-            backgroundColor: pageBackground,
-            position: 'relative' as const,
-            ...(editorCanvasOptimize ? { contain: 'layout' as const } : {}),
-          }}
-        >
-          <NodeRenderer
-            node={screen.rootNode}
-            rootNodeId={screen.rootNode.id}
-            assets={assets}
-            globalStates={globalStates}
-            interactionPreview={interactionPreview}
-            hideGhostNodes={hideGhostNodes}
-            onNodeClick={onNodeClick}
-            onNodeHover={onNodeHover}
-            onNodeDoubleClick={onNodeDoubleClick}
-          />
-        </div>
-      </SchemaVirtualizeContext.Provider>
-    </DataContextProvider>
+    <StaticAssetOriginProvider origin={staticAssetOrigin}>
+      <DataContextProvider value={activeDataContext}>
+        <SchemaVirtualizeContext.Provider value={virtualizeCtx}>
+          <div
+            data-screen-id={screen.id}
+            style={{
+              width: '100%',
+              minHeight: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              backgroundColor: pageBackground,
+              position: 'relative' as const,
+              ...(editorCanvasOptimize ? { contain: 'layout' as const } : {}),
+            }}
+          >
+            <NodeRenderer
+              node={screen.rootNode}
+              rootNodeId={screen.rootNode.id}
+              assets={assets}
+              globalStates={globalStates}
+              interactionPreview={interactionPreview}
+              hideGhostNodes={hideGhostNodes}
+              onNodeClick={onNodeClick}
+              onNodeHover={onNodeHover}
+              onNodeDoubleClick={onNodeDoubleClick}
+            />
+          </div>
+        </SchemaVirtualizeContext.Provider>
+      </DataContextProvider>
+    </StaticAssetOriginProvider>
   );
-}
-
-/** Build a DataContext：合并各数据源活跃场景数据（替代旧 dataSets / activeDataSetId） */
-function getActiveData(screen: Screen): Record<string, unknown> {
-  const mergedData: Record<string, unknown> = {};
-  for (const ds of screen.dataSources ?? []) {
-    if (ds.activePhase !== 'loaded') continue;
-    const scenario = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
-    if (scenario) {
-      Object.assign(mergedData, scenario.data);
-    }
-  }
-  return mergedData;
-}
-
-function buildDataContextFromScreen(screen: Screen): DataContext {
-  return {
-    data: getActiveData(screen),
-  };
 }
 
 // ===== Internal: Recursive Node Renderer =====
@@ -265,6 +258,7 @@ function NodeRenderer({
 }: NodeRendererProps) {
   const dataContext = useDataContext();
   const vctx = useSchemaVirtualize();
+  const staticOrigin = useStaticAssetOrigin();
 
   // Step 1: Resolve component instances
   const node = isComponentInstanceType(rawNode.type)
@@ -316,6 +310,13 @@ function NodeRenderer({
   // 列表子项：从 absolute 切到 relative，参与父容器 flex 流
   if (isListItem) {
     reactStyles = applyListItemStyleOverrides(reactStyles);
+  }
+
+  if (staticOrigin) {
+    reactStyles = rewriteStyleObjectUrls(
+      reactStyles as Record<string, unknown>,
+      staticOrigin,
+    ) as React.CSSProperties;
   }
 
   // Step 5: Event handlers
@@ -466,6 +467,11 @@ function NodeRenderer({
     });
   }
 
+  const propsForRender =
+    staticOrigin && node.type === 'img' && typeof resolvedProps.src === 'string'
+      ? { ...resolvedProps, src: rewriteMediaSrc(resolvedProps.src, staticOrigin) ?? resolvedProps.src }
+      : resolvedProps;
+
   // Step 7: Wrap with click/hover handlers
   return (
     <div
@@ -478,7 +484,7 @@ function NodeRenderer({
       <PrimitiveRenderer
         node={node}
         style={reactStyles}
-        resolvedProps={resolvedProps}
+        resolvedProps={propsForRender}
       >
         {children}
       </PrimitiveRenderer>

@@ -315,6 +315,132 @@ export async function deleteMaterialProject(
   });
 }
 
+/** 更新素材工程元数据（如 targetNodeId，与设计节点建立「主关联」） */
+export async function updateMaterialProject(
+  projectId: string,
+  materialProjectId: string,
+  body: Record<string, unknown>,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/material-projects/${materialProjectId}`, {
+    method: 'PUT',
+    body,
+  });
+}
+
+// ===== Material slots（节点 ↔ 素材工程，可编辑绑定 — 与前端 MaterialEditorModal 一致）=====
+
+export interface MaterialSlotRecordDto {
+  id: string;
+  projectId: string;
+  nodeId: string;
+  slotName: string;
+  materialProjectId: string;
+  sortOrder: number;
+  cssTarget: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 查询某设计节点上所有素材槽位 */
+export async function listMaterialSlotsByNode(
+  projectId: string,
+  nodeId: string,
+): Promise<MaterialSlotRecordDto[]> {
+  return request(`/api/projects/${projectId}/material-slots/by-node/${nodeId}`);
+}
+
+/** 创建槽位：把素材工程挂到节点 + 指定 CSS 落点（如 background-image） */
+export async function createMaterialSlot(
+  projectId: string,
+  body: {
+    nodeId: string;
+    slotName?: string;
+    materialProjectId: string;
+    sortOrder?: number;
+    cssTarget?: string;
+    isActive?: boolean;
+  },
+): Promise<MaterialSlotRecordDto> {
+  return request(`/api/projects/${projectId}/material-slots`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export async function updateMaterialSlot(
+  projectId: string,
+  slotId: string,
+  body: {
+    slotName?: string;
+    materialProjectId?: string;
+    sortOrder?: number;
+    cssTarget?: string;
+    isActive?: boolean;
+  },
+): Promise<MaterialSlotRecordDto> {
+  return request(`/api/projects/${projectId}/material-slots/${slotId}`, {
+    method: 'PUT',
+    body,
+  });
+}
+
+/**
+ * 保证「节点 + 素材工程」在 node_material_slots 中有记录（前端「设计素材…」依赖此表）。
+ * 仅 applyMaterialDesign / 手写 backgroundImage 不会自动建槽位，必须在导出或绑定时调用本函数。
+ */
+export async function ensureMaterialNodeBinding(
+  projectId: string,
+  nodeId: string,
+  materialProjectId: string,
+): Promise<{ ok: boolean; action: 'none' | 'created' | 'updated'; slotId?: string; error?: string }> {
+  try {
+    const slots = await listMaterialSlotsByNode(projectId, nodeId);
+    if (slots.some((s) => s.materialProjectId === materialProjectId)) {
+      return { ok: true, action: 'none' };
+    }
+    const def = slots.find((s) => s.slotName === 'default');
+    if (def) {
+      await updateMaterialSlot(projectId, def.id, {
+        materialProjectId,
+        cssTarget: 'background-image',
+        isActive: true,
+      });
+      return { ok: true, action: 'updated', slotId: def.id };
+    }
+    try {
+      const created = await createMaterialSlot(projectId, {
+        nodeId,
+        slotName: 'default',
+        materialProjectId,
+        cssTarget: 'background-image',
+        isActive: true,
+      });
+      return { ok: true, action: 'created', slotId: created.id };
+    } catch (e) {
+      if (e instanceof ApiHttpError && e.statusCode === 409) {
+        const again = await listMaterialSlotsByNode(projectId, nodeId);
+        const d = again.find((s) => s.slotName === 'default');
+        if (d) {
+          await updateMaterialSlot(projectId, d.id, {
+            materialProjectId,
+            cssTarget: 'background-image',
+            isActive: true,
+          });
+          return { ok: true, action: 'updated', slotId: d.id };
+        }
+      }
+      throw e;
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      action: 'none',
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
 // ===== Material Editor Actions =====
 
 /**

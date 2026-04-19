@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { ComponentTemplate, ComponentNode, Screen } from '@globallink/design-schema';
 import { SchemaRenderer } from '@globallink/design-engine';
 import { editorStore } from '@/stores/editor';
+import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 import { buildIsolatedScreen } from '../../Panorama/PanoramaPage';
 
 const THUMB_W = 80;
@@ -93,6 +94,7 @@ export const StatePreviewThumbnail = React.memo(function StatePreviewThumbnail({
               screen={renderScreen}
               assets={assets}
               globalStates={globalStates}
+              staticAssetOrigin={getEditorStaticAssetOrigin()}
               interactionPreview={{ nodeId, state: stateName }}
               hideGhostNodes
             />
@@ -136,6 +138,7 @@ export const StatePreviewThumbnail = React.memo(function StatePreviewThumbnail({
             screen={renderScreen}
             assets={assets}
             globalStates={globalStates}
+            staticAssetOrigin={getEditorStaticAssetOrigin()}
             interactionPreview={{ nodeId, state: stateName }}
             hideGhostNodes
             editorCanvasOptimize={false}

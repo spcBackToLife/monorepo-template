@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { Screen, ComponentTemplate } from '@globallink/design-schema';
 import { SchemaRenderer } from '@globallink/design-engine';
+import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 
 /**
  * 交互链路图中的页面节点 — 渲染真实页面缩略图而非文字方块。
@@ -30,7 +31,7 @@ export function ScreenFlowNode({ data }: NodeProps) {
             transform: `scale(${scale})`, transformOrigin: 'top left',
             pointerEvents: 'none',
           }}>
-            <SchemaRenderer screen={screen} assets={assets} hideGhostNodes editorCanvasOptimize={false} />
+            <SchemaRenderer screen={screen} assets={assets} staticAssetOrigin={getEditorStaticAssetOrigin()} hideGhostNodes editorCanvasOptimize={false} />
           </div>
         </div>
       ) : (

@@ -66,6 +66,17 @@ function writeStoredCanvasView(projectId: string, scale: number, panX: number, p
   }
 }
 
+/** 会影响当前页领域态 Schema 的操作：执行后须重跑 initGlobalStatesForScreen */
+const DOMAIN_STATE_SCHEMA_OPS = new Set<string>([
+  'addDomainState',
+  'removeDomainState',
+  'updateDomainState',
+  'setDomainStatePreview',
+  'addDomainStateBinding',
+  'removeDomainStateBinding',
+  'updateDomainStateBinding',
+]);
+
 export type ToolType = 'select' | 'hand' | 'container' | 'element' | 'text' | 'component' | 'annotation';
 
 /** 右侧面板可滚动分区（用于「展开并定位」） */
@@ -438,6 +449,13 @@ export class EditorStore {
         this.selectedNodeIds = [];
         this.hoveredNodeId = null;
         this.initGlobalStatesForScreen();
+      } else if (
+        result.success &&
+        this.activeScreen &&
+        DOMAIN_STATE_SCHEMA_OPS.has(op.type)
+      ) {
+        // 新增/删除领域态或改预览值后，画布 globalStates 需与 Schema 同步（否则分页等绑定不生效）
+        this.initGlobalStatesForScreen();
       }
     });
     if (result.success) {
@@ -465,6 +483,12 @@ export class EditorStore {
         this.activeScreenId = op.params.screenId;
         this.selectedNodeIds = [];
         this.hoveredNodeId = null;
+        this.initGlobalStatesForScreen();
+      } else if (
+        result.success &&
+        this.activeScreen &&
+        DOMAIN_STATE_SCHEMA_OPS.has(op.type)
+      ) {
         this.initGlobalStatesForScreen();
       }
     });

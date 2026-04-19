@@ -13,6 +13,7 @@ import {
   scaleCoordinateMapToLayoutContainer,
   expandRootRectToContainer,
   buildSchemaLayoutMap,
+  buildScreenDataContext,
   hitTest,
   getEditorCoordinateRoot,
   getPlacementParentRect,
@@ -31,6 +32,7 @@ import {
 } from '@globallink/design-operations';
 import { generateNodeId } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
+import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 import { useEditorCanvasOperations } from './useEditorCanvasOps';
 import { TextInlineEditor } from './TextInlineEditor';
 import { CanvasContextBar } from './CanvasContextBar';
@@ -41,7 +43,6 @@ import {
   handleEditorContextMenuClick,
   preloadMaterialSlots,
 } from '../EditorContextMenu';
-import { collectNodeIdsWithEvents } from '../utils/collectNodeIdsWithEvents';
 import { collectNodeIdsWithListBinding } from '../utils/collectNodeIdsWithListBinding';
 import { resolveDrawParentId } from '../utils/placement';
 import './canvas.css';
@@ -104,18 +105,13 @@ export const Canvas = observer(function Canvas() {
   const schemaLayoutMap = useMemo(() => {
     if (!screen || !viewport) return null;
     if (!editorStore.canvasVirtualizeOutsideDeviceFrame) return null;
-    const mergedData: Record<string, unknown> = {};
-    for (const ds of screen.dataSources ?? []) {
-      if (ds.activePhase !== 'loaded') continue;
-      const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
-      if (sc) Object.assign(mergedData, sc.data);
-    }
+    const dataContext = buildScreenDataContext(screen, editorStore.currentGlobalStates);
     return buildSchemaLayoutMap(screen, {
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       globalStates: editorStore.currentGlobalStates,
       assets: editorStore.project?.componentAssets ?? [],
-      dataContext: { data: mergedData },
+      dataContext,
       interactionPreview:
         editorStore.selectedNodeIds.length === 1 &&
         editorStore.previewInteractionState &&
@@ -193,11 +189,6 @@ export const Canvas = observer(function Canvas() {
     };
   }, [screen?.id, projectUpdatedAt, editorStore.canvasScale, mergeCanvasCoordinateMap]);
 
-  const nodeIdsWithInteractionEvents = useMemo(
-    () => (screen ? collectNodeIdsWithEvents(screen.rootNode) : []),
-    [screen],
-  );
-
   const nodeIdsWithListBinding = useMemo(
     () => (screen ? collectNodeIdsWithListBinding(screen.rootNode) : []),
     [screen],
@@ -216,6 +207,22 @@ export const Canvas = observer(function Canvas() {
   );
 
   const handleSelect = useCallback((nodeId: string | null) => {
+    if (!nodeId) {
+      editorStore.select(null);
+      return;
+    }
+    const node = findNodeInScreens(editorStore.screens, nodeId);
+    const clickEvt = node?.events?.find((ev) => ev.trigger === 'click' && !ev.disabled);
+    const acts = clickEvt?.actions ?? [];
+    if (acts.length > 0 && acts.every((a) => a.type === 'setDomainState')) {
+      runInAction(() => {
+        for (const a of acts) {
+          if (a.type === 'setDomainState') {
+            editorStore.setCurrentGlobalState(a.variableName, a.value);
+          }
+        }
+      });
+    }
     editorStore.select(nodeId);
   }, []);
 
@@ -618,6 +625,7 @@ export const Canvas = observer(function Canvas() {
                     onSwitchDataSourcePhase={handlePreviewSwitchDataSourcePhase}
                     onNavigateBackRef={editorStore.previewNavigateBackRef}
                     embedded
+                    staticAssetOrigin={getEditorStaticAssetOrigin()}
                   />
                 </TransitionAnimator>
               ) : (
@@ -626,6 +634,7 @@ export const Canvas = observer(function Canvas() {
                     screen={screen}
                     assets={editorStore.project?.componentAssets}
                     globalStates={editorStore.currentGlobalStates}
+                    staticAssetOrigin={getEditorStaticAssetOrigin()}
                     virtualizeOutsideDeviceFrame={editorStore.canvasVirtualizeOutsideDeviceFrame}
                     virtualizeViewportWidth={viewport.width}
                     virtualizeViewportHeight={viewport.height}
@@ -689,7 +698,6 @@ export const Canvas = observer(function Canvas() {
                   editorStore.select(id);
                 }}
                 /* 已移除：双击非文本节点不再自动插入文本段落 */
-                nodeIdsWithInteractionEvents={nodeIdsWithInteractionEvents}
                 nodeIdsWithListBinding={nodeIdsWithListBinding}
                 lockedNodeIds={lockedNodeIds}
                 annotationNodeIds={annotationNodeIds}

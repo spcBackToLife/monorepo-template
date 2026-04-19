@@ -102,17 +102,19 @@ function useTargetNodeStyles(nodeId: string | null) {
 
   return useMemo(() => {
     if (!node) return null;
-    const styles = (node.styles ?? {}) as Record<string, string>;
+    const styles = (node.styles ?? {}) as Record<string, unknown>;
+    const w = styles.width;
+    const h = styles.height;
     return {
       nodeId: node.id,
       nodeType: node.type,
       nodeName: node.name ?? node.id.slice(0, 8),
-      background: styles.background || styles.backgroundImage || styles.backgroundColor || '',
-      boxShadow: styles.boxShadow || '',
-      textShadow: styles.textShadow || '',
-      filter: styles.filter || '',
-      width: styles.width || '',
-      height: styles.height || '',
+      background: String(styles.background || styles.backgroundImage || styles.backgroundColor || ''),
+      boxShadow: String(styles.boxShadow || ''),
+      textShadow: String(styles.textShadow || ''),
+      filter: String(styles.filter || ''),
+      width: w === undefined || w === null || w === '' ? '' : (typeof w === 'number' ? w : String(w)),
+      height: h === undefined || h === null || h === '' ? '' : (typeof h === 'number' ? h : String(h)),
     };
   }, [node]);
 }
@@ -123,14 +125,19 @@ function useTargetNodeStyles(nodeId: string | null) {
  * 画布尺寸由 createMaterialProject 自动计算（比组件大）。
  */
 function resolveComponentSize(
-  widthStr?: string,
-  heightStr?: string,
+  widthStr?: string | number,
+  heightStr?: string | number,
 ): { width: number; height: number } {
-  const parseSize = (val: string | undefined, fallback: number): number => {
-    if (!val || val === 'auto' || val === '') return fallback;
-    const pxMatch = val.match(/^(\d+(?:\.\d+)?)(px)?$/);
+  const parseSize = (val: string | number | undefined, fallback: number): number => {
+    if (val === undefined || val === null) return fallback;
+    if (typeof val === 'number') {
+      return Number.isFinite(val) ? Math.max(50, Math.min(1200, val)) : fallback;
+    }
+    const s = val.trim();
+    if (!s || s === 'auto') return fallback;
+    const pxMatch = s.match(/^(\d+(?:\.\d+)?)(px)?$/);
     if (pxMatch) return Math.max(50, Math.min(1200, Number(pxMatch[1])));
-    const pctMatch = val.match(/^(\d+(?:\.\d+)?)%$/);
+    const pctMatch = s.match(/^(\d+(?:\.\d+)?)%$/);
     if (pctMatch) return Math.max(50, Math.min(1200, (Number(pctMatch[1]) / 100) * 400));
     return fallback;
   };
