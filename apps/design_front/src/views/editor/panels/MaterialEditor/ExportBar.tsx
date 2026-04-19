@@ -28,8 +28,6 @@ import { findNodeInScreens } from '@globallink/design-operations';
 import { API_BASE } from '@/api/client';
 import { materialProjectApi } from '@/api/materialProject';
 import { getCssTargetLabel, getExportFormat } from '@/views/editor/EditorContextMenu/buildMenuItems';
-import { stripMaterialSvgExportChrome } from '@/views/editor/panels/MaterialEditor/stripMaterialSvgExportChrome';
-
 interface ExportBarProps {
   targetNodeId: string | null;
   onClose: () => void;
@@ -85,8 +83,6 @@ function exportCroppedSvg(
   // 移除前端交互相关的内联样式（overflow: visible 等）
   clone.style.cssText = '';
   clone.removeAttribute('style');
-
-  stripMaterialSvgExportChrome(clone);
 
   return new XMLSerializer().serializeToString(clone);
 }
