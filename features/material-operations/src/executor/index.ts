@@ -201,6 +201,18 @@ export class MaterialOperationExecutor {
     project: MaterialProjectSchema,
     op: MaterialOperation,
   ): DispatchResult {
+    if (op == null || typeof (op as { type?: unknown }).type !== 'string') {
+      return {
+        project,
+        result: {
+          success: false,
+          description: 'Invalid material operation: missing type or null operation',
+          affectedObjectIds: [],
+        },
+        inverse: { type: 'noop', params: {} },
+      };
+    }
+
     switch (op.type) {
       // 画布操作
       case 'me:setBackgroundColor':

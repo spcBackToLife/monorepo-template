@@ -29,6 +29,8 @@ import {
 
 interface ObjectRendererProps {
   object: MaterialObject;
+  /** 组件默认框 id：该对象 locked 时仍允许点击选中（与 SelectionOverlay 一致） */
+  defaultElementId?: string;
   /** 是否被选中（用于外部交互提示，本组件不绘制选框） */
   isSelected?: boolean;
   /** 是否被 hover */
@@ -44,16 +46,18 @@ interface ObjectRendererProps {
 /** 渲染单个素材对象 */
 export const ObjectRenderer = memo(function ObjectRenderer({
   object: obj,
+  defaultElementId,
   onMouseDown,
   onMouseEnter,
   onMouseLeave,
 }: ObjectRendererProps) {
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
-      if (obj.locked) return;
+      const isDefault = defaultElementId != null && obj.id === defaultElementId;
+      if (obj.locked && !isDefault) return;
       onMouseDown?.(e, obj);
     },
-    [obj, onMouseDown],
+    [obj, onMouseDown, defaultElementId],
   );
 
   const handleMouseEnter = useCallback(
@@ -74,13 +78,14 @@ export const ObjectRenderer = memo(function ObjectRenderer({
     ? `url(#${getShadowFilterId(obj.id)})`
     : undefined;
 
+  const isDefaultSlot = defaultElementId != null && obj.id === defaultElementId;
   const commonGroupProps = {
     transform,
     style,
     filter,
     'data-object-id': obj.id,
     'data-object-type': obj.type,
-    cursor: obj.locked ? 'default' : 'move',
+    cursor: isDefaultSlot ? 'default' : obj.locked ? 'default' : 'move',
     onMouseDown: handleMouseDown,
     onMouseEnter: handleMouseEnter,
     onMouseLeave: handleMouseLeave,
@@ -246,6 +251,7 @@ export const ObjectRenderer = memo(function ObjectRenderer({
             <ObjectRenderer
               key={child.id}
               object={child}
+              defaultElementId={defaultElementId}
               onMouseDown={onMouseDown}
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}

@@ -5,6 +5,7 @@
  */
 import type {
   MaterialObject,
+  MaterialProjectSchema,
   GradientDef,
   ShadowDef,
   FilterEntry,
@@ -211,4 +212,32 @@ export function getBoundingBox(obj: MaterialObject): BoundingBox {
     height: obj.height * obj.scaleY,
     rotation: obj.rotation,
   };
+}
+
+/**
+ * 选中框 / 对齐线 / hover 叠加层使用的几何包围盒。
+ *
+ * 历史数据里「组件默认框」常被存成整画布占位 (0,0,600×400)，而视觉上的组件边界是 referenceFrame。
+ * 此时若仍用 getBoundingBox，选框会跑到左上角；应对齐到与 CanvasGrid 虚线参考框一致。
+ */
+export function getOverlayBoundingBox(
+  obj: MaterialObject,
+  project: MaterialProjectSchema,
+): BoundingBox {
+  const rf = project.referenceFrame;
+  if (
+    project.defaultElementId &&
+    obj.id === project.defaultElementId &&
+    rf?.enabled
+  ) {
+    const { canvasWidth, canvasHeight } = project;
+    return {
+      x: (canvasWidth - rf.width) / 2,
+      y: (canvasHeight - rf.height) / 2,
+      width: rf.width,
+      height: rf.height,
+      rotation: 0,
+    };
+  }
+  return getBoundingBox(obj);
 }

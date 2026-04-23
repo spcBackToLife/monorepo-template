@@ -22,8 +22,8 @@ interface CanvasRulerProps {
   visible?: boolean;
 }
 
-/** 标尺高度/宽度常量 */
-export const RULER_SIZE = 20;
+/** 标尺高度/宽度常量（略大以免刻度数字顶部被裁切） */
+export const RULER_SIZE = 24;
 
 /** 根据缩放级别动态计算合适的刻度间距 */
 function getTickInterval(zoom: number): { minor: number; major: number; labelEvery: number } {
@@ -76,10 +76,11 @@ function HorizontalRuler({ width, zoom }: { width: number; zoom: number }) {
             {tick.showLabel && (
               <text
                 x={tick.pos + 2}
-                y={RULER_SIZE - 10}
-                fontSize={8}
+                y={RULER_SIZE - 6}
+                fontSize={9}
                 fill="#999"
                 fontFamily="monospace"
+                dominantBaseline="alphabetic"
               >
                 {tick.value}
               </text>

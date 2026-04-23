@@ -43,7 +43,7 @@ const TYPE_ICONS: Record<string, string> = {
 export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
   const { state, execute, setSelected } = useMaterialEditor();
   const { project, selectedIds } = state;
-  const { objects } = project;
+  const { objects, defaultElementId } = project;
 
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -170,6 +170,7 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
 
           {reversedObjects.map((obj) => {
             const isSelected = selectedIds.includes(obj.id);
+            const isDefault = defaultElementId != null && obj.id === defaultElementId;
 
             return (
               <div
@@ -226,7 +227,7 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
-                      handleStartRename(obj.id, obj.name);
+                      if (!isDefault) handleStartRename(obj.id, obj.name);
                     }}
                   >
                     {obj.name}
@@ -249,30 +250,37 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
                     {obj.visible ? '👁' : '🚫'}
                   </button>
 
-                  {/* 锁定 */}
+                  {/* 锁定（组件默认框固定锁定，不可切换） */}
                   <button
                     type="button"
-                    title={obj.locked ? '解锁' : '锁定'}
+                    title={isDefault ? '组件默认框（固定锁定）' : obj.locked ? '解锁' : '锁定'}
+                    disabled={isDefault}
                     style={{
                       width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                      color: obj.locked ? '#f59e0b' : '#9ca3af', fontSize: 10,
+                      background: 'none', border: 'none', cursor: isDefault ? 'not-allowed' : 'pointer', padding: 0,
+                      color: isDefault || obj.locked ? '#f59e0b' : '#9ca3af', fontSize: 10,
+                      opacity: isDefault ? 0.85 : 1,
                     }}
-                    onClick={(e) => { e.stopPropagation(); handleToggleLock(obj.id, obj.locked); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isDefault) handleToggleLock(obj.id, obj.locked);
+                    }}
                   >
-                    {obj.locked ? '🔒' : '🔓'}
+                    🔒
                   </button>
 
                   {/* 上移（堆叠顺序上移 = 数组中后移） */}
                   <button
                     type="button"
                     title="上移"
+                    disabled={isDefault}
                     style={{
                       width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      background: 'none', border: 'none', cursor: isDefault ? 'not-allowed' : 'pointer', padding: 0,
                       color: '#9ca3af', fontSize: 9,
+                      opacity: isDefault ? 0.4 : 1,
                     }}
-                    onClick={(e) => { e.stopPropagation(); handleMoveUp(obj.id); }}
+                    onClick={(e) => { e.stopPropagation(); if (!isDefault) handleMoveUp(obj.id); }}
                   >
                     ▲
                   </button>
@@ -281,12 +289,14 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
                   <button
                     type="button"
                     title="下移"
+                    disabled={isDefault}
                     style={{
                       width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      background: 'none', border: 'none', cursor: isDefault ? 'not-allowed' : 'pointer', padding: 0,
                       color: '#9ca3af', fontSize: 9,
+                      opacity: isDefault ? 0.4 : 1,
                     }}
-                    onClick={(e) => { e.stopPropagation(); handleMoveDown(obj.id); }}
+                    onClick={(e) => { e.stopPropagation(); if (!isDefault) handleMoveDown(obj.id); }}
                   >
                     ▼
                   </button>
@@ -294,15 +304,17 @@ export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {
                   {/* 删除 */}
                   <button
                     type="button"
-                    title="删除"
+                    title={isDefault ? '组件默认框不可删除' : '删除'}
+                    disabled={isDefault}
                     style={{
                       width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      background: 'none', border: 'none', cursor: isDefault ? 'not-allowed' : 'pointer', padding: 0,
                       color: '#d1d5db', fontSize: 9,
+                      opacity: isDefault ? 0.4 : 1,
                     }}
-                    onClick={(e) => { e.stopPropagation(); handleDelete(obj.id); }}
-                    onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#ef4444'; }}
-                    onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#d1d5db'; }}
+                    onClick={(e) => { e.stopPropagation(); if (!isDefault) handleDelete(obj.id); }}
+                    onMouseEnter={(e) => { if (!isDefault) (e.target as HTMLElement).style.color = '#ef4444'; }}
+                    onMouseLeave={(e) => { if (!isDefault) (e.target as HTMLElement).style.color = '#d1d5db'; }}
                   >
                     ✕
                   </button>

@@ -25,6 +25,10 @@ export type {
 export {
   createMaterialProject,
   createDefaultObject,
+  reconcileDefaultElementWithReferenceFrame,
+  normalizeMaterialEditorSchema,
+  computeMaterialWorkspaceCanvasSize,
+  expandMaterialProjectCanvasIfTooTight,
 } from './schema';
 
 // ===== Operation Types =====

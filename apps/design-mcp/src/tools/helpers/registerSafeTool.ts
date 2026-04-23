@@ -53,7 +53,7 @@ export function registerSafeTool(
       description: config.description,
       inputSchema: looseSchema as unknown as Record<string, z.ZodTypeAny>,
     },
-    async (rawParams) => {
+    async (rawParams: unknown) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params = rawParams as any;
 

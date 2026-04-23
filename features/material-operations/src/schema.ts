@@ -5,6 +5,8 @@
  * 后端和前端共享同一份类型定义，后端是数据唯一真相来源。
  */
 
+import { deepClone } from './utils';
+
 // ===== 基础值类型 =====
 
 /** 渐变色标 */
@@ -186,7 +188,7 @@ export interface MaterialProjectSchema {
 
   /**
    * 默认元素 ID — 组件自带的那个框。
-   * 该元素可以被选中、设置背景色等，但不能移动/缩放/删除。
+   * 数据上 `locked: true`，与前端一致：可选中、改填充等样式，不可移动/缩放/旋转/删除/改名/解锁/复制。
    * 布尔运算时不直接操作它，而是在同位置生成克隆体参与运算。
    */
   defaultElementId?: string;
@@ -204,6 +206,43 @@ export interface MaterialProjectSchema {
 
 /** 画布最小边距 — 画布至少比参考框每边多出这些像素 */
 const CANVAS_MIN_PADDING = 400;
+
+/**
+ * 工作台画布尺寸（与 createMaterialProject 一致）。
+ * 参考框为「组件」尺寸；画布应显著更大，便于摆放素材与标尺。
+ */
+export function computeMaterialWorkspaceCanvasSize(
+  referenceWidth: number,
+  referenceHeight: number,
+  explicitCanvasWidth?: number,
+  explicitCanvasHeight?: number,
+): { canvasWidth: number; canvasHeight: number } {
+  const canvasWidth =
+    explicitCanvasWidth ?? Math.max(1200, referenceWidth + CANVAS_MIN_PADDING * 2);
+  const canvasHeight =
+    explicitCanvasHeight ?? Math.max(900, referenceHeight + CANVAS_MIN_PADDING * 2);
+  return { canvasWidth, canvasHeight };
+}
+
+/**
+ * 修复「画布几乎等于参考框」的错误元数据（历史 Modal 曾把二者都设成组件像素）。
+ * 展开后须再 reconcile 默认框几何。
+ */
+export function expandMaterialProjectCanvasIfTooTight(
+  schema: MaterialProjectSchema,
+): MaterialProjectSchema {
+  const rf = schema.referenceFrame;
+  if (!rf?.enabled) return schema;
+  const margin = 80;
+  const tooTight =
+    schema.canvasWidth < rf.width + margin || schema.canvasHeight < rf.height + margin;
+  if (!tooTight) return schema;
+  const { canvasWidth, canvasHeight } = computeMaterialWorkspaceCanvasSize(rf.width, rf.height);
+  const next = deepClone(schema);
+  next.canvasWidth = canvasWidth;
+  next.canvasHeight = canvasHeight;
+  return next;
+}
 
 /** 创建空的素材工程
  * @param id 工程 ID
@@ -224,9 +263,12 @@ export function createMaterialProject(
   canvasHeight?: number,
 ): MaterialProjectSchema {
   const now = new Date().toISOString();
-  // 画布至少比组件大 CANVAS_MIN_PADDING*2，且不小于 600×400
-  const cw = canvasWidth ?? Math.max(1200, componentWidth + CANVAS_MIN_PADDING * 2);
-  const ch = canvasHeight ?? Math.max(900, componentHeight + CANVAS_MIN_PADDING * 2);
+  const { canvasWidth: cw, canvasHeight: ch } = computeMaterialWorkspaceCanvasSize(
+    componentWidth,
+    componentHeight,
+    canvasWidth,
+    canvasHeight,
+  );
 
   // 默认元素 — 组件自带的框，居中放置在画布上
   const defaultElementId = `default_${id}`;
@@ -249,7 +291,8 @@ export function createMaterialProject(
     opacity: 1,
     blendMode: 'normal',
     visible: true,
-    locked: false, // 可选中但受限
+    /** 与前端交互一致：数据上锁定；选中与填充等样式仍由引擎对 defaultElementId 单独放行 */
+    locked: true,
     rx: 0,
     ry: 0,
   };
@@ -272,6 +315,63 @@ export function createMaterialProject(
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/**
+ * 将「组件默认框」矩形与当前参考框对齐（居中于画布，尺寸 = referenceFrame）。
+ *
+ * 背景：SyncBridge 曾用后端 `objects` 覆盖本地后，部分历史工程里默认框被存成整画布占位 (0,0,600×400)，
+ * 与参考框虚线脱节。调用本函数可在加载合并后恢复与 createMaterialProject 一致的几何语义。
+ */
+export function reconcileDefaultElementWithReferenceFrame(
+  schema: MaterialProjectSchema,
+): MaterialProjectSchema {
+  const defId = schema.defaultElementId;
+  const rf = schema.referenceFrame;
+  if (!defId || !rf?.enabled) return schema;
+
+  const idx = schema.objects.findIndex((o) => o.id === defId);
+  if (idx < 0) return schema;
+
+  const { canvasWidth: cw, canvasHeight: ch } = schema;
+  const x = (cw - rf.width) / 2;
+  const y = (ch - rf.height) / 2;
+  const obj = schema.objects[idx]!;
+  const w = rf.width;
+  const h = rf.height;
+
+  const aligned =
+    Math.abs(obj.x - x) < 0.01 &&
+    Math.abs(obj.y - y) < 0.01 &&
+    Math.abs(obj.width * obj.scaleX - w) < 0.01 &&
+    Math.abs(obj.height * obj.scaleY - h) < 0.01;
+
+  if (aligned) {
+    const o = schema.objects[idx]!;
+    if (o.locked === true) return schema;
+    const nextLocked = deepClone(schema);
+    nextLocked.objects[idx]!.locked = true;
+    return nextLocked;
+  }
+
+  const next = deepClone(schema);
+  const t = next.objects[idx]!;
+  t.x = Math.round(x);
+  t.y = Math.round(y);
+  t.width = rf.width;
+  t.height = rf.height;
+  t.scaleX = 1;
+  t.scaleY = 1;
+  t.locked = true;
+  return next;
+}
+
+/**
+ * 素材编辑器 / GET schema 出口：仅展开工作台画布 + 对齐「组件默认框」与参考框。
+ * 具体图元（波形等）必须由 MCP / 前端操作写入 Schema，**不在此写死任何设计**。
+ */
+export function normalizeMaterialEditorSchema(schema: MaterialProjectSchema): MaterialProjectSchema {
+  return reconcileDefaultElementWithReferenceFrame(expandMaterialProjectCanvasIfTooTight(schema));
 }
 
 /** 创建默认的 MaterialObject */

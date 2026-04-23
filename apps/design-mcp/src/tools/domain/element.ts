@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 import { generateNodeId } from '@globallink/design-schema';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { walkTree } from '@globallink/design-operations';
@@ -31,7 +32,7 @@ export function registerElementTools(server: McpServer): void {
           .describe('例: { textContent: "标题" } 或 { children: "{{data.x}}" }；p/h/span/button 等会渲染上述字段'),
         position: z.number().optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addElement', params: { parentId: p.parentId, tag: p.tag, elementId: generateNodeId(), styles: p.styles, props: p.props, position: p.position } });
@@ -41,7 +42,7 @@ export function registerElementTools(server: McpServer): void {
     remove: {
       description: '删除指定元素及其所有子节点',
       schema: z.object({ projectId: z.string(), elementId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'removeElement', params: { elementId: p.elementId } });
@@ -51,7 +52,7 @@ export function registerElementTools(server: McpServer): void {
     move: {
       description: '将元素移动到新的父节点下',
       schema: z.object({ projectId: z.string(), elementId: z.string(), newParentId: z.string(), position: z.number().optional() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'moveElement', params: { elementId: p.elementId, newParentId: p.newParentId, position: p.position } });
@@ -61,7 +62,7 @@ export function registerElementTools(server: McpServer): void {
     duplicate: {
       description: '深拷贝元素及其子节点（生成新 ID）',
       schema: z.object({ projectId: z.string(), elementId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'duplicateElement', params: { elementId: p.elementId } });
@@ -71,7 +72,7 @@ export function registerElementTools(server: McpServer): void {
     rename: {
       description: '重命名节点的显示名称',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), name: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'renameNode', params: { nodeId: p.nodeId, name: p.name } });
@@ -83,7 +84,7 @@ export function registerElementTools(server: McpServer): void {
         '在父节点下插入一棵完整的节点子树。文本节点：props.textContent 或 props.children（字符串，可含 {{data.*}}）；' +
         '勿仅用树 children 数组承载纯文案（与 SchemaRenderer 一致）。',
       schema: z.object({ projectId: z.string(), parentId: z.string(), subtree: z.record(z.string(), z.unknown()), position: z.number().optional() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { walkTree: wt } = await import('@globallink/design-operations') as any;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -101,7 +102,7 @@ export function registerElementTools(server: McpServer): void {
         containerTag: z.string().optional().describe('默认 div'),
         containerStyles: z.record(z.string(), z.unknown()).optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'wrapInContainer', params: { nodeIds: p.nodeIds, containerTag: p.containerTag, containerStyles: p.containerStyles } });
@@ -111,7 +112,7 @@ export function registerElementTools(server: McpServer): void {
     unwrap: {
       description: '解除容器包裹，将子节点提升到父级',
       schema: z.object({ projectId: z.string(), containerId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'unwrapContainer', params: { containerId: p.containerId } });
@@ -121,7 +122,7 @@ export function registerElementTools(server: McpServer): void {
     reorder: {
       description: '调整元素在父节点中的排列顺序',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), parentId: z.string(), newIndex: z.number() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'reorderElement', params: { nodeId: p.nodeId, parentId: p.parentId, newIndex: p.newIndex } });
@@ -131,7 +132,7 @@ export function registerElementTools(server: McpServer): void {
     set_visibility_when: {
       description: '设置节点的条件可见性规则',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), visibilityWhen: z.record(z.string(), z.unknown()).nullable() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'setNodeVisibilityWhen', params: { nodeId: p.nodeId, visibilityWhen: p.visibilityWhen } });
@@ -141,7 +142,7 @@ export function registerElementTools(server: McpServer): void {
     set_locked: {
       description: '设置节点的锁定状态（锁定后不可拖拽/编辑）',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), locked: z.boolean() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'setNodeLocked', params: { nodeId: p.nodeId, locked: p.locked } });
@@ -151,7 +152,7 @@ export function registerElementTools(server: McpServer): void {
     set_visible: {
       description: '设置节点的可见性（显示/隐藏）',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), visible: z.boolean() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'setNodeVisible', params: { nodeId: p.nodeId, visible: p.visible } });
@@ -161,7 +162,7 @@ export function registerElementTools(server: McpServer): void {
     change_type: {
       description: '将 HTML 节点的标签类型改为另一种 primitive（如 div → img）',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), newType: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'changeElementType', params: { nodeId: p.nodeId, newType: p.newType } });

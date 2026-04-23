@@ -37,7 +37,8 @@ export {
 export { MaterialEditorCanvas } from './MaterialEditorCanvas';
 
 // ===== Renderer =====
-export { MaterialRenderer } from './renderer/MaterialRenderer';
+export { MaterialRenderer, type MaterialWorkbenchBackdrop } from './renderer/MaterialRenderer';
+export { prepareMaterialSvgCloneForExport } from './renderer/exportSvgUtils';
 export { ObjectRenderer } from './renderer/ObjectRenderer';
 export { GradientDefs } from './renderer/GradientDefs';
 export { ShadowDefs } from './renderer/ShadowDefs';
@@ -49,6 +50,7 @@ export {
   getPolygonPoints,
   getStarPoints,
   getBoundingBox,
+  getOverlayBoundingBox,
   isGradientFill,
   type BoundingBox,
 } from './renderer/svg-utils';

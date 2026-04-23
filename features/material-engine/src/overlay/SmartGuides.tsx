@@ -10,7 +10,7 @@
 import { useMemo } from 'react';
 import type { MaterialObject } from '@globallink/material-operations';
 import { useMaterialEditor } from '../context/MaterialEditorContext';
-import { getBoundingBox, type BoundingBox } from '../renderer/svg-utils';
+import { getOverlayBoundingBox, type BoundingBox } from '../renderer/svg-utils';
 
 interface SmartGuidesProps {
   /** 是否启用（拖拽时启用） */
@@ -43,8 +43,8 @@ export function SmartGuides({ enabled = false }: SmartGuidesProps) {
 
     if (selectedObjects.length === 0 || otherObjects.length === 0) return [];
 
-    // 获取选中对象的组合包围盒
-    const selectedBounds = selectedObjects.map(getBoundingBox);
+    // 获取选中对象的组合包围盒（默认框与参考框对齐）
+    const selectedBounds = selectedObjects.map((o) => getOverlayBoundingBox(o, project));
     const selMinX = Math.min(...selectedBounds.map((b: BoundingBox) => b.x));
     const selMinY = Math.min(...selectedBounds.map((b: BoundingBox) => b.y));
     const selMaxX = Math.max(...selectedBounds.map((b: BoundingBox) => b.x + b.width));
@@ -66,7 +66,7 @@ export function SmartGuides({ enabled = false }: SmartGuidesProps) {
     const { canvasWidth, canvasHeight } = project;
 
     for (const other of otherObjects) {
-      const ob = getBoundingBox(other);
+      const ob = getOverlayBoundingBox(other, project);
       const otherPoints = {
         left: ob.x,
         right: ob.x + ob.width,

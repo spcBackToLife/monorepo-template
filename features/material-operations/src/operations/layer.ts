@@ -131,6 +131,18 @@ export function executeSetLock(
   }
 
   const obj = newProject.objects[idx]!;
+  if (project.defaultElementId && params.objectId === project.defaultElementId) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: 'Cannot change lock on the default element',
+        affectedObjectIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const oldLocked = obj.locked;
   obj.locked = params.locked;
   newProject.version++;
@@ -168,6 +180,18 @@ export function executeRenameObject(
   }
 
   const obj = newProject.objects[idx]!;
+  if (project.defaultElementId && params.objectId === project.defaultElementId) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: 'Cannot rename the default element',
+        affectedObjectIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const oldName = obj.name;
   obj.name = params.name;
   newProject.version++;

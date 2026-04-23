@@ -48,7 +48,9 @@ export function useMaterialKeyboard() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         const selected = getSelectedObjects();
+        const defId = state.project.defaultElementId;
         for (const obj of selected) {
+          if (defId && obj.id === defId) continue;
           execute({ type: 'me:removeObject', params: { objectId: obj.id } });
         }
         setSelected([]);
@@ -59,8 +61,10 @@ export function useMaterialKeyboard() {
       if (isMod && e.key === 'd') {
         e.preventDefault();
         const selected = getSelectedObjects();
+        const defId = state.project.defaultElementId;
         const newIds: string[] = [];
         for (const obj of selected) {
+          if (defId && obj.id === defId) continue;
           const newId = generateObjectId();
           execute({
             type: 'me:duplicateObject',

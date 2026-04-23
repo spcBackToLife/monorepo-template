@@ -40,17 +40,21 @@ export class MaterialEditorController {
   async execute(
     @Param('projectId') projectId: string,
     @Param('materialId') materialId: string,
-    @Body() body: {
-      operation: MaterialOperation;
+    @Body() body: Record<string, unknown> & {
+      operation?: MaterialOperation;
       author?: string;
       fingerprint?: string;
       authorId?: string;
     },
   ) {
+    // 兼容：既支持 { operation: { type, params } }，也支持顶层直接传 { type, params }（脚本/MCP 易写错）
+    const operation =
+      body.operation ??
+      (typeof body.type === 'string' ? (body as unknown as MaterialOperation) : undefined);
     return this.service.execute(
       projectId,
       materialId,
-      body.operation,
+      operation,
       body.author,
       body.fingerprint,
       body.authorId,
@@ -127,6 +131,18 @@ export class MaterialEditorController {
     @Param('materialId') materialId: string,
   ) {
     return this.service.getSchema(projectId, materialId);
+  }
+
+  /**
+   * 将「组件默认框」持久化为与 referenceFrame 对齐（写入一条 me:updateObject）。
+   * 用于修复历史坏数据；读路径已在 rebuildSchema 中 reconcile，本接口把对齐写入操作日志。
+   */
+  @Post('api/projects/:projectId/materials/:materialId/schema/repair-default-frame')
+  async repairDefaultFrame(
+    @Param('projectId') projectId: string,
+    @Param('materialId') materialId: string,
+  ) {
+    return this.service.repairDefaultElementFrame(projectId, materialId);
   }
 
   // ===================================================================

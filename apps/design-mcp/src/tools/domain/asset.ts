@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { generateTemplateId } from '@globallink/design-schema';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as api from '../../api-client.js';
 
@@ -13,7 +14,7 @@ export function registerAssetTools(server: McpServer): void {
     instantiate: {
       description: '从组件资产库实例化一个组件到指定位置',
       schema: z.object({ projectId: z.string(), templateId: z.string(), parentId: z.string(), position: z.number().optional() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'instantiateTemplate', params: { templateId: p.templateId, parentId: p.parentId, position: p.position } });
@@ -26,7 +27,7 @@ export function registerAssetTools(server: McpServer): void {
         projectId: z.string(), nodeId: z.string(), name: z.string(), category: z.string(),
         tags: z.array(z.string()).optional(), description: z.string().optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'saveAsTemplate', params: { nodeId: p.nodeId, name: p.name, category: p.category, tags: p.tags, description: p.description, templateId: generateTemplateId() } });
@@ -36,7 +37,7 @@ export function registerAssetTools(server: McpServer): void {
     list: {
       description: '列出可用组件资产（项目级/团队级/全局）',
       schema: z.object({ scope: z.enum(['project','team','global']).optional(), projectId: z.string().optional() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.listAssets(p.scope, p.projectId);
@@ -46,7 +47,7 @@ export function registerAssetTools(server: McpServer): void {
     detach_instance: {
       description: '将组件实例设为脱离模板（不再随模板更新同步）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'detachInstance', params: { nodeId: p.nodeId } });
@@ -56,7 +57,7 @@ export function registerAssetTools(server: McpServer): void {
     sync_instance: {
       description: '从关联模板重新同步实例结构（需仍为引用模式）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'syncInstance', params: { nodeId: p.nodeId } });
@@ -66,7 +67,7 @@ export function registerAssetTools(server: McpServer): void {
     update_template: {
       description: '更新组件模板属性（名称/分类/描述）',
       schema: z.object({ projectId: z.string(), templateId: z.string(), patch: z.record(z.string(), z.unknown()) }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'updateTemplate', params: { templateId: p.templateId, patch: p.patch } });
@@ -76,7 +77,7 @@ export function registerAssetTools(server: McpServer): void {
     delete_template: {
       description: '删除组件模板',
       schema: z.object({ projectId: z.string(), templateId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'deleteTemplate', params: { templateId: p.templateId } });
@@ -86,7 +87,7 @@ export function registerAssetTools(server: McpServer): void {
     duplicate_template: {
       description: '复制组件模板',
       schema: z.object({ projectId: z.string(), sourceTemplateId: z.string(), newName: z.string().optional() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'duplicateTemplate', params: { sourceTemplateId: p.sourceTemplateId, newName: p.newName } });

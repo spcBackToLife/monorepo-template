@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 import * as api from '../../api-client.js';
 
 export function registerHistoryTools(server: McpServer): void {
@@ -11,7 +12,7 @@ export function registerHistoryTools(server: McpServer): void {
     undo: {
       description: '撤销最后一次操作',
       schema: z.object({ projectId: z.string() }),
-      handler: async (p) => ({ content: [{ type:'text', text: JSON.stringify(await api.undo(p.projectId), null, 2) }] }),
+      handler: async (p: DomainToolParams) => ({ content: [{ type:'text', text: JSON.stringify(await api.undo(p.projectId), null, 2) }] }),
     },
     redo: {
       description: '重做被撤销的操作（当前后端使用快照模式实现 undo，redo 暂不可用）',

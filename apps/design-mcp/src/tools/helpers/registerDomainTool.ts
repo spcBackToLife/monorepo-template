@@ -34,7 +34,9 @@ export function registerDomainTool(
     }),
   );
 
-  const fullSchema = z.discriminatedUnion('action', variants);
+  // Zod 对 discriminatedUnion 的 tuple 推断过严；variants 已保证每项含 action literal
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fullSchema = z.discriminatedUnion('action', variants as any);
 
   const actionDescriptions = entries
     .map(([name, def]) => `  - ${name}: ${def.description}`)
@@ -56,7 +58,7 @@ export function registerDomainTool(
       // 🔒 宽松 schema：让 SDK 放行所有参数，由我们在 handler 里手动验证
       inputSchema: z.object({ action: z.string() }).passthrough() as unknown as Record<string, z.ZodTypeAny>,
     },
-    async (rawParams) => {
+    async (rawParams: unknown) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params = rawParams as any;
       const actionKey = params.action;

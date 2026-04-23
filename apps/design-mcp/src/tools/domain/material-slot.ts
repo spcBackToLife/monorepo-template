@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as _api from '../../api-client.js';
 
@@ -12,7 +13,7 @@ export function registerMaterialSlotTools(server: McpServer): void {
     list_by_node: {
       description: '查询节点的所有素材槽位（含工程摘要、cssTarget、isActive 等）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.findSlotsByNode(p.projectId, p.nodeId);
@@ -27,7 +28,7 @@ export function registerMaterialSlotTools(server: McpServer): void {
         sortOrder: z.number().optional(), cssTarget: z.string().optional().describe('默认 "background-image"'),
         isActive: z.boolean().optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.createSlot(p.projectId, { nodeId: p.nodeId, materialProjectId: p.materialProjectId, slotName: p.slotName, sortOrder: p.sortOrder, cssTarget: p.cssTarget, isActive: p.isActive });
@@ -41,7 +42,7 @@ export function registerMaterialSlotTools(server: McpServer): void {
         slotName: z.string().optional(), materialProjectId: z.string().optional(),
         sortOrder: z.number().optional(), cssTarget: z.string().optional(), isActive: z.boolean().optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const { slotId, ...rest } = p;
@@ -52,7 +53,7 @@ export function registerMaterialSlotTools(server: McpServer): void {
     delete: {
       description: '删除槽位（解除关联，不删素材工程本身）',
       schema: z.object({ projectId: z.string(), slotId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         await api2.default.deleteSlot(p.projectId, p.slotId);

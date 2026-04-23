@@ -12,6 +12,9 @@ import { DatabaseService } from '../../database/database.service';
 import {
   MaterialOperationExecutor,
   createMaterialProject,
+  reconcileDefaultElementWithReferenceFrame,
+  expandMaterialProjectCanvasIfTooTight,
+  normalizeMaterialEditorSchema,
   type MaterialOperation,
   type MaterialProjectSchema,
   type OperationResult,
@@ -78,11 +81,17 @@ export class MaterialEditorService {
   async execute(
     projectId: string,
     materialId: string,
-    operation: MaterialOperation,
+    operation: MaterialOperation | undefined,
     author?: string,
     fingerprint?: string,
     authorId?: string,
   ): Promise<{ seq: number; result: OperationResult }> {
+    if (operation == null || typeof (operation as { type?: unknown }).type !== 'string') {
+      throw new BadRequestException(
+        '请求体缺少有效素材操作：请使用 { "operation": { "type": "me:...", "params": { ... } } }，或顶层直接传 { "type", "params" }',
+      );
+    }
+
     const pool = this.db.getPool();
 
     // 1. 获取当前版本
@@ -123,6 +132,70 @@ export class MaterialEditorService {
   }
 
   /**
+   * 若「组件默认框」几何与 referenceFrame 不一致，追加一条 me:updateObject 写入操作日志并升版本。
+   * 用于修复历史数据；正常 GET schema 已在 rebuildSchema 出口 reconcile，本接口负责持久化对齐。
+   */
+  async repairDefaultElementFrame(
+    projectId: string,
+    materialId: string,
+  ): Promise<{ patched: boolean; seq?: number }> {
+    this.clearExecutorCache(materialId);
+    const raw = await this.rebuildSchemaFromStorage(projectId, materialId);
+    const fixed = reconcileDefaultElementWithReferenceFrame(raw);
+    const id = raw.defaultElementId;
+    if (!id || !raw.referenceFrame?.enabled) {
+      return { patched: false };
+    }
+    const rawDef = raw.objects.find((o) => o.id === id);
+    const fixDef = fixed.objects.find((o) => o.id === id);
+    if (!rawDef || !fixDef || this.defaultElementGeomMatches(rawDef, fixDef)) {
+      return { patched: false };
+    }
+
+    const op: MaterialOperation = {
+      type: 'me:updateObject',
+      params: {
+        objectId: id,
+        allowDefaultGeometry: true,
+        props: {
+          x: fixDef.x,
+          y: fixDef.y,
+          width: fixDef.width,
+          height: fixDef.height,
+          scaleX: 1,
+          scaleY: 1,
+        },
+      },
+    };
+
+    const { seq } = await this.execute(
+      projectId,
+      materialId,
+      op,
+      'system:repair-default-frame',
+      undefined,
+    );
+    return { patched: true, seq };
+  }
+
+  private defaultElementGeomMatches(
+    a: { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number },
+    b: { x: number; y: number; width: number; height: number; scaleX: number; scaleY: number },
+  ): boolean {
+    const eps = 0.01;
+    const aw = a.width * a.scaleX;
+    const ah = a.height * a.scaleY;
+    const bw = b.width * b.scaleX;
+    const bh = b.height * b.scaleY;
+    return (
+      Math.abs(a.x - b.x) < eps &&
+      Math.abs(a.y - b.y) < eps &&
+      Math.abs(aw - bw) < eps &&
+      Math.abs(ah - bh) < eps
+    );
+  }
+
+  /**
    * 批量执行操作（事务）
    */
   async executeBatch(
@@ -133,8 +206,11 @@ export class MaterialEditorService {
     fingerprints?: string[],
     authorId?: string,
   ): Promise<{ startSeq: number; endSeq: number; results: OperationResult[] }> {
-    if (operations.length === 0) {
+    if (!operations?.length) {
       throw new BadRequestException('操作列表不能为空');
+    }
+    if (operations.some((op) => op == null || typeof (op as { type?: unknown }).type !== 'string')) {
+      throw new BadRequestException('操作列表中含有无效项（缺少 type 或为 null）');
     }
 
     const pool = this.db.getPool();
@@ -429,9 +505,9 @@ export class MaterialEditorService {
   }
 
   /**
-   * 从快照+操作日志重建完整 Schema
+   * 从快照+操作日志重建 Schema（**不**做默认框 reconcile，供比对/持久化修复使用）
    */
-  private async rebuildSchema(
+  private async rebuildSchemaFromStorage(
     projectId: string,
     materialId: string,
   ): Promise<MaterialProjectSchema> {
@@ -495,6 +571,18 @@ export class MaterialEditorService {
     }
 
     return schema;
+  }
+
+  /**
+   * 从快照+操作日志重建完整 Schema，并在出口将默认框与 referenceFrame 对齐。
+   */
+  private async rebuildSchema(
+    projectId: string,
+    materialId: string,
+  ): Promise<MaterialProjectSchema> {
+    const schema = await this.rebuildSchemaFromStorage(projectId, materialId);
+    // 历史错误：画布与参考框同像素；先展开工作台，再对齐「组件默认框」与参考框。
+    return normalizeMaterialEditorSchema(schema);
   }
 
   /**

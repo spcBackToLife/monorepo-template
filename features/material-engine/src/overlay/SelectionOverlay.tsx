@@ -12,7 +12,7 @@
  */
 import { useCallback, useRef, useState, type MouseEvent } from 'react';
 import { useMaterialEditor } from '../context/MaterialEditorContext';
-import { getBoundingBox, type BoundingBox } from '../renderer/svg-utils';
+import { getOverlayBoundingBox, type BoundingBox } from '../renderer/svg-utils';
 
 interface SelectionOverlayProps {
   /** 自定义 className */
@@ -49,7 +49,7 @@ export function SelectionOverlay({ className, onDraggingChange }: SelectionOverl
   const selectedObjects = getSelectedObjects();
   const selectedBounds = selectedObjects.map((obj) => ({
     id: obj.id,
-    bounds: getBoundingBox(obj),
+    bounds: getOverlayBoundingBox(obj, project),
   }));
 
   // 计算多选组合包围盒
@@ -58,9 +58,11 @@ export function SelectionOverlay({ className, onDraggingChange }: SelectionOverl
   // Hover 对象的包围盒
   const hoveredBounds =
     hoveredId && !selectedIds.includes(hoveredId)
-      ? getBoundingBox(
-          project.objects.find((o: { id: string }) => o.id === hoveredId) ?? project.objects[0]!,
-        )
+      ? (() => {
+          const ho =
+            project.objects.find((o: { id: string }) => o.id === hoveredId) ?? project.objects[0]!;
+          return getOverlayBoundingBox(ho, project);
+        })()
       : null;
 
   // ===== 吸附计算 =====
@@ -133,7 +135,7 @@ export function SelectionOverlay({ className, onDraggingChange }: SelectionOverl
 
       for (const other of otherObjects) {
         if (foundX && foundY) break;
-        const ob = getBoundingBox(other);
+        const ob = getOverlayBoundingBox(other, project);
         const otherLeft = ob.x;
         const otherRight = ob.x + ob.width;
         const otherCenterX = ob.x + ob.width / 2;
@@ -169,7 +171,7 @@ export function SelectionOverlay({ className, onDraggingChange }: SelectionOverl
 
       return { dx: snapDx, dy: snapDy };
     },
-    [project.objects, project.referenceFrame, selectedIds, canvasWidth, canvasHeight],
+    [project, selectedIds, canvasWidth, canvasHeight],
   );
 
   // ===== 拖拽移动 =====

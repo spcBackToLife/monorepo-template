@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ComponentEvent } from '@globallink/design-schema';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as _api from '../../api-client.js';
 
@@ -19,7 +20,7 @@ export function registerVisualStateTools(server: McpServer): void {
         transition: z.object({ duration: z.number().optional(), easing: z.string().optional(), properties: z.array(z.string()).optional() }).optional(),
         childrenStates: z.record(z.string(), z.string()).optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addState', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, ...(p.transition != null ? { transition: p.transition } : {}), ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}) } });
@@ -29,7 +30,7 @@ export function registerVisualStateTools(server: McpServer): void {
     set_active: {
       description: '切换组件当前激活状态（用于预览不同状态下外观）',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), stateName: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'setActiveState', params: { nodeId: p.nodeId, stateName: p.stateName } });
@@ -39,7 +40,7 @@ export function registerVisualStateTools(server: McpServer): void {
     remove: {
       description: '删除节点上的指定视觉状态',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), stateName: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,7 +63,7 @@ export function registerVisualStateTools(server: McpServer): void {
         childrenStates: z.record(z.string(), z.string()).optional(),
         transition: z.object({ duration: z.number().optional(), easing: z.string().optional(), properties: z.array(z.string()).optional() }).optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,7 +84,7 @@ export function registerVisualStateTools(server: McpServer): void {
         stateName: z.string(),
         properties: z.array(z.string()).describe('要删除的 CSS 属性名数组，如 ["backgroundImage", "backgroundColor"]'),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -104,7 +105,7 @@ export function registerEventTools(server: McpServer): void {
         trigger: z.enum(['click', 'hover', 'longPress']),
         targetScreenId: z.string().describe('目标屏幕 ID 或 "new"'),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addNavigation', params: { nodeId: p.nodeId, trigger: p.trigger, targetScreenId: p.targetScreenId } });
@@ -117,7 +118,7 @@ export function registerEventTools(server: McpServer): void {
         projectId: z.string(), nodeId: z.string(),
         event: z.record(z.string(), z.unknown()),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addEvent', params: { nodeId: p.nodeId, event: p.event as unknown as ComponentEvent } });
@@ -127,7 +128,7 @@ export function registerEventTools(server: McpServer): void {
     remove_event: {
       description: '按索引删除节点上的事件',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), eventIndex: z.number() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'removeEvent', params: { nodeId: p.nodeId, eventIndex: p.eventIndex } });
@@ -137,7 +138,7 @@ export function registerEventTools(server: McpServer): void {
     update_event: {
       description: '就地更新节点上某条事件的 trigger/actions/condition 等字段',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), eventIndex: z.number(), event: z.record(z.string(), z.unknown()) }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'updateEvent', params: { nodeId: p.nodeId, eventIndex: p.eventIndex, event: p.event as unknown as Partial<ComponentEvent> } });
@@ -153,7 +154,7 @@ export function registerScreenTools(server: McpServer): void {
     add: {
       description: '添加一个新的空白屏幕（页面）',
       schema: z.object({ projectId: z.string(), name: z.string().describe('如"登录页"、"首页"') }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addScreen', params: { name: p.name } });
@@ -163,7 +164,7 @@ export function registerScreenTools(server: McpServer): void {
     remove: {
       description: '删除指定屏幕',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'removeScreen', params: { screenId: p.screenId } });
@@ -173,7 +174,7 @@ export function registerScreenTools(server: McpServer): void {
     activate: {
       description: '切换当前激活的屏幕',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'setActiveScreen', params: { screenId: p.screenId } });
@@ -183,7 +184,7 @@ export function registerScreenTools(server: McpServer): void {
     rename: {
       description: '重命名指定屏幕',
       schema: z.object({ projectId: z.string(), screenId: z.string(), name: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'renameScreen', params: { screenId: p.screenId, name: p.name } });
@@ -193,7 +194,7 @@ export function registerScreenTools(server: McpServer): void {
     reorder: {
       description: '调整屏幕排列顺序',
       schema: z.object({ projectId: z.string(), screenId: z.string(), newIndex: z.number() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'reorderScreen', params: { screenId: p.screenId, newIndex: p.newIndex } });
@@ -215,7 +216,7 @@ export function registerViewportTools(server: McpServer): void {
           devicePixelRatio: z.number().optional(), platform: z.enum(['pc','mobile','tablet']),
         }),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'switchViewport', params: { viewport: p.viewport } });
@@ -225,7 +226,7 @@ export function registerViewportTools(server: McpServer): void {
     add_preset: {
       description: '添加自定义视口预设',
       schema: z.object({ projectId: z.string(), viewport: z.record(z.string(), z.unknown()) }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addViewportPreset', params: { viewport: p.viewport } });
@@ -244,7 +245,7 @@ export function registerAnnotationTools(server: McpServer): void {
         projectId: z.string(), parentId: z.string(), content: z.string(),
         author: z.string().optional(), styles: z.record(z.string(), z.unknown()).optional(), position: z.number().optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addAnnotation', params: { parentId: p.parentId, content: p.content, author: p.author, styles: p.styles, position: p.position } });
@@ -254,7 +255,7 @@ export function registerAnnotationTools(server: McpServer): void {
     remove: {
       description: '删除指定标注',
       schema: z.object({ projectId: z.string(), annotationId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'removeAnnotation', params: { annotationId: p.annotationId } });

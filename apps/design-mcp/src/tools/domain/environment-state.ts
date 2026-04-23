@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import * as _api from '../../api-client.js';
 
@@ -12,7 +13,7 @@ export function registerEnvironmentTools(server: McpServer): void {
     list: {
       description: '列出项目的所有环境变量',
       schema: z.object({ projectId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js') as any;
         const proj = await api2.default.getProject(p.projectId);
@@ -22,7 +23,7 @@ export function registerEnvironmentTools(server: McpServer): void {
     add: {
       description: '添加项目级环境变量',
       schema: z.object({ projectId: z.string(), name: z.string(), label: z.string(), values: z.array(z.object({ value:z.string(), label:z.string() })), defaultValue: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addEnvironmentState', params: { name:p.name, label:p.label, values:p.values, defaultValue:p.defaultValue } });
@@ -32,7 +33,7 @@ export function registerEnvironmentTools(server: McpServer): void {
     set_preview: {
       description: '切换环境态预览值',
       schema: z.object({ projectId: z.string(), variableName: z.string(), value: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'setEnvironmentPreview', params: { variableName:p.variableName, value:p.value } });
@@ -46,7 +47,7 @@ export function registerEnvironmentTools(server: McpServer): void {
         styles: z.record(z.string(), z.union([z.string(),z.number()])).optional(),
         props: z.record(z.string(), z.unknown()).optional(), visible: z.boolean().optional(),
       }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
         const result = await api2.default.executeOperation(p.projectId, { type: 'addEnvironmentBinding', params: { nodeId:p.nodeId, binding:{ variableName:p.variableName, value:p.value, styles:p.styles, props:p.props, visible:p.visible } } });

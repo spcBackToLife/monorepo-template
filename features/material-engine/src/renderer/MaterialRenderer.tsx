@@ -17,12 +17,14 @@
  *     {objects.map(obj => <ObjectRenderer />)}
  *   </svg>
  */
-import { useCallback, type MouseEvent } from 'react';
+import { useCallback, useId, type MouseEvent } from 'react';
 import type { MaterialObject } from '@globallink/material-operations';
 import { useMaterialEditor } from '../context/MaterialEditorContext';
 import { ObjectRenderer } from './ObjectRenderer';
 import { GradientDefs } from './GradientDefs';
 import { ShadowDefs } from './ShadowDefs';
+
+export type MaterialWorkbenchBackdrop = 'default' | 'dark' | 'checker';
 
 interface MaterialRendererProps {
   /** 自定义 className */
@@ -31,15 +33,22 @@ interface MaterialRendererProps {
   style?: React.CSSProperties;
   /** SVG 画布点击空白区域的回调 */
   onCanvasClick?: (e: MouseEvent) => void;
+  /**
+   * 仅编辑器预览：改画布底 rect 的填充，避免 transparent 时 HTML 衬底被挡住看不见。
+   * 导出前须用 prepareMaterialSvgCloneForExport 恢复为工程 backgroundColor。
+   */
+  workbenchBackdrop?: MaterialWorkbenchBackdrop;
 }
 
 export function MaterialRenderer({
   className,
   style,
   onCanvasClick,
+  workbenchBackdrop = 'default',
 }: MaterialRendererProps) {
   const { state, setSelected, setHovered } = useMaterialEditor();
   const { project, selectedIds, zoom } = state;
+  const checkerPatternId = `wb-chk-${useId().replace(/:/g, '')}`;
 
   // 点击对象 → 选中
   const handleObjectMouseDown = useCallback(
@@ -89,6 +98,13 @@ export function MaterialRenderer({
 
   const { canvasWidth, canvasHeight, backgroundColor, objects } = project;
 
+  const canvasRectFill =
+    workbenchBackdrop === 'dark'
+      ? '#1a1b20'
+      : workbenchBackdrop === 'checker'
+        ? `url(#${checkerPatternId})`
+        : backgroundColor;
+
   // 收集所有对象（含 group 子对象）以提取渐变和阴影
   const allObjects = flattenObjects(objects);
 
@@ -107,6 +123,19 @@ export function MaterialRenderer({
     >
       {/* Definitions: 渐变 + 阴影 */}
       <defs>
+        {workbenchBackdrop === 'checker' && (
+          <pattern
+            id={checkerPatternId}
+            data-workbench-checker="true"
+            width={16}
+            height={16}
+            patternUnits="userSpaceOnUse"
+          >
+            <rect width={16} height={16} fill="#f2f2f2" />
+            <rect width={8} height={8} fill="#c4c4c4" />
+            <rect x={8} y={8} width={8} height={8} fill="#c4c4c4" />
+          </pattern>
+        )}
         <GradientDefs objects={allObjects} />
         <ShadowDefs objects={allObjects} />
       </defs>
@@ -117,7 +146,7 @@ export function MaterialRenderer({
         y={0}
         width={canvasWidth}
         height={canvasHeight}
-        fill={backgroundColor}
+        fill={canvasRectFill}
         data-canvas-bg="true"
       />
 
@@ -128,6 +157,7 @@ export function MaterialRenderer({
         <ObjectRenderer
           key={obj.id}
           object={obj}
+          defaultElementId={project.defaultElementId}
           isSelected={selectedIds.includes(obj.id)}
           isHovered={state.hoveredId === obj.id}
           onMouseDown={handleObjectMouseDown}

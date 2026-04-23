@@ -153,7 +153,7 @@ export async function uploadExportedMaterial(
 ): Promise<unknown> {
   const url = `${BASE_URL}/api/projects/${projectId}/material-projects/${materialProjectId}/export`;
   const form = new FormData();
-  const blob = new Blob([pngBuffer], { type: 'image/png' });
+  const blob = new Blob([pngBuffer as BlobPart], { type: 'image/png' });
   form.append('file', blob, filename ?? 'material-export.png');
 
   const res = await fetch(url, { method: 'POST', body: form });

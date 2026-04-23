@@ -49,11 +49,14 @@ import {
   useMaterialEditor,
   MaterialEditorCanvas,
   LayerPanel,
+  getOverlayBoundingBox,
   type MaterialToolType,
 } from '@globallink/material-engine';
 import {
   createMaterialProject,
   generateObjectId,
+  normalizeMaterialEditorSchema,
+  computeMaterialWorkspaceCanvasSize,
   type MaterialOperation,
   type MaterialProjectSchema,
   type BooleanOpType,
@@ -128,17 +131,18 @@ function resolveComponentSize(
   widthStr?: string | number,
   heightStr?: string | number,
 ): { width: number; height: number } {
+  /** 设计节点上的宽高是真实组件尺寸，须如实传入参考框（勿把 32 钳成 50） */
   const parseSize = (val: string | number | undefined, fallback: number): number => {
     if (val === undefined || val === null) return fallback;
     if (typeof val === 'number') {
-      return Number.isFinite(val) ? Math.max(50, Math.min(1200, val)) : fallback;
+      return Number.isFinite(val) ? Math.max(1, Math.min(1200, Math.round(val))) : fallback;
     }
     const s = val.trim();
     if (!s || s === 'auto') return fallback;
     const pxMatch = s.match(/^(\d+(?:\.\d+)?)(px)?$/);
-    if (pxMatch) return Math.max(50, Math.min(1200, Number(pxMatch[1])));
+    if (pxMatch) return Math.max(1, Math.min(1200, Math.round(Number(pxMatch[1]))));
     const pctMatch = s.match(/^(\d+(?:\.\d+)?)%$/);
-    if (pctMatch) return Math.max(50, Math.min(1200, (Number(pctMatch[1]) / 100) * 400));
+    if (pctMatch) return Math.max(1, Math.min(1200, Math.round((Number(pctMatch[1]) / 100) * 400)));
     return fallback;
   };
 
@@ -246,11 +250,15 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
           const newSlotName = generateSlotName(existingSlots);
           const nodeName = selectedStyles?.nodeName ?? '素材';
 
+          const { canvasWidth: cw, canvasHeight: ch } = computeMaterialWorkspaceCanvasSize(
+            componentSize.width,
+            componentSize.height,
+          );
           const created = await materialProjectApi.create(projectId, {
             name: `${nodeName}-${newSlotName}`,
             targetNodeId: targetNodeId,
-            canvasWidth: componentSize.width,
-            canvasHeight: componentSize.height,
+            canvasWidth: cw,
+            canvasHeight: ch,
             canvasJSON: {},
             referenceFrameWidth: componentSize.width,
             referenceFrameHeight: componentSize.height,
@@ -314,11 +322,15 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
         if (!mpId && !cancelled) {
           const nodeName = selectedStyles?.nodeName ?? '素材';
           const newSlotName = slotName ?? 'default';
+          const { canvasWidth: cw2, canvasHeight: ch2 } = computeMaterialWorkspaceCanvasSize(
+            componentSize.width,
+            componentSize.height,
+          );
           const created = await materialProjectApi.create(projectId, {
             name: `${nodeName}-${newSlotName}`,
             targetNodeId: targetNodeId ?? undefined,
-            canvasWidth: componentSize.width,
-            canvasHeight: componentSize.height,
+            canvasWidth: cw2,
+            canvasHeight: ch2,
             canvasJSON: {},
             referenceFrameWidth: componentSize.width,
             referenceFrameHeight: componentSize.height,
@@ -417,7 +429,7 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
  * 这是 MCP 远程操作实时反映到弹窗画布的关键。
  */
 function SyncBridge({ materialProjectId }: { materialProjectId: string | null }) {
-  const { execute, state, setProject } = useMaterialEditor();
+  const { execute, setProject } = useMaterialEditor();
 
   // 挂载时从后端加载已有对象，合并到前端本地 Context
   useEffect(() => {
@@ -435,17 +447,14 @@ function SyncBridge({ materialProjectId }: { materialProjectId: string | null })
         if (!res.ok || cancelled) return;
         const backendSchema = await res.json() as MaterialProjectSchema;
 
-        // 后端有对象时，用 setProject 整体替换前端 Schema（避免重复添加）
-        const backendObjects = backendSchema.objects ?? [];
-        if (backendObjects.length > 0 && !cancelled) {
-          // 合并策略：用前端的大画布设置 + 后端的对象列表
-          const mergedSchema: MaterialProjectSchema = {
-            ...state.project,                     // 前端的画布/参考框配置
-            objects: backendObjects,               // 后端的对象列表（唯一真相来源）
-            version: backendSchema.version,        // 后端版本号
-          };
-          setProject(mergedSchema);
-          console.log(`[SyncBridge] Loaded ${backendObjects.length} objects from backend (setProject)`);
+        if (!cancelled) {
+          // 必须用后端完整 Schema（含 defaultElementId / referenceFrame / 画布尺寸），
+          // 勿再与本地 initialProject 拼接，否则会保留错误的 default_${modalId} 与错位参考框。
+          const normalized = normalizeMaterialEditorSchema(backendSchema);
+          setProject(normalized);
+          console.log(
+            `[SyncBridge] Loaded material schema v${normalized.version} (${normalized.objects?.length ?? 0} objects)`,
+          );
         }
       } catch (err) {
         console.error('[SyncBridge] Failed to load backend schema:', err);
@@ -533,25 +542,28 @@ function ModalContent({
 
   // ===== 选中对象 =====
   const selectedObject = useMemo<SelectedObjectInfo | null>(() => {
-    if (selectedIds.length !== 1) return null;
-    const objects = getSelectedObjects();
-    if (objects.length !== 1) return null;
-    const obj = objects[0];
+    if (selectedIds.length === 0) return null;
+    const primaryId = selectedIds[0]!;
+    const obj = state.project.objects.find((o) => o.id === primaryId);
+    if (!obj) return null;
+    const box = getOverlayBoundingBox(obj, state.project);
     return {
       type: obj.type ?? '',
       fill: typeof obj.fill === 'string' ? obj.fill : undefined,
       stroke: typeof obj.stroke === 'string' ? obj.stroke : undefined,
       strokeWidth: obj.strokeWidth,
       opacity: obj.opacity,
-      left: obj.x,
-      top: obj.y,
-      width: obj.width,
-      height: obj.height,
+      left: box.x,
+      top: box.y,
+      width: box.width,
+      height: box.height,
       angle: obj.rotation,
       scaleX: obj.scaleX,
       scaleY: obj.scaleY,
+      rx: obj.rx,
+      ry: obj.ry,
     };
-  }, [selectedIds, getSelectedObjects]);
+  }, [selectedIds, state.project]);
 
   // ===== 拖拽逻辑 =====
   const panelRef = useRef<HTMLDivElement>(null);
@@ -692,6 +704,23 @@ function ModalContent({
           params: { objectId: id, props: transformProps },
         });
       }
+
+      const styleProps: Record<string, unknown> = {};
+      if (updates.rx !== undefined || updates.ry !== undefined) {
+        const rx = (updates.rx ?? updates.ry) as number;
+        const ry = (updates.ry ?? updates.rx) as number;
+        styleProps.rx = rx;
+        styleProps.ry = ry;
+      }
+      if (updates.mixBlendMode !== undefined) {
+        styleProps.blendMode = updates.mixBlendMode as string;
+      }
+      if (Object.keys(styleProps).length > 0) {
+        execute({
+          type: 'me:updateObject',
+          params: { objectId: id, props: styleProps },
+        });
+      }
     }
   }, [selectedIds, execute, selectedObject]);
 
@@ -733,6 +762,7 @@ function ModalContent({
             height: MODAL_HEIGHT,
             zIndex: 9991,
             borderRadius: 12,
+            /* 仅裁切圆角外溢出；子级画布区用 min-h-0 控制滚动，避免标尺负偏移被整块裁掉 */
             overflow: 'hidden',
             boxShadow: '0 16px 48px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
             display: 'flex',
@@ -773,7 +803,7 @@ function ModalContent({
           </div>
 
           {/* ===== 三栏主体 ===== */}
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-1 min-h-0 min-w-0">
             {/* ① 左侧工具栏 (48px) */}
             <LeftToolbar
               activeTool={activeTool}

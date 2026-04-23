@@ -42,6 +42,7 @@ import {
   MaterialEditorProvider,
   useMaterialEditor,
   MaterialEditorCanvas,
+  prepareMaterialSvgCloneForExport,
   type MaterialToolType,
 } from '@globallink/material-engine';
 import {
@@ -174,6 +175,7 @@ function CanvasToolbar() {
         }
         clone.style.cssText = '';
         clone.removeAttribute('style');
+        prepareMaterialSvgCloneForExport(clone, project.backgroundColor);
         const svgString = new XMLSerializer().serializeToString(clone);
 
         // 上传为独立资产而非内联 data URI
@@ -231,6 +233,7 @@ function CanvasToolbar() {
         }
         clone.style.cssText = '';
         clone.removeAttribute('style');
+        prepareMaterialSvgCloneForExport(clone, project.backgroundColor);
         const svgString = new XMLSerializer().serializeToString(clone);
         downloadBlob(new Blob([svgString], { type: 'image/svg+xml' }), 'material.svg');
         message.success('SVG 已导出');
@@ -253,6 +256,7 @@ function CanvasToolbar() {
         }
         clone.style.cssText = '';
         clone.removeAttribute('style');
+        prepareMaterialSvgCloneForExport(clone, project.backgroundColor);
         const svgString = new XMLSerializer().serializeToString(clone);
         await navigator.clipboard.writeText(svgString);
         message.success('SVG 代码已复制');

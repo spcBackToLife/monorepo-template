@@ -120,20 +120,21 @@ export function executeUpdateObject(
 
   const obj = newProject.objects[idx]!;
 
-  // 默认元素：不允许修改位置和尺寸属性（但允许样式属性）
+  // 默认元素：不允许修改位置/尺寸/锁定态（与前端「不可移动、不可解锁」一致）；allowDefaultGeometry 时仅放行几何（服务端对齐用）
   const isDefault = project.defaultElementId && params.objectId === project.defaultElementId;
-  const protectedKeys = ['x', 'y', 'width', 'height', 'scaleX', 'scaleY', 'rotation'];
+  const protectedKeys = ['x', 'y', 'width', 'height', 'scaleX', 'scaleY', 'rotation', 'locked'];
+  const allowGeom = params.allowDefaultGeometry === true;
 
   // 记录旧值用于反向操作
   const oldProps: Record<string, unknown> = {};
   for (const key of Object.keys(params.props)) {
-    if (isDefault && protectedKeys.includes(key)) continue;
+    if (isDefault && protectedKeys.includes(key) && !allowGeom) continue;
     oldProps[key] = (obj as unknown as Record<string, unknown>)[key];
   }
 
-  // 应用新值（跳过默认元素的受保护属性）
+  // 应用新值（跳过默认元素的受保护属性，除非 allowDefaultGeometry）
   for (const key of Object.keys(params.props)) {
-    if (isDefault && protectedKeys.includes(key)) continue;
+    if (isDefault && protectedKeys.includes(key) && !allowGeom) continue;
     (obj as unknown as Record<string, unknown>)[key] = (params.props as unknown as Record<string, unknown>)[key];
   }
   // 不允许修改 id 和 type
@@ -162,6 +163,14 @@ export function executeDuplicateObject(
   project: MaterialProjectSchema,
   params: DuplicateObjectOp['params'],
 ): ExecResult {
+  if (project.defaultElementId && params.objectId === project.defaultElementId) {
+    return {
+      project,
+      result: { success: false, description: 'Cannot duplicate the default element', affectedObjectIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const newProject = deepClone(project);
   const idx = findObjectIndex(newProject.objects, params.objectId);
 

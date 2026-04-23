@@ -133,6 +133,30 @@ function anchorsBounds(anchors: PenAnchor[]): { x: number; y: number; width: num
 /** 最小绘制尺寸（避免 0x0 对象） */
 const MIN_DRAW_SIZE = 4;
 
+/** 仅编辑器 UI：衬在 SVG 下方，便于查看纯白/透明图形；不写入 project、不参与导出逻辑。 */
+const WORKBENCH_BACKDROP_KEY = 'material-engine-workbench-backdrop';
+
+type WorkbenchBackdrop = 'default' | 'dark' | 'checker';
+
+function loadWorkbenchBackdrop(): WorkbenchBackdrop {
+  try {
+    const v = sessionStorage.getItem(WORKBENCH_BACKDROP_KEY);
+    if (v === 'dark' || v === 'checker') return v;
+  } catch {
+    /* ignore */
+  }
+  return 'default';
+}
+
+function saveWorkbenchBackdrop(v: WorkbenchBackdrop) {
+  try {
+    if (v === 'default') sessionStorage.removeItem(WORKBENCH_BACKDROP_KEY);
+    else sessionStorage.setItem(WORKBENCH_BACKDROP_KEY, v);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 绘图预览（拖拽过程中的临时矩形） */
 interface DrawPreview {
   x: number;
@@ -155,6 +179,12 @@ export function MaterialEditorCanvas({
   const [isDragging, setIsDragging] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [drawPreview, setDrawPreview] = useState<DrawPreview | null>(null);
+  const [workbenchBackdrop, setWorkbenchBackdropState] = useState<WorkbenchBackdrop>(loadWorkbenchBackdrop);
+
+  const setWorkbenchBackdrop = useCallback((v: WorkbenchBackdrop) => {
+    setWorkbenchBackdropState(v);
+    saveWorkbenchBackdrop(v);
+  }, []);
 
   // 用于保存 space 键按下前的工具
   const prevToolRef = useRef<MaterialToolType>('select');
@@ -748,65 +778,79 @@ export function MaterialEditorCanvas({
 
   // 画布在容器中居中的 padding（标尺需要额外空间）
   const CANVAS_PADDING = 60;
-  const rulerOffset = showRuler ? RULER_SIZE : 0;
+  /** 标尺用 absolute 负偏移画在画布外，须在可滚动区内用 padding 留出空间，否则 overflow:auto 会裁掉左侧垂直标尺 */
+  const rulerPad = showRuler ? RULER_SIZE : 0;
 
   return (
     <div
-      ref={containerRef}
       className={className}
       style={{
         position: 'relative',
-        overflow: 'auto',
-        background: '#e8e8e8',
+        height: '100%',
+        minHeight: 0,
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
         ...style,
-        cursor: getCursor(tool, isPanning, isDragging),
       }}
-      onWheel={handleWheel}
     >
-      {/* 居中容器 */}
+      {/* 仅中间区域滚动；工作台控件挂在外层，不随画布滚动 */}
       <div
+        ref={containerRef}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minWidth: '100%',
-          minHeight: '100%',
-          padding: CANVAS_PADDING,
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          background: '#e8e8e8',
+          cursor: getCursor(tool, isPanning, isDragging),
         }}
+        onWheel={handleWheel}
       >
-        {/* 画布外壳 — 投影 + 白色背景 + 标尺 */}
+        {/* 居中容器 */}
         <div
-          ref={svgContainerRef}
           style={{
-            position: 'relative',
-            width: canvasW,
-            height: canvasH,
-            flexShrink: 0,
-            boxShadow: '0 2px 16px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)',
-            borderRadius: 2,
-            overflow: 'visible',
-            // 为标尺留出空间
-            marginLeft: rulerOffset,
-            marginTop: rulerOffset,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '100%',
+            minHeight: '100%',
+            paddingTop: CANVAS_PADDING + rulerPad,
+            paddingLeft: CANVAS_PADDING + rulerPad,
+            paddingRight: CANVAS_PADDING,
+            paddingBottom: CANVAS_PADDING,
           }}
-          onMouseDown={handleCanvasMouseDown}
-          onMouseMove={handleCanvasMouseMove}
-          onDoubleClick={handleCanvasDblClick}
         >
-          {/* 标尺 */}
-          {showRuler && <CanvasRuler visible={showRuler} />}
-
-          {/* SVG 渲染层 */}
-          <MaterialRenderer
-            className="material-renderer-svg"
+          {/* 画布外壳 — 投影 + 标尺 */}
+          <div
+            ref={svgContainerRef}
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
+              position: 'relative',
               width: canvasW,
               height: canvasH,
+              flexShrink: 0,
+              boxShadow: '0 2px 16px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06)',
+              borderRadius: 2,
+              overflow: 'visible',
             }}
-          />
+            onMouseDown={handleCanvasMouseDown}
+            onMouseMove={handleCanvasMouseMove}
+            onDoubleClick={handleCanvasDblClick}
+          >
+            {/* 标尺 */}
+            {showRuler && <CanvasRuler visible={showRuler} />}
+
+            {/* SVG 渲染层 — 勿加 z-index，否则会盖住后面的网格/选中框；深色/棋盘格画在画布底 rect 上 */}
+            <MaterialRenderer
+              className="material-renderer-svg"
+              workbenchBackdrop={workbenchBackdrop}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: canvasW,
+                height: canvasH,
+              }}
+            />
 
           {/* 栅格叠加层 */}
           {showGrid && <CanvasGrid showGrid={showGrid} />}
@@ -880,7 +924,46 @@ export function MaterialEditorCanvas({
               <PencilPreview points={pencilPoints} />
             </svg>
           )}
+          </div>
         </div>
+      </div>
+
+      {/* 工作台背景（仅预览）：纯白元素在默认灰底上不易分辨时可切深色/棋盘格 */}
+      <div
+        style={{
+          position: 'absolute',
+          right: 12,
+          bottom: 12,
+          zIndex: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '4px 8px',
+          borderRadius: 6,
+          background: 'rgba(255,255,255,0.92)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+          fontSize: 12,
+          color: '#333',
+        }}
+      >
+        <span style={{ whiteSpace: 'nowrap', userSelect: 'none' }}>工作台背景</span>
+        <select
+          aria-label="工作台背景"
+          value={workbenchBackdrop}
+          onChange={(e) => setWorkbenchBackdrop(e.target.value as WorkbenchBackdrop)}
+          style={{
+            fontSize: 12,
+            maxWidth: 120,
+            borderRadius: 4,
+            border: '1px solid #ccc',
+            padding: '2px 4px',
+            background: '#fff',
+          }}
+        >
+          <option value="default">默认（跟画布）</option>
+          <option value="dark">深色衬底</option>
+          <option value="checker">棋盘格</option>
+        </select>
       </div>
     </div>
   );

@@ -63,6 +63,11 @@ export interface UpdateObjectOp {
   params: {
     objectId: string;
     props: Partial<MaterialObject>;
+    /**
+     * 为 true 时允许修改「组件默认框」的位置与尺寸（仅服务端修复脚本等应使用；
+     * 普通编辑器 UI 不应传，避免破坏参考框语义）。
+     */
+    allowDefaultGeometry?: boolean;
   };
 }
 

@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import type { DomainToolParams } from './domainToolParams.js';
 import * as api from '../../api-client.js';
 
 interface DesignScreen { id: string; name: string; backgroundColor?: string; }
@@ -15,7 +16,7 @@ export function registerQueryTools(server: McpServer): void {
     project_info: {
       description: '获取设计项目的基本信息（名称、平台、屏幕列表、视口、资产数量）',
       schema: z.object({ projectId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         const prj = (await api.getProject(p.projectId)) as DesignProject;
         return { content: [{ type:'text', text: JSON.stringify({
           id: prj.id, name: prj.name, platform: prj.platform,
@@ -28,7 +29,7 @@ export function registerQueryTools(server: McpServer): void {
     screen_schema: {
       description: '获取指定屏幕的完整 Schema（组件树、样式、交互、状态）',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         const prj = (await api.getProject(p.projectId)) as DesignProject & { screens: Array<{id:string;name:string;rootNode:unknown;backgroundColor?:string}> };
         const scr = prj.screens.find(s => s.id === p.screenId);
         if (!scr) return { content: [{ type:'text', text: `屏幕 ${p.screenId} 不存在`, isError:true as const }] };
@@ -38,7 +39,7 @@ export function registerQueryTools(server: McpServer): void {
     list_screens: {
       description: '列出项目的所有屏幕（ID、名称）',
       schema: z.object({ projectId: z.string() }),
-      handler: async (p) => {
+      handler: async (p: DomainToolParams) => {
         const prj = (await api.getProject(p.projectId)) as DesignProject;
         return { content: [{ type:'text', text: JSON.stringify(prj.screens.map(s=>({id:s.id,name:s.name})), null, 2) }] };
       },

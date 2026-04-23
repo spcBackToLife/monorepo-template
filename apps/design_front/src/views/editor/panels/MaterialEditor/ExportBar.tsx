@@ -22,7 +22,7 @@ import {
   CodeOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
-import { useMaterialEditor } from '@globallink/material-engine';
+import { useMaterialEditor, prepareMaterialSvgCloneForExport } from '@globallink/material-engine';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { API_BASE } from '@/api/client';
@@ -64,6 +64,7 @@ function exportCroppedSvg(
   referenceFrame: { enabled: boolean; width: number; height: number },
   canvasWidth: number,
   canvasHeight: number,
+  schemaBackgroundColor: string | undefined,
 ): string | null {
   const svgEl = getSvgElement();
   if (!svgEl) return null;
@@ -84,6 +85,8 @@ function exportCroppedSvg(
   clone.style.cssText = '';
   clone.removeAttribute('style');
 
+  prepareMaterialSvgCloneForExport(clone, schemaBackgroundColor);
+
   return new XMLSerializer().serializeToString(clone);
 }
 
@@ -95,9 +98,10 @@ async function croppedSvgToPngDataUrl(
   referenceFrame: { enabled: boolean; width: number; height: number },
   canvasWidth: number,
   canvasHeight: number,
+  schemaBackgroundColor: string | undefined,
   multiplier: number = 2,
 ): Promise<string | null> {
-  const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
+  const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor);
   if (!svgString) return null;
 
   const width = referenceFrame.enabled ? referenceFrame.width : canvasWidth;
@@ -145,7 +149,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
   const { message } = AntdApp.useApp();
   const { state } = useMaterialEditor();
   const { project } = state;
-  const { referenceFrame, canvasWidth, canvasHeight } = project;
+  const { referenceFrame, canvasWidth, canvasHeight, backgroundColor: schemaBackgroundColor } = project;
   const [applying, setApplying] = useState(false);
 
   // 解析 cssTarget → 决定导出策略
@@ -171,7 +175,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
       if (isPropTarget) {
         // ── Props 目标（如 img.src、组件的 image props）→ 导出 PNG ──
         const propKey = effectiveCssTarget.replace('props.', '');
-        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, 2);
+        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor, 2);
         if (!dataUrl) { message.error('PNG 导出失败'); return; }
 
         if (materialProjectId) {
@@ -196,7 +200,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
       } else if (effectiveCssTarget.startsWith('::') && effectiveCssTarget.includes('.background')) {
         // ── 伪元素目标（::before / ::after）→ 导出 SVG，提示用户需手动处理 ──
         // 注：CSS 伪元素无法通过 JS 直接操作，需通过 CSS 变量 / class 间接实现
-        const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
+        const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor);
         if (!svgString) { message.error('SVG 导出失败'); return; }
 
         // 暂时将 SVG 存为 CSS 变量，后续渲染器可读取
@@ -229,7 +233,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
 
       } else {
         // ── CSS 属性目标（background-image / border-image / mask-image）──
-        const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
+        const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor);
         if (!svgString) { message.error('SVG 导出失败'); return; }
 
         // 将 CSS 属性名转为 camelCase（用于 JS styles 对象）
@@ -238,7 +242,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
         // 根据不同 CSS 属性决定附加样式
         const additionalStyles: Record<string, string> = {};
         if (effectiveCssTarget === 'background-image') {
-          // contain：整图落在盒内，避免 cover + 白底 SVG 与内容裁切后只剩一条线
+          // contain：整图落在盒内（不对节点尺寸做启发式改写，便于真实测设计器行为）
           additionalStyles.backgroundSize = 'contain';
           additionalStyles.backgroundColor = 'transparent';
           additionalStyles.backgroundRepeat = 'no-repeat';
@@ -324,12 +328,12 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
     } finally {
       setApplying(false);
     }
-  }, [targetNodeId, materialProjectId, referenceFrame, canvasWidth, canvasHeight, message, effectiveCssTarget, isPropTarget]);
+  }, [targetNodeId, materialProjectId, referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor, message, effectiveCssTarget, isPropTarget]);
 
   // 保存为项目素材
   const handleSaveAsMaterial = useCallback(async () => {
     try {
-      const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, 2);
+      const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor, 2);
       if (!dataUrl) return;
 
       const blob = await dataUrlToBlob(dataUrl);
@@ -361,16 +365,16 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
     } catch {
       message.error('保存为项目素材失败');
     }
-  }, [message, materialProjectId, referenceFrame, canvasWidth, canvasHeight]);
+  }, [message, materialProjectId, referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor]);
 
   // 导出 SVG（裁剪参考框区域）
   const handleExportSVG = useCallback(() => {
-    const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
+    const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor);
     if (!svgString) return;
     const blob = new Blob([svgString], { type: 'image/svg+xml' });
     downloadBlob(blob, 'material.svg');
     message.success('SVG 已导出');
-  }, [message, referenceFrame, canvasWidth, canvasHeight]);
+  }, [message, referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor]);
 
   // 导出 PNG 菜单（裁剪参考框区域）
   const pngMenuItems = [
@@ -378,7 +382,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
       key: '1x',
       label: 'PNG (1x)',
       onClick: async () => {
-        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, 1);
+        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor, 1);
         if (dataUrl) { downloadDataURL(dataUrl, 'material.png'); message.success('PNG (1x) 已导出'); }
       },
     },
@@ -386,7 +390,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
       key: '2x',
       label: 'PNG (2x) — 推荐',
       onClick: async () => {
-        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, 2);
+        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor, 2);
         if (dataUrl) { downloadDataURL(dataUrl, 'material@2x.png'); message.success('PNG (2x) 已导出'); }
       },
     },
@@ -394,7 +398,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
       key: '3x',
       label: 'PNG (3x)',
       onClick: async () => {
-        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, 3);
+        const dataUrl = await croppedSvgToPngDataUrl(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor, 3);
         if (dataUrl) { downloadDataURL(dataUrl, 'material@3x.png'); message.success('PNG (3x) 已导出'); }
       },
     },
@@ -402,7 +406,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
 
   // 复制 CSS（裁剪参考框区域）
   const handleCopyCSS = useCallback(async () => {
-    const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight);
+    const svgString = exportCroppedSvg(referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor);
     if (!svgString) return;
 
     const cssLines: string[] = [];
@@ -412,7 +416,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
 
     await navigator.clipboard.writeText(cssLines.join('\n'));
     message.success('CSS 代码已复制到剪贴板');
-  }, [message, referenceFrame, canvasWidth, canvasHeight]);
+  }, [message, referenceFrame, canvasWidth, canvasHeight, schemaBackgroundColor]);
 
   return (
     <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50">
