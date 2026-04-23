@@ -52,7 +52,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         seq           INTEGER NOT NULL,
         operation     JSONB NOT NULL,
         fingerprint   VARCHAR(100),
-        author        VARCHAR(10) DEFAULT 'user',
+        author        VARCHAR(128) DEFAULT 'user',
         author_id     VARCHAR(100),
         created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(project_id, seq)
@@ -196,7 +196,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         seq           INTEGER NOT NULL,
         operation     JSONB NOT NULL,
         fingerprint   VARCHAR(100),
-        author        VARCHAR(10) DEFAULT 'user',
+        author        VARCHAR(128) DEFAULT 'user',
         author_id     VARCHAR(100),
         created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(material_id, seq)
@@ -209,6 +209,35 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     await this.pool.query(`
       CREATE INDEX IF NOT EXISTS idx_mat_ops_project
         ON material_operations(project_id);
+    `);
+
+    // Migrate: widen author (scripts/MCP may use labels longer than legacy VARCHAR(10))
+    await this.pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns c
+          WHERE c.table_schema = current_schema()
+            AND c.table_name = 'design_operations'
+            AND c.column_name = 'author'
+            AND c.data_type = 'character varying'
+            AND c.character_maximum_length IS NOT NULL
+            AND c.character_maximum_length < 128
+        ) THEN
+          ALTER TABLE design_operations ALTER COLUMN author TYPE VARCHAR(128);
+        END IF;
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns c
+          WHERE c.table_schema = current_schema()
+            AND c.table_name = 'material_operations'
+            AND c.column_name = 'author'
+            AND c.data_type = 'character varying'
+            AND c.character_maximum_length IS NOT NULL
+            AND c.character_maximum_length < 128
+        ) THEN
+          ALTER TABLE material_operations ALTER COLUMN author TYPE VARCHAR(128);
+        END IF;
+      END $$;
     `);
 
     // ===== 素材快照表（与 design_snapshots 同构） =====

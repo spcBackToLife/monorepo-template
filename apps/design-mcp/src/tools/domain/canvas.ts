@@ -304,7 +304,10 @@ export function registerCanvasTools(server: McpServer): void {
       handler: async (p: DomainToolParams) => ({ content: [{ type:'text', text: JSON.stringify(await api.getMaterialSchema(p.projectId, p.materialId), null, 2) }] }),
     },
     get_canvas_info: {
-      description: '获取画布坐标信息摘要（referenceFrameX/Y 用于 add_object 的 x/y）。操作画布前必须调用。',
+      description:
+        '获取画布坐标信息摘要。操作画布前建议调用。\n\n' +
+        '⭐ 坐标系（canvas 工具 add_object / update_object）：x/y 为**参考框内局部坐标** [0, referenceFrame 宽)×[0, 高)，工具会自动加大画布偏移。\n' +
+        '⚠️ get_schema 里对象的 x/y 是**前端大画布坐标**，勿直接当上述局部坐标传入，否则条会飞到参考框外；需先减 referenceFrameX/Y（与本返回字段一致）再传。',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
       handler: async (p: DomainToolParams) => {
         const s = await api.getMaterialSchema(p.projectId, p.materialId) as Record<string, unknown>;
@@ -441,8 +444,9 @@ export function registerCanvasTools(server: McpServer): void {
       description: [
         '更新对象属性（位置/尺寸/填充/描边等）。',
         '',
-        '✅ x/y/left/top 等坐标属性使用**局部坐标**（0 ~ canvasWidth, 0 ~ canvasHeight），MCP 内部自动转换。',
-        '与 add_object 坐标规则一致：参考框内局部坐标 → 自动加偏移为前端画布坐标。',
+        '✅ x/y/left/top 为**参考框内局部坐标**（0～referenceFrame 宽高），MCP 内自动加大画布偏移。',
+        '⚠️ 勿把 get_schema 里读到的对象 x/y（大画布坐标）原样传入，否则会画出参考框。',
+        '几何上 MCP 无「不能画 2px 宽」的限制；过粗/错位多为坐标系用错或数值取整。',
       ].join('\n'),
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),updates:z.record(z.string(),z.unknown()) }),
       handler: async (p: DomainToolParams)=>{
@@ -485,7 +489,7 @@ export function registerCanvasTools(server: McpServer): void {
             if(ux < 0) issues.push(`左边界溢出：x=${ux} < 0`);
             if(uy < 0) issues.push(`上边界溢出：y=${uy} < 0`);
             if(or > rw) issues.push(`右边界溢出：x+width=${or} > 参考框宽${rw}`);
-            if(ob > uh && ob > rh) issues.push(`下边界溢出：y+height=${ob} > 参考框高${rh}`);
+            if(ob > rh) issues.push(`下边界溢出：y+height=${ob} > 参考框高${rh}`);
             boundsError = `对象超出参考框(${rw}×${rh})！${issues.join('；')}`;
           } else {
             inBounds = true;
