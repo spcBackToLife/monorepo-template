@@ -485,6 +485,13 @@ export function MaterialEditorCanvas({
 
   const handleCanvasMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // [DIAG]
+      console.log('[DIAG] CanvasContainer.divMouseDown', {
+        target: (e.target as HTMLElement)?.tagName,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        button: e.button,
+      });
       e.stopPropagation();
 
       // --- 中键平移 ---

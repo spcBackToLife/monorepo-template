@@ -59,6 +59,17 @@ export const ObjectRenderer = memo(function ObjectRenderer({
   const handleMouseDown = useCallback(
     (e: MouseEvent) => {
       const isDefault = defaultElementId != null && obj.id === defaultElementId;
+      // [DIAG]
+      if (obj.name === '组件默认框' || obj.id?.startsWith('default_')) {
+        console.log('[DIAG] ObjectRenderer.mousedown', {
+          objId: obj.id,
+          objName: obj.name,
+          objLocked: obj.locked,
+          defaultElementId,
+          isDefault,
+          willPassThrough: obj.locked && !isDefault,
+        });
+      }
       if (obj.locked && !isDefault) return;
       onMouseDown?.(e, obj);
     },
@@ -84,9 +95,56 @@ export const ObjectRenderer = memo(function ObjectRenderer({
     : undefined;
 
   const isDefaultSlot = defaultElementId != null && obj.id === defaultElementId;
+
+  /** 
+   * 默认框（组件默认元素）必须始终可交互。
+   * 
+   * 关键发现：默认框数据中 visible=false → getObjectStyle() 会设置 display:none
+   *   → 整个 <g> 从 DOM 渲染和事件命中中移除，pointerEvents/all/fill 都无效！
+   *   必须显式覆盖 display:none
+   */
+  const defaultStyle: React.CSSProperties = isDefaultSlot
+    ? { ...style, pointerEvents: 'all', cursor: 'default', display: undefined }
+    : style;
+
+  /**
+   * 默认框填充策略：
+   * - 始终用 rgba(0,0,0,0.001) 替代原始 fill（如 #ffffff）
+   * - 原因：原始白色填充在深色/棋盘格背景上会显示为白色实心方块，遮挡其他元素
+   * - 0.001 不透明度：人眼不可见，但 SVG 命中测试能识别（物理存在）
+   */
+  const HIT_FILL = 'rgba(0,0,0,0.001)';
+  const effectiveFill = isDefaultSlot ? HIT_FILL : fill;
+
+  // [DIAG] 打印默认框完整渲染参数
+  if (isDefaultSlot) {
+    console.log('[DIAG] ObjectRenderer.render/defaultSlot', {
+      id: obj.id,
+      name: obj.name,
+      type: obj.type,
+      x: obj.x,
+      y: obj.y,
+      width: obj.width,
+      height: obj.height,
+      rotation: obj.rotation,
+      scaleX: obj.scaleX,
+      scaleY: obj.scaleY,
+      fill: obj.fill,
+      stroke: obj.stroke,
+      strokeWidth: obj.strokeWidth,
+      opacity: obj.opacity,
+      visible: obj.visible,
+      locked: obj.locked,
+      computedFill: fill,
+      effectiveFill,
+      transform: getTransform(obj),
+      pointerEvents: defaultStyle.pointerEvents,
+    });
+  }
+
   const commonGroupProps = {
     transform,
-    style,
+    style: defaultStyle,
     filter,
     'data-object-id': obj.id,
     'data-object-type': obj.type,
@@ -97,7 +155,7 @@ export const ObjectRenderer = memo(function ObjectRenderer({
   };
 
   const commonShapeProps = {
-    fill,
+    fill: effectiveFill,
     stroke,
     strokeWidth: obj.strokeWidth || undefined,
   };

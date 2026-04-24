@@ -87,6 +87,15 @@ export function MaterialRenderer({
   // 点击空白区域 → 取消选中
   const handleCanvasMouseDown = useCallback(
     (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // [DIAG]
+      console.log('[DIAG] MaterialRenderer.svgMouseDown', {
+        targetTag: target.tagName,
+        targetDataset: target.dataset,
+        targetClass: target.className,
+        objectId: target.closest('[data-object-id]')?.getAttribute('data-object-id'),
+        isCanvasBg: target.dataset.canvasBg === 'true',
+      });
       // 仅当直接点击 SVG 背景时
       if ((e.target as SVGElement).dataset.canvasBg === 'true') {
         setSelected([]);
@@ -152,7 +161,7 @@ export function MaterialRenderer({
 
       {/* 参考框边界由 CanvasGrid 叠加层负责绘制 */}
 
-      {/* 对象层（从底到顶） */}
+      {/* 对象层 */}
       {objects.map((obj) => (
         <ObjectRenderer
           key={obj.id}
