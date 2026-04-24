@@ -333,21 +333,27 @@ export function registerCanvasTools(server: McpServer): void {
     get_canvas_info: {
       description:
         '获取画布坐标信息摘要。操作画布前建议调用。\n\n' +
-        '⭐ 坐标系（canvas 工具 add_object / update_object）：x/y 为**参考框内局部坐标** [0, referenceFrame 宽)×[0, 高)，工具会自动加大画布偏移。\n' +
-        '⚠️ get_schema 里对象的 x/y 是**前端大画布坐标**，勿直接当上述局部坐标传入，否则条会飞到参考框外；需先减 referenceFrameX/Y（与本返回字段一致）再传。',
+        '⭐ 坐标系（统一画布绝对坐标）：\n' +
+        '  - canvasWidth × canvasHeight = 画布尺寸\n' +
+        '  - referenceFrameX/Y = 参考框左上角在画布中的位置（画布绝对坐标）\n' +
+        '  - add_object / update_object / draw_arcs 等的 x/y 直接使用画布绝对坐标，无隐式转换\n' +
+        '  - 要在参考框内绘制：x ≥ referenceFrameX, y ≥ referenceFrameY',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
       handler: async (p: DomainToolParams) => {
         const s = await api.getMaterialSchema(p.projectId, p.materialId) as Record<string, unknown>;
         const bw = (s.canvasWidth as number)??600, bh = (s.canvasHeight as number)??400;
         const rf = s.referenceFrame as {enabled?:boolean;width?:number;height?:number}|undefined;
         const rw = rf?.width??bw, rh = rf?.height??bh;
-        const P=400; const fw=Math.max(1200,rw+P*2); const fh=Math.max(900,rh+P*2);
+
+        // 参考框居中偏移（与后端 createMaterialProject 一致）
+        const rfx = Math.round((bw - rw) / 2);
+        const rfy = Math.round((bh - rh) / 2);
+
         return { content: [{ type:'text', text: JSON.stringify({
-          backendCanvasWidth:bw, backendCanvasHeight:bh,
-          frontendCanvasWidth:fw, frontendCanvasHeight:fh,
+          canvasWidth: bw, canvasHeight: bh,
           referenceFrameWidth:rw, referenceFrameHeight:rh,
           referenceFrameEnabled:rf?.enabled??true,
-          referenceFrameX:(fw-rw)/2, referenceFrameY:(fh-rh)/2,
+          referenceFrameX:rfx, referenceFrameY:rfy,
           backgroundColor:s.backgroundColor??'#ffffff',
           objectCount:((s.objects as unknown[])??[]).length,
           defaultElementId:s.defaultElementId??null,
@@ -377,8 +383,8 @@ export function registerCanvasTools(server: McpServer): void {
       description: [
         '在画布上添加对象(rect/ellipse/polygon/star/path/line/textbox/image)。通用工具：传 type 与几何/样式字段即可，不包含任何固定图案说明。',
         '',
-        '坐标：x/y 为**参考框内局部坐标**（原点参考框左上角，范围 0～referenceFrame 宽高）；服务端会加上大画布上的参考框偏移。',
-        '操作前可先 `get_canvas_info` 读取 referenceFrame 与画布尺寸。',
+        '坐标：x/y 为**画布绝对坐标**，存什么就是什么，无隐式转换。',
+        '操作前应先 `get_canvas_info` 获取 referenceFrameX/Y，再计算目标位置（如要在参考框内绘制：x = referenceFrameX + localX）。',
         '',
         '常用字段：rect 用 width/height/rx/ry/fill；line 用 x1/y1/x2/y2；path 用 pathData；image 用 src。',
         '推荐 stroke 色: #1a3ab4 #32c896 #333333 #d4389a',
@@ -411,47 +417,9 @@ export function registerCanvasTools(server: McpServer): void {
         const { projectId: _a, materialId: _b, ...opRest } = rp;
         const op = opRest as Record<string, unknown>;
 
-        // ── 获取参考框尺寸和位置用于坐标转换 + 边界校验 ──
-        const schema = await api.getMaterialSchema(projectId,materialId) as Record<string,unknown>;
-        const bw = (schema.canvasWidth as number)??600;
-        const bh = (schema.canvasHeight as number)??400;
-        const rf = schema.referenceFrame as {width?:number;height?:number}|undefined;
-        const rw = rf?.width??bw, rh = rf?.height??bh;
-
-        // 计算参考框在画布中的位置（与 createMaterialProject / get_canvas_info 完全一致）
-        const P = 400;
-        const fw = Math.max(1200, rw + P*2), fh = Math.max(900, rh + P*2);
-        const rfx = (fw - rw)/2, rfy = (fh - rh)/2;
-
-        // 记录原始局部坐标（用于校验）——MCP 接口使用 [0,rw)×[0,rh) 局部坐标系
-        const localX = Number(op.x ?? 0);
-        const localY = Number(op.y ?? 0);
-        const localW = Number(op.width ?? 0);
-        const localH = Number(op.height ?? 0);
-
-        // 坐标转换：局部坐标 [0,rw)×[0,rh) → 画布绝对坐标
-        // 前端 ObjectRenderer 用 translate(x,y) 直接渲染，所以必须存画布绝对坐标
-        const adjustedOp: Record<string, unknown> = { ...op };
-        if(adjustedOp.x != null) adjustedOp.x = Number(adjustedOp.x) + rfx;
-        if(adjustedOp.y != null) adjustedOp.y = Number(adjustedOp.y) + rfy;
-
-        const apiResult = await api.executeMaterialOperation(projectId,materialId,{type:'me:addObject',params:{object:adjustedOp}});
-
-        // ── 位置校验：对象是否在参考框内 ──
-        const objRight = localX + localW;
-        const objBottom = localY + localH;
-        let inBounds = true;
-        let boundsError: string | undefined;
-
-        if(localX < 0 || localY < 0 || objRight > rw || objBottom > rh){
-          inBounds = false;
-          const issues:string[] = [];
-          if(localX < 0) issues.push(`左边界溢出：x=${localX} < 0`);
-          if(localY < 0) issues.push(`上边界溢出：y=${localY} < 0`);
-          if(objRight > rw) issues.push(`右边界溢出：x+width=${objRight} > 参考框宽${rw}`);
-          if(objBottom > rh) issues.push(`下边界溢出：y+height=${objBottom} > 参考框高${rh}`);
-          boundsError = `对象超出参考框(${rw}×${rh})！${issues.join('；')}。建议调整 x/y/width/height 使其在 [0,0] ~ [${rw},${rh}] 范围内。`;
-        }
+        // ★ 方案 A：存什么就是什么，无隐式坐标转换
+        // 调用者负责传入画布绝对坐标（可通过 get_canvas_info 获取 referenceFrameX/Y）
+        const apiResult = await api.executeMaterialOperation(projectId,materialId,{type:'me:addObject',params:{object:op}});
 
         const apiExtra =
           typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
@@ -462,13 +430,8 @@ export function registerCanvasTools(server: McpServer): void {
             type:'text',
             text:JSON.stringify({
               ...apiExtra,
-              inBounds,
-              ...(boundsError ? { error: boundsError } : {}),
-              _position:{
-                local:{x:localX, y:localY, width:localW, height:localH},
-                referenceFrame:{ width:rw, height:rh },
-                stored:{x:adjustedOp.x, y:adjustedOp.y},
-              },
+              _stored:{ x: op.x, y: op.y, width: op.width, height: op.height },
+              _note: '坐标为画布绝对坐标，存什么就是什么',
             },null,2),
           }],
         };
@@ -478,7 +441,7 @@ export function registerCanvasTools(server: McpServer): void {
       description: [
         '添加「沿圆的可变线宽 + 弧上色标」对象（type=profiledStroke）。',
         '采样算法与前端 ObjectRenderer、本工具 export_and_apply 共用 `@globallink/material-operations` 的 `sampleProfiledStrokeCircle`。',
-        'x/y/width/height 为参考框内局部坐标，规则与 add_object 一致。',
+        'x/y/width/height 为**画布绝对坐标**，存什么就是什么，无隐式转换。',
       ].join('\n'),
       schema: z.object({
         projectId: z.string(),
@@ -499,30 +462,15 @@ export function registerCanvasTools(server: McpServer): void {
         const rp = raw as Record<string, unknown>;
         const projectId = String(rp.projectId ?? '');
         const materialId = String(rp.materialId ?? '');
-        const schema = (await api.getMaterialSchema(projectId, materialId)) as Record<string, unknown>;
-        const bw = (schema.canvasWidth as number) ?? 600;
-        const bh = (schema.canvasHeight as number) ?? 400;
-        const rf = schema.referenceFrame as { width?: number; height?: number } | undefined;
-        const rw = rf?.width ?? bw;
-        const rh = rf?.height ?? bh;
-        const P = 400;
-        const fw = Math.max(1200, rw + P * 2);
-        const fh = Math.max(900, rh + P * 2);
-        const rfx = (fw - rw) / 2;
-        const rfy = (fh - rh) / 2;
 
-        const localX = Number(rp.x ?? 0);
-        const localY = Number(rp.y ?? 0);
-        const localW = Number(rp.width ?? 220);
-        const localH = Number(rp.height ?? 220);
-
+        // ★ 方案 A：存什么就是什么，无隐式坐标转换
         const object: Record<string, unknown> = {
           type: 'profiledStroke',
           name: (rp.name as string) ?? '渐变光环',
-          x: localX + rfx,
-          y: localY + rfy,
-          width: localW,
-          height: localH,
+          x: Number(rp.x ?? 0),
+          y: Number(rp.y ?? 0),
+          width: Number(rp.width ?? 220),
+          height: Number(rp.height ?? 220),
           rotation: 0,
           scaleX: 1,
           scaleY: 1,
@@ -547,14 +495,6 @@ export function registerCanvasTools(server: McpServer): void {
           params: { object },
         });
 
-        const objRight = localX + localW;
-        const objBottom = localY + localH;
-        let inBounds = true;
-        let boundsError: string | undefined;
-        if (localX < 0 || localY < 0 || objRight > rw || objBottom > rh) {
-          inBounds = false;
-          boundsError = `对象超出参考框(${rw}×${rh})`;
-        }
         const apiExtra =
           typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
             ? (apiResult as Record<string, unknown>)
@@ -563,11 +503,10 @@ export function registerCanvasTools(server: McpServer): void {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                { ...apiExtra, inBounds, ...(boundsError ? { error: boundsError } : {}) },
-                null,
-                2,
-              ),
+              text: JSON.stringify({
+                ...apiExtra,
+                _stored: { x: object.x, y: object.y, width: object.width, height: object.height },
+              }, null, 2),
             },
           ],
         };
@@ -582,72 +521,18 @@ export function registerCanvasTools(server: McpServer): void {
       description: [
         '更新对象属性（位置/尺寸/填充/描边等）。',
         '',
-        '✅ x/y/left/top 为**参考框内局部坐标**（0～referenceFrame 宽高），MCP 内自动加大画布偏移。',
-        '⚠️ 勿把 get_schema 里读到的对象 x/y（大画布坐标）原样传入，否则会画出参考框。',
-        '几何上 MCP 无「不能画 2px 宽」的限制；过粗/错位多为坐标系用错或数值取整。',
+        '✅ x/y/left/top 为**画布绝对坐标**，存什么就是什么，无隐式转换。',
+        '⚠️ 如需在参考框内移动，先通过 get_canvas_info 获取 referenceFrameX/Y 再计算目标位置。',
       ].join('\n'),
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),updates:z.record(z.string(),z.unknown()) }),
       handler: async (p: DomainToolParams)=>{
-        // ⚠️ 同样需要坐标转换
-        const schema = await api.getMaterialSchema(p.projectId,p.materialId) as Record<string,unknown>;
-        const bw = (schema.canvasWidth as number)??600;
-        const bh = (schema.canvasHeight as number)??400;
-        const rf = schema.referenceFrame as {width?:number;height?:number}|undefined;
-        const rw = rf?.width??bw, rh = rf?.height??bh;
-        const P = 400;
-        const fw = Math.max(1200,rw + P*2), fh = Math.max(900,rh + P*2);
-        const rfx = (fw - rw)/2, rfy = (fh - rh)/2;
-
-        const adjustedUpdates = { ...p.updates };
-        for(const key of ['x','y','left','top']){
-          if(adjustedUpdates[key] != null) adjustedUpdates[key] = Number(adjustedUpdates[key]) + rfx;
-        }
-        // right/bottom 如果有的话也处理
-        for(const key of ['right','bottom']){
-          if(adjustedUpdates[key] != null) adjustedUpdates[key] = Number(adjustedUpdates[key]) + rfy;
-        }
-
-        const apiResult = await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:updateObject',params:{objectId:p.objectId,props:adjustedUpdates}});
-
-        // ── 位置校验：如果更新包含坐标，检查是否在参考框内 ──
-        let inBounds: boolean | undefined;
-        let boundsError: string | undefined;
-        const coordKeys = ['x','y','left','top'] as const;
-        const hasCoordUpdate = coordKeys.some(k => p.updates[k] != null);
-        if(hasCoordUpdate){
-          // 尝试从更新值或已有对象推断位置（简化版：只检查传入的坐标）
-          const ux = Number(p.updates.x ?? p.updates.left ?? 0);
-          const uy = Number(p.updates.y ?? p.updates.top ?? 0);
-          const uw = Number(p.updates.width ?? 0);
-          const uh = Number(p.updates.height ?? 0);
-          const or = ux + uw, ob = uy + uh;
-          if(ux < 0 || uy < 0 || or > rw || ob > rh){
-            inBounds = false;
-            const issues:string[] = [];
-            if(ux < 0) issues.push(`左边界溢出：x=${ux} < 0`);
-            if(uy < 0) issues.push(`上边界溢出：y=${uy} < 0`);
-            if(or > rw) issues.push(`右边界溢出：x+width=${or} > 参考框宽${rw}`);
-            if(ob > rh) issues.push(`下边界溢出：y+height=${ob} > 参考框高${rh}`);
-            boundsError = `对象超出参考框(${rw}×${rh})！${issues.join('；')}`;
-          } else {
-            inBounds = true;
-          }
-        }
-
-        const apiExtra2 =
+        // ★ 方案 A：存什么就是什么，无隐式坐标转换
+        const apiResult = await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:updateObject',params:{objectId:p.objectId,props:p.updates}});
+        const apiExtra =
           typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
             ? (apiResult as Record<string, unknown>)
             : {};
-        return {
-          content:[{
-            type:'text',
-            text:JSON.stringify({
-              ...apiExtra2,
-              ...(inBounds !== undefined ? { inBounds } : {}),
-              ...(boundsError ? { error: boundsError } : {}),
-            },null,2),
-          }],
-        };
+        return { content:[{type:'text',text:JSON.stringify({...apiExtra, _note:'坐标为画布绝对坐标'},null,2)}] };
       },
     },
     duplicate_object: {
@@ -763,7 +648,7 @@ export function registerCanvasTools(server: McpServer): void {
 
     // ── Advanced Drawing ──
     draw_arcs: {
-      description: '在参考框内绘制发散弧线装饰效果。自动计算坐标和颜色渐变。',
+      description: '在参考框内绘制发散弧线装饰效果。自动读取画布信息计算参考框位置，使用画布绝对坐标存储。',
       schema: z.object({
         projectId:z.string(),materialId:z.string(),
         count:z.number().min(2).max(30).optional(),
@@ -779,9 +664,9 @@ export function registerCanvasTools(server: McpServer): void {
         const s=await api.getMaterialSchema(projectId,materialId) as Record<string,unknown>;
         const bw=(s.canvasWidth as number)??600,bh=(s.canvasHeight as number)??400;
         const rf=s.referenceFrame as {width?:number;height?:number}|undefined;
-        const W=rf?.width??bw,H=rf?.height??bh;const P=400;
-        const cw=Math.max(1200,W+P*2),ch=Math.max(900,H+P*2);
-        const fx=(cw-W)/2,fy=(ch-H)/2;
+        const W=rf?.width??bw,H=rf?.height??bh;
+        // 计算参考框在画布中的位置 → 直接作为对象 x/y（画布绝对坐标）
+        const fx=(bw-W)/2,fy=(bh-H)/2;
         const N=count??12,o=origin??'top-left',c1=colorStart??'#1a3ab4',c2=colorEnd??'#32c896',swd=sw??1.5,a=opacity??0.85;
         const h2rgb=(h:string)=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
         const r1=h2rgb(c1),r2=h2rgb(c2);
@@ -988,11 +873,9 @@ export function registerCanvasTools(server: McpServer): void {
         const rf = schema.referenceFrame as {width?:number;height?:number}|undefined;
         const rw = rf?.width ?? cw;
         const rh = rf?.height ?? ch;
-        const P = 400;
-        const fw = Math.max(1200, rw + P*2);
-        const fh = Math.max(900, rh + P*2);
-        const rfx = (fw - rw) / 2;
-        const rfy = (fh - rh) / 2;
+        // ★ 使用实际画布尺寸计算参考框偏移（反向：存储坐标→局部坐标）
+        const rfx = (cw - rw) / 2;
+        const rfy = (ch - rh) / 2;
 
         // 导出像素尺寸 = **参考框**（与参考框裁剪一致）；应用到节点时的 background-size 见下方 styleUpdates
         const w = Math.round(rw * scale);
