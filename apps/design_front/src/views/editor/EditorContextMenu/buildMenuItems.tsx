@@ -1,8 +1,11 @@
 import type { MenuProps } from 'antd';
+import { Modal } from 'antd';
 import type { MessageInstance } from 'antd/es/message/interface';
+import { ApiError, getErrorMessage } from '@/api/client';
 import { editorStore } from '@/stores/editor';
-import { materialSlotApi, materialProjectApi, type MaterialSlotWithProject } from '@/api/materialProject';
+import { materialSlotApi, type MaterialSlotWithProject } from '@/api/materialProject';
 import { findNodeInScreens } from '@globallink/design-operations';
+import { getStyleCleanupAfterMaterialSlotRemove } from '@/views/editor/materialSlotStyleCleanup';
 import { getElementProps } from '@globallink/design-schema';
 import type { PrimitiveNodeType, ComponentNode } from '@globallink/design-schema';
 
@@ -134,39 +137,15 @@ let _cachedSlots: MaterialSlotWithProject[] = [];
 /**
  * 预加载节点的素材槽位（在右键菜单打开前调用）
  *
- * 向后兼容：如果槽位表为空，还会检查旧的 material_design_projects.target_node_id
- * 直接关联方式。若发现旧关联，自动迁移到槽位表并写入缓存，确保已有素材在右键菜单中可见。
+ * 仅拉取 `node_material_slots`，**不在此做「槽位为空 → 按旧 target_node_id 自动建槽」**：
+ * 否则用户删除所有槽位后，下一次预加载会再次为 `findAllByNode` 返回的每个素材工程批量 INSERT，
+ * 表现为「删完刷新又冒出两条背景槽」。旧数据迁移请用一次性脚本或 MCP `material_slot` 显式创建。
  */
 export async function preloadMaterialSlots(targetNodeId: string): Promise<void> {
   const projectId = editorStore.project?.id;
   if (!projectId) return;
   try {
-    let slots = await materialSlotApi.findByNode(projectId, targetNodeId);
-
-    // 向后兼容：槽位表为空时，检查旧的 target_node_id 直接关联
-    if (slots.length === 0) {
-      const legacyProjects = await materialProjectApi.findAllByNode(projectId, targetNodeId);
-      if (legacyProjects.length > 0) {
-        // 自动迁移：为每个旧关联的素材工程创建默认槽位
-        for (let i = 0; i < legacyProjects.length; i++) {
-          const lp = legacyProjects[i];
-          const slotName = i === 0 ? 'default' : `material-${i + 1}`;
-          try {
-            await materialSlotApi.create(projectId, {
-              nodeId: targetNodeId,
-              slotName,
-              materialProjectId: lp.id,
-              cssTarget: 'background-image',
-            });
-          } catch {
-            // 槽位已存在，忽略
-          }
-        }
-        // 重新查询完整的槽位数据（含素材工程联合信息）
-        slots = await materialSlotApi.findByNode(projectId, targetNodeId);
-      }
-    }
-
+    const slots = await materialSlotApi.findByNode(projectId, targetNodeId);
     _cachedSlots = slots;
     _cachedSlotsNodeId = targetNodeId;
   } catch {
@@ -200,10 +179,21 @@ export function buildEditorContextMenuItems(
   const node = findNodeInScreens(editorStore.screens, targetNodeId);
   const availableTargets = getAvailableTargets(node ?? 'div');
 
-  // 已有素材 → 用户看到 CSS 用途 + 素材名 + 尺寸，点击编辑
+  // 已有素材 → 子菜单：编辑 / 删除槽位（删除仅解绑 node_material_slots，不删素材工程）
   const existingItems: NonNullable<MenuProps['items']> = slots.map((slot) => ({
-    key: `asset:edit:${slot.id}:${slot.materialProjectId}:${slot.cssTarget}`,
+    key: `asset:slot:${slot.id}`,
     label: `${getCssTargetLabel(slot.cssTarget)} — ${slot.materialProjectName}${slot.isActive ? '' : '（未激活）'}`,
+    children: [
+      {
+        key: `asset:edit:${slot.id}:${slot.materialProjectId}:${slot.cssTarget}`,
+        label: '编辑…',
+      },
+      {
+        key: `asset:remove:${slot.id}`,
+        label: '删除素材槽',
+        danger: true,
+      },
+    ],
   }));
 
   // 已占用的 cssTarget 集合 — 避免重复创建同类型
@@ -314,6 +304,64 @@ export function handleEditorContextMenuClick(
   }
 
   // ── 素材操作 ──
+
+  if (key.startsWith('asset:remove:')) {
+    const slotId = key.slice('asset:remove:'.length);
+    const projectId = editorStore.project?.id;
+    if (!projectId) {
+      message.error('项目信息不存在');
+      return;
+    }
+    Modal.confirm({
+      title: '删除素材槽',
+      content:
+        '将移除该节点与此素材槽的绑定（不会删除素材工程本身），并同步清除该槽对应 CSS 通道上由素材应用写入的样式（含 background 简写中的首层 url）。在属性面板里仅改样式不会自动删槽。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const slotsBefore = await materialSlotApi.findByNode(projectId, targetNodeId);
+          const slot = slotsBefore.find((s) => s.id === slotId);
+          if (!slot) {
+            message.warning('槽位已不存在');
+            await preloadMaterialSlots(targetNodeId);
+            return;
+          }
+          const node = findNodeInScreens(editorStore.screens, targetNodeId);
+          const nodeStyles = { ...((node?.styles ?? {}) as Record<string, unknown>) };
+          const deleted = await materialSlotApi.remove(projectId, slotId);
+
+          const { resetProperties, updateStyles } = getStyleCleanupAfterMaterialSlotRemove(
+            slot.cssTarget,
+            nodeStyles,
+          );
+          if (resetProperties.length > 0) {
+            editorStore.execute({
+              type: 'resetStyle',
+              params: { nodeId: targetNodeId, properties: resetProperties },
+            });
+          }
+          if (updateStyles && Object.keys(updateStyles).length > 0) {
+            editorStore.execute({
+              type: 'updateStyle',
+              params: { nodeId: targetNodeId, styles: updateStyles },
+            });
+          }
+
+          message.success(
+            `已删除素材槽（${deleted.cssTarget}），并已清理节点上对应样式`,
+          );
+          await preloadMaterialSlots(targetNodeId);
+        } catch (e) {
+          message.error(
+            e instanceof ApiError ? getErrorMessage(e.body) : '删除素材槽失败',
+          );
+        }
+      },
+    });
+    return;
+  }
 
   // 编辑已有素材
   if (key.startsWith('asset:edit:')) {

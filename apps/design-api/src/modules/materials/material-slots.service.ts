@@ -229,17 +229,19 @@ export class MaterialSlotsService {
   }
 
   /**
-   * 删除槽位
+   * 删除槽位（返回被删记录，便于前端 / 网络面板确认，并在客户端联动清理节点样式）
    */
-  async remove(projectId: string, slotId: string): Promise<void> {
+  async remove(projectId: string, slotId: string): Promise<MaterialSlotRecord> {
+    const existing = await this.findById(projectId, slotId);
+    if (!existing) {
+      throw new NotFoundException('槽位不存在');
+    }
     const pool = this.db.getPool();
-    const result = await pool.query(
+    await pool.query(
       `DELETE FROM node_material_slots WHERE project_id = $1 AND id = $2`,
       [projectId, slotId],
     );
-    if (result.rowCount === 0) {
-      throw new NotFoundException('槽位不存在');
-    }
+    return existing;
   }
 
   /**

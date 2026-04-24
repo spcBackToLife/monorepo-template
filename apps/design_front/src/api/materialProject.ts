@@ -317,9 +317,9 @@ export const materialSlotApi = {
     );
   },
 
-  /** 删除槽位 */
-  async remove(projectId: string, slotId: string): Promise<void> {
-    await apiJson(`/projects/${projectId}/material-slots/${slotId}`, {
+  /** 删除槽位（响应体为被删槽位记录） */
+  async remove(projectId: string, slotId: string): Promise<MaterialSlotRecord> {
+    return apiJson<MaterialSlotRecord>(`/projects/${projectId}/material-slots/${slotId}`, {
       method: 'DELETE',
       token: token(),
     });
