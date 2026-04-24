@@ -410,22 +410,27 @@ export function registerCanvasTools(server: McpServer): void {
         const materialId = String(rp.materialId ?? '');
         const { projectId: _a, materialId: _b, ...opRest } = rp;
         const op = opRest as Record<string, unknown>;
-        // ⚠️ 坐标转换：局部坐标 → 前端画布坐标（API 要求前端画布坐标）
+
+        // ── 获取参考框尺寸和位置用于坐标转换 + 边界校验 ──
         const schema = await api.getMaterialSchema(projectId,materialId) as Record<string,unknown>;
         const bw = (schema.canvasWidth as number)??600;
         const bh = (schema.canvasHeight as number)??400;
         const rf = schema.referenceFrame as {width?:number;height?:number}|undefined;
         const rw = rf?.width??bw, rh = rf?.height??bh;
+
+        // 计算参考框在画布中的位置（与 createMaterialProject / get_canvas_info 完全一致）
         const P = 400;
-        const fw = Math.max(1200,rw + P*2), fh = Math.max(900,rh + P*2);
+        const fw = Math.max(1200, rw + P*2), fh = Math.max(900, rh + P*2);
         const rfx = (fw - rw)/2, rfy = (fh - rh)/2;
 
-        // 记录原始局部坐标（用于校验）
+        // 记录原始局部坐标（用于校验）——MCP 接口使用 [0,rw)×[0,rh) 局部坐标系
         const localX = Number(op.x ?? 0);
         const localY = Number(op.y ?? 0);
         const localW = Number(op.width ?? 0);
         const localH = Number(op.height ?? 0);
 
+        // 坐标转换：局部坐标 [0,rw)×[0,rh) → 画布绝对坐标
+        // 前端 ObjectRenderer 用 translate(x,y) 直接渲染，所以必须存画布绝对坐标
         const adjustedOp: Record<string, unknown> = { ...op };
         if(adjustedOp.x != null) adjustedOp.x = Number(adjustedOp.x) + rfx;
         if(adjustedOp.y != null) adjustedOp.y = Number(adjustedOp.y) + rfy;
@@ -462,7 +467,7 @@ export function registerCanvasTools(server: McpServer): void {
               _position:{
                 local:{x:localX, y:localY, width:localW, height:localH},
                 referenceFrame:{ width:rw, height:rh },
-                converted:{x:adjustedOp.x, y:adjustedOp.y},
+                stored:{x:adjustedOp.x, y:adjustedOp.y},
               },
             },null,2),
           }],

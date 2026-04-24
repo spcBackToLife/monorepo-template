@@ -10,40 +10,58 @@ provider:
 
 ## 核心架构（必须理解）
 
-### 1. 前后端双画布体系
+### 1. 只有一套画布坐标系（2026-04-24 修正）
 
-素材编辑器存在**两套画布**，这是最大的心智负担来源：
+**后端和前端共用同一套画布坐标系。不存在"双画布"。**
 
-| | 后端画布（API/数据库） | 前端画布（SVG 渲染器） |
-|---|---|---|
-| **尺寸** | 组件原始尺寸（如 192×152） | 自动放大：`max(1200, W+800) × max(900, H+800)` |
-| **默认框位置** | 无默认框（后端不创建） | 默认框居中：`x = (cw-W)/2, y = (ch-H)/2` |
-| **对象坐标** | 直接存储 | 通过 `<g transform="translate(x,y)">` 渲染 |
+| 字段 | 典型值 | 含义 |
+|------|--------|------|
+| `canvasWidth` × `canvasHeight` | **1200 × 900** | 画布尺寸（固定） |
+| `referenceFrame` | `{x:576, y:426, w:48, h:48}` | 参考框在画布中居中 |
+| 对象存储坐标 `(x,y)` | 如 `(576, 426)` | **画布绝对坐标** |
 
-**关键公式：**
+### 参考框位置计算公式（与 createMaterialProject 一致）
+
 ```
-前端画布宽度 cw = max(1200, componentWidth + 800)
-前端画布高度 ch = max(900, componentHeight + 800)
-默认框 x = (cw - componentWidth) / 2
-默认框 y = (ch - componentHeight) / 2
+P = 400 （内边距常量）
+fw = max(1200, referenceFrameWidth + P×2)   → 通常 = 1200
+fh = max(900, referenceFrameHeight + P×2)    → 通常 = 900
+rfx = (fw - referenceFrameWidth) / 2          → 如 (1200-48)/2 = 576
+rfy = (fh - referenceFrameHeight) / 2         → 如 (900-48)/2 = 426
 ```
 
-### 2. MCP 添加对象时的坐标规则
+### 2. MCP 接口坐标转换规则
 
-通过 MCP `me_add_object` 添加的对象，坐标是**前端画布坐标系**（因为 SyncBridge 会将后端操作 execute 到前端 Context）。
+**MCP 对外暴露"参考框内局部坐标" `[0, rw) × [0, rh)`，内部自动转换为画布绝对坐标存储。**
 
-**要让对象出现在参考框（默认框）内部：**
-- 对象的 `x` 和 `y` 应设置为默认框的位置
-- `pathData` 中的坐标是**相对于对象自身 (x,y) 的局部坐标**，范围 `0 ~ width` / `0 ~ height`
-
-**示例：在 192×152 的组件中画一条从左下到右上的弧线**
 ```
-x = 504 (默认框 x)
-y = 400 (默认框 y)
-width = 192
-height = 152
-pathData = "M 0 152 Q 96 0 192 0"  // 局部坐标：左下→右上
+调用者传入: localX=0, localY=0 (参考框左上角)
+    │
+    │ add_object / update_object 内部:
+    │   storedX = localX + rfx, storedY = localY + rfy
+    ▼
+数据库存储: x=576, y=426 (画布绝对坐标)
+    │
+    ├─→ 前端 ObjectRenderer: translate(x,y) 直接渲染 ✅
+    └─→ export_and_apply: 减去 rfx/rfy → 在 rw×rh 上裁剪渲染 ✅
 ```
+
+### 各工具坐标行为一览
+
+| 工具 | 输入 | 转换 |
+|------|------|------|
+| `add_object` | 局部 `[0,rw)` | **+rfx/+rfy** 存储为画布绝对坐标 |
+| `update_object` | 局部 `[0,rw)` | **+rfx/+rfy** 存储为画布绝对坐标 |
+| `add_profiled_stroke` | 局部 `[0,rw)` | **+rfx/+rfy** 存储为画布绝对坐标 |
+| `draw_arcs` | 局部 `[0,rw)` | **+fx/+fy** 存储为画布绝对坐标 |
+| `export_and_apply` | 读数据库 | **-rfx/-rfy** 反向转换用于导出 |
+| `get_canvas_info` 返回值 | — | 返回 rfx/rfy/rw/rh 供计算用 |
+
+### ⚠️ 绝对不能去掉坐标偏移
+
+如果 `add_object` 不加 rfx/rfy 直接存局部坐标 `(0,0)`：
+- 对象在数据库是 `(0,0)` 而 default 框在 `(576,426)`
+- 前端渲染时对象飞到左上角，完全不在参考框内 ❌
 
 ### 3. 颜色选择规则
 
@@ -73,8 +91,8 @@ MCP → REST API → 后端 Executor → 数据库 + WS 广播
 
 ### ✅ 正确流程
 
-1. **先调用 `me_get_schema`** 获取当前状态（对象列表、画布尺寸、背景色）
-2. **计算默认框位置**（用上面的公式）
+1. **先调用 `me_get_canvas_info`** 获取参考框位置 (rfx, rfy) 和尺寸 (rw, rh)
+2. **用 [0,rw)×[0,rh) 局部坐标** 添加对象（MCP 工具内部自动 +rfx/+rfy）
 3. **用深色 stroke** 添加对象
 4. **用 `me_add_object`** 逐个添加（避免自写脚本循环调用）
 5. 如果需要清理，**用 `me_delete_project` 删除整个工程**，不要逐个删对象
@@ -109,12 +127,8 @@ M 0 H Q cx cy W endY  // 这是从左下到右上
 ### 画一组弧线的步骤
 
 ```
-1. me_get_schema → 获取画布信息
-2. 计算默认框位置：
-   cw = max(1200, refW + 800)
-   ch = max(900, refH + 800)
-   frameX = (cw - refW) / 2
-   frameY = (ch - refH) / 2
+1. me_get_canvas_info → 获取 rfx, rfy, rw, rh
+2. MCP 工具自动处理坐标转换（你只需用 0~rw × 0~rh 局部坐标）
 3. 选择颜色方案（深色渐变 or 匹配背景的亮色）
 4. 循环调用 me_add_object 添加每条弧线
 5. 提醒用户重新打开素材编辑器查看
