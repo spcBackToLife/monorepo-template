@@ -2,7 +2,7 @@
  * 左侧工具栏 — 严格对照 README §4.2
  *
  * 上半区：绘图工具
- *   [▲] 选择  [□] 矩形  [○] 椭圆  [△] 多边  [╱] 线段
+ *   [▲] 选择  [□] 矩形  [○] 椭圆  [◐] 沿圆场  [△] 多边  [╱] 线段
  *   [✒] 钢笔  [★] 星形  [T] 文字  [✏] 铅笔  [🖼] 图片
  *
  * 分隔线
@@ -45,6 +45,20 @@ const IconRect = () => (
 const IconEllipse = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <ellipse cx="8" cy="8" rx="6" ry="5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+  </svg>
+);
+
+/** 沿圆外观场（缺口环 + 弧上宽/色场） */
+const IconProfiledRing = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M 8 2.5 A 5.5 5.5 0 1 1 3.5 11"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      fill="none"
+      strokeLinecap="round"
+    />
+    <circle cx="8" cy="8" r="1.25" fill="currentColor" opacity="0.35" />
   </svg>
 );
 
@@ -148,6 +162,12 @@ const DRAWING_TOOLS: { key: MaterialToolType; icon: ReactNode; label: string; sh
   { key: 'select', icon: <IconSelect />, label: '选择', shortcut: 'V' },
   { key: 'rect', icon: <IconRect />, label: '矩形', shortcut: 'R' },
   { key: 'ellipse', icon: <IconEllipse />, label: '椭圆', shortcut: 'O' },
+  {
+    key: 'profiledStroke',
+    icon: <IconProfiledRing />,
+    label: '沿圆外观场 — 拖出参考框，线宽与颜色沿弧变化（语音光圈等）',
+    shortcut: 'A',
+  },
   { key: 'polygon', icon: <IconPolygon />, label: '多边形', shortcut: 'P' },
   { key: 'line', icon: <IconLine />, label: '线段', shortcut: 'L' },
   { key: 'path', icon: <IconPen />, label: '钢笔 — 单击画直线，按住拖拽画曲线', shortcut: 'C' },

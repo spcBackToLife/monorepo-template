@@ -57,7 +57,9 @@ export type MaterialObjectType =
   | 'line'
   | 'textbox'
   | 'image'
-  | 'group';
+  | 'group'
+  /** 沿路径可变线宽 + 弧上色标（当前实现：圆模板），渲染见 profiledStroke 采样 */
+  | 'profiledStroke';
 
 /** 素材对象 — 画布上的一个图形元素 */
 export interface MaterialObject {
@@ -109,6 +111,22 @@ export interface MaterialObject {
   innerRatio?: number;
   /** SVG path d 属性 */
   pathData?: string;
+
+  // ===== profiledStroke（圆模板）— 与 @globallink/material-operations/profiledStroke 采样一致 =====
+  /** 当前仅支持 circle */
+  profiledKind?: 'circle';
+  /** 12 点方向总缺口角度（度） */
+  profiledGapDegrees?: number;
+  /** 缺口两侧线宽羽化角度（度）；不传则由采样算法按 gap 自动估算 */
+  profiledGapFeatherDegrees?: number;
+  /** 采样段数 */
+  profiledSampleSegments?: number;
+  /** 沿可见弧 t∈[0,1] 的线宽锚点 */
+  profiledWidthStops?: { t: number; width: number }[];
+  /** 沿同一参数 t 的色标 */
+  profiledColorStops?: { t: number; color: string }[];
+  /** 线段端帽 */
+  profiledLineCap?: 'round' | 'butt';
   /** SVG fill-rule（布尔运算合并路径使用） */
   fillRule?: 'nonzero' | 'evenodd';
   /** line 起点 X */
@@ -390,6 +408,33 @@ export function createDefaultObject(
     textbox: { width: 200, height: 40, fill: '#333333', text: 'Text', fontSize: 16, fontFamily: 'sans-serif' },
     image: { width: 200, height: 150, fill: null, src: '' },
     group: { width: 100, height: 100, fill: null, children: [] },
+    profiledStroke: {
+      width: 220,
+      height: 220,
+      fill: null,
+      stroke: null,
+      strokeWidth: 0,
+      profiledKind: 'circle',
+      /** 顶部开口；与 sampleProfiledStrokeCircle 缺口居中于 12 点一致 */
+      profiledGapDegrees: 16,
+      profiledSampleSegments: 128,
+      /** 细线 + 底部略粗（t=0.5 为 6 点方向），近缺口两端由采样算法再平滑收细 */
+      profiledWidthStops: [
+        { t: 0, width: 0.55 },
+        { t: 0.38, width: 0.88 },
+        { t: 0.5, width: 1.45 },
+        { t: 0.62, width: 0.88 },
+        { t: 1, width: 0.48 },
+      ],
+      profiledColorStops: [
+        { t: 0, color: '#a78bfa' },
+        { t: 0.22, color: '#22d3ee' },
+        { t: 0.45, color: '#f472b6' },
+        { t: 0.72, color: '#fb923c' },
+        { t: 1, color: '#818cf8' },
+      ],
+      profiledLineCap: 'round',
+    },
   };
 
   const d = defaults[type] ?? {};

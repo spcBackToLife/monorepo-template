@@ -8,6 +8,9 @@
  *   2. 用资产 URL + materialProjectId 通过 applyMaterialDesign 写入设计节点
  *   3. 设计稿中只保存短 URL 引用，不再内联巨大的 SVG data URI
  *
+ * `cssTarget` 与槽位一致：`background-image` → 写背景；`border-image` → 写 border-image（及配套 border-*），
+ * **不在应用路径里改槽位的 cssTarget**；库表调整只做显式 migration / material_slot API。
+ *
  * 导出方式：
  *   - SVG：直接序列化 SVG DOM（裁剪参考框区域）
  *   - PNG：通过 Canvas 2D + SVG 转换（裁剪参考框区域）
@@ -152,7 +155,6 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
   const { referenceFrame, canvasWidth, canvasHeight, backgroundColor: schemaBackgroundColor } = project;
   const [applying, setApplying] = useState(false);
 
-  // 解析 cssTarget → 决定导出策略
   const effectiveCssTarget = cssTarget ?? 'background-image';
   const isPropTarget = effectiveCssTarget.startsWith('props.');
   const exportFormat = getExportFormat(effectiveCssTarget);
@@ -240,13 +242,19 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
         const cssPropCamel = effectiveCssTarget.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
         // 根据不同 CSS 属性决定附加样式
-        const additionalStyles: Record<string, string> = {};
+        const additionalStyles: Record<string, string | number> = {};
         if (effectiveCssTarget === 'background-image') {
           // contain：整图落在盒内（不对节点尺寸做启发式改写，便于真实测设计器行为）
           additionalStyles.backgroundSize = 'contain';
           additionalStyles.backgroundColor = 'transparent';
           additionalStyles.backgroundRepeat = 'no-repeat';
           additionalStyles.backgroundPosition = 'center center';
+        } else if (effectiveCssTarget === 'border-image') {
+          additionalStyles.borderWidth = 3;
+          additionalStyles.borderStyle = 'solid';
+          additionalStyles.borderColor = 'transparent';
+          additionalStyles.borderImageSlice = 1;
+          additionalStyles.borderImageRepeat = 'stretch';
         } else if (effectiveCssTarget === 'mask-image') {
           // mask-image 需要 -webkit- 前缀（Chrome/Safari）和配套尺寸属性
           additionalStyles.maskSize = 'cover';
@@ -263,6 +271,9 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
           return { WebkitMaskImage: urlValue };
         };
 
+        const clearStyleKeys =
+          effectiveCssTarget === 'border-image' ? (['border'] as const) : undefined;
+
         if (materialProjectId) {
           const blob = new Blob([svgString], { type: 'image/svg+xml' });
           const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.svg');
@@ -271,6 +282,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
             type: 'applyMaterialDesign',
             params: {
               nodeId: targetNodeId,
+              ...(clearStyleKeys ? { clearStyleKeys: [...clearStyleKeys] } : {}),
               styleUpdates: {
                 [cssPropCamel]: urlValue,
                 ...buildMaskStyles(urlValue),
@@ -309,8 +321,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
           }
         }
 
-        const targetLabel = getCssTargetLabel(effectiveCssTarget);
-        message.success(`已应用到${targetLabel}`);
+        message.success(`已应用到${getCssTargetLabel(effectiveCssTarget)}`);
 
         // 遮罩特别提示：节点需要有背景色/背景图才能看到 mask 效果
         if (effectiveCssTarget === 'mask-image') {

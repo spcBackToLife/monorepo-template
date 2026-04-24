@@ -17,6 +17,11 @@
 import { memo, useCallback, type MouseEvent } from 'react';
 import type { MaterialObject } from '@globallink/material-operations';
 import {
+  sampleProfiledStrokeCircle,
+  defaultVoiceHaloWidthStops,
+  defaultVoiceHaloColorStops,
+} from '@globallink/material-operations';
+import {
   getTransform,
   getFillValue,
   getStrokeValue,
@@ -259,6 +264,44 @@ export const ObjectRenderer = memo(function ObjectRenderer({
           ))}
         </g>
       );
+
+    case 'profiledStroke': {
+      const cap = obj.profiledLineCap ?? 'round';
+      const widthStops =
+        obj.profiledWidthStops && obj.profiledWidthStops.length > 0
+          ? obj.profiledWidthStops
+          : defaultVoiceHaloWidthStops();
+      const colorStops =
+        obj.profiledColorStops && obj.profiledColorStops.length > 0
+          ? obj.profiledColorStops
+          : defaultVoiceHaloColorStops();
+      const lines = sampleProfiledStrokeCircle({
+        width: obj.width,
+        height: obj.height,
+        gapDegrees: obj.profiledGapDegrees ?? 16,
+        gapFeatherDegrees: obj.profiledGapFeatherDegrees,
+        segments: obj.profiledSampleSegments ?? 128,
+        widthStops,
+        colorStops,
+      });
+      return (
+        <g {...commonGroupProps}>
+          {lines.map((ln, i) => (
+            <line
+              key={i}
+              x1={ln.x1}
+              y1={ln.y1}
+              x2={ln.x2}
+              y2={ln.y2}
+              stroke={ln.stroke}
+              strokeWidth={ln.strokeWidth}
+              strokeLinecap={cap}
+              fill="none"
+            />
+          ))}
+        </g>
+      );
+    }
 
     default:
       return null;

@@ -23,7 +23,7 @@ export interface MaterialApplyTarget {
 /** 通用 CSS 属性目标（所有元素都有） */
 const CSS_STYLE_TARGETS: MaterialApplyTarget[] = [
   { value: 'background-image', label: '背景', icon: '🎨', exportFormat: 'svg' },
-  { value: 'border-image', label: '边框', icon: '🔲', exportFormat: 'svg' },
+  { value: 'border-image', label: '边框图', icon: '🔲', exportFormat: 'svg' },
   { value: 'mask-image', label: '遮罩', icon: '🎭', exportFormat: 'svg' },
   { value: '::before.background', label: '前装饰 (::before)', icon: '✨', exportFormat: 'svg' },
   { value: '::after.background', label: '后装饰 (::after)', icon: '💫', exportFormat: 'svg' },
@@ -38,7 +38,7 @@ const ELEMENT_PROP_TARGETS: Record<string, MaterialApplyTarget[]> = {
  * 根据节点获取所有可用的素材应用目标。
  *
  * 优先级：元素特有 Props > 通用 CSS 属性
- * - img → [props.src, background-image, border-image, ...]
+ * - img → [props.src, background-image, mask-image, ...]
  * - div → [background-image, border-image, mask-image, ...]
  * - component:xxx → 从模板 propDefinitions 中提取 type=image 的 props + 通用 CSS
  */

@@ -1304,6 +1304,7 @@ export class OperationExecutor {
       nodeId: string;
       restoreStyles: Record<string, any>;
       removeStyleKeys: string[];
+      restoreClearedStyles?: Record<string, any>;
       restoreProps: Record<string, any>;
       removePropKeys: string[];
       restoreMaterialProjectId: string | undefined;
@@ -1330,6 +1331,9 @@ export class OperationExecutor {
       delete (node.styles as any)[key];
     }
     Object.assign(node.styles, params.restoreStyles);
+    if (params.restoreClearedStyles && Object.keys(params.restoreClearedStyles).length > 0) {
+      Object.assign(node.styles, params.restoreClearedStyles);
+    }
 
     // Restore props: remove newly added keys, then restore old values
     for (const key of params.removePropKeys) {

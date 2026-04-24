@@ -42,6 +42,7 @@ import {
   ColumnHeightOutlined,
 } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
+import { runInAction } from 'mobx';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
 import {
@@ -310,7 +311,7 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
                 nodeId: targetNodeId,
                 slotName: 'default',
                 materialProjectId: existing.id,
-                cssTarget: 'background-image',
+                cssTarget: cssTarget ?? 'background-image',
               });
             } catch {
               // 槽位已存在，忽略
@@ -353,6 +354,21 @@ const MaterialEditorModalInner = observer(function MaterialEditorModalInner({
         }
 
         if (cancelled || !mpId) return;
+
+        // 未从右键菜单传入 cssTarget 时，按「当前工程 id」在槽位表里反查，避免多槽位时误走 background 导出
+        if (!cssTarget && targetNodeId && !cancelled) {
+          try {
+            const slotsAlign = await materialSlotApi.findByNode(projectId, targetNodeId);
+            const slotForMp = slotsAlign.find((s) => s.materialProjectId === mpId);
+            if (slotForMp?.cssTarget) {
+              runInAction(() => {
+                editorStore.materialEditorCssTarget = slotForMp.cssTarget;
+              });
+            }
+          } catch {
+            // ignore
+          }
+        }
 
         materialProjectIdRef.current = mpId;
         setMaterialProjectId(mpId);
@@ -547,7 +563,7 @@ function ModalContent({
     const obj = state.project.objects.find((o) => o.id === primaryId);
     if (!obj) return null;
     const box = getOverlayBoundingBox(obj, state.project);
-    return {
+    const base = {
       type: obj.type ?? '',
       fill: typeof obj.fill === 'string' ? obj.fill : undefined,
       stroke: typeof obj.stroke === 'string' ? obj.stroke : undefined,
@@ -563,6 +579,18 @@ function ModalContent({
       rx: obj.rx,
       ry: obj.ry,
     };
+    if (obj.type === 'profiledStroke') {
+      return {
+        ...base,
+        profiledGapDegrees: obj.profiledGapDegrees,
+        profiledGapFeatherDegrees: obj.profiledGapFeatherDegrees,
+        profiledSampleSegments: obj.profiledSampleSegments,
+        profiledWidthStops: obj.profiledWidthStops,
+        profiledColorStops: obj.profiledColorStops,
+        profiledLineCap: obj.profiledLineCap,
+      };
+    }
+    return base;
   }, [selectedIds, state.project]);
 
   // ===== 拖拽逻辑 =====
@@ -646,6 +674,7 @@ function ModalContent({
           case 'v': setTool('select'); setActiveTool('select'); break;
           case 'r': setTool('rect'); setActiveTool('rect'); break;
           case 'o': setTool('ellipse'); setActiveTool('ellipse'); break;
+          case 'a': setTool('profiledStroke'); setActiveTool('profiledStroke'); break;
           case 'p': setTool('polygon'); setActiveTool('polygon'); break;
           case 'l': setTool('line'); setActiveTool('line'); break;
           case 'c': setTool('path'); setActiveTool('path'); break;
@@ -719,6 +748,32 @@ function ModalContent({
         execute({
           type: 'me:updateObject',
           params: { objectId: id, props: styleProps },
+        });
+      }
+
+      const profiledProps: Record<string, unknown> = {};
+      if (updates.profiledGapDegrees !== undefined) {
+        profiledProps.profiledGapDegrees = updates.profiledGapDegrees as number;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, 'profiledGapFeatherDegrees')) {
+        profiledProps.profiledGapFeatherDegrees = updates.profiledGapFeatherDegrees as number | undefined;
+      }
+      if (updates.profiledSampleSegments !== undefined) {
+        profiledProps.profiledSampleSegments = updates.profiledSampleSegments as number;
+      }
+      if (updates.profiledWidthStops !== undefined) {
+        profiledProps.profiledWidthStops = updates.profiledWidthStops;
+      }
+      if (updates.profiledColorStops !== undefined) {
+        profiledProps.profiledColorStops = updates.profiledColorStops;
+      }
+      if (updates.profiledLineCap !== undefined) {
+        profiledProps.profiledLineCap = updates.profiledLineCap;
+      }
+      if (Object.keys(profiledProps).length > 0) {
+        execute({
+          type: 'me:updateObject',
+          params: { objectId: id, props: profiledProps },
         });
       }
     }

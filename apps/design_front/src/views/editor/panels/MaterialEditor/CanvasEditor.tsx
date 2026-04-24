@@ -65,6 +65,7 @@ const TOOL_ITEMS: { key: MaterialToolType; icon: string; label: string }[] = [
   { key: 'hand', icon: '✋', label: '平移 (H)' },
   { key: 'rect', icon: '□', label: '矩形 (R)' },
   { key: 'ellipse', icon: '○', label: '椭圆 (O)' },
+  { key: 'profiledStroke', icon: '◎', label: '沿圆外观场 (A)' },
   { key: 'polygon', icon: '⬡', label: '多边形 (P)' },
   { key: 'star', icon: '★', label: '星形 (S)' },
   { key: 'line', icon: '╱', label: '线段 (L)' },

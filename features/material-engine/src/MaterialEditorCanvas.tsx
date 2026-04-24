@@ -17,7 +17,7 @@
  */
 import { useRef, useCallback, useState, useEffect, type WheelEvent } from 'react';
 import { useMaterialEditor, type MaterialToolType } from './context/MaterialEditorContext';
-import { generateObjectId, type MaterialObjectType } from '@globallink/material-operations';
+import { createDefaultObject, generateObjectId, type MaterialObjectType } from '@globallink/material-operations';
 import { MaterialRenderer } from './renderer/MaterialRenderer';
 import { SelectionOverlay } from './overlay/SelectionOverlay';
 import { SmartGuides } from './overlay/SmartGuides';
@@ -46,6 +46,7 @@ const TOOL_TO_OBJECT_TYPE: Partial<Record<MaterialToolType, MaterialObjectType>>
   line: 'line',
   text: 'textbox',
   image: 'image',
+  profiledStroke: 'profiledStroke',
 };
 
 /** 判断工具是否是拖拽创建模式的绘图工具 */
@@ -446,6 +447,22 @@ export function MaterialEditorCanvas({
           baseProps.width = Math.max(100, Math.round(width));
           baseProps.height = Math.max(80, Math.round(height));
           break;
+        case 'profiledStroke': {
+          const d = createDefaultObject('profiledStroke', newId);
+          Object.assign(baseProps, {
+            fill: d.fill,
+            stroke: d.stroke,
+            strokeWidth: d.strokeWidth,
+            name: d.name,
+            profiledKind: d.profiledKind,
+            profiledGapDegrees: d.profiledGapDegrees,
+            profiledSampleSegments: d.profiledSampleSegments,
+            profiledWidthStops: d.profiledWidthStops,
+            profiledColorStops: d.profiledColorStops,
+            profiledLineCap: d.profiledLineCap,
+          });
+          break;
+        }
       }
 
       const result = execute({
@@ -1037,6 +1054,20 @@ function DrawPreviewShape({
           </text>
         </g>
       );
+    case 'profiledStroke':
+      return (
+        <ellipse
+          cx={x + width / 2}
+          cy={y + height / 2}
+          rx={width / 2}
+          ry={height / 2}
+          fill="none"
+          stroke="#1677ff"
+          strokeWidth={1}
+          strokeDasharray="4 2"
+          opacity={0.85}
+        />
+      );
     default:
       return null;
   }
@@ -1224,6 +1255,8 @@ function getCursor(
     case 'text':
       return 'text';
     case 'image':
+      return 'crosshair';
+    case 'profiledStroke':
       return 'crosshair';
     default:
       return 'default';

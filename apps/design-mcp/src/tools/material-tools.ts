@@ -519,7 +519,8 @@ export function registerMaterialTools(server: McpServer): void {
     'me_add_object',
     {
       description:
-        '在素材画布上添加对象。支持类型：矩形(rect)、椭圆(ellipse)、多边形(polygon)、星形(star)、路径(path)、线段(line)、文字(textbox)、图片(image)。\n\n' +
+        '在素材画布上添加对象。支持类型：矩形(rect)、椭圆(ellipse)、多边形(polygon)、星形(star)、路径(path)、线段(line)、文字(textbox)、图片(image)、沿圆可变线宽描边(profiledStroke)。\n\n' +
+        'profiledStroke 与 canvas 域 `add_profiled_stroke` 使用同一套 `@globallink/material-operations` 默认 stops；也可用本工具传入 profiledGapDegrees / profiledWidthStops 等完整覆盖。\n\n' +
         '⚠️ 坐标系说明：\n' +
         '  - x/y 是对象在前端画布坐标系中的位置（不是后端画布坐标）\n' +
         '  - 要让对象出现在参考框内，先调用 me_get_canvas_info 获取 referenceFrameX/Y，用它们作为 x/y\n' +
@@ -531,7 +532,9 @@ export function registerMaterialTools(server: McpServer): void {
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         materialId: z.string().describe('素材工程 ID'),
-        type: z.enum(['rect', 'ellipse', 'polygon', 'star', 'path', 'line', 'textbox', 'image']).describe('对象类型'),
+        type: z
+          .enum(['rect', 'ellipse', 'polygon', 'star', 'path', 'line', 'textbox', 'image', 'profiledStroke'])
+          .describe('对象类型'),
         name: z.string().optional().describe('对象名称'),
         x: z.number().optional().describe('X 坐标'),
         y: z.number().optional().describe('Y 坐标'),
@@ -557,6 +560,20 @@ export function registerMaterialTools(server: McpServer): void {
         textAlign: z.enum(['left', 'center', 'right']).optional().describe('对齐方式'),
         // 图片属性
         src: z.string().optional().describe('图片 URL（image 类型必须）'),
+        // profiledStroke — 与 material-operations schema / canvas.add_object 对齐
+        profiledKind: z.literal('circle').optional().describe('模板种类（当前仅 circle）'),
+        profiledGapDegrees: z.number().optional().describe('圆环缺口角度（度）'),
+        profiledGapFeatherDegrees: z.number().optional().describe('缺口两侧线宽羽化角度（度），不传则自动'),
+        profiledSampleSegments: z.number().optional().describe('采样分段数'),
+        profiledWidthStops: z
+          .array(z.object({ t: z.number(), width: z.number() }))
+          .optional()
+          .describe('线宽标：t∈[0,1] 沿弧参数'),
+        profiledColorStops: z
+          .array(z.object({ t: z.number(), color: z.string() }))
+          .optional()
+          .describe('颜色标：t∈[0,1] 沿弧参数'),
+        profiledLineCap: z.enum(['round', 'butt']).optional().describe('线段端帽'),
       },
     },
     async ({ projectId, materialId, ...objectProps }) => {
@@ -591,7 +608,8 @@ export function registerMaterialTools(server: McpServer): void {
     'me_update_object',
     {
       description:
-        '更新指定对象的属性（位置、尺寸、缩放、旋转、填充、描边等）。传入需要更新的属性键值对。',
+        '更新指定对象的属性（位置、尺寸、缩放、旋转、填充、描边等）。传入需要更新的属性键值对。\n' +
+        'profiledStroke 对象可更新：profiledGapDegrees、profiledGapFeatherDegrees、profiledSampleSegments、profiledWidthStops、profiledColorStops、profiledLineCap（与前端属性面板一致）。',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         materialId: z.string().describe('素材工程 ID'),

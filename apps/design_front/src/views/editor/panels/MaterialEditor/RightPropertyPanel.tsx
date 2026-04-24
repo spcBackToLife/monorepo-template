@@ -5,7 +5,7 @@
  * 上下文切换：效果工具激活时，面板切换为对应的编辑器（渐变/填充/滤镜/阴影）。
  */
 import { useState } from 'react';
-import { InputNumber, Slider, Select, Button, Divider, ColorPicker } from 'antd';
+import { InputNumber, Slider, Select, Button, Divider, ColorPicker, Tooltip } from 'antd';
 import type { EffectToolType } from './LeftToolbar';
 import { GradientEditor } from './GradientEditor';
 import { FilterEditor } from './FilterEditor';
@@ -45,6 +45,13 @@ export interface SelectedObjectInfo {
   ry?: number;
   // 多边形特有
   sides?: number;
+  /** profiledStroke：与 @globallink/material-operations/profiledStroke 字段对齐 */
+  profiledGapDegrees?: number;
+  profiledGapFeatherDegrees?: number;
+  profiledSampleSegments?: number;
+  profiledWidthStops?: { t: number; width: number }[];
+  profiledColorStops?: { t: number; color: string }[];
+  profiledLineCap?: 'round' | 'butt';
 }
 
 interface RightPropertyPanelProps {
@@ -109,6 +116,7 @@ function ObjectPropsPanel({
   const typeLabel: Record<string, string> = {
     rect: '矩形', ellipse: '椭圆', polygon: '多边形', line: '线段',
     path: '路径', text: '文字', image: '图片', group: '组', circle: '圆形',
+    profiledStroke: '渐变描边(圆)',
   };
 
   return (
@@ -122,36 +130,134 @@ function ObjectPropsPanel({
         </span>
       </PropRow>
 
-      {/* 填充色 */}
-      <PropRow label="填充">
-        <ColorPicker
-          size="small"
-          value={obj.fill ?? '#ffffff'}
-          onChange={(_, hex) => onPropertyChange({ fill: hex })}
-          showText
-          format="hex"
-        />
-      </PropRow>
-
-      {/* 描边 */}
-      <PropRow label="描边">
-        <div className="flex items-center gap-1">
+      {/* 填充色 — profiledStroke 无填充语义 */}
+      {obj.type !== 'profiledStroke' && (
+        <PropRow label="填充">
           <ColorPicker
             size="small"
-            value={obj.stroke ?? '#000000'}
-            onChange={(_, hex) => onPropertyChange({ stroke: hex })}
+            value={obj.fill ?? '#ffffff'}
+            onChange={(_, hex) => onPropertyChange({ fill: hex })}
+            showText
+            format="hex"
           />
-          <InputNumber
-            size="small"
-            min={0}
-            max={20}
-            value={obj.strokeWidth ?? 0}
-            onChange={(v) => v != null && onPropertyChange({ strokeWidth: v })}
-            style={{ width: 52 }}
-            suffix="px"
-          />
-        </div>
-      </PropRow>
+        </PropRow>
+      )}
+
+      {/* 描边 — profiledStroke 由弧上色标控制 */}
+      {obj.type !== 'profiledStroke' && (
+        <PropRow label="描边">
+          <div className="flex items-center gap-1">
+            <ColorPicker
+              size="small"
+              value={obj.stroke ?? '#000000'}
+              onChange={(_, hex) => onPropertyChange({ stroke: hex })}
+            />
+            <InputNumber
+              size="small"
+              min={0}
+              max={20}
+              value={obj.strokeWidth ?? 0}
+              onChange={(v) => v != null && onPropertyChange({ strokeWidth: v })}
+              style={{ width: 52 }}
+              suffix="px"
+            />
+          </div>
+        </PropRow>
+      )}
+
+      {obj.type === 'profiledStroke' && (
+        <>
+          <SectionTitle title="沿圆外观场" />
+          <PropRow label="缺口°">
+            <InputNumber
+              size="small"
+              min={0}
+              max={60}
+              value={obj.profiledGapDegrees ?? 16}
+              onChange={(v) => v != null && onPropertyChange({ profiledGapDegrees: v })}
+              style={{ width: '100%' }}
+            />
+          </PropRow>
+          <PropRow label="缺口羽化°">
+            <Tooltip title="留空=按缺口角度自动收笔；数值越大缺口两端线越渐细">
+              <InputNumber
+                size="small"
+                min={0}
+                max={24}
+                step={0.5}
+                value={obj.profiledGapFeatherDegrees ?? null}
+                onChange={(v) => onPropertyChange({ profiledGapFeatherDegrees: v ?? undefined })}
+                style={{ width: '100%' }}
+              />
+            </Tooltip>
+          </PropRow>
+          <PropRow label="分段">
+            <InputNumber
+              size="small"
+              min={16}
+              max={256}
+              value={obj.profiledSampleSegments ?? 128}
+              onChange={(v) => v != null && onPropertyChange({ profiledSampleSegments: v })}
+              style={{ width: '100%' }}
+            />
+          </PropRow>
+          <PropRow label="线帽">
+            <Select
+              size="small"
+              value={obj.profiledLineCap ?? 'round'}
+              onChange={(v) => onPropertyChange({ profiledLineCap: v as 'round' | 'butt' })}
+              options={[
+                { value: 'round', label: '圆角' },
+                { value: 'butt', label: '平头' },
+              ]}
+              style={{ width: '100%' }}
+            />
+          </PropRow>
+          <PropRow label="弧上色">
+            <div className="flex flex-col gap-1">
+              {(obj.profiledColorStops ?? []).map((s, i) => (
+                <div key={`c-${i}-${s.t}`} className="flex items-center gap-1">
+                  <span className="text-[9px] text-gray-400 w-6 shrink-0">{Math.round(s.t * 100)}%</span>
+                  <ColorPicker
+                    size="small"
+                    value={s.color}
+                    onChange={(_, hex) => {
+                      const next = [...(obj.profiledColorStops ?? [])];
+                      next[i] = { ...next[i]!, color: hex };
+                      onPropertyChange({ profiledColorStops: next });
+                    }}
+                    showText
+                    format="hex"
+                  />
+                </div>
+              ))}
+            </div>
+          </PropRow>
+          <PropRow label="线宽 t">
+            <div className="flex flex-col gap-1">
+              {(obj.profiledWidthStops ?? []).map((s, i) => (
+                <div key={`w-${i}-${s.t}`} className="flex items-center gap-1">
+                  <span className="text-[9px] text-gray-400 w-6 shrink-0">{Math.round(s.t * 100)}%</span>
+                  <InputNumber
+                    size="small"
+                    min={0}
+                    max={40}
+                    step={0.25}
+                    value={s.width}
+                    onChange={(v) => {
+                      if (v == null) return;
+                      const next = [...(obj.profiledWidthStops ?? [])];
+                      next[i] = { ...next[i]!, width: v };
+                      onPropertyChange({ profiledWidthStops: next });
+                    }}
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                </div>
+              ))}
+            </div>
+          </PropRow>
+        </>
+      )}
 
       {/* 矩形圆角 */}
       {obj.type === 'rect' && (

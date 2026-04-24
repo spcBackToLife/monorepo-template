@@ -38,6 +38,7 @@ const TYPE_ICONS: Record<string, string> = {
   textbox: 'T',
   image: '🖼',
   group: '📦',
+  profiledStroke: '◎',
 };
 
 export function LayerPanel({ defaultCollapsed = false }: LayerPanelProps) {

@@ -34,13 +34,14 @@ export function executeApplyMaterialDesign(
     };
   }
 
+  const stylesRecord = node.styles as Record<string, unknown>;
+
   // ---- Save old values for inverse ----
 
   // 1. Style inverse
   const oldStyles: Partial<CSSProperties> = {};
   const removedStyleKeys: string[] = [];
   if (params.styleUpdates) {
-    const stylesRecord = node.styles as Record<string, unknown>;
     const oldStylesRecord = oldStyles as Record<string, unknown>;
     for (const key of Object.keys(params.styleUpdates)) {
       if (key in stylesRecord) {
@@ -66,6 +67,17 @@ export function executeApplyMaterialDesign(
 
   // 3. materialProjectId inverse
   const oldMaterialProjectId: string | undefined = node.materialProjectId;
+
+  // 4. 显式清除的样式键（逆操作需恢复原值）
+  const restoreClearedStyles: Record<string, unknown> = {};
+  if (params.clearStyleKeys?.length) {
+    for (const key of params.clearStyleKeys) {
+      if (key in stylesRecord) {
+        restoreClearedStyles[key] = stylesRecord[key];
+        delete stylesRecord[key];
+      }
+    }
+  }
 
   // ---- Apply changes ----
 
@@ -108,6 +120,7 @@ export function executeApplyMaterialDesign(
         nodeId: params.nodeId,
         restoreStyles: oldStyles,
         removeStyleKeys: removedStyleKeys,
+        restoreClearedStyles,
         restoreProps: oldProps,
         removePropKeys: removedPropKeys,
         restoreMaterialProjectId: oldMaterialProjectId,

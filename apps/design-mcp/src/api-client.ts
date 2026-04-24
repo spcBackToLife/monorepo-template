@@ -393,17 +393,30 @@ export async function ensureMaterialNodeBinding(
   projectId: string,
   nodeId: string,
   materialProjectId: string,
+  options?: { preferredCssTarget?: string },
 ): Promise<{ ok: boolean; action: 'none' | 'created' | 'updated'; slotId?: string; error?: string }> {
   try {
     const slots = await listMaterialSlotsByNode(projectId, nodeId);
-    if (slots.some((s) => s.materialProjectId === materialProjectId)) {
-      return { ok: true, action: 'none' };
+    const preferred = options?.preferredCssTarget;
+    const same = slots.find((s) => s.materialProjectId === materialProjectId);
+    if (same) {
+      // 绝不把 border-image / mask-image 等槽位强行改成 background-image（会与「边框素材」语义冲突）
+      if (same.isActive !== true) {
+        await updateMaterialSlot(projectId, same.id, {
+          materialProjectId,
+          cssTarget: same.cssTarget,
+          isActive: true,
+        });
+        return { ok: true, action: 'updated', slotId: same.id };
+      }
+      return { ok: true, action: 'none', slotId: same.id };
     }
     const def = slots.find((s) => s.slotName === 'default');
     if (def) {
+      const cssTarget = preferred ?? def.cssTarget ?? 'background-image';
       await updateMaterialSlot(projectId, def.id, {
         materialProjectId,
-        cssTarget: 'background-image',
+        cssTarget,
         isActive: true,
       });
       return { ok: true, action: 'updated', slotId: def.id };
@@ -413,7 +426,7 @@ export async function ensureMaterialNodeBinding(
         nodeId,
         slotName: 'default',
         materialProjectId,
-        cssTarget: 'background-image',
+        cssTarget: preferred ?? 'background-image',
         isActive: true,
       });
       return { ok: true, action: 'created', slotId: created.id };
@@ -424,7 +437,7 @@ export async function ensureMaterialNodeBinding(
         if (d) {
           await updateMaterialSlot(projectId, d.id, {
             materialProjectId,
-            cssTarget: 'background-image',
+            cssTarget: preferred ?? d.cssTarget ?? 'background-image',
             isActive: true,
           });
           return { ok: true, action: 'updated', slotId: d.id };

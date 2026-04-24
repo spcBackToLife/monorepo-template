@@ -39,7 +39,8 @@ export type MaterialToolType =
   | 'path'     // 钢笔工具 — 单击放锚点，拖拽出贝塞尔曲线控制手柄
   | 'pencil'   // 铅笔工具 — 自由绘制
   | 'text'
-  | 'image';
+  | 'image'
+  | 'profiledStroke'; // 沿圆外观场（可变线宽 + 弧上色标），与 material-operations 同源
 
 // ===== 编辑器状态 =====
 

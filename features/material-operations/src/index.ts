@@ -89,3 +89,16 @@ export {
 
 // ===== CSS Tools (migrated from @globallink/material-editor) =====
 export * from './css-tools';
+
+// ===== 沿路径外观场（圆模板 profiledStroke）=====
+export {
+  interpolateWidthStops,
+  interpolateColorStops,
+  sampleProfiledStrokeCircle,
+  defaultVoiceHaloWidthStops,
+  defaultVoiceHaloColorStops,
+  type ProfiledWidthStop,
+  type ProfiledColorStop,
+  type ProfiledCircleSampleParams,
+  type ProfiledStrokeLineSegment,
+} from './profiledStroke';

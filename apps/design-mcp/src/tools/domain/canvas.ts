@@ -6,6 +6,11 @@
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  sampleProfiledStrokeCircle,
+  defaultVoiceHaloWidthStops,
+  defaultVoiceHaloColorStops,
+} from '@globallink/material-operations';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
 import * as api from '../../api-client.js';
 import type { DomainToolParams } from './domainToolParams.js';
@@ -160,6 +165,28 @@ async function renderObject(
     case 'line':{
       const x1=Number(obj.x1??0),y1=Number(obj.y1??0),x2=Number(obj.x2??width),y2=Number(obj.y2??height);
       ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      break;
+    }
+    case 'profiledStroke':{
+      const lines=sampleProfiledStrokeCircle({
+        width:Number(obj.width??0),
+        height:Number(obj.height??0),
+        gapDegrees:Number((obj as Record<string,unknown>).profiledGapDegrees??16),
+        gapFeatherDegrees:(obj as Record<string,unknown>).profiledGapFeatherDegrees as number|undefined,
+        segments:Number((obj as Record<string,unknown>).profiledSampleSegments??128),
+        widthStops:((obj as Record<string,unknown>).profiledWidthStops as {t:number;width:number}[])??[],
+        colorStops:((obj as Record<string,unknown>).profiledColorStops as {t:number;color:string}[])??[],
+      });
+      const cap=String((obj as Record<string,unknown>).profiledLineCap??'round')==='butt'?'butt':'round';
+      ctx.lineCap=cap as CanvasLineCap;
+      for(const ln of lines){
+        ctx.beginPath();
+        ctx.strokeStyle=ln.stroke;
+        ctx.lineWidth=ln.strokeWidth;
+        ctx.moveTo(ox+ln.x1,oy+ln.y1);
+        ctx.lineTo(ox+ln.x2,oy+ln.y2);
+        ctx.stroke();
+      }
       break;
     }
     case 'textbox':
@@ -358,7 +385,7 @@ export function registerCanvasTools(server: McpServer): void {
       ].join('\n'),
       schema: z.object({
         projectId:z.string(),materialId:z.string(),
-        type:z.enum(['rect','ellipse','polygon','star','path','line','textbox','image']),
+        type:z.enum(['rect','ellipse','polygon','star','path','line','textbox','image','profiledStroke']),
         name:z.string().optional(),x:z.number().optional(),y:z.number().optional(),
         width:z.number().optional(),height:z.number().optional(),
         fill:z.string().optional(),stroke:z.string().optional(),strokeWidth:z.number().optional(),
@@ -369,6 +396,13 @@ export function registerCanvasTools(server: McpServer): void {
         text:z.string().optional(),fontSize:z.number().optional(),fontFamily:z.string().optional(),
         fontWeight:z.union([z.string(),z.number()]).optional(),textAlign:z.enum(['left','center','right']).optional(),
         src:z.string().optional(),
+        profiledKind: z.literal('circle').optional(),
+        profiledGapDegrees: z.number().optional(),
+        profiledGapFeatherDegrees: z.number().optional(),
+        profiledSampleSegments: z.number().optional(),
+        profiledWidthStops: z.array(z.object({ t: z.number(), width: z.number() })).optional(),
+        profiledColorStops: z.array(z.object({ t: z.number(), color: z.string() })).optional(),
+        profiledLineCap: z.enum(['round', 'butt']).optional(),
       }),
       handler: async (raw: DomainToolParams) => {
         const rp = raw as Record<string, unknown>;
@@ -432,6 +466,105 @@ export function registerCanvasTools(server: McpServer): void {
               },
             },null,2),
           }],
+        };
+      },
+    },
+    add_profiled_stroke: {
+      description: [
+        '添加「沿圆的可变线宽 + 弧上色标」对象（type=profiledStroke）。',
+        '采样算法与前端 ObjectRenderer、本工具 export_and_apply 共用 `@globallink/material-operations` 的 `sampleProfiledStrokeCircle`。',
+        'x/y/width/height 为参考框内局部坐标，规则与 add_object 一致。',
+      ].join('\n'),
+      schema: z.object({
+        projectId: z.string(),
+        materialId: z.string(),
+        name: z.string().optional(),
+        x: z.number().optional(),
+        y: z.number().optional(),
+        width: z.number().optional(),
+        height: z.number().optional(),
+        gapDegrees: z.number().optional(),
+        gapFeatherDegrees: z.number().optional(),
+        sampleSegments: z.number().optional(),
+        widthStops: z.array(z.object({ t: z.number(), width: z.number() })).optional(),
+        colorStops: z.array(z.object({ t: z.number(), color: z.string() })).optional(),
+        lineCap: z.enum(['round', 'butt']).optional(),
+      }),
+      handler: async (raw: DomainToolParams) => {
+        const rp = raw as Record<string, unknown>;
+        const projectId = String(rp.projectId ?? '');
+        const materialId = String(rp.materialId ?? '');
+        const schema = (await api.getMaterialSchema(projectId, materialId)) as Record<string, unknown>;
+        const bw = (schema.canvasWidth as number) ?? 600;
+        const bh = (schema.canvasHeight as number) ?? 400;
+        const rf = schema.referenceFrame as { width?: number; height?: number } | undefined;
+        const rw = rf?.width ?? bw;
+        const rh = rf?.height ?? bh;
+        const P = 400;
+        const fw = Math.max(1200, rw + P * 2);
+        const fh = Math.max(900, rh + P * 2);
+        const rfx = (fw - rw) / 2;
+        const rfy = (fh - rh) / 2;
+
+        const localX = Number(rp.x ?? 0);
+        const localY = Number(rp.y ?? 0);
+        const localW = Number(rp.width ?? 220);
+        const localH = Number(rp.height ?? 220);
+
+        const object: Record<string, unknown> = {
+          type: 'profiledStroke',
+          name: (rp.name as string) ?? '渐变光环',
+          x: localX + rfx,
+          y: localY + rfy,
+          width: localW,
+          height: localH,
+          rotation: 0,
+          scaleX: 1,
+          scaleY: 1,
+          fill: null,
+          stroke: null,
+          strokeWidth: 0,
+          opacity: 1,
+          blendMode: 'normal',
+          visible: true,
+          locked: false,
+          profiledKind: 'circle',
+          profiledGapDegrees: rp.gapDegrees ?? 16,
+          profiledGapFeatherDegrees: rp.gapFeatherDegrees as number | undefined,
+          profiledSampleSegments: rp.sampleSegments ?? 128,
+          profiledWidthStops: rp.widthStops ?? defaultVoiceHaloWidthStops(),
+          profiledColorStops: rp.colorStops ?? defaultVoiceHaloColorStops(),
+          profiledLineCap: rp.lineCap ?? 'round',
+        };
+
+        const apiResult = await api.executeMaterialOperation(projectId, materialId, {
+          type: 'me:addObject',
+          params: { object },
+        });
+
+        const objRight = localX + localW;
+        const objBottom = localY + localH;
+        let inBounds = true;
+        let boundsError: string | undefined;
+        if (localX < 0 || localY < 0 || objRight > rw || objBottom > rh) {
+          inBounds = false;
+          boundsError = `对象超出参考框(${rw}×${rh})`;
+        }
+        const apiExtra =
+          typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
+            ? (apiResult as Record<string, unknown>)
+            : {};
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                { ...apiExtra, inBounds, ...(boundsError ? { error: boundsError } : {}) },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       },
     },
@@ -794,9 +927,9 @@ export function registerCanvasTools(server: McpServer): void {
         '完整流程：get_schema → 按参考框裁剪渲染 → PNG → 上传 → applyMaterialDesign → **写入 node_material_slots 槽位** → 更新素材工程 targetNodeId',
         '',
         '⚠️ 绑定约定（沉淀到 MCP，与前端「设计素材… / 添加素材」一致）：',
-        '- **Schema 节点上的 materialProjectId + 背景样式** 只表示「画什么」；可编辑入口依赖 **素材槽位 API**：`POST /material-slots`（nodeId + materialProjectId + cssTarget=background-image）。',
+        '- **槽位 `cssTarget` 与写入样式一致**：槽为 `background-image` 则写节点背景；槽为 `border-image` 则写 `borderImage` 及配套 border（与前端 ExportBar 一致）。**禁止**在本 action 内偷偷改槽位的 `cssTarget`；改库表只做显式 migration / `material_slot` update。',
         '- 仅 `execute_operations_batch` 里手写 `applyMaterialDesign` 而不建槽位 → 右键「设计素材…」可能打不开或行为异常；**请优先用本 action**，或手动调 `material-slots` API。',
-        '- 导出 PNG 的尺寸 = **referenceFrame 宽×高**（不是整张大画布），与参考框内所见一致；节点上 `background-size` 由 apply 写入样式决定。',
+        '- 导出 PNG 的尺寸 = **referenceFrame 宽×高**（不是整张大画布），与参考框内所见一致；`apply` 的样式字段随槽位分支而定。',
         '',
         '⚠️ 其他要点：',
         '- getMaterialSchema 用 /materials/{id}/schema；正确操作类型是 applyMaterialDesign（与 ExportBar 一致），不是 updateStyle',
@@ -897,27 +1030,59 @@ export function registerCanvasTools(server: McpServer): void {
           return{content:[{type:'text',text:JSON.stringify({error:'上传成功但未返回 url',uploadResult},null,2)}]};
         }
 
-        // 6. ⚠️ 关键：用 applyMaterialDesign 操作（和前端 ExportBar 一致）
-        //    不是 updateStyle，也不是设置 exportedMaterialId
-        const applyResult = await api.executeOperation(projectId,{
-          type:'applyMaterialDesign',
-          params:{
-            nodeId,
-            styleUpdates:{
-              backgroundImage:`url("${imgUrl}")`,
-              backgroundSize:'contain',
-              backgroundPosition:'center center',
-              backgroundRepeat:'no-repeat',
-              backgroundColor:'transparent',
-            },
-            materialProjectId:materialId,
-          },
+        // 6. 按槽位 cssTarget 写样式（与前端 ExportBar 一致）；不改槽 metadata
+        let slots: api.MaterialSlotRecordDto[] = [];
+        try {
+          slots = await api.listMaterialSlotsByNode(projectId, nodeId);
+        } catch {
+          slots = [];
+        }
+        const slotForMaterial = slots.find((s) => s.materialProjectId === materialId);
+        const applyCssTarget = slotForMaterial?.cssTarget ?? 'background-image';
+
+        const applyResult = await api.executeOperation(projectId, {
+          type: 'applyMaterialDesign',
+          params:
+            applyCssTarget === 'border-image'
+              ? {
+                  nodeId,
+                  clearStyleKeys: ['border'],
+                  styleUpdates: {
+                    borderImage: `url("${imgUrl}")`,
+                    borderWidth: 3,
+                    borderStyle: 'solid',
+                    borderColor: 'transparent',
+                    borderImageSlice: 1,
+                    borderImageRepeat: 'stretch',
+                    boxSizing: 'border-box',
+                  },
+                  materialProjectId: materialId,
+                }
+              : {
+                  nodeId,
+                  styleUpdates: {
+                    backgroundImage: `url("${imgUrl}"), linear-gradient(180deg, #1a1a22 0%, #1e1e28 100%)`,
+                    backgroundSize: 'contain, cover',
+                    backgroundPosition: 'center center, center center',
+                    backgroundRepeat: 'no-repeat, no-repeat',
+                    border: 'none',
+                    borderWidth: 0,
+                    boxSizing: 'border-box',
+                    backgroundClip: 'border-box',
+                    backgroundOrigin: 'border-box',
+                    boxShadow:
+                      '0 0 36px rgba(236, 72, 153, 0.28), 0 0 72px rgba(168, 85, 247, 0.2), 0 0 96px rgba(251, 146, 60, 0.12), inset 0 0 26px rgba(99, 102, 241, 0.07)',
+                  },
+                  materialProjectId: materialId,
+                },
         });
 
         let slotBinding: { ok: boolean; action?: string; slotId?: string; error?: string } = { ok: false };
-        try{
-          slotBinding = await api.ensureMaterialNodeBinding(projectId, nodeId, materialId);
-        }catch(e){
+        try {
+          slotBinding = await api.ensureMaterialNodeBinding(projectId, nodeId, materialId, {
+            preferredCssTarget: applyCssTarget,
+          });
+        } catch (e) {
           slotBinding = { ok: false, error: (e as Error).message };
         }
 
@@ -928,11 +1093,12 @@ export function registerCanvasTools(server: McpServer): void {
         }
 
         const result = {
-          success:true,
-          message:`✅ 素材已导出 (${format}, ${w}×${h} ref ${rw}×${rh}, ${buf.length}B) 并应用到节点 ${nodeId}`,
-          imageUrl:imgUrl,
-          assetId:(uploadResult as Record<string,unknown>).assetId,
-          operationApplied:'applyMaterialDesign' as string,
+          success: true,
+          message: `✅ 素材已导出 (${format}, ${w}×${h} ref ${rw}×${rh}, ${buf.length}B) 并应用到节点 ${nodeId}（${applyCssTarget}）`,
+          imageUrl: imgUrl,
+          assetId: (uploadResult as Record<string, unknown>).assetId,
+          operationApplied: 'applyMaterialDesign' as string,
+          applyCssTarget,
           applyResult,
           slotBinding,
         };

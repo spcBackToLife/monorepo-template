@@ -628,6 +628,7 @@ export function getAvailableOperations(): OperationDescription[] {
       params: [
         { name: 'nodeId', type: 'string', required: true, description: 'ID of the target node to apply material design to' },
         { name: 'styleUpdates', type: 'CSSProperties', required: false, description: 'CSS style updates to apply (e.g., background, boxShadow, filter, animation)' },
+        { name: 'clearStyleKeys', type: 'string[]', required: false, description: 'Style keys to remove before applying styleUpdates (e.g. remove border shorthand so border-image is not reset)' },
         { name: 'propUpdates', type: 'object', required: false, description: 'Component prop updates to apply (e.g., src for image, data-animation for animation resources)' },
         { name: 'materialProjectId', type: 'string', required: false, description: 'Material editor project ID to associate with this node' },
       ],

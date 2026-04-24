@@ -818,6 +818,11 @@ export interface ApplyMaterialDesignOp {
     nodeId: string;
     /** Batch style updates (gradient, shadow, filter, animation, etc.) */
     styleUpdates?: Partial<CSSProperties>;
+    /**
+     * 在写入 styleUpdates 之前从节点样式中删除这些键（用于去掉会重置 border-image 的 `border` 简写等）。
+     * 撤销时会自动恢复原值。
+     */
+    clearStyleKeys?: string[];
     /** Batch prop updates (src, data-animation, etc.) */
     propUpdates?: Record<string, unknown>;
     /** Material project ID to associate with this node */

@@ -135,10 +135,12 @@ export function useMaterialKeyboard() {
           h: 'hand',
           r: 'rect',
           o: 'ellipse',
+          a: 'profiledStroke',
           p: 'polygon',
           s: 'star',
           l: 'line',
-          b: 'path',
+          c: 'path',
+          b: 'pencil',
           t: 'text',
           i: 'image',
         };
