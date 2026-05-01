@@ -11,8 +11,9 @@ import {
   defaultVoiceHaloWidthStops,
   defaultVoiceHaloColorStops,
 } from '@globallink/material-operations';
-import { registerDomainTool } from '../helpers/registerDomainTool.js';
-import { apiClient } from '../../api-client.js';
+import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.js';
+import { apiClient as api, listMaterialSlotsByNode, ensureMaterialNodeBinding, updateMaterialProject } from '../../api-client.js';
+import type { MaterialSlotRecordDto } from '../../api-client.js';
 import type { CanvasObjectProps, CanvasSchema, GradientDefLike, ApiJsonResponse } from '../../types/canvas.js';
 
 // ── 服务端渲染辅助函数 ──
@@ -401,12 +402,12 @@ export function registerCanvasTools(server: McpServer): void {
   registerDomainTool(server, 'canvas', '素材画布核心操作集：Schema查询/画布管理/对象CRUD/样式/组/文字/撤销重做/高级绘图/CSS工具/设计集成', {
 
     // ── Schema & Info ──
-    get_schema: {
+    get_schema: defineAction({
       description: '获取素材工程完整 Schema。理解画布状态的首要工具。',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
       handler: async (p) => ({ content: [{ type:'text', text: JSON.stringify(await api.getMaterialSchema(p.projectId, p.materialId), null, 2) }] }),
-    },
-    get_canvas_info: {
+    }),
+    get_canvas_info: defineAction({
       description:
         '获取画布坐标信息摘要。操作画布前建议调用。\n\n' +
         '⭐ 坐标系（统一画布绝对坐标）：\n' +
@@ -435,27 +436,27 @@ export function registerCanvasTools(server: McpServer): void {
           defaultElementId:s.defaultElementId??null,
         }, null, 2) }] };
       },
-    },
+    }),
 
     // ── Canvas Management ──
-    set_background_color: {
+    set_background_color: defineAction({
       description: '设置画布背景色',
       schema: z.object({ projectId:z.string(), materialId:z.string(), color:z.string() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setBackgroundColor',params:{color:p.color}}),null,2)}] }),
-    },
-    resize_canvas: {
+    }),
+    resize_canvas: defineAction({
       description: '调整画布尺寸',
       schema: z.object({ projectId:z.string(), materialId:z.string(), width:z.number().positive(), height:z.number().positive() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:resizeCanvas',params:{width:p.width,height:p.height}}),null,2)}] }),
-    },
-    resize_reference_frame: {
+    }),
+    resize_reference_frame: defineAction({
       description: '调整参考框尺寸',
       schema: z.object({ projectId:z.string(), materialId:z.string(), width:z.number().positive(), height:z.number().positive(), enabled:z.boolean().optional() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:resizeReferenceFrame',params:{width:p.width,height:p.height,enabled:p.enabled}}),null,2)}] }),
-    },
+    }),
 
     // ── Object CRUD ──
-    add_object: {
+    add_object: defineAction({
       description: [
         '在画布上添加对象(rect/ellipse/polygon/star/path/line/textbox/image)。通用工具：传 type 与几何/样式字段即可，不包含任何固定图案说明。',
         '',
@@ -514,8 +515,8 @@ export function registerCanvasTools(server: McpServer): void {
           }],
         };
       },
-    },
-    add_profiled_stroke: {
+    }),
+    add_profiled_stroke: defineAction({
       description: [
         '添加「沿圆的可变线宽 + 弧上色标」对象（type=profiledStroke）。',
         '采样算法与前端 ObjectRenderer、本工具 export_and_apply 共用 `@globallink/material-operations` 的 `sampleProfiledStrokeCircle`。',
@@ -589,13 +590,13 @@ export function registerCanvasTools(server: McpServer): void {
           ],
         };
       },
-    },
-    remove_object: {
+    }),
+    remove_object: defineAction({
       description: '删除指定对象',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:removeObject',params:{objectId:p.objectId}}),null,2)}] }),
-    },
-    update_object: {
+    }),
+    update_object: defineAction({
       description: [
         '更新对象属性（位置/尺寸/填充/描边等）。',
         '',
@@ -612,35 +613,35 @@ export function registerCanvasTools(server: McpServer): void {
             : {};
         return { content:[{type:'text',text:JSON.stringify({...apiExtra, _note:'坐标为画布绝对坐标'},null,2)}] };
       },
-    },
-    duplicate_object: {
+    }),
+    duplicate_object: defineAction({
       description: '复制对象并偏移放置',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),offsetX:z.number().optional(),offsetY:z.number().optional() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:duplicateObject',params:{objectId:p.objectId,offsetX:p.offsetX,offsetY:p.offsetY}}),null,2)}] }),
-    },
-    reorder_object: {
+    }),
+    reorder_object: defineAction({
       description: '调整对象图层位置',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),newIndex:z.number() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:reorderObject',params:{objectId:p.objectId,newIndex:p.newIndex}}),null,2)}] }),
-    },
-    set_visibility: {
+    }),
+    set_visibility: defineAction({
       description: '设置对象可见性',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),visible:z.boolean() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setVisibility',params:{objectId:p.objectId,visible:p.visible}}),null,2)}] }),
-    },
-    set_lock: {
+    }),
+    set_lock: defineAction({
       description: '设置对象锁定',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),locked:z.boolean() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setLock',params:{objectId:p.objectId,locked:p.locked}}),null,2)}] }),
-    },
-    rename_object: {
+    }),
+    rename_object: defineAction({
       description: '重命名对象',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),name:z.string() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:renameObject',params:{objectId:p.objectId,name:p.name}}),null,2)}] }),
-    },
+    }),
 
     // ── Style ──
-    set_fill: {
+    set_fill: defineAction({
       description:
         '设置填充色。支持三种写法（按推荐顺序）：\n' +
         '  1) 结构化渐变对象 GradientDef：{type:"linear"|"radial", angle?, stops:[{color,offset}], cx?, cy?, r?}\n' +
@@ -669,48 +670,48 @@ export function registerCanvasTools(server: McpServer): void {
         ]),
       }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setFill',params:{objectId:p.objectId,fill:p.fill}}),null,2)}] }),
-    },
-    set_stroke: {
+    }),
+    set_stroke: defineAction({
       description: '设置描边颜色和宽度',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),color:z.string().optional(),width:z.number().optional() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setStroke',params:{objectId:p.objectId,color:p.color,width:p.width}}),null,2)}] }),
-    },
-    set_opacity: {
+    }),
+    set_opacity: defineAction({
       description: '设置透明度(0~1)',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),opacity:z.number().min(0).max(1) }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setOpacity',params:{objectId:p.objectId,opacity:p.opacity}}),null,2)}] }),
-    },
-    set_shadow: {
+    }),
+    set_shadow: defineAction({
       description: '设置或移除阴影(传null移除)',
       schema: z.object({
         projectId:z.string(),materialId:z.string(),objectId:z.string(),
         shadow:z.object({color:z.string().optional(),blur:z.number().optional(),offsetX:z.number().optional(),offsetY:z.number().optional()}).nullable().optional()
       }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setShadow',params:{objectId:p.objectId,shadow:p.shadow}}),null,2)}] }),
-    },
-    set_blend_mode: {
+    }),
+    set_blend_mode: defineAction({
       description: '设置混合模式（16种CSS blend-mode）',
       schema: z.object({
         projectId:z.string(),materialId:z.string(),objectId:z.string(),
         mode:z.enum(['normal','multiply','screen','overlay','darken','lighten','color-dodge','color-burn','hard-light','soft-light','difference','exclusion','hue','saturation','color','luminosity'])
       }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setBlendMode',params:{objectId:p.objectId,blendMode:p.mode}}),null,2)}] }),
-    },
+    }),
 
     // ── Group ──
-    group_objects: {
+    group_objects: defineAction({
       description: '将多个对象编为一组',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectIds:z.array(z.string()).min(2),groupName:z.string().optional() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:groupObjects',params:{objectIds:p.objectIds,groupName:p.groupName}}),null,2)}] }),
-    },
-    ungroup_objects: {
+    }),
+    ungroup_objects: defineAction({
       description: '解散组',
       schema: z.object({ projectId:z.string(),materialId:z.string(),groupId:z.string() }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:ungroupObjects',params:{groupId:p.groupId}}),null,2)}] }),
-    },
+    }),
 
     // ── Text ──
-    update_text: {
+    update_text: defineAction({
       description: '更新文字对象的文本和字体属性',
       schema: z.object({
         projectId:z.string(),materialId:z.string(),objectId:z.string(),
@@ -741,16 +742,16 @@ export function registerCanvasTools(server: McpServer): void {
           ],
         };
       },
-    },
+    }),
 
     // ── Undo/Redo ──
-    undo: { description:'撤销最近一次画布操作', schema:z.object({projectId:z.string(),materialId:z.string()}),
-      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.materialUndo(p.projectId,p.materialId),null,2)}] }) },
-    redo: { description:'重做撤销的操作', schema:z.object({projectId:z.string(),materialId:z.string()}),
-      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.materialRedo(p.projectId,p.materialId),null,2)}] }) },
+    undo: defineAction({ description:'撤销最近一次画布操作', schema:z.object({projectId:z.string(),materialId:z.string()}),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.materialUndo(p.projectId,p.materialId),null,2)}] }) }),
+    redo: defineAction({ description:'重做撤销的操作', schema:z.object({projectId:z.string(),materialId:z.string()}),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.materialRedo(p.projectId,p.materialId),null,2)}] }) }),
 
     // ── Advanced Drawing ──
-    draw_arcs: {
+    draw_arcs: defineAction({
       description: '在参考框内绘制发散弧线装饰效果。自动读取画布信息计算参考框位置，使用画布绝对坐标存储。',
       schema: z.object({
         projectId:z.string(),materialId:z.string(),
@@ -791,8 +792,8 @@ export function registerCanvasTools(server: McpServer): void {
         const result=await api.executeMaterialBatch(projectId,materialId,ops);
         return { content:[{type:'text',text:JSON.stringify({success:true,message:`绘制了${N}条弧线`,result},null,2)}] };
       },
-    },
-    clear_objects: {
+    }),
+    clear_objects: defineAction({
       description: '清除画布上所有对象（保留默认框/参考框）。includeDefault=true则连默认框也删。',
       schema: z.object({ projectId:z.string(),materialId:z.string(),includeDefault:z.boolean().optional() }),
       handler: async (p)=>{
@@ -805,10 +806,10 @@ export function registerCanvasTools(server: McpServer): void {
         const result=await api.executeMaterialBatch(p.projectId,p.materialId,ops);
         return{content:[{type:'text',text:JSON.stringify({success:true,deletedCount:toDel.length,result},null,2)}]};
       },
-    },
+    }),
 
     // ── CSS Tools (pure computation) ──
-    generate_gradient_css: {
+    generate_gradient_css: defineAction({
       description: '生成CSS渐变代码(linear/radial/conic)，纯计算无需画布',
       schema: z.object({
         type:z.enum(['linear','radial','conic']),colorStops:z.array(z.object({color:z.string(),position:z.number().min(0).max(1)})).min(2),
@@ -830,8 +831,8 @@ export function registerCanvasTools(server: McpServer): void {
           case'conic':css=`conic-gradient(from ${angle??0}deg at ${Math.round((centerX??0.5)*100)}% ${Math.round((centerY??0.5)*100)}%,${stops})`;break;}
         return{content:[{type:'text',text:JSON.stringify({css,property:'background',value:css},null,2)}]};
       },
-    },
-    generate_shadow_css: {
+    }),
+    generate_shadow_css: defineAction({
       description: '生成CSS阴影代码(box-shadow/text-shadow)',
       schema: z.object({shadows:z.array(z.object({type:z.enum(['box-shadow','text-shadow']),x:z.number(),y:z.number(),blur:z.number(),spread:z.number().optional(),color:z.string(),inset:z.boolean().optional()})).min(1)}),
       handler: (args) => {
@@ -851,8 +852,8 @@ export function registerCanvasTools(server: McpServer): void {
         const r:Record<string,string>={};if(bp.length)r.boxShadow=bp.join(', ');if(tp.length)r.textShadow=tp.join(', ');
         return{content:[{type:'text',text:JSON.stringify(r,null,2)}]};
       },
-    },
-    generate_filter_css: {
+    }),
+    generate_filter_css: defineAction({
       description: '生成CSS filter代码，支持所有原生滤镜组合',
       schema: z.object({blur:z.number().optional(),brightness:z.number().optional(),contrast:z.number().optional(),grayscale:z.number().optional(),hueRotate:z.number().optional(),invert:z.number().optional(),opacity:z.number().optional(),saturate:z.number().optional(),sepia:z.number().optional(),dropShadow:z.string().optional()}),
       handler: (f) => {
@@ -863,8 +864,8 @@ export function registerCanvasTools(server: McpServer): void {
         if(fr.dropShadow)parts.push(`drop-shadow(${String(fr.dropShadow)})`);
         return{content:[{type:'text',text:JSON.stringify({property:'filter',value:parts.join(' ')||'none'},null,2)}]};
       },
-    },
-    generate_animation_css: {
+    }),
+    generate_animation_css: defineAction({
       description: '生成CSS动画代码(@keyframes+animation简写)，支持预设或自定义关键帧',
       schema: z.object({
         name:z.string().optional(),duration:z.string().optional(),timingFunction:z.string().optional(),delay:z.string().optional(),
@@ -892,19 +893,19 @@ export function registerCanvasTools(server: McpServer): void {
         const sh=[an,duration??'0.3s',timingFunction??'ease',delay??'0s',String(iterationCount??1),direction??'normal',fillMode??'none'].join(' ');
         return{content:[{type:'text',text:JSON.stringify({keyframesCSS:kcss,animation:sh},null,2)}]};
       },
-    },
-    list_presets: {
+    }),
+    list_presets: defineAction({
       description: '列出素材编辑器所有预设（渐变、阴影等）',
       schema: z.object({ type:z.enum(['gradients','shadows','all']).optional() }),
       handler: async (_p)=>({ content:[{type:'text',text:JSON.stringify(await api.getMaterialEditorPresets(),null,2)}] }),
-    },
+    }),
 
     // ── Design Integration ──
-    apply_material_design: {
+    apply_material_design: defineAction({
       description: '将素材编辑器的CSS属性集合应用到设计Schema的目标节点（素材编辑器↔设计编辑器的桥梁）',
       schema: z.object({ projectId:z.string(),nodeId:z.string(),styleUpdates:z.record(z.string(),z.union([z.string(),z.number()])) }),
       handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeOperation(p.projectId,{type:'applyMaterialDesign',params:{nodeId:p.nodeId,styleUpdates:p.styleUpdates}}),null,2)}] }),
-    },
+    }),
 
     // ── Server-side Export & Apply (MCP 独有能力) ──
     /**
@@ -913,7 +914,7 @@ export function registerCanvasTools(server: McpServer): void {
      * 这是 MCP Server 独有的能力：不需要前端 fabric.js 渲染，
      * 直接在 Node.js 侧用 canvas 包将 canvasJSON 渲染成图片。
      */
-    export_and_apply: {
+    export_and_apply: defineAction({
       description: [
         '服务端导出素材为 PNG 并应用到设计节点（MCP 独有能力）。',
         '',
@@ -1022,9 +1023,9 @@ export function registerCanvasTools(server: McpServer): void {
         }
 
         // 6. 按槽位 cssTarget 写样式（与前端 ExportBar 一致）；不改槽 metadata
-        let slots: api.MaterialSlotRecordDto[] = [];
+        let slots: MaterialSlotRecordDto[] = [];
         try {
-          slots = await api.listMaterialSlotsByNode(projectId, nodeId);
+          slots = await listMaterialSlotsByNode(projectId, nodeId);
         } catch {
           slots = [];
         }
@@ -1094,7 +1095,7 @@ export function registerCanvasTools(server: McpServer): void {
 
         let slotBinding: { ok: boolean; action?: string; slotId?: string; error?: string } = { ok: false };
         try {
-          slotBinding = await api.ensureMaterialNodeBinding(projectId, nodeId, materialId, {
+          slotBinding = await ensureMaterialNodeBinding(projectId, nodeId, materialId, {
             preferredCssTarget: applyCssTarget,
           });
         } catch (e) {
@@ -1102,7 +1103,7 @@ export function registerCanvasTools(server: McpServer): void {
         }
 
         try{
-          await api.updateMaterialProject(projectId, materialId, { targetNodeId: nodeId });
+          await updateMaterialProject(projectId, materialId, { targetNodeId: nodeId });
         }catch{
           // 非致命：部分环境可能无写权限
         }
@@ -1119,6 +1120,6 @@ export function registerCanvasTools(server: McpServer): void {
         };
         return { content: [{ type:'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
-    },
+    }),
   });
 }

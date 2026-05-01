@@ -4,12 +4,12 @@
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { registerDomainTool } from '../helpers/registerDomainTool.js';
+import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.js';
 import { apiClient } from '../../api-client.js';
 
 export function registerStyleTools(server: McpServer): void {
   registerDomainTool(server, 'style', 'CSS 样式修改与批量操作', {
-    update: {
+    update: defineAction({
       description: '修改指定元素的 CSS 样式（backgroundColor/fontSize/padding/display/flexDirection 等）',
       schema: z.object({
         projectId: z.string(), nodeId: z.string(),
@@ -19,16 +19,16 @@ export function registerStyleTools(server: McpServer): void {
         const result = await apiClient.executeOperation(p.projectId, { type: 'updateStyle', params: { nodeId: p.nodeId, styles: p.styles } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
-    },
-    reset: {
+    }),
+    reset: defineAction({
       description: '重置（删除）某些 CSS 属性，恢复默认值',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), properties: z.array(z.string()) }),
       handler: async (p) => {
         const result = await apiClient.executeOperation(p.projectId, { type: 'resetStyle', params: { nodeId: p.nodeId, properties: p.properties } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
-    },
-    batch_update: {
+    }),
+    batch_update: defineAction({
       description: '批量更新多个节点的样式',
       schema: z.object({
         projectId: z.string(),
@@ -40,6 +40,6 @@ export function registerStyleTools(server: McpServer): void {
         const result = await apiClient.executeOperation(p.projectId, { type: 'batchUpdateStyle', params: { updates: p.updates } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
-    },
+    }),
   });
 }

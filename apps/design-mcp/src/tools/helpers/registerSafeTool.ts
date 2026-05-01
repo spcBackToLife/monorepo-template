@@ -31,47 +31,51 @@ export function registerSafeTool(
   name: string,
   config: {
     description: string;
-    inputSchema: Record<string, z.ZodTypeAny> | z.ZodType<unknown>;
+    inputSchema: Record<string, z.ZodTypeAny>;
   },
   handler: (params: Record<string, unknown>) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>,
 ): void {
   const rawInput = config.inputSchema;
-  const isZodObject = rawInput && typeof (rawInput as { shape?: unknown }).shape === 'object';
-  const fieldNames = isZodObject ? extractFieldNames((rawInput as { shape: Record<string, z.ZodTypeAny> }).shape) : [];
+  const fieldNames = extractFieldNames(rawInput);
 
-  // 用宽松 schema 注册：让 SDK 放行所有参数
-  const looseSchema = z.object({}).passthrough();
+  // 重构原始 schema 为 ZodObject 用于 safeParse
+  const zodSchema = z.object(rawInput);
 
-  (server as unknown as { registerTool: (...args: Parameters<McpServer['registerTool']>) => void }).registerTool(
+  // 🔒 宽松 schema：让 SDK 放行所有参数，由我们在 handler 里手动验证
+  // 只声明一个宽松的 action 字段即可
+  const looseInputSchema: Record<string, z.ZodTypeAny> = {};
+  for (const key of Object.keys(rawInput)) {
+    looseInputSchema[key] = z.unknown();
+  }
+
+  server.registerTool(
     name,
     {
       description: config.description,
-      inputSchema: looseSchema as unknown as Record<string, z.ZodTypeAny>,
+      inputSchema: looseInputSchema,
     },
-    async (rawParams: unknown) => {
+    async (rawParams) => {
       const params = rawParams as Record<string, unknown>;
 
       // ── 手动 Zod 校验 ──
-      if (isZodObject) {
-        const parseResult = rawInput.safeParse(params);
-        if (!parseResult.success) {
-          const issues = parseResult.error.issues ?? [];
-          const fieldErrors = issues.map((i: z.ZodIssue) => {
-            const path = i.path.join('.');
-            const received = path ? JSON.stringify(params?.[path] ?? params) : JSON.stringify(params);
-            return `  • 字段 "${path}": ${i.message} (收到值: ${received})`;
-          });
+      const parseResult = zodSchema.safeParse(params);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues ?? [];
+        const fieldErrors = issues.map((i: z.ZodIssue) => {
+          const path = i.path.join('.');
+          const received = path ? JSON.stringify(params?.[path] ?? params) : JSON.stringify(params);
+          return `  • 字段 "${path}": ${i.message} (收到值: ${received})`;
+        });
 
-          return makeStructuredError(
-            name,
-            'VALIDATION_ERROR',
-            `参数校验失败 (${issues.length} 个问题):\n${fieldErrors.join('\n')}`,
-            [
-              `"${name}" 的必填参数: [${fieldNames.join(', ')}]`,
-              `请检查参数名拼写是否正确（注意大小写和下划线风格）`,
-            ].join('\n'),
-          );
-        }
+        return makeStructuredError(
+          name,
+          'VALIDATION_ERROR',
+          `参数校验失败 (${issues.length} 个问题):\n${fieldErrors.join('\n')}`,
+          [
+            `"${name}" 的必填参数: [${fieldNames.join(', ')}]`,
+            `请检查参数名拼写是否正确（注意大小写和下划线风格）`,
+          ].join('\n'),
+        );
       }
 
       // ── 执行业务逻辑 ──

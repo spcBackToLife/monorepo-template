@@ -12,17 +12,47 @@ import { makeToolError } from './toolResponse.js';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-interface ActionDef {
+/** MCP tool handler return type */
+type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+
+/**
+ * 单个 action 定义，handler 参数类型从 schema 的 z.infer<S> 自动推导。
+ *
+ * schema 约束为 z.ZodObject — 保证：
+ *   1. handler(params) 拥有精确字段类型
+ *   2. registerDomainTool 内部可安全访问 schema.shape 构造 discriminatedUnion
+ */
+interface ActionDef<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
   description: string;
-  schema: z.ZodType<unknown>;
-  handler: (params: Record<string, unknown>) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>;
+  schema: S;
+  handler: (params: z.infer<S>) => ToolResult | Promise<ToolResult>;
 }
+
+/**
+ * 工具函数：创建类型安全的 action 定义。
+ * 泛型 S 由 schema 自动推导，handler 的 params 获得精确类型。
+ *
+ * @example
+ * defineAction({
+ *   description: '切换视口',
+ *   schema: z.object({ projectId: z.string(), width: z.number() }),
+ *   handler: async (p) => {
+ *     // p.projectId: string ✅  p.width: number ✅
+ *   },
+ * })
+ */
+export function defineAction<S extends z.ZodObject<z.ZodRawShape>>(def: ActionDef<S>): ActionDef<S> {
+  return def;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyActionDef = ActionDef<any>;
 
 export function registerDomainTool(
   server: McpServer,
   toolName: string,
   toolDescription: string,
-  actions: Record<string, ActionDef>,
+  actions: Record<string, AnyActionDef>,
 ): void {
   const entries = Object.entries(actions);
   if (entries.length === 0) return;
@@ -33,13 +63,18 @@ export function registerDomainTool(
   const variants = entries.map(([name, def]) =>
     z.object({
       action: z.literal(name),
-      ...(def.schema.shape as Record<string, z.ZodTypeAny>),
+      ...def.schema.shape,
     }),
   );
 
-  // Zod 对 discriminatedUnion 的 tuple 推断过严；variants 已保证每项含 action literal
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fullSchema = z.discriminatedUnion('action', variants as any);
+  // Zod discriminatedUnion 要求每个 variant 的 shape 包含 discriminator key。
+  // 我们显式构造了 `action: z.literal(name)`，但 TS 推导丢失了这个信息。
+  // 用精确的 ZodDiscriminatedUnionOption 类型断言。
+  type ActionVariant = z.ZodObject<{ action: z.ZodTypeAny } & z.ZodRawShape>;
+  const fullSchema = z.discriminatedUnion(
+    'action',
+    variants as [ActionVariant, ...ActionVariant[]],
+  );
 
   const actionDescriptions = entries
     .map(([name, def]) => `  - ${name}: ${def.description}`)
@@ -48,18 +83,22 @@ export function registerDomainTool(
   // ── 提取各 action 的可用字段名，用于错误提示 ──
   const actionFieldMap: Record<string, string[]> = {};
   for (const [name, def] of entries) {
-    const shape = (def.schema?.shape ?? {}) as Record<string, z.ZodTypeAny>;
-    actionFieldMap[name] = Object.keys(shape);
+    actionFieldMap[name] = Object.keys(def.schema.shape);
   }
 
-  (server as unknown as { registerTool: (...args: Parameters<McpServer['registerTool']>) => void }).registerTool(
+  // 🔒 宽松 schema：让 SDK 放行所有参数，由我们在 handler 里手动验证
+  // SDK registerTool 的 inputSchema 期望 ZodRawShapeCompat (Record<string, z.ZodTypeAny>)
+  const looseInputSchema: Record<string, z.ZodTypeAny> = {
+    action: z.string(),
+  };
+
+  server.registerTool(
     toolName,
     {
       description: `${toolDescription}\n\n可用操作 (action):\n${actionDescriptions}`,
-      // 🔒 宽松 schema：让 SDK 放行所有参数，由我们在 handler 里手动验证
-      inputSchema: z.object({ action: z.string() }).passthrough() as unknown as Record<string, z.ZodTypeAny>,
+      inputSchema: looseInputSchema,
     },
-    async (rawParams: unknown) => {
+    async (rawParams) => {
       const params = rawParams as Record<string, unknown>;
       const actionKey = String(params.action ?? '');
 

@@ -1,5 +1,6 @@
 import { ApiHttpError } from './tools/helpers/toolResponse.js';
 import type { MaterialProjectUpdateBody } from './types/canvas.js';
+import type { DesignProject } from '@globallink/design-schema';
 
 const BASE_URL = process.env.DESIGN_API_URL ?? 'http://localhost:3001';
 
@@ -44,8 +45,8 @@ async function request<T>(path: string, opts: FetchOptions = {}): Promise<T> {
 
 // ===== Projects =====
 
-export async function getProject(projectId: string): Promise<unknown> {
-  return request(`/api/projects/${projectId}`);
+export async function getProject(projectId: string): Promise<DesignProject> {
+  return request<DesignProject>(`/api/projects/${projectId}`);
 }
 
 export async function listProjects(): Promise<unknown> {

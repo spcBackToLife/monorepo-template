@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { ComponentEvent } from '@globallink/design-schema';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
 
@@ -107,7 +106,7 @@ export function registerMiscTools(server: McpServer): void {
     async ({ projectId, nodeId, event }) => {
       const result = await api.executeOperation(projectId, {
         type: 'addEvent',
-        params: { nodeId, event: event as unknown as ComponentEvent },
+        params: { nodeId, event },
       });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -153,7 +152,7 @@ export function registerMiscTools(server: McpServer): void {
     async ({ projectId, nodeId, eventIndex, event }) => {
       const result = await api.executeOperation(projectId, {
         type: 'updateEvent',
-        params: { nodeId, eventIndex, event: event as unknown as Partial<ComponentEvent> },
+        params: { nodeId, eventIndex, event },
       });
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
