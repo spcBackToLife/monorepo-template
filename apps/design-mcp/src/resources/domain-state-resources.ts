@@ -5,12 +5,6 @@ function extractSegments(uri: URL): string[] {
   return uri.pathname.split('/').filter(Boolean);
 }
 
-interface ScreenShape {
-  id: string;
-  name: string;
-  domainStates: unknown[];
-}
-
 /**
  * Resource: domainstates://screen/{projectId}/{screenId}
  */
@@ -26,7 +20,7 @@ export function registerDomainStateResources(server: McpServer): void {
       const segments = extractSegments(uri);
       const projectId = segments[1] ?? '';
       const screenId = segments[2] ?? '';
-      const project = (await api.getProject(projectId)) as { screens: ScreenShape[] };
+      const project = await api.getProject(projectId);
       const screen = project.screens.find((s) => s.id === screenId);
       const content = screen
         ? {

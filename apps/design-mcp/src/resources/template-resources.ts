@@ -1,21 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
 
-interface DesignProject {
-  id: string;
-  templates?: Array<{
-    id: string;
-    name: string;
-    rootNode: unknown;
-    propDefinitions: Record<string, {
-      type: string;
-      defaultValue?: unknown;
-      description?: string;
-    }>;
-    kind?: string;
-  }>;
-}
-
 /** Extract path segments from a resource URI */
 function extractSegments(uri: URL): string[] {
   return uri.pathname.split('/').filter(Boolean);
@@ -40,8 +25,8 @@ export function registerTemplateResources(server: McpServer): void {
       // template://{projectId}/{templateId} → segments = ["<projectId>", "<templateId>"]
       const projectId = segments[0] ?? '';
       const templateId = segments[1] ?? '';
-      const project = (await api.getProject(projectId)) as DesignProject;
-      const template = project.templates?.find((t) => t.id === templateId);
+      const project = await api.getProject(projectId);
+      const template = project.componentAssets?.find((t) => t.id === templateId);
 
       const content = template
         ? {
@@ -49,7 +34,7 @@ export function registerTemplateResources(server: McpServer): void {
             name: template.name,
             kind: template.kind,
             propDefinitions: template.propDefinitions,
-            rootNode: template.rootNode,
+            schema: template.schema,
           }
         : { error: `Template ${templateId} not found` };
 

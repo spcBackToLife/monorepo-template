@@ -48,6 +48,11 @@ interface MaterialItem {
   size: number;
 }
 
+/** Response shape from GET /projects/:id/materials */
+interface MaterialListResponse {
+  materials?: MaterialItem[];
+}
+
 const CATEGORY_OPTIONS = [
   { label: '全部', value: '' },
   { label: '图片', value: 'image' },
@@ -67,7 +72,7 @@ function useSelectedNodeStyles() {
 
   return useMemo(() => {
     if (!node) return null;
-    const styles = (node.styles ?? {}) as Record<string, string>;
+    const styles = node.styles ?? {};
     return {
       nodeId: node.id,
       nodeType: node.type,
@@ -101,7 +106,7 @@ export const MaterialEditorPanel = observer(function MaterialEditorPanel() {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/projects/${projectId}/materials`);
-      const data = await res.json() as { materials?: MaterialItem[] };
+      const data: MaterialListResponse = await res.json();
       setMaterials(data.materials ?? []);
     } catch {
       // ignore
@@ -146,7 +151,7 @@ export const MaterialEditorPanel = observer(function MaterialEditorPanel() {
         message.error('上传失败');
         return;
       }
-      const data = await res.json() as MaterialItem;
+      const data: MaterialItem = await res.json();
       setMaterials((prev) => [data, ...prev]);
       message.success('上传成功');
     } catch {

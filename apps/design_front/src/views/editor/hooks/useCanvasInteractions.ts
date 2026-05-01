@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { App as AntdApp } from 'antd';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
-import { generateNodeId } from '@globallink/design-schema';
+import { generateNodeId, type PrimitiveNodeType } from '@globallink/design-schema';
 import {
   getPlacementParentRect,
   resolvePlacementParentElement,
@@ -88,7 +88,7 @@ export function useCanvasInteractions(containerRef: React.RefObject<HTMLElement 
 
         const result = editorStore.execute({
           type: 'addElement',
-          params: { parentId, tag: tagMap[tool] as never, elementId: generateNodeId(), styles: droppedStyles },
+          params: { parentId, tag: tagMap[tool] as PrimitiveNodeType, elementId: generateNodeId(), styles: droppedStyles },
         });
 
         if (result.success) {

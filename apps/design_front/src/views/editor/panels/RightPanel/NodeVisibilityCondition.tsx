@@ -147,7 +147,7 @@ export const NodeVisibilityCondition = observer(function NodeVisibilityCondition
         stateName,
         visible,
       },
-    } as never);
+    });
   };
 
   const handleReset = (stateName: string) => {
@@ -160,7 +160,7 @@ export const NodeVisibilityCondition = observer(function NodeVisibilityCondition
         stateName,
         visible: undefined,
       },
-    } as never);
+    });
   };
 
   return (

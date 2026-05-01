@@ -1,19 +1,16 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ComponentNode, DomainStateVariable } from '@globallink/design-schema';
 import * as api from '../api-client.js';
 
 function walkCollectDomainStates(
-  node: { id: string; domainStates?: unknown[]; children?: unknown[] },
-  out: Array<{ ownerType: 'node'; ownerId: string; variables: unknown[] }>,
+  node: ComponentNode,
+  out: Array<{ ownerType: 'node'; ownerId: string; variables: DomainStateVariable[] }>,
 ): void {
   if (node.domainStates?.length) {
     out.push({ ownerType: 'node', ownerId: node.id, variables: node.domainStates });
   }
-  for (const c of (node.children ?? []) as Array<{
-    id: string;
-    domainStates?: unknown[];
-    children?: unknown[];
-  }>) {
+  for (const c of (node.children ?? [])) {
     walkCollectDomainStates(c, out);
   }
 }
@@ -33,22 +30,15 @@ export function registerDomainStateTools(server: McpServer): void {
       },
     },
     async ({ projectId, screenId }) => {
-      const project = (await api.getProject(projectId)) as {
-        screens: Array<{
-          id: string;
-          name: string;
-          domainStates: unknown[];
-          rootNode: { id: string; domainStates?: unknown[]; children?: unknown[] };
-        }>;
-      };
+      const project = await api.getProject(projectId);
       const screen = project.screens.find((s) => s.id === screenId);
       if (!screen) {
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Screen not found' }, null, 2) }],
         };
       }
-      const onNodes: Array<{ ownerType: 'node'; ownerId: string; variables: unknown[] }> = [];
-      walkCollectDomainStates(screen.rootNode as never, onNodes);
+      const onNodes: Array<{ ownerType: 'node'; ownerId: string; variables: DomainStateVariable[] }> = [];
+      walkCollectDomainStates(screen.rootNode, onNodes);
       return {
         content: [
           {

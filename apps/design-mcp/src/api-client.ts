@@ -72,7 +72,7 @@ export async function executeOperation(
 
 export async function executeBatch(
   projectId: string,
-  operations: unknown[],
+  operations: unknown[], // polymorphic operation shapes — intentionally untyped
   author?: string,
 ): Promise<unknown> {
   return request(`/api/projects/${projectId}/operations/batch`, {
@@ -487,7 +487,7 @@ export async function executeMaterialOperation(
 export async function executeMaterialBatch(
   projectId: string,
   materialId: string,
-  operations: unknown[],
+  operations: unknown[], // polymorphic operation shapes — intentionally untyped
   author?: string,
 ): Promise<unknown> {
   return request(`/api/projects/${projectId}/materials/${materialId}/operations/batch`, {

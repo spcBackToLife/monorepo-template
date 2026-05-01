@@ -19,9 +19,7 @@ export function registerEnvironmentStateResources(server: McpServer): void {
     async (uri) => {
       const segments = extractSegments(uri);
       const projectId = segments[1] ?? '';
-      const project = (await api.getProject(projectId)) as {
-        environmentStates?: unknown[];
-      };
+      const project = await api.getProject(projectId);
       return {
         contents: [
           {

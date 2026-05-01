@@ -47,13 +47,13 @@ function parseCssPx(value: string | number | undefined): number {
 
 /** 合并 base + 当前激活状态覆盖，用于读 left/top（拖拽增量） */
 function getEffectiveLeftTop(node: ComponentNode): { left: number; top: number } {
-  const base = node.styles as Record<string, string | number | undefined>;
+  const base = node.styles;
   let left = parseCssPx(base.left);
   let top = parseCssPx(base.top);
   const active = node.activeState ?? 'default';
   if (active !== 'default') {
     const st = node.states.find((s) => s.name === active);
-    const o = st?.styles as Record<string, string | number | undefined> | undefined;
+    const o = st?.styles;
     if (o?.left !== undefined) left = parseCssPx(o.left);
     if (o?.top !== undefined) top = parseCssPx(o.top);
   }
@@ -81,11 +81,11 @@ export function useEditorCanvasOperations(
 
         const parentInfo = findParentInScreens(editorStore.screens, id);
         const parent = parentInfo?.parent;
-        const parentDisplay = (parent?.styles as Record<string, string | undefined>)?.display;
+        const parentDisplay = parent?.styles?.display;
         const isFlexParent = parentDisplay === 'flex' || parentDisplay === 'inline-flex';
         const siblingCount = parent?.children?.length ?? 0;
         /** 仅在有多个兄弟时走 flex 重排序；单子节点时 handleFlexReorder 会空操作，导致无法写回 left/top，表现为「拖不动」。 */
-        const nodePos = (node.styles as Record<string, string | undefined>)?.position;
+        const nodePos = node.styles?.position;
         const isOutOfFlow = nodePos === 'absolute' || nodePos === 'fixed';
 
         if (isFlexParent && parent && siblingCount > 1 && !isOutOfFlow) {
@@ -94,7 +94,7 @@ export function useEditorCanvasOperations(
         }
 
         const activeState = node.activeState ?? 'default';
-        const styles = node.styles as Record<string, string | number | undefined>;
+        const styles = node.styles;
         const pos = styles.position;
         const wasStatic = !pos || pos === 'static';
 
@@ -145,7 +145,7 @@ export function useEditorCanvasOperations(
     const centerY = nodeRect.y + nodeRect.height / 2 + deltaY;
 
     const siblings = parent.children ?? [];
-    const flexDir = (parent.styles as Record<string, string | undefined>)?.flexDirection ?? 'row';
+    const flexDir = parent.styles?.flexDirection ?? 'row';
     const isHorizontal = flexDir === 'row' || flexDir === 'row-reverse';
 
     let bestIndex = 0;
@@ -171,7 +171,7 @@ export function useEditorCanvasOperations(
     editorStore.execute({
       type: 'reorderElement',
       params: { nodeId, parentId: parent.id, newIndex: bestIndex > currentIndex ? bestIndex - 1 : bestIndex },
-    } as never);
+    });
   }
 
   const handleResize = useCallback(

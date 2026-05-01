@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { DataSource } from '@globallink/design-schema';
 import * as api from '../api-client.js';
 
 function extractSegments(uri: URL): string[] {
@@ -20,7 +21,7 @@ export function registerDatasourceResources(server: McpServer): void {
       const segments = extractSegments(uri);
       const projectId = segments[1] ?? '';
       const screenId = segments[2] ?? '';
-      const list = (await api.listDataSources(projectId, screenId)) as unknown[];
+      const list = (await api.listDataSources(projectId, screenId)) as DataSource[];
       return {
         contents: [
           {

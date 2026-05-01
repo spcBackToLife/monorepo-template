@@ -16,6 +16,17 @@ function token() {
 
 // ===== 类型定义 =====
 
+/** Response from the material export upload endpoint */
+export interface MaterialUploadResponse {
+  url: string;
+  assetId: string;
+}
+
+/** Response from the thumbnail upload endpoint */
+export interface ThumbnailUploadResponse {
+  thumbnailUrl: string;
+}
+
 /** 工程列表摘要（不含 canvasJSON） */
 export interface MaterialProjectSummary {
   id: string;
@@ -192,7 +203,7 @@ export const materialProjectApi = {
     materialProjectId: string,
     file: Blob,
     filename: string,
-  ): Promise<{ url: string; assetId: string }> {
+  ): Promise<MaterialUploadResponse> {
     const formData = new FormData();
     formData.append('file', file, filename);
 
@@ -212,7 +223,8 @@ export const materialProjectApi = {
       throw new Error(`上传导出素材失败: HTTP ${res.status}`);
     }
 
-    return res.json() as Promise<{ url: string; assetId: string }>;
+    const result: MaterialUploadResponse = await res.json();
+    return result;
   },
 
   /**
@@ -222,7 +234,7 @@ export const materialProjectApi = {
     projectId: string,
     materialProjectId: string,
     file: Blob,
-  ): Promise<{ thumbnailUrl: string }> {
+  ): Promise<ThumbnailUploadResponse> {
     const formData = new FormData();
     formData.append('file', file, 'thumbnail.png');
 
@@ -242,7 +254,8 @@ export const materialProjectApi = {
       throw new Error(`上传缩略图失败: HTTP ${res.status}`);
     }
 
-    return res.json() as Promise<{ thumbnailUrl: string }>;
+    const result: ThumbnailUploadResponse = await res.json();
+    return result;
   },
 };
 

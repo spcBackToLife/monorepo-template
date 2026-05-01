@@ -24,7 +24,7 @@ import {
   type NodeRect,
   type OverlayToolMode,
 } from '@globallink/design-engine';
-import type { TransitionAnimation } from '@globallink/design-schema';
+import type { TransitionAnimation, PrimitiveNodeType } from '@globallink/design-schema';
 import {
   findNodeInScreens,
   collectEffectivelyLockedNodeIds,
@@ -300,7 +300,7 @@ export const Canvas = observer(function Canvas() {
         type: 'addElement',
         params: {
           parentId,
-          tag: tag as never,
+          tag: tag as PrimitiveNodeType,
           elementId: generateNodeId(),
           styles: {
             position: 'absolute',
@@ -561,7 +561,7 @@ export const Canvas = observer(function Canvas() {
 
       const result = editorStore.execute({
         type: 'addElement',
-        params: { parentId, tag: tag as never, elementId: generateNodeId(), styles: droppedStyles },
+        params: { parentId, tag: tag as PrimitiveNodeType, elementId: generateNodeId(), styles: droppedStyles },
       });
       if (result.success) {
         editorStore.select(result.affectedNodeIds[0] ?? null);

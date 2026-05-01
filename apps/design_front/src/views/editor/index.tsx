@@ -4,7 +4,7 @@ import { CopyOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { toJS } from 'mobx';
 import { generateReactCode } from '@globallink/design-engine';
-import type { Screen, ComponentNode } from '@globallink/design-schema';
+import type { Screen } from '@globallink/design-schema';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { editorStore } from '@/stores/editor';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -98,11 +98,11 @@ const CodeSplitPane = observer(function CodeSplitPane() {
   const node = nodeId ? findNodeInScreens(editorStore.screens, nodeId) : null;
 
   const codegenScreen = useMemo((): Screen | null => {
-    const s = screen ? (toJS(screen) as Screen) : null;
+    const s = screen ? toJS(screen) : null;
     if (!s) return null;
     if (scope === 'screen') return s;
     if (scope === 'node' && node) {
-      return { ...s, name: (node.name && String(node.name)) || s.name || 'Node', rootNode: toJS(node) as ComponentNode };
+      return { ...s, name: (node.name && String(node.name)) || s.name || 'Node', rootNode: toJS(node) };
     }
     return null;
   }, [screen, scope, node]);

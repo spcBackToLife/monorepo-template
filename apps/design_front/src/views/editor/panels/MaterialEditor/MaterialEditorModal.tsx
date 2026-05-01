@@ -108,7 +108,7 @@ function useTargetNodeStyles(nodeId: string | null) {
 
   return useMemo(() => {
     if (!node) return null;
-    const styles = (node.styles ?? {}) as StyleOverrides;
+    const styles: StyleOverrides = node.styles ?? {};
     const w = styles.width;
     const h = styles.height;
     return {
@@ -463,7 +463,7 @@ function SyncBridge({ materialProjectId }: { materialProjectId: string | null })
           `${API_BASE}/projects/${projectId}/materials/${materialProjectId}/schema`,
         );
         if (!res.ok || cancelled) return;
-        const backendSchema = await res.json() as MaterialProjectSchema;
+        const backendSchema: MaterialProjectSchema = await res.json();
 
         if (!cancelled) {
           // 必须用后端完整 Schema（含 defaultElementId / referenceFrame / 画布尺寸），
@@ -499,7 +499,7 @@ function SyncBridge({ materialProjectId }: { materialProjectId: string | null })
           `${API_BASE}/projects/${projectId}/materials/${event.materialId}/schema`,
         );
         if (res.ok) {
-          const schema = await res.json() as MaterialProjectSchema;
+          const schema: MaterialProjectSchema = await res.json();
           window.dispatchEvent(new CustomEvent('material-schema-reload', { detail: schema }));
         }
       } catch (err) {
@@ -729,7 +729,7 @@ function ModalContent({
       if (updates.fill !== undefined) {
         execute({
           type: 'me:setFill',
-          params: { objectId: id, fill: updates.fill as string | GradientDef | null },
+          params: { objectId: id, fill: updates.fill },
         });
       }
       if (updates.stroke !== undefined || updates.strokeWidth !== undefined) {
@@ -737,22 +737,22 @@ function ModalContent({
           type: 'me:setStroke',
           params: {
             objectId: id,
-            stroke: (updates.stroke as string) ?? selectedObject?.stroke ?? '#000000',
-            strokeWidth: (updates.strokeWidth as number) ?? selectedObject?.strokeWidth ?? 1,
+            stroke: updates.stroke ?? selectedObject?.stroke ?? '#000000',
+            strokeWidth: updates.strokeWidth ?? selectedObject?.strokeWidth ?? 1,
           },
         });
       }
       if (updates.opacity !== undefined) {
-        execute({ type: 'me:setOpacity', params: { objectId: id, opacity: updates.opacity as number } });
+        execute({ type: 'me:setOpacity', params: { objectId: id, opacity: updates.opacity } });
       }
 
       // 变换属性 → 统一使用 me:updateObject
       const transformProps: MaterialPropertyUpdates = {};
-      if (updates.left !== undefined) transformProps.x = updates.left as number;
-      if (updates.top !== undefined) transformProps.y = updates.top as number;
-      if (updates.width !== undefined) transformProps.width = updates.width as number;
-      if (updates.height !== undefined) transformProps.height = updates.height as number;
-      if (updates.angle !== undefined) transformProps.rotation = updates.angle as number;
+      if (updates.left !== undefined) transformProps.x = updates.left;
+      if (updates.top !== undefined) transformProps.y = updates.top;
+      if (updates.width !== undefined) transformProps.width = updates.width;
+      if (updates.height !== undefined) transformProps.height = updates.height;
+      if (updates.angle !== undefined) transformProps.rotation = updates.angle;
 
       if (Object.keys(transformProps).length > 0) {
         execute({
@@ -763,13 +763,13 @@ function ModalContent({
 
       const styleProps: MaterialPropertyUpdates = {};
       if (updates.rx !== undefined || updates.ry !== undefined) {
-        const rx = (updates.rx ?? updates.ry) as number;
-        const ry = (updates.ry ?? updates.rx) as number;
+        const rx = updates.rx ?? updates.ry;
+        const ry = updates.ry ?? updates.rx;
         styleProps.rx = rx;
         styleProps.ry = ry;
       }
       if (updates.mixBlendMode !== undefined) {
-        styleProps.blendMode = updates.mixBlendMode as string;
+        styleProps.blendMode = updates.mixBlendMode;
       }
       if (Object.keys(styleProps).length > 0) {
         execute({
@@ -780,13 +780,13 @@ function ModalContent({
 
       const profiledProps: MaterialPropertyUpdates = {};
       if (updates.profiledGapDegrees !== undefined) {
-        profiledProps.profiledGapDegrees = updates.profiledGapDegrees as number;
+        profiledProps.profiledGapDegrees = updates.profiledGapDegrees;
       }
       if (Object.prototype.hasOwnProperty.call(updates, 'profiledGapFeatherDegrees')) {
-        profiledProps.profiledGapFeatherDegrees = updates.profiledGapFeatherDegrees as number | undefined;
+        profiledProps.profiledGapFeatherDegrees = updates.profiledGapFeatherDegrees;
       }
       if (updates.profiledSampleSegments !== undefined) {
-        profiledProps.profiledSampleSegments = updates.profiledSampleSegments as number;
+        profiledProps.profiledSampleSegments = updates.profiledSampleSegments;
       }
       if (updates.profiledWidthStops !== undefined) {
         profiledProps.profiledWidthStops = updates.profiledWidthStops;

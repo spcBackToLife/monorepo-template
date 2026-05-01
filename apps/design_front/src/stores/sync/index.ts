@@ -18,12 +18,15 @@ export class SyncStore {
 
     this.unsub = syncManager.onEnvelope((envelope: OperationEnvelopePayload) => {
       runInAction(() => {
-        editorStore.applyRemoteOperation(envelope.operation);
+        const op = envelope.operation;
+
+        // Skip synthetic undo operations — they don't go through the executor
+        if (op.type === 'undo') return;
+
+        editorStore.applyRemoteOperation(op);
 
         if (envelope.author === 'ai') {
-          const op = envelope.operation as { type?: string; params?: Record<string, unknown> };
-          const description = op.type ?? 'unknown';
-          aiToastStore.add(description);
+          aiToastStore.add(op.type);
         }
       });
     });

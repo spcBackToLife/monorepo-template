@@ -4,6 +4,7 @@ import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
 import type { EventPayload } from '@/types/editor';
+import type { ComponentEvent } from '@globallink/design-schema';
 
 // ===== Constants =====
 
@@ -158,7 +159,7 @@ const EventCard = observer(function EventCard({ event, eventIndex, nodeId }: Eve
     editorStore.execute({
       type: 'updateEvent',
       params: { nodeId, eventIndex, event: { disabled: !event.disabled } },
-    } as never);
+    });
   }, [nodeId, eventIndex, event.disabled]);
 
   const handleSaveInline = useCallback(() => {
@@ -167,8 +168,8 @@ const EventCard = observer(function EventCard({ event, eventIndex, nodeId }: Eve
     patch.actions = editActions;
     editorStore.execute({
       type: 'updateEvent',
-      params: { nodeId, eventIndex, event: patch },
-    } as never);
+      params: { nodeId, eventIndex, event: patch as Partial<ComponentEvent> },
+    });
     setEditing(false);
   }, [nodeId, eventIndex, editTrigger, editActions, event.trigger]);
 
@@ -296,22 +297,29 @@ const EventCard = observer(function EventCard({ event, eventIndex, nodeId }: Eve
 function ActionBadge({ action }: { action: { type: string; [key: string]: unknown } }) {
   const label = ACTION_TYPES.find((a) => a.value === action.type)?.label ?? action.type;
 
+  // Helper to safely read optional string/number fields from the loosely-typed action object
+  const str = (key: string): string | undefined => {
+    const v = action[key];
+    return typeof v === 'string' ? v : undefined;
+  };
+  const num = (key: string): number | undefined => {
+    const v = action[key];
+    return typeof v === 'number' ? v : undefined;
+  };
+
   let summary = '';
   switch (action.type) {
     case 'navigate': {
-      const sid = (action as { targetScreenId?: string; screenId?: string }).targetScreenId
-        ?? (action as { screenId?: string }).screenId;
-      summary = sid ? ` → ${String(sid).slice(0, 6)}` : '';
+      const sid = str('targetScreenId') ?? str('screenId');
+      summary = sid ? ` → ${sid.slice(0, 6)}` : '';
       break;
     }
     case 'setState': {
-      const sn = (action as { stateName?: string; state?: string }).stateName
-        ?? (action as { state?: string }).state;
-      const tid = (action as { nodeId?: string; targetId?: string }).nodeId
-        ?? (action as { targetId?: string }).targetId;
+      const sn = str('stateName') ?? str('state');
+      const tid = str('nodeId') ?? str('targetId');
       const parts: string[] = [];
-      if (sn) parts.push(String(sn));
-      if (tid) parts.push(`@${String(tid).slice(0, 6)}`);
+      if (sn) parts.push(sn);
+      if (tid) parts.push(`@${tid.slice(0, 6)}`);
       summary = parts.length ? ` → ${parts.join(' ')}` : '';
       break;
     }
@@ -319,34 +327,33 @@ function ActionBadge({ action }: { action: { type: string; [key: string]: unknow
       summary = action.variableName ? ` → ${String(action.variableName)}` : '';
       break;
     case 'toggleVisible': {
-      const tid = (action as { nodeId?: string; targetId?: string }).nodeId
-        ?? (action as { targetId?: string }).targetId;
-      summary = tid ? ` → ${String(tid).slice(0, 6)}` : '';
+      const tid = str('nodeId') ?? str('targetId');
+      summary = tid ? ` → ${tid.slice(0, 6)}` : '';
       break;
     }
     case 'openUrl':
       summary = action.url ? ` → ${String(action.url).slice(0, 20)}` : '';
       break;
     case 'delay': {
-      const d = (action as { duration?: number }).duration;
+      const d = num('duration');
       summary = d != null ? ` ${d}ms` : '';
       break;
     }
     case 'showToast': {
-      const msg = (action as { message?: string }).message;
-      const tt = (action as { toastType?: string }).toastType ?? 'info';
+      const msg = str('message');
+      const tt = str('toastType') ?? 'info';
       const typeLabel: Record<string, string> = { success: '成功', error: '错误', warning: '警告', info: '信息' };
-      summary = ` [${typeLabel[tt] ?? tt}]${msg ? ` ${String(msg).slice(0, 12)}` : ''}`;
+      summary = ` [${typeLabel[tt] ?? tt}]${msg ? ` ${msg.slice(0, 12)}` : ''}`;
       break;
     }
     case 'apiRequest': {
-      const rid = (action as { requestId?: string }).requestId;
-      summary = rid ? ` → ${String(rid).slice(0, 8)}` : '';
+      const rid = str('requestId');
+      summary = rid ? ` → ${rid.slice(0, 8)}` : '';
       break;
     }
     case 'custom': {
-      const h = (action as { handler?: string }).handler;
-      summary = h ? ` → ${String(h).slice(0, 12)}` : '';
+      const h = str('handler');
+      summary = h ? ` → ${h.slice(0, 12)}` : '';
       break;
     }
   }
@@ -697,8 +704,8 @@ const AddEventForm = observer(function AddEventForm({
       type: 'addEvent',
       params: {
         nodeId: hostNodeId,
-        event: eventPayload,
-      } as never,
+        event: eventPayload as unknown as ComponentEvent,
+      },
     });
 
     reset();

@@ -15,9 +15,7 @@ export function registerEnvironmentTools(server: McpServer): void {
       },
     },
     async ({ projectId }) => {
-      const project = (await api.getProject(projectId)) as {
-        environmentStates?: unknown[];
-      };
+      const project = await api.getProject(projectId);
       return {
         content: [
           {

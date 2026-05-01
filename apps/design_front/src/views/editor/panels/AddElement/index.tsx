@@ -4,6 +4,7 @@ import {
   generateNodeId,
   getPrimitiveCategories,
   getPrimitivesByCategory,
+  type PrimitiveNodeType,
 } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
 import { SaveTemplateButton } from '../SaveTemplate';
@@ -26,7 +27,7 @@ export const AddElementPanel = observer(function AddElementPanel() {
     const parentId = screen.rootNode.id;
     const result = editorStore.execute({
       type: 'addElement',
-      params: { parentId, tag: tag as never, elementId: generateNodeId() },
+      params: { parentId, tag: tag as PrimitiveNodeType, elementId: generateNodeId() },
     });
     if (result.success) {
       const createdNodeId = result.affectedNodeIds[0] ?? null;

@@ -96,7 +96,7 @@ export const ComponentLibrary = observer(function ComponentLibrary({
         return;
       }
       // Use root node as fallback
-      const rootId = (screen.rootNode as { id?: string })?.id;
+      const rootId = screen.rootNode?.id;
       if (!rootId) {
         message.warning('请先选中一个容器节点');
         return;

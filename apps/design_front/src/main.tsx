@@ -6,7 +6,12 @@ import 'antd/dist/reset.css';
 import './styles/index.css';
 import './styles/theme.less';
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+const rootEl = document.getElementById('root');
+if (!rootEl) {
+  throw new Error('Root element #root not found in document');
+}
+
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <BrowserRouter>
       <App />

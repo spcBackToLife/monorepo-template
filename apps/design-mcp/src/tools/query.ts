@@ -2,21 +2,6 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
 
-interface DesignScreen {
-  id: string;
-  name: string;
-  backgroundColor?: string;
-}
-
-interface DesignProject {
-  id: string;
-  name: string;
-  platform: string;
-  screens: DesignScreen[];
-  currentViewport: { name: string; width: number; height: number };
-  componentAssets: unknown[];
-}
-
 export function registerQueryTools(server: McpServer): void {
   server.registerTool(
     'get_project_info',
@@ -28,7 +13,7 @@ export function registerQueryTools(server: McpServer): void {
       },
     },
     async ({ projectId }) => {
-      const project = (await api.getProject(projectId)) as DesignProject;
+      const project = await api.getProject(projectId);
       const summary = {
         id: project.id,
         name: project.name,
@@ -55,9 +40,7 @@ export function registerQueryTools(server: McpServer): void {
       },
     },
     async ({ projectId, screenId }) => {
-      const project = (await api.getProject(projectId)) as DesignProject & {
-        screens: Array<{ id: string; name: string; rootNode: unknown; backgroundColor?: string }>;
-      };
+      const project = await api.getProject(projectId);
       const screen = project.screens.find((s) => s.id === screenId);
       if (!screen) {
         return {
@@ -80,7 +63,7 @@ export function registerQueryTools(server: McpServer): void {
       },
     },
     async ({ projectId }) => {
-      const project = (await api.getProject(projectId)) as DesignProject;
+      const project = await api.getProject(projectId);
       const screens = project.screens.map((s) => ({
         id: s.id,
         name: s.name,

@@ -55,7 +55,7 @@ export const StyleEditorPanel = observer(function StyleEditorPanel() {
     return <Empty description="节点未找到" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
-  const styles = node.styles as StyleOverrides;
+  const styles: StyleOverrides = node.styles;
 
   const handleChange = (key: string, value: string) => {
     const normalized = normalizeStyleInput(key, value);

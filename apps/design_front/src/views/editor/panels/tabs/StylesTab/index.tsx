@@ -2,8 +2,9 @@ import { useState, useRef, useCallback } from 'react';
 import { Empty } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
-import { API_BASE } from '@/api/client';
+import { API_BASE, type AssetUploadResponse } from '@/api/client';
 import { findNodeInScreens } from '@globallink/design-operations';
+import type { CSSProperties } from '@globallink/design-schema';
 import { NumericInput } from '../../../controls/NumericInput';
 import { ColorPicker } from '../../../controls/ColorPicker';
 import { BoxModelEditor } from '../../../controls/BoxModelEditor';
@@ -18,6 +19,8 @@ function computeIntersectedStyles(
   screens: typeof editorStore.screens,
   nodeIds: string[],
   parentStateOverride?: string | null,
+// TODO: 下游 BackgroundEditor/MaskSection 等组件的 styles prop 类型为 Record<string, string>，
+// 需要统一改成 CSSProperties 后才能去掉此返回类型中的 Record。
 ): Record<string, string> {
   if (nodeIds.length <= 1) {
     const node = findNodeInScreens(screens, nodeIds[0]);
@@ -30,21 +33,21 @@ function computeIntersectedStyles(
     }
     
     const stateEntry = effectiveState !== 'default' ? node.states.find((s) => s.name === effectiveState) : undefined;
-    return { ...(node.styles as Record<string, string>), ...((stateEntry?.styles ?? {}) as Record<string, string>) };
+    return { ...node.styles, ...(stateEntry?.styles ?? {}) } as Record<string, string>;
   }
 
   const allStyles = nodeIds.map((id) => {
     const n = findNodeInScreens(screens, id);
-    if (!n) return {} as Record<string, string>;
+    if (!n) return {};
     const active = n.activeState ?? 'default';
     const se = active !== 'default' ? n.states.find((s) => s.name === active) : undefined;
-    return { ...(n.styles as Record<string, string>), ...((se?.styles ?? {}) as Record<string, string>) };
+    return { ...n.styles, ...(se?.styles ?? {}) } as Record<string, string>;
   });
 
   const allKeys = new Set(allStyles.flatMap((s) => Object.keys(s)));
   const result: Record<string, string> = {};
   for (const key of allKeys) {
-    const values = allStyles.map((s) => s[key] ?? '');
+    const values = allStyles.map((s) => String(s[key as keyof CSSProperties] ?? ''));
     const allSame = values.every((v) => v === values[0]);
     result[key] = allSame ? values[0] : MIXED;
   }
@@ -162,7 +165,7 @@ export const StylesTab = observer(function StylesTab() {
       editorStore.execute({
         type: 'resetStateStyle',
         params: { nodeId: nid, stateName: effectiveState, properties: [key] },
-      } as never);
+      });
     }
   };
 
@@ -265,16 +268,16 @@ export const StylesTab = observer(function StylesTab() {
       <CollapsibleSection title="间距" defaultOpen>
         <BoxModelEditor
           margin={{
-            top: styles.marginTop ?? '',
-            right: styles.marginRight ?? '',
-            bottom: styles.marginBottom ?? '',
-            left: styles.marginLeft ?? '',
+            top: String(styles.marginTop ?? ''),
+            right: String(styles.marginRight ?? ''),
+            bottom: String(styles.marginBottom ?? ''),
+            left: String(styles.marginLeft ?? ''),
           }}
           padding={{
-            top: styles.paddingTop ?? '',
-            right: styles.paddingRight ?? '',
-            bottom: styles.paddingBottom ?? '',
-            left: styles.paddingLeft ?? '',
+            top: String(styles.paddingTop ?? ''),
+            right: String(styles.paddingRight ?? ''),
+            bottom: String(styles.paddingBottom ?? ''),
+            left: String(styles.paddingLeft ?? ''),
           }}
           onMarginChange={handleChange}
           onPaddingChange={handleChange}
@@ -571,7 +574,7 @@ function BgImageInput({ value, onChange }: { value: string; onChange: (v: string
       method: 'POST',
       body: fd,
     });
-    const data = (await res.json()) as { url?: string };
+    const data: AssetUploadResponse = await res.json();
     if (!res.ok || !data.url) return;
     onChange(`url(${data.url})`);
   }, [projectId, onChange]);

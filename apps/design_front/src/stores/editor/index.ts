@@ -1,12 +1,24 @@
 import { makeAutoObservable, runInAction, toJS } from 'mobx';
-import type { ComponentNode, DesignProject, DomainStateVariable, Screen, Viewport } from '@globallink/design-schema';
+import type { ComponentNode, CSSProperties, DesignProject, DomainStateVariable, Screen, Viewport } from '@globallink/design-schema';
 import { generateNodeId, normalizeNode } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
-import type { StyleOverrides } from '@/types/editor';
 import { OperationExecutor, findNodeInScreens, findParent, findParentInScreens, walkTree } from '@globallink/design-operations';
 import { API_BASE, ApiError, apiJson, getErrorMessage } from '@/api/client';
 import { authStore } from '@/stores/auth';
 import { syncManager } from '@/services/SyncManager';
+
+/** Shape of serialized canvas view state stored in sessionStorage */
+interface CanvasViewState {
+  scale?: number;
+  panX?: number;
+  panY?: number;
+}
+
+/** Shape of a pending operation entry stored in localStorage */
+interface OperationLogEntry {
+  operation: Operation;
+  fingerprint: string;
+}
 
 /** Storage key for pending operations across page reloads */
 const PENDING_OPS_KEY = 'design-editor-pending-ops:';
@@ -18,7 +30,7 @@ function readStoredCanvasView(projectId: string): { scale: number; panX: number;
   try {
     const raw = sessionStorage.getItem(CANVAS_VIEW_KEY + projectId);
     if (!raw) return null;
-    const o = JSON.parse(raw) as { scale?: unknown; panX?: unknown; panY?: unknown };
+    const o: CanvasViewState = JSON.parse(raw);
     if (typeof o.scale !== 'number') return null;
     return {
       scale: Math.min(4, Math.max(0.1, o.scale)),
@@ -30,7 +42,7 @@ function readStoredCanvasView(projectId: string): { scale: number; panX: number;
   }
 }
 
-function savePendingOperations(projectId: string, ops: Array<{ operation: Operation; fingerprint: string }>): void {
+function savePendingOperations(projectId: string, ops: OperationLogEntry[]): void {
   try {
     const data = JSON.stringify(ops);
     localStorage.setItem(PENDING_OPS_KEY + projectId, data);
@@ -40,11 +52,12 @@ function savePendingOperations(projectId: string, ops: Array<{ operation: Operat
   }
 }
 
-function loadPendingOperations(projectId: string): Array<{ operation: Operation; fingerprint: string }> {
+function loadPendingOperations(projectId: string): OperationLogEntry[] {
   try {
     const raw = localStorage.getItem(PENDING_OPS_KEY + projectId);
     if (!raw) return [];
-    return JSON.parse(raw) as Array<{ operation: Operation; fingerprint: string }>;
+    const entries: OperationLogEntry[] = JSON.parse(raw);
+    return entries;
   } catch (err) {
     console.warn('[editor] failed to load pending operations from localStorage:', err);
     return [];
@@ -201,7 +214,7 @@ export class EditorStore {
   clipboardSubtreeJson: string | null = null;
 
   /** 内存中的样式剪贴板（复制/粘贴样式，与节点 JSON 剪贴板独立） */
-  styleClipboard: Record<string, string | number> | null = null;
+  styleClipboard: Partial<CSSProperties> | null = null;
 
   /** Project color palette (persistent) */
   projectColorPalette: string[] = [
@@ -233,7 +246,7 @@ export class EditorStore {
   }
 
   /** Pending operations waiting for server persistence (with fingerprints) */
-  private pendingOperations: Array<{ operation: Operation; fingerprint: string }> = [];
+  private pendingOperations: OperationLogEntry[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private isFlushing = false;
   private readonly flushIntervalMs = 10000; // Reduced from 180s to 10s for faster persistence
@@ -359,10 +372,10 @@ export class EditorStore {
       clearPendingOperations(this.project.id);
     }
     // Project data from MobX stores may be observable proxies. Convert to plain JS first.
-    const plain = toJS(project) as DesignProject;
+    const plain = toJS(project);
     for (const screen of plain.screens) {
       normalizeNode(screen.rootNode);
-      const rs = screen.rootNode.styles as StyleOverrides;
+      const rs = screen.rootNode.styles;
       delete rs.left;
       delete rs.top;
       delete rs.right;
@@ -845,7 +858,7 @@ export class EditorStore {
   copyNodeToClipboard(nodeId: string): void {
     const node = findNodeInScreens(this.screens, nodeId);
     if (!node) return;
-    const plain = toJS(node) as ComponentNode;
+    const plain = toJS(node);
     const json = JSON.stringify(plain);
     runInAction(() => {
       this.clipboardSubtreeJson = json;
@@ -865,7 +878,7 @@ export class EditorStore {
     if (!nodeId) return;
     const node = findNodeInScreens(this.screens, nodeId);
     if (!node) return;
-    const styles = (node.styles ?? {}) as Record<string, string | number>;
+    const styles: Partial<CSSProperties> = node.styles ?? {};
     runInAction(() => {
       this.styleClipboard = { ...styles };
     });
@@ -929,15 +942,16 @@ export class EditorStore {
   }
 
   private applyPasteJson(text: string): OperationResult {
-    let subtree: ComponentNode;
+    let parsed: unknown;
     try {
-      subtree = JSON.parse(text) as ComponentNode;
+      parsed = JSON.parse(text);
     } catch {
       return { success: false, description: '剪贴板不是有效 JSON', affectedNodeIds: [] };
     }
-    if (!isValidPasteSubtree(subtree)) {
+    if (!isValidPasteSubtree(parsed)) {
       return { success: false, description: '剪贴板不是有效的节点树', affectedNodeIds: [] };
     }
+    const subtree: ComponentNode = parsed;
 
     const screen = this.activeScreen;
     if (!screen) {
@@ -1139,7 +1153,7 @@ export class EditorStore {
         
         // Try to identify problematic operations from error response
         if (err.body && typeof err.body === 'object' && 'failedOperationIndex' in err.body) {
-          const failedIdx = (err.body as Record<string, unknown>).failedOperationIndex as number;
+          const failedIdx = typeof err.body.failedOperationIndex === 'number' ? err.body.failedOperationIndex : 0;
           const failedOp = operations[failedIdx];
           console.error('[editor] operation causing failure:', failedIdx, failedOp?.type, getErrorMessage(err.body));
           
@@ -1268,7 +1282,7 @@ export class EditorStore {
     });
   }
 
-  private takePendingOperations(): Array<{ operation: Operation; fingerprint: string }> {
+  private takePendingOperations(): OperationLogEntry[] {
     const pending = [...this.pendingOperations];
     this.pendingOperations = [];
     return pending;
@@ -1278,10 +1292,9 @@ export class EditorStore {
 
 function isValidPasteSubtree(n: unknown): n is ComponentNode {
   if (!n || typeof n !== 'object') return false;
-  const o = n as Record<string, unknown>;
-  if (typeof o.type !== 'string') return false;
-  if (!Array.isArray(o.children)) return false;
-  for (const c of o.children) {
+  if (!('type' in n) || typeof n.type !== 'string') return false;
+  if (!('children' in n) || !Array.isArray(n.children)) return false;
+  for (const c of n.children) {
     if (!isValidPasteSubtree(c)) return false;
   }
   return true;

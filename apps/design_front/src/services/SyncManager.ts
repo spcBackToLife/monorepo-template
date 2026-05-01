@@ -4,16 +4,38 @@ import { EchoDeduplicator } from './EchoDeduplicator';
 import { SaveStatusTracker } from './SaveStatusTracker';
 import { offlineStore } from './OfflineStore';
 
+/**
+ * Synthetic undo operation dispatched when the server broadcasts an undo event.
+ * This is NOT a real design-operations Operation — it is a SyncManager-internal
+ * envelope used only to notify handlers about remote undo events.
+ */
+export interface UndoSyntheticOperation {
+  type: 'undo';
+  params: { undoneSeq: number };
+}
+
 export type OperationEnvelopePayload = {
   id: string;
   fingerprint: string;
   projectId: string;
-  operation: Operation;
+  operation: Operation | UndoSyntheticOperation;
   seq: number;
   author: string;
   authorId?: string;
   timestamp: string;
 };
+
+/** Raw row shape returned by the HTTP polling endpoint */
+interface OperationPollRow {
+  id: string;
+  project_id: string;
+  seq: number;
+  operation: Operation;
+  fingerprint: string | null;
+  author: string | null;
+  author_id: string | null;
+  created_at: string;
+}
 
 export type IncomingHandler = (envelope: OperationEnvelopePayload) => void;
 
@@ -164,12 +186,18 @@ export class SyncManager {
       if (payload.seq != null) {
         this.ackSeq(payload.seq);
       }
+      // Undo is not a real Operation from design-operations; we create a
+      // synthetic envelope so downstream handlers can react to remote undos.
+      const undoOp: UndoSyntheticOperation = {
+        type: 'undo',
+        params: { undoneSeq: payload.undoneSeq },
+      };
       this.handlers.forEach((h) =>
         h({
           id: `undo-${payload.seq}`,
           fingerprint: '',
           projectId: payload.projectId,
-          operation: { type: 'undo', params: { undoneSeq: payload.undoneSeq } } as never,
+          operation: undoOp,
           seq: payload.seq,
           author: 'remote',
           timestamp: payload.timestamp,
@@ -269,16 +297,7 @@ export class SyncManager {
       const url = `${this.apiBase}/projects/${this.projectId}/operations?since=${this.lastSeq}`;
       const resp = await fetch(url);
       if (!resp.ok) return;
-      const rows = (await resp.json()) as Array<{
-        id: string;
-        project_id: string;
-        seq: number;
-        operation: Operation;
-        fingerprint: string | null;
-        author: string | null;
-        author_id: string | null;
-        created_at: string;
-      }>;
+      const rows: OperationPollRow[] = await resp.json();
 
       for (const row of rows) {
         const envelope: OperationEnvelopePayload = {

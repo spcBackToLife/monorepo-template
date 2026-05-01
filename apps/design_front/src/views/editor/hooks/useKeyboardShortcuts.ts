@@ -163,7 +163,7 @@ export function useKeyboardShortcuts() {
         editorStore.execute({
           type: 'reorderElement',
           params: { nodeId: id, parentId: parent.id, newIndex: newIdx },
-        } as never);
+        });
         return;
       }
 

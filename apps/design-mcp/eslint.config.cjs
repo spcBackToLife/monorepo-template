@@ -20,8 +20,17 @@ module.exports = [
     rules: {
       'no-unused-vars': 'off',
       'no-undef': 'off',
+      // ── 类型安全 ──
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // 提醒：优先 import 已有 schema 类型，不要手写 inline 重复定义
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: 'TSTypeAnnotation TSArrayType TSTypeReference[typeName.name="unknown"]',
+          message: '避免 unknown[] — 请使用具体类型（如 ComponentNode[], DomainStateVariable[] 等来自 @globallink/design-schema）',
+        },
+      ],
     },
   },
   {

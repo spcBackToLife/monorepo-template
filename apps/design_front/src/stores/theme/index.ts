@@ -34,7 +34,7 @@ export class ThemeStore {
   }
 
   private load(): void {
-    const raw = localStorage.getItem(LOCAL_KEY) as ThemeMode | null;
+    const raw = localStorage.getItem(LOCAL_KEY);
     if (raw === ThemeMode.Light || raw === ThemeMode.Dark || raw === ThemeMode.System) {
       this.mode = raw;
     }

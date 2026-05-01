@@ -282,7 +282,7 @@ const ApiEndpointsSection = observer(function ApiEndpointsSection({
     editorStore.execute({
       type: 'addApiEndpoint',
       params: { screenId, endpoint: ep },
-    } as never);
+    });
     setAddingNew(false);
   };
 
@@ -290,7 +290,7 @@ const ApiEndpointsSection = observer(function ApiEndpointsSection({
     editorStore.execute({
       type: 'removeApiEndpoint',
       params: { screenId, endpointId },
-    } as never);
+    });
     if (expandedId === endpointId) setExpandedId(null);
   };
 
@@ -535,7 +535,7 @@ function EndpointDefEditor({
     editorStore.execute({
       type: 'updateApiEndpoint',
       params: { screenId, endpointId: def.id, definition: changes },
-    } as never);
+    });
     onClose();
   };
 
@@ -610,21 +610,21 @@ const MockScenariosEditor = observer(function MockScenariosEditor({
     editorStore.execute({
       type: 'switchMockScenario',
       params: { screenId, endpointId, scenarioId },
-    } as never);
+    });
   };
 
   const handleRemoveScenario = (scenarioId: string) => {
     editorStore.execute({
       type: 'removeMockScenario',
       params: { screenId, endpointId, scenarioId },
-    } as never);
+    });
   };
 
   const handleAddScenario = (scenario: MockScenario) => {
     editorStore.execute({
       type: 'addMockScenario',
       params: { screenId, endpointId, scenario },
-    } as never);
+    });
     setAddingScenario(false);
   };
 
@@ -632,7 +632,7 @@ const MockScenariosEditor = observer(function MockScenariosEditor({
     editorStore.execute({
       type: 'updateMockScenario',
       params: { screenId, endpointId, scenarioId, changes },
-    } as never);
+    });
     setEditingId(null);
   };
 

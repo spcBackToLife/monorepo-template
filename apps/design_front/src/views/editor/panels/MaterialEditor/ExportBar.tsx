@@ -28,7 +28,7 @@ import {
 import { useMaterialEditor, prepareMaterialSvgCloneForExport } from '@globallink/material-engine';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
-import { API_BASE } from '@/api/client';
+import { API_BASE, type MaterialExportUploadResponse } from '@/api/client';
 import { materialProjectApi } from '@/api/materialProject';
 import { getCssTargetLabel, getExportFormat } from '@/views/editor/EditorContextMenu/buildMenuItems';
 interface ExportBarProps {
@@ -215,6 +215,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
             type: 'applyMaterialDesign',
             params: {
               nodeId: targetNodeId,
+              // Cast needed: TS cannot infer Record type from computed template-literal keys
               styleUpdates: {
                 [`--${pseudoName}-bg`]: `url("${result.url}")`,
               } as Record<string, string>,
@@ -227,6 +228,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
             type: 'updateStyle',
             params: {
               nodeId: targetNodeId,
+              // Cast needed: TS cannot infer Record type from computed template-literal keys
               styles: { [`--${pseudoName}-bg`]: encodedSvg } as Record<string, string>,
             },
           });
@@ -302,7 +304,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
             body: formData,
           });
           if (response.ok) {
-            const uploaded = await response.json() as { url: string };
+            const uploaded: MaterialExportUploadResponse = await response.json();
             const urlValue = `url("${uploaded.url}")`;
             editorStore.execute({
               type: 'updateStyle',
@@ -326,7 +328,7 @@ export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectS
         // 遮罩特别提示：节点需要有背景色/背景图才能看到 mask 效果
         if (effectiveCssTarget === 'mask-image') {
           const node = findNodeInScreens(editorStore.screens, targetNodeId);
-          const st = node?.styles as Record<string, string> | undefined;
+          const st = node?.styles;
           const hasBg = st?.backgroundColor || st?.backgroundImage || st?.background;
           if (!hasBg) {
             message.info('提示：遮罩需要节点有背景色或背景图才能看到效果，请先设置背景', 5);

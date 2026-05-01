@@ -1,15 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
 
-interface DesignProject {
-  id: string;
-  name: string;
-  platform: string;
-  screens: Array<{ id: string; name: string; rootNode: unknown; backgroundColor?: string }>;
-  currentViewport: unknown;
-  componentAssets: unknown[];
-}
-
 /** Extract path segments from a resource URI */
 function extractSegments(uri: URL): string[] {
   return uri.pathname.split('/').filter(Boolean);
@@ -54,7 +45,7 @@ export function registerResources(server: McpServer): void {
       // schema://screen/{projectId}/{screenId} → segments = ["screen", "<projectId>", "<screenId>"]
       const projectId = segments[1] ?? '';
       const screenId = segments[2] ?? '';
-      const project = (await api.getProject(projectId)) as DesignProject;
+      const project = await api.getProject(projectId);
       const screen = project.screens.find((s) => s.id === screenId);
       const content = screen ?? { error: `屏幕 ${screenId} 不存在` };
       return {

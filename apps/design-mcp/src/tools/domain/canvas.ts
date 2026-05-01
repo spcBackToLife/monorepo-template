@@ -774,7 +774,7 @@ export function registerCanvasTools(server: McpServer): void {
         const N=count??12,o=origin??'top-left',c1=colorStart??'#1a3ab4',c2=colorEnd??'#32c896',swd=sw??1.5,a=opacity??0.85;
         const h2rgb=(h:string)=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
         const r1=h2rgb(c1),r2=h2rgb(c2);
-        const ops:unknown[]=[];
+        const ops:unknown[]=[]; // polymorphic operation shapes — intentionally untyped
         for(let i=0;i<N;i++){
           const t=N>1?i/(N-1):0;
           const cr=`rgba(${Math.round(r1[0]!+(r2[0]!-r1[0]!)*t)},${Math.round(r1[1]!+(r2[1]!-r1[1]!)*t)},${Math.round(r1[2]!+(r2[2]!-r1[2]!)*t)},${a})`;

@@ -324,7 +324,7 @@ const ExportMenu = observer(function ExportMenu() {
         return;
       }
       try {
-        const code = generateReactCode(toJS(screen) as Screen, {
+        const code = generateReactCode(toJS(screen), {
           format,
           includeStyles: true,
           includeEvents: true,

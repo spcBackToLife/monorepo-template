@@ -4,7 +4,7 @@ import { CopyOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
-import { API_BASE } from '@/api/client';
+import { API_BASE, type AssetUploadResponse } from '@/api/client';
 
 interface AssetItem {
   url: string;
@@ -54,7 +54,7 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
         method: 'POST',
         body: fd,
       });
-      const data = (await res.json()) as { url?: string; filename?: string };
+      const data: AssetUploadResponse = await res.json();
       if (!res.ok || !data.url) {
         message.error('上传失败');
         return;

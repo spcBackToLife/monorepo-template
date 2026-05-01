@@ -11,20 +11,6 @@ import * as api from '../api-client.js';
  * - list_element_props
  */
 
-interface DesignProject {
-  id: string;
-  templates?: Array<{
-    id: string;
-    name: string;
-    rootNode: unknown;
-    propDefinitions: Record<string, {
-      type: string;
-      defaultValue?: unknown;
-      description?: string;
-    }>;
-  }>;
-}
-
 export function registerComponentPropsTools(server: McpServer): void {
   server.registerTool(
     'get_template_props',
@@ -37,8 +23,8 @@ export function registerComponentPropsTools(server: McpServer): void {
       },
     },
     async ({ projectId, templateId }) => {
-      const project = (await api.getProject(projectId)) as DesignProject;
-      const template = project.templates?.find((t) => t.id === templateId);
+      const project = await api.getProject(projectId);
+      const template = project.componentAssets?.find((t) => t.id === templateId);
       if (!template) {
         return {
           content: [

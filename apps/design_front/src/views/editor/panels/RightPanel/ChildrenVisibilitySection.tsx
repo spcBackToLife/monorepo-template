@@ -92,7 +92,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
           stateName: 'default',
           visible: checked ? true : false,
         },
-      } as never);
+      });
     } else {
       editorStore.execute({
         type: 'setChildVisibility',
@@ -102,7 +102,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
           stateName: currentEditState,
           visible: checked,
         },
-      } as never);
+      });
     }
   };
 
@@ -116,7 +116,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
         stateName: currentEditState,
         visible: undefined,
       },
-    } as never);
+    });
   };
 
   return (

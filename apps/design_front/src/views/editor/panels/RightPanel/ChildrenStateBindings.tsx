@@ -144,9 +144,10 @@ const StateBindingRow = observer(function StateBindingRow({
       params: {
         nodeId: parentNode.id,
         stateName: state.name,
+        styles: {},
         childrenStates: newChildrenStates,
       },
-    } as never);
+    });
   };
 
   return (

@@ -11,7 +11,7 @@ import {
   FontSizeOutlined,
   PictureOutlined,
 } from '@ant-design/icons';
-import { generateNodeId, getPrimitiveCategories, getPrimitivesByCategory } from '@globallink/design-schema';
+import { generateNodeId, getPrimitiveCategories, getPrimitivesByCategory, type PrimitiveNodeType } from '@globallink/design-schema';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import type { ToolType } from '@/stores/editor';
@@ -47,7 +47,7 @@ export const BottomToolbar = observer(function BottomToolbar() {
         type: 'addElement',
         params: {
           parentId,
-          tag: tag as never,
+          tag: tag as PrimitiveNodeType,
           elementId: generateNodeId(),
           ...(isText ? {
             props: { text: 'Text' },

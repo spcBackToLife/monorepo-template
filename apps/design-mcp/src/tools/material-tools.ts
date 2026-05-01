@@ -1005,7 +1005,7 @@ export function registerMaterialTools(server: McpServer): void {
       const rgb2 = parseHex(c2);
 
       // 3. 生成弧线并批量添加
-      const operations: unknown[] = [];
+      const operations: unknown[] = []; // polymorphic operation shapes — intentionally untyped
       for (let i = 0; i < N; i++) {
         const t = N > 1 ? i / (N - 1) : 0;
         const r = Math.round(rgb1[0]! + (rgb2[0]! - rgb1[0]!) * t);

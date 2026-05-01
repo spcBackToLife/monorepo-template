@@ -56,7 +56,7 @@ import {
   materialEditorSync,
   type MaterialOperationEnvelope,
 } from '@/services/MaterialEditorSyncManager';
-import { API_BASE } from '@/api/client';
+import { API_BASE, type MaterialExportUploadResponse } from '@/api/client';
 
 // ===== 工具栏配置 =====
 
@@ -192,7 +192,7 @@ function CanvasToolbar() {
               body: formData,
             });
             if (response.ok) {
-              const uploaded = await response.json() as { url: string };
+              const uploaded: MaterialExportUploadResponse = await response.json();
               editorStore.execute({
                 type: 'updateStyle',
                 params: {
@@ -392,7 +392,7 @@ function SyncedCanvas() {
           `${API_BASE}/api/projects/${projectId}/materials/${event.materialId}/schema`,
         );
         if (res.ok) {
-          const schema = await res.json() as MaterialProjectSchema;
+          const schema: MaterialProjectSchema = await res.json();
           // 通过一系列操作来同步不太现实，直接重新初始化更可靠
           // 这里我们触发一个 window 事件让 Provider 重新加载
           window.dispatchEvent(new CustomEvent('material-schema-reload', { detail: schema }));

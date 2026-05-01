@@ -3,7 +3,7 @@ import { App as AntdApp, Button, Segmented } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { toJS } from 'mobx';
-import type { Screen, ComponentNode } from '@globallink/design-schema';
+import type { Screen } from '@globallink/design-schema';
 import { generateReactCode } from '@globallink/design-engine';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
@@ -34,14 +34,14 @@ export const CodeTab = observer(function CodeTab() {
   const node = nodeId ? findNodeInScreens(screens, nodeId) : null;
 
   const codegenScreen = useMemo((): Screen | null => {
-    const s = screen ? (toJS(screen) as Screen) : null;
+    const s = screen ? toJS(screen) : null;
     if (!s) return null;
     if (scope === 'screen') return s;
     if (scope === 'node' && node) {
       return {
         ...s,
         name: (node.name && String(node.name)) || s.name || 'Node',
-        rootNode: toJS(node) as ComponentNode,
+        rootNode: toJS(node),
       };
     }
     return null;
@@ -67,11 +67,11 @@ export const CodeTab = observer(function CodeTab() {
     }
 
     if (scope === 'screen' && screen) {
-      const plain = toJS(screen) as Screen;
+      const plain = toJS(screen);
       return safeStringify(plain);
     }
     if (scope === 'node' && node) {
-      const plain = toJS(node) as ComponentNode;
+      const plain = toJS(node);
       return safeStringify(plain);
     }
     if (scope === 'node' && !nodeId) {
@@ -95,7 +95,7 @@ export const CodeTab = observer(function CodeTab() {
         <Segmented<CodeScope>
           size="small"
           value={scope}
-          onChange={(v) => setScope(v as CodeScope)}
+          onChange={(v) => setScope(v)}
           options={[
             { label: '选中节点', value: 'node' },
             { label: '当前页面', value: 'screen' },
@@ -104,7 +104,7 @@ export const CodeTab = observer(function CodeTab() {
         <Segmented<CodeView>
           size="small"
           value={view}
-          onChange={(v) => setView(v as CodeView)}
+          onChange={(v) => setView(v)}
           options={[
             { label: 'JSON', value: 'json' },
             { label: 'React', value: 'react' },

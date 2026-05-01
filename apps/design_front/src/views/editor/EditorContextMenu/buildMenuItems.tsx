@@ -330,7 +330,7 @@ export function handleEditorContextMenuClick(
             return;
           }
           const node = findNodeInScreens(editorStore.screens, targetNodeId);
-          const nodeStyles = { ...((node?.styles ?? {}) as StyleOverrides) };
+          const nodeStyles: StyleOverrides = { ...(node?.styles ?? {}) };
           const deleted = await materialSlotApi.remove(projectId, slotId);
 
           const { resetProperties, updateStyles } = getStyleCleanupAfterMaterialSlotRemove(
