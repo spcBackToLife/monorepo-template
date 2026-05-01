@@ -4,6 +4,7 @@ import { OperationsService } from '../../operations/operations.service';
 import type { Operation } from '@globallink/design-operations';
 import { generateId } from '@globallink/design-schema';
 import type { DataScenario, DataSource } from '@globallink/design-schema';
+import type { DataPayload } from '../../shared/types';
 
 @Injectable()
 export class DatasourcesService {
@@ -120,7 +121,7 @@ export class DatasourcesService {
     scenario: {
       id: string;
       name: string;
-      data: Record<string, unknown>;
+      data: DataPayload;
       description?: string;
       isDefault?: boolean;
     },
@@ -139,7 +140,7 @@ export class DatasourcesService {
     dataSourceId: string,
     scenarioId: string,
     patch: {
-      data?: Record<string, unknown>;
+      data?: DataPayload;
       name?: string;
       description?: string;
     },

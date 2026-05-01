@@ -4,9 +4,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
-import type { DomainToolParams } from './domainToolParams.js';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import * as _api from '../../api-client.js';
+import { apiClient } from '../../api-client.js';
 
 export function registerMaterialProjectTools(server: McpServer): void {
   registerDomainTool(server, 'material_project', '素材工程的 CRUD 与节点关联查询', {
@@ -18,10 +16,8 @@ export function registerMaterialProjectTools(server: McpServer): void {
         backgroundColor: z.string().optional(), referenceFrameWidth: z.number().positive().optional(),
         referenceFrameHeight: z.number().positive().optional(), tags: z.array(z.string()).optional(),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.createMaterialProject(p.projectId, {
+      handler: async (p) => {
+        const result = await apiClient.createMaterialProject(p.projectId, {
           name: p.name, targetNodeId: p.targetNodeId,
           canvasWidth: p.canvasWidth ?? 600, canvasHeight: p.canvasHeight ?? 400,
           backgroundColor: p.backgroundColor,
@@ -33,50 +29,40 @@ export function registerMaterialProjectTools(server: McpServer): void {
     list: {
       description: '列出项目下所有素材工程摘要（可按节点/关键词过滤）',
       schema: z.object({ projectId: z.string(), targetNodeId: z.string().optional(), search: z.string().optional() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.listMaterialProjects(p.projectId, { targetNodeId: p.targetNodeId, search: p.search });
+      handler: async (p) => {
+        const result = await apiClient.listMaterialProjects(p.projectId, { targetNodeId: p.targetNodeId, search: p.search });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     get: {
       description: '获取素材工程详细信息（含画布 JSON）',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.getMaterialProject(p.projectId, p.materialId);
+      handler: async (p) => {
+        const result = await apiClient.getMaterialProject(p.projectId, p.materialId);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     delete: {
       description: '删除素材工程（不可恢复）',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        await api2.default.deleteMaterialProject(p.projectId, p.materialId);
+      handler: async (p) => {
+        await apiClient.deleteMaterialProject(p.projectId, p.materialId);
         return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true }) }] };
       },
     },
     find_by_node: {
       description: '按设计 Schema 节点查找关联的素材工程（返回最近一个）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.findMaterialProjectByNode(p.projectId, p.nodeId);
+      handler: async (p) => {
+        const result = await apiClient.findMaterialProjectByNode(p.projectId, p.nodeId);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     find_all_by_node: {
       description: '按节点查找所有关联的素材工程（一对多）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.findAllMaterialProjectsByNode(p.projectId, p.nodeId);
+      handler: async (p) => {
+        const result = await apiClient.findAllMaterialProjectsByNode(p.projectId, p.nodeId);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },

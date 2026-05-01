@@ -4,6 +4,7 @@ import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { generateId } from '@globallink/design-schema';
 import type { DataSource, ApiEndpoint, HttpMethod, MockScenario, Screen } from '@globallink/design-schema';
+import type { DataPayload } from '@/types/editor';
 
 /**
  * 页面数据面板 — 重写版
@@ -83,8 +84,8 @@ export const DataTab = observer(function DataTab() {
 // ===================================================================
 
 /** 合并当前屏所有「已加载」数据源的活跃场景数据，供 JSON 预览（与画布 getActiveData 一致） */
-function mergeLoadedScenarioData(screen: Screen): Record<string, unknown> {
-  const merged: Record<string, unknown> = {};
+function mergeLoadedScenarioData(screen: Screen): DataPayload {
+  const merged: DataPayload = {};
   for (const ds of screen.dataSources ?? []) {
     if (ds.activePhase !== 'loaded') continue;
     const sc = ds.scenarios.find((s) => s.id === ds.activeScenarioId);
@@ -123,7 +124,7 @@ const PageDataEditor = observer(function PageDataEditor({
   }, [dataSource.id, scenarioId, dataFingerprint]);
 
   const commitData = useCallback(
-    (data: Record<string, unknown>) => {
+    (data: DataPayload) => {
       if (!scenarioId) return;
       editorStore.execute({
         type: 'updateDataScenario',
@@ -146,7 +147,7 @@ const PageDataEditor = observer(function PageDataEditor({
             return;
           }
           setError(null);
-          commitData(parsed as Record<string, unknown>);
+          commitData(parsed as DataPayload);
         } catch (e) {
           setError((e as Error).message);
         }
@@ -519,7 +520,7 @@ function EndpointDefEditor({
   const [bodyText, setBodyText] = useState(def.body ? JSON.stringify(def.body, null, 2) : '');
 
   const handleSave = () => {
-    const changes: Record<string, unknown> = {};
+    const changes: DataPayload = {};
     if (method !== def.method) changes.method = method;
     if (path !== def.path) changes.path = path;
     if (name !== def.name) changes.name = name;
@@ -810,7 +811,7 @@ function ScenarioEditForm({
 // 预设数据模板
 // ===================================================================
 
-const PRESETS: { key: string; label: string; desc: string; data: Record<string, unknown> }[] = [
+const PRESETS: { key: string; label: string; desc: string; data: DataPayload }[] = [
   { key: 'tasks', label: '任务列表', desc: 'tasks 数组 × 3 行', data: { tasks: [{ title: '写需求', status: '进行中' }, { title: '对接接口', status: '待开始' }, { title: '联调', status: '已完成' }] } },
   { key: 'items', label: '通用列表', desc: 'items 数组 × 2 行', data: { items: [{ id: '1', title: '示例项' }, { id: '2', title: '第二项' }] } },
   { key: 'user', label: '用户', desc: '单用户对象', data: { user: { name: '张三', email: 'demo@example.com' } } },
@@ -827,7 +828,7 @@ const PresetSection = observer(function PresetSection({
   const { message } = AntdApp.useApp();
   const [open, setOpen] = useState(false);
 
-  const apply = (data: Record<string, unknown>) => {
+  const apply = (data: DataPayload) => {
     const scenarioId = dataSource.activeScenarioId;
     if (!scenarioId) return;
     editorStore.execute({
@@ -868,8 +869,8 @@ function JsonTreeEditor({
   onChange,
   path = '',
 }: {
-  data: Record<string, unknown>;
-  onChange: (newData: Record<string, unknown>) => void;
+  data: DataPayload;
+  onChange: (newData: DataPayload) => void;
   path?: string;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -907,7 +908,7 @@ function JsonTreeEditor({
     setNewKey('');
   };
 
-  const handleNestedChange = (key: string, nestedData: Record<string, unknown>) => {
+  const handleNestedChange = (key: string, nestedData: DataPayload) => {
     onChange({ ...data, [key]: nestedData });
   };
 
@@ -958,7 +959,7 @@ function JsonTreeEditor({
             {isObject && !collapsed.has(fullPath) && (
               <div className="ml-4 border-l border-gray-100 pl-1">
                 <JsonTreeEditor
-                  data={value as Record<string, unknown>}
+                  data={value as DataPayload}
                   onChange={(nd) => handleNestedChange(key, nd)}
                   path={fullPath}
                 />

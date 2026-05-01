@@ -45,10 +45,10 @@ export function buildIsolatedScreen(screen: Screen, targetNode: ComponentNode, v
     isolatedNode.styles = {
       ...isolatedNode.styles,
       position: 'relative',
-      top: undefined as unknown as string | undefined,
-      left: undefined as unknown as string | undefined,
-      bottom: undefined as unknown as string | undefined,
-      right: undefined as unknown as string | undefined,
+      top: undefined,
+      left: undefined,
+      bottom: undefined,
+      right: undefined,
     };
   }
 

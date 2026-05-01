@@ -50,7 +50,7 @@ export class MaterialEditorController {
     // 兼容：既支持 { operation: { type, params } }，也支持顶层直接传 { type, params }（脚本/MCP 易写错）
     const operation =
       body.operation ??
-      (typeof body.type === 'string' ? (body as unknown as MaterialOperation) : undefined);
+      (typeof body.type === 'string' ? (body as MaterialOperation) : undefined);
     return this.service.execute(
       projectId,
       materialId,

@@ -1,4 +1,5 @@
 import type { CSSProperties } from '@globallink/design-schema';
+import type { StyleOverrides } from '@/types/editor';
 
 /**
  * 从 `background` 简写中去掉最前面的 `url(...)` 及其后紧跟的 position/size/repeat 片段，保留其余层（如渐变）。
@@ -16,7 +17,7 @@ export function stripLeadingBackgroundUrlLayer(background: string): string {
  */
 export function getStyleCleanupAfterMaterialSlotRemove(
   cssTarget: string,
-  nodeStyles: Record<string, unknown>,
+  nodeStyles: StyleOverrides,
 ): { resetProperties: string[]; updateStyles?: Partial<CSSProperties> } {
   if (cssTarget === 'background-image') {
     const resetProperties: string[] = [

@@ -1,4 +1,5 @@
 import { ApiHttpError } from './tools/helpers/toolResponse.js';
+import type { MaterialProjectUpdateBody } from './types/canvas.js';
 
 const BASE_URL = process.env.DESIGN_API_URL ?? 'http://localhost:3001';
 
@@ -245,7 +246,7 @@ export async function createMaterialProject(
     targetNodeId?: string;
     canvasWidth: number;
     canvasHeight: number;
-    canvasJSON?: Record<string, unknown>;
+    canvasJSON?: Record<string, unknown>; // intentional: raw JSON structure from backend
     backgroundColor?: string;
     referenceFrameWidth?: number;
     referenceFrameHeight?: number;
@@ -320,7 +321,7 @@ export async function deleteMaterialProject(
 export async function updateMaterialProject(
   projectId: string,
   materialProjectId: string,
-  body: Record<string, unknown>,
+  body: MaterialProjectUpdateBody,
 ): Promise<unknown> {
   return request(`/api/projects/${projectId}/material-projects/${materialProjectId}`, {
     method: 'PUT',
@@ -554,7 +555,7 @@ export async function getMaterialSchema(
 export async function materialEditorAction(
   projectId: string,
   action: string,
-  params: Record<string, unknown>,
+  params: Record<string, unknown>, // intentional: legacy action params are untyped
   options?: { materialProjectId?: string; fingerprint?: string },
 ): Promise<unknown> {
   return request(`/api/projects/${projectId}/material-editor/${action}`, {
@@ -686,4 +687,5 @@ const apiClient = {
   findSlotsByNode, findSlot, createSlot, updateSlot, deleteSlot,
   uploadExportedMaterial,
 };
+export { apiClient };
 export { apiClient as default };

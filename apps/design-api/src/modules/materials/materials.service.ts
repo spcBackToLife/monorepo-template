@@ -353,7 +353,7 @@ export class MaterialsService {
     const inputBuffer = readFileSync(filepath);
     let pipeline = sharp(inputBuffer);
 
-    const formatOpts: Record<string, any> = {};
+    const formatOpts: Record<string, string | number | boolean> = {};
     if (options.quality !== undefined) {
       formatOpts.quality = Math.min(100, Math.max(1, options.quality));
     }

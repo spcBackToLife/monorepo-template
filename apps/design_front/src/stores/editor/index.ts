@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction, toJS } from 'mobx';
 import type { ComponentNode, DesignProject, DomainStateVariable, Screen, Viewport } from '@globallink/design-schema';
 import { generateNodeId, normalizeNode } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
+import type { StyleOverrides } from '@/types/editor';
 import { OperationExecutor, findNodeInScreens, findParent, findParentInScreens, walkTree } from '@globallink/design-operations';
 import { API_BASE, ApiError, apiJson, getErrorMessage } from '@/api/client';
 import { authStore } from '@/stores/auth';
@@ -361,7 +362,7 @@ export class EditorStore {
     const plain = toJS(project) as DesignProject;
     for (const screen of plain.screens) {
       normalizeNode(screen.rootNode);
-      const rs = screen.rootNode.styles as Record<string, unknown>;
+      const rs = screen.rootNode.styles as StyleOverrides;
       delete rs.left;
       delete rs.top;
       delete rs.right;

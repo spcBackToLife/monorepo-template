@@ -15,6 +15,7 @@ import '@xyflow/react/dist/style.css';
 import { Checkbox } from 'antd';
 import type { DesignProject } from '@globallink/design-schema';
 import type { BlueprintAnalysis, FlowEdgeType } from '../types';
+import type { FlowMetadata } from '@/types/editor';
 import { buildFlowGraph } from '../SchemaAnalyzer';
 import { ScreenFlowNode } from './ScreenFlowNode';
 import { StateFlowNode } from './StateFlowNode';
@@ -126,7 +127,7 @@ export function FlowView({
       },
       markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors[e.type] },
       labelStyle: { fontSize: 10, fill: '#64748b' },
-      data: { ...e, label: e.label } as Record<string, unknown>,
+      data: { ...e, label: e.label } as FlowMetadata,
     }));
 
     // Apply ELK layout

@@ -3,6 +3,7 @@ import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { STYLE_GROUPS, type StyleGroup } from './styleGroups';
+import type { StyleOverrides } from '@/types/editor';
 import './styleEditor.css';
 
 const PIXEL_DEFAULT_KEYS = new Set([
@@ -54,7 +55,7 @@ export const StyleEditorPanel = observer(function StyleEditorPanel() {
     return <Empty description="节点未找到" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
-  const styles = node.styles as Record<string, unknown>;
+  const styles = node.styles as StyleOverrides;
 
   const handleChange = (key: string, value: string) => {
     const normalized = normalizeStyleInput(key, value);
@@ -80,7 +81,7 @@ export const StyleEditorPanel = observer(function StyleEditorPanel() {
 
 interface GroupFieldsProps {
   group: StyleGroup;
-  styles: Record<string, unknown>;
+  styles: StyleOverrides;
   onChange: (key: string, value: string) => void;
 }
 

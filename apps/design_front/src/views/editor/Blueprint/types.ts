@@ -6,6 +6,7 @@ import type {
   EnvironmentVariable,
   ComponentTemplate,
 } from '@globallink/design-schema';
+import type { FlowMetadata } from '@/types/editor';
 
 // ===== Top-level Analysis =====
 
@@ -192,7 +193,7 @@ export interface FlowNode {
   type: 'screen' | 'domainState' | 'envState' | 'api';
   label: string;
   screenId?: string;
-  metadata: Record<string, unknown>;
+  metadata: FlowMetadata;
 }
 
 export interface FlowEdge {
@@ -203,7 +204,7 @@ export interface FlowEdge {
   /** 产品语言标签 */
   label: string;
   trigger?: EventTrigger;
-  metadata: Record<string, unknown>;
+  metadata: FlowMetadata;
 }
 
 export type FlowEdgeType =

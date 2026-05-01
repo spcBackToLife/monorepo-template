@@ -3,6 +3,7 @@ import { Empty, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
+import type { EventPayload } from '@/types/editor';
 
 // ===== Constants =====
 
@@ -161,7 +162,7 @@ const EventCard = observer(function EventCard({ event, eventIndex, nodeId }: Eve
   }, [nodeId, eventIndex, event.disabled]);
 
   const handleSaveInline = useCallback(() => {
-    const patch: Record<string, unknown> = {};
+    const patch: EventPayload = {};
     if (editTrigger !== event.trigger) patch.trigger = editTrigger;
     patch.actions = editActions;
     editorStore.execute({
@@ -429,7 +430,7 @@ function SubActionChainEditor({
     onChange(actions.map((a, i) => (i === idx ? { ...a, [field]: value } : a)));
   };
 
-  const updateSubActionFields = (idx: number, fields: Record<string, unknown>) => {
+  const updateSubActionFields = (idx: number, fields: EventPayload) => {
     onChange(actions.map((a, i) => (i === idx ? { ...a, ...fields } : a)));
   };
 
@@ -636,7 +637,7 @@ const AddEventForm = observer(function AddEventForm({
   const [conditionExpr, setConditionExpr] = useState('');
 
   const handleSave = () => {
-    const action: Record<string, unknown> = { type: actionConfig.type };
+    const action: EventPayload = { type: actionConfig.type };
 
     switch (actionConfig.type) {
       case 'navigate':
@@ -683,7 +684,7 @@ const AddEventForm = observer(function AddEventForm({
         break;
     }
 
-    const eventPayload: Record<string, unknown> = { trigger, actions: [action] };
+    const eventPayload: EventPayload = { trigger, actions: [action] };
     if (conditionEnabled) {
       if (conditionType === 'domainState' && conditionVar) {
         eventPayload.condition = { type: 'domainState', variableName: conditionVar, value: conditionVal };

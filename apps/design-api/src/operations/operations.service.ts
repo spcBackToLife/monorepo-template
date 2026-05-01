@@ -60,6 +60,8 @@ function findNodeInProjectApi(
  * 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
  */
 function ensureDeterministicIds(operation: Operation, project: DesignProject): void {
+  // Operation params are polymorphic (each op type has its own shape),
+  // so Record<string, unknown> is the correct structural type here.
   const p = (operation.params ?? {}) as Record<string, unknown>;
 
   switch (operation.type) {

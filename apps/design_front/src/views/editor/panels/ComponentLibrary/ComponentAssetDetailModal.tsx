@@ -3,6 +3,7 @@ import { App as AntdApp, Modal, Button, Input } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { API_BASE } from '@/api/client';
+import type { DataPayload } from '@/types/editor';
 
 type Snapshot = {
   name: string;
@@ -87,10 +88,10 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
     message.success('已设为缩略图');
   };
 
-  const buildPatch = (): Record<string, unknown> | null => {
+  const buildPatch = (): DataPayload | null => {
     const init = initialRef.current;
     if (!init) return null;
-    const patch: Record<string, unknown> = {};
+    const patch: DataPayload = {};
     if (name !== init.name) patch.name = name;
     if (category !== init.category) patch.category = category;
     if (description !== init.description) patch.description = description;

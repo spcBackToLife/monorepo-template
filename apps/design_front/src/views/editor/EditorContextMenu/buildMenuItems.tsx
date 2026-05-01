@@ -8,6 +8,7 @@ import { findNodeInScreens } from '@globallink/design-operations';
 import { getStyleCleanupAfterMaterialSlotRemove } from '@/views/editor/materialSlotStyleCleanup';
 import { getElementProps } from '@globallink/design-schema';
 import type { PrimitiveNodeType, ComponentNode } from '@globallink/design-schema';
+import type { StyleOverrides } from '@/types/editor';
 
 // ===== 素材应用目标 (Material Apply Target) =====
 
@@ -329,7 +330,7 @@ export function handleEditorContextMenuClick(
             return;
           }
           const node = findNodeInScreens(editorStore.screens, targetNodeId);
-          const nodeStyles = { ...((node?.styles ?? {}) as Record<string, unknown>) };
+          const nodeStyles = { ...((node?.styles ?? {}) as StyleOverrides) };
           const deleted = await materialSlotApi.remove(projectId, slotId);
 
           const { resetProperties, updateStyles } = getStyleCleanupAfterMaterialSlotRemove(

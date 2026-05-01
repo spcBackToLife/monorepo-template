@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MaterialProjectsService } from './material-projects.service';
+import type { CanvasJSON } from '../../shared/types';
 
 /**
  * 素材编辑器工程文件 API
@@ -42,7 +43,7 @@ export class MaterialProjectsController {
       targetNodeId?: string;
       canvasWidth: number;
       canvasHeight: number;
-      canvasJSON: Record<string, unknown>;
+      canvasJSON: CanvasJSON;
       backgroundColor?: string;
       referenceFrameWidth?: number;
       referenceFrameHeight?: number;
@@ -100,7 +101,7 @@ export class MaterialProjectsController {
       targetNodeId?: string;
       canvasWidth?: number;
       canvasHeight?: number;
-      canvasJSON?: Record<string, unknown>;
+      canvasJSON?: CanvasJSON;
       backgroundColor?: string;
       referenceFrameWidth?: number;
       referenceFrameHeight?: number;
@@ -132,7 +133,7 @@ export class MaterialProjectsController {
   async uploadExport(
     @Param('projectId') projectId: string,
     @Param('id') id: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('未上传文件');
@@ -151,7 +152,7 @@ export class MaterialProjectsController {
   async uploadThumbnail(
     @Param('projectId') projectId: string,
     @Param('id') id: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('未上传文件');

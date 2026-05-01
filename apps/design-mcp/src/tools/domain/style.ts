@@ -5,9 +5,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
-import type { DomainToolParams } from './domainToolParams.js';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import * as api from '../../api-client.js';
+import { apiClient } from '../../api-client.js';
 
 export function registerStyleTools(server: McpServer): void {
   registerDomainTool(server, 'style', 'CSS 样式修改与批量操作', {
@@ -17,20 +15,16 @@ export function registerStyleTools(server: McpServer): void {
         projectId: z.string(), nodeId: z.string(),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).describe('CSS 属性键值对'),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'updateStyle', params: { nodeId: p.nodeId, styles: p.styles } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'updateStyle', params: { nodeId: p.nodeId, styles: p.styles } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     reset: {
       description: '重置（删除）某些 CSS 属性，恢复默认值',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), properties: z.array(z.string()) }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'resetStyle', params: { nodeId: p.nodeId, properties: p.properties } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'resetStyle', params: { nodeId: p.nodeId, properties: p.properties } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -42,10 +36,8 @@ export function registerStyleTools(server: McpServer): void {
           nodeId: z.string(), styles: z.record(z.string(), z.union([z.string(), z.number()])),
         })),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'batchUpdateStyle', params: { updates: p.updates } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'batchUpdateStyle', params: { updates: p.updates } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },

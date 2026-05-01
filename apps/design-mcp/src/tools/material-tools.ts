@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
+import type { CanvasSchema, ApiJsonResponse } from '../types/canvas.js';
 
 /**
  * Material Editor MCP Tools — 素材编辑器完整操作集
@@ -109,7 +110,7 @@ export function registerMaterialTools(server: McpServer): void {
         }
         const uploadResult = await uploadRes.json();
         if (tags || category) {
-          const materialId = (uploadResult as Record<string, string>).id;
+          const materialId = (uploadResult as ApiJsonResponse).id as string | undefined;
           if (materialId) {
             await api.updateMaterialMeta(projectId, materialId, { ...(category ? { category } : {}), ...(tags ? { tags } : {}) });
           }
@@ -404,10 +405,10 @@ export function registerMaterialTools(server: McpServer): void {
       },
     },
     async ({ projectId, materialId }) => {
-      const schema = await api.getMaterialSchema(projectId, materialId) as Record<string, unknown>;
-      const backendW = (schema.canvasWidth as number) ?? 600;
-      const backendH = (schema.canvasHeight as number) ?? 400;
-      const refFrame = schema.referenceFrame as { enabled?: boolean; width?: number; height?: number } | undefined;
+      const schema = await api.getMaterialSchema(projectId, materialId) as CanvasSchema;
+      const backendW = schema.canvasWidth ?? 600;
+      const backendH = schema.canvasHeight ?? 400;
+      const refFrame = schema.referenceFrame;
       const refW = refFrame?.width ?? backendW;
       const refH = refFrame?.height ?? backendH;
 
@@ -418,7 +419,7 @@ export function registerMaterialTools(server: McpServer): void {
       const frameX = (frontendW - refW) / 2;
       const frameY = (frontendH - refH) / 2;
 
-      const objects = (schema.objects as unknown[]) ?? [];
+      const objects = schema.objects ?? [];
       const info = {
         // 后端存储的画布尺寸（= 组件原始尺寸）
         backendCanvasWidth: backendW,
@@ -975,10 +976,10 @@ export function registerMaterialTools(server: McpServer): void {
     },
     async ({ projectId, materialId, count, origin, colorStart, colorEnd, strokeWidth: sw, opacity }) => {
       // 1. 获取画布信息，计算参考框位置
-      const schema = await api.getMaterialSchema(projectId, materialId) as Record<string, unknown>;
-      const backendW = (schema.canvasWidth as number) ?? 600;
-      const backendH = (schema.canvasHeight as number) ?? 400;
-      const refFrame = schema.referenceFrame as { width?: number; height?: number } | undefined;
+      const schema = await api.getMaterialSchema(projectId, materialId) as CanvasSchema;
+      const backendW = schema.canvasWidth ?? 600;
+      const backendH = schema.canvasHeight ?? 400;
+      const refFrame = schema.referenceFrame;
       const W = refFrame?.width ?? backendW;
       const H = refFrame?.height ?? backendH;
 
@@ -1073,7 +1074,7 @@ export function registerMaterialTools(server: McpServer): void {
             origin: orig,
             referenceFrame: { x: frameX, y: frameY, width: W, height: H },
             colorRange: `${c1} → ${c2}`,
-            ...(result as Record<string, unknown>),
+            ...(result as ApiJsonResponse),
           }, null, 2),
         }],
       };
@@ -1095,9 +1096,9 @@ export function registerMaterialTools(server: McpServer): void {
     },
     async ({ projectId, materialId, includeDefault }) => {
       // 获取当前所有对象
-      const schema = await api.getMaterialSchema(projectId, materialId) as Record<string, unknown>;
-      const objects = (schema.objects as Array<{ id: string; name?: string }>) ?? [];
-      const defaultId = schema.defaultElementId as string | undefined;
+      const schema = await api.getMaterialSchema(projectId, materialId) as CanvasSchema;
+      const objects = schema.objects ?? [];
+      const defaultId = schema.defaultElementId;
 
       const toDelete = objects.filter(o => includeDefault || o.id !== defaultId);
 
@@ -1121,7 +1122,7 @@ export function registerMaterialTools(server: McpServer): void {
             message: `已删除 ${toDelete.length} 个对象`,
             deletedCount: toDelete.length,
             keptDefault: !includeDefault && defaultId ? true : false,
-            ...(result as Record<string, unknown>),
+            ...(result as ApiJsonResponse),
           }, null, 2),
         }],
       };

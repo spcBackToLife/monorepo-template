@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import type { StorageProvider, FileMeta } from './storage/storage-provider.interface';
+import type { CanvasJSON } from '../../shared/types';
 
 /**
  * 素材编辑器工程文件记录（数据库行映射）
@@ -15,7 +16,7 @@ export interface MaterialProjectRecord {
   name: string;
   canvasWidth: number;
   canvasHeight: number;
-  canvasJSON: Record<string, unknown>;
+  canvasJSON: CanvasJSON;
   backgroundColor: string;
   referenceFrameWidth: number | null;
   referenceFrameHeight: number | null;
@@ -36,7 +37,7 @@ interface MaterialProjectRow {
   name: string;
   canvas_width: number;
   canvas_height: number;
-  canvas_json: Record<string, unknown>;
+  canvas_json: CanvasJSON;
   background_color: string;
   reference_frame_width: number | null;
   reference_frame_height: number | null;
@@ -117,7 +118,7 @@ export class MaterialProjectsService {
       targetNodeId?: string;
       canvasWidth: number;
       canvasHeight: number;
-      canvasJSON: Record<string, unknown>;
+      canvasJSON: CanvasJSON;
       backgroundColor?: string;
       referenceFrameWidth?: number;
       referenceFrameHeight?: number;
@@ -255,7 +256,7 @@ export class MaterialProjectsService {
       targetNodeId?: string;
       canvasWidth?: number;
       canvasHeight?: number;
-      canvasJSON?: Record<string, unknown>;
+      canvasJSON?: CanvasJSON;
       backgroundColor?: string;
       referenceFrameWidth?: number;
       referenceFrameHeight?: number;

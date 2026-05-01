@@ -109,7 +109,7 @@ export class MaterialSlotsService {
       return rowToRecord(result.rows[0]);
     } catch (err: unknown) {
       // 唯一约束冲突 — 同一节点同名槽位已存在
-      if ((err as Record<string, unknown>).code === '23505') {
+      if ((err as { code?: string }).code === '23505') {
         throw new ConflictException(
           `节点 ${data.nodeId} 的槽位 "${data.slotName ?? 'default'}" 已被占用`,
         );

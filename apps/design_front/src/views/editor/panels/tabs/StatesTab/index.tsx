@@ -4,6 +4,7 @@ import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import { findNodeInScreens } from '@globallink/design-operations';
 import { type DomainStateVariable, type DomainStateValue } from '@globallink/design-schema';
+import type { StyleOverrides, ElementProps } from '@/types/editor';
 import { StateCombinationPreview } from './StateCombinationPreview';
 
 // ===== Interaction state presets =====
@@ -150,7 +151,7 @@ const InteractionStatesSection = observer(function InteractionStatesSection({
 
 interface BusinessStatesSectionProps {
   nodeId: string;
-  states: Array<{ name: string; styles: Record<string, unknown>; props?: Record<string, unknown> }>;
+  states: Array<{ name: string; styles: StyleOverrides; props?: ElementProps }>;
   activeState: string;
 }
 
@@ -313,8 +314,8 @@ interface DomainStateBindingsSectionProps {
     variableName: string;
     ownerNodeId?: string;
     value: string;
-    styles?: Record<string, unknown>;
-    props?: Record<string, unknown>;
+    styles?: StyleOverrides;
+    props?: ElementProps;
     visible?: boolean;
   }>;
   screenDomainStates: DomainStateVariable[];

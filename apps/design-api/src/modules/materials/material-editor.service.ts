@@ -19,6 +19,7 @@ import {
   type MaterialProjectSchema,
   type OperationResult,
 } from '@globallink/material-operations';
+import type { MaterialPresetConfig } from '../../shared/types';
 
 /** 每隔多少次操作自动创建快照 */
 const SNAPSHOT_INTERVAL = 50;
@@ -448,8 +449,8 @@ export class MaterialEditorService {
   /**
    * 获取预设数据（纯只读）
    */
-  getPresets(presetType?: string): Record<string, unknown> {
-    const presets: Record<string, unknown> = {
+  getPresets(presetType?: string): MaterialPresetConfig {
+    const presets: MaterialPresetConfig = {
       gradients: [
         { name: '日出渐变', type: 'linear', angle: 135, stops: [{ offset: 0, color: '#ff6b6b' }, { offset: 1, color: '#feca57' }] },
         { name: '海洋渐变', type: 'linear', angle: 180, stops: [{ offset: 0, color: '#667eea' }, { offset: 1, color: '#764ba2' }] },

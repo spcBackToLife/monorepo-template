@@ -3,6 +3,13 @@ import { Select, Button, Typography, Segmented, Dropdown, Switch, Tooltip, App a
 import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
+
+// html2canvas 通过 CDN 全局注入，不在 bundle 内
+declare global {
+  interface Window {
+    html2canvas?: (el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+  }
+}
 import { toJS } from 'mobx';
 import { ALL_VIEWPORTS, type Screen } from '@globallink/design-schema';
 import { generateReactCode } from '@globallink/design-engine';
@@ -346,9 +353,7 @@ const ExportMenu = observer(function ExportMenu() {
       return;
     }
     try {
-      const html2canvasGlobal = (window as unknown as Record<string, unknown>).html2canvas as
-        | ((el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>)
-        | undefined;
+      const html2canvasGlobal = window.html2canvas;
       if (!html2canvasGlobal) {
         message.warning('PNG 导出需要 html2canvas，请先添加依赖');
         return;

@@ -11,6 +11,7 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { randomUUID } from 'crypto';
+import type { Request } from 'express';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
@@ -27,10 +28,10 @@ export class FileUploadController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: (_req: any, _file: any, cb: any) => {
+        destination: (_req: Request, _file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
           cb(null, UPLOAD_DIR);
         },
-        filename: (_req: any, file: any, cb: any) => {
+        filename: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
           const uniqueSuffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
           const ext = extname(file.originalname);
           cb(null, `${uniqueSuffix}${ext}`);
@@ -39,7 +40,7 @@ export class FileUploadController {
       limits: {
         fileSize: 10 * 1024 * 1024,
       },
-      fileFilter: (_req: any, file: any, cb: any) => {
+      fileFilter: (_req: Request, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
         const allowedMimes = [
           'image/jpeg',
           'image/png',
@@ -61,7 +62,7 @@ export class FileUploadController {
   )
   uploadFile(
     @Param('projectId') projectId: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

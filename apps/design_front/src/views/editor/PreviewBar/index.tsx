@@ -196,8 +196,8 @@ export const PreviewBar = observer(function PreviewBar() {
   const handleMockScenarioSwitch = (endpointId: string, scenarioId: string) => {
     if (!screen) return;
     runInAction(() => {
-      const ep = (screen as unknown as { apiEndpoints?: Array<{ definition: { id: string }; activeScenarioId: string }> }).apiEndpoints?.find(
-        (e: { definition: { id: string } }) => e.definition.id === endpointId,
+      const ep = screen.apiEndpoints?.find(
+        (e) => e.definition.id === endpointId,
       );
       if (ep) ep.activeScenarioId = scenarioId;
     });

@@ -70,6 +70,7 @@ import {
 } from '@/services/MaterialEditorSyncManager';
 import { materialProjectApi, materialSlotApi } from '@/api/materialProject';
 import { API_BASE } from '@/api/client';
+import type { StyleOverrides, MaterialPropertyUpdates } from '@/types/editor';
 import { LeftToolbar } from './LeftToolbar';
 import type { ActiveTool, EffectToolType } from './LeftToolbar';
 import { RightPropertyPanel } from './RightPropertyPanel';
@@ -107,7 +108,7 @@ function useTargetNodeStyles(nodeId: string | null) {
 
   return useMemo(() => {
     if (!node) return null;
-    const styles = (node.styles ?? {}) as Record<string, unknown>;
+    const styles = (node.styles ?? {}) as StyleOverrides;
     const w = styles.width;
     const h = styles.height;
     return {
@@ -722,7 +723,7 @@ function ModalContent({
   }, [selectedIds, state.project.objects, state.project.version, handleApplyMaterialGradientFill]);
 
   // ===== 属性变更 =====
-  const handlePropertyChange = useCallback((updates: Record<string, unknown>) => {
+  const handlePropertyChange = useCallback((updates: MaterialPropertyUpdates) => {
     for (const id of selectedIds) {
       // 专有样式操作
       if (updates.fill !== undefined) {
@@ -746,7 +747,7 @@ function ModalContent({
       }
 
       // 变换属性 → 统一使用 me:updateObject
-      const transformProps: Record<string, unknown> = {};
+      const transformProps: MaterialPropertyUpdates = {};
       if (updates.left !== undefined) transformProps.x = updates.left as number;
       if (updates.top !== undefined) transformProps.y = updates.top as number;
       if (updates.width !== undefined) transformProps.width = updates.width as number;
@@ -760,7 +761,7 @@ function ModalContent({
         });
       }
 
-      const styleProps: Record<string, unknown> = {};
+      const styleProps: MaterialPropertyUpdates = {};
       if (updates.rx !== undefined || updates.ry !== undefined) {
         const rx = (updates.rx ?? updates.ry) as number;
         const ry = (updates.ry ?? updates.rx) as number;
@@ -777,7 +778,7 @@ function ModalContent({
         });
       }
 
-      const profiledProps: Record<string, unknown> = {};
+      const profiledProps: MaterialPropertyUpdates = {};
       if (updates.profiledGapDegrees !== undefined) {
         profiledProps.profiledGapDegrees = updates.profiledGapDegrees as number;
       }

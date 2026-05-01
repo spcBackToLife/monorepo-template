@@ -5,9 +5,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ComponentEvent } from '@globallink/design-schema';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
-import type { DomainToolParams } from './domainToolParams.js';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import * as _api from '../../api-client.js';
+import { apiClient } from '../../api-client.js';
 
 // ── 视觉状态 ──
 export function registerVisualStateTools(server: McpServer): void {
@@ -20,36 +18,29 @@ export function registerVisualStateTools(server: McpServer): void {
         transition: z.object({ duration: z.number().optional(), easing: z.string().optional(), properties: z.array(z.string()).optional() }).optional(),
         childrenStates: z.record(z.string(), z.string()).optional(),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'addState', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, ...(p.transition != null ? { transition: p.transition } : {}), ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}) } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'addState', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, ...(p.transition != null ? { transition: p.transition } : {}), ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}) } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     set_active: {
       description: '切换组件当前激活状态（用于预览不同状态下外观）',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), stateName: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'setActiveState', params: { nodeId: p.nodeId, stateName: p.stateName } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'setActiveState', params: { nodeId: p.nodeId, stateName: p.stateName } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     remove: {
       description: '删除节点上的指定视觉状态',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), stateName: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await api2.default.executeOperation(p.projectId, { type: 'removeState', params: { nodeId: p.nodeId, stateName: p.stateName } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'removeState', params: { nodeId: p.nodeId, stateName: p.stateName } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     /**
-     * ⚠️ 重要：update 是【合并模式】（{ ...oldStyles, ...newStyles }）。
+     * ⚠️ 重要：update 是【合并模式】（{ ...oldStyles, ...newStyles}）。
      * - 想修改/新增属性 ✅ 正常传
      * - 想【删除】某个已有属性 ❌ 不传没用！必须用 reset_style action
      * - 例如：hover 状态有 backgroundImage: null 想删除 → 用 reset_style，properties: ["backgroundImage"]
@@ -63,11 +54,8 @@ export function registerVisualStateTools(server: McpServer): void {
         childrenStates: z.record(z.string(), z.string()).optional(),
         transition: z.object({ duration: z.number().optional(), easing: z.string().optional(), properties: z.array(z.string()).optional() }).optional(),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await api2.default.executeOperation(p.projectId, { type: 'updateState', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, props: p.props, ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}), ...(p.transition != null ? { transition: p.transition } : {}) } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'updateState', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, props: p.props, ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}), ...(p.transition != null ? { transition: p.transition } : {}) } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -84,11 +72,8 @@ export function registerVisualStateTools(server: McpServer): void {
         stateName: z.string(),
         properties: z.array(z.string()).describe('要删除的 CSS 属性名数组，如 ["backgroundImage", "backgroundColor"]'),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await api2.default.executeOperation(p.projectId, { type: 'resetStateStyle', params: { nodeId: p.nodeId, stateName: p.stateName, properties: p.properties } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'resetStateStyle', params: { nodeId: p.nodeId, stateName: p.stateName, properties: p.properties } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -105,10 +90,8 @@ export function registerEventTools(server: McpServer): void {
         trigger: z.enum(['click', 'hover', 'longPress']),
         targetScreenId: z.string().describe('目标屏幕 ID 或 "new"'),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'addNavigation', params: { nodeId: p.nodeId, trigger: p.trigger, targetScreenId: p.targetScreenId } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'addNavigation', params: { nodeId: p.nodeId, trigger: p.trigger, targetScreenId: p.targetScreenId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -118,30 +101,24 @@ export function registerEventTools(server: McpServer): void {
         projectId: z.string(), nodeId: z.string(),
         event: z.record(z.string(), z.unknown()),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'addEvent', params: { nodeId: p.nodeId, event: p.event as unknown as ComponentEvent } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'addEvent', params: { nodeId: p.nodeId, event: p.event as unknown as ComponentEvent } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     remove_event: {
       description: '按索引删除节点上的事件',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), eventIndex: z.number() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'removeEvent', params: { nodeId: p.nodeId, eventIndex: p.eventIndex } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'removeEvent', params: { nodeId: p.nodeId, eventIndex: p.eventIndex } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     update_event: {
       description: '就地更新节点上某条事件的 trigger/actions/condition 等字段',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), eventIndex: z.number(), event: z.record(z.string(), z.unknown()) }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'updateEvent', params: { nodeId: p.nodeId, eventIndex: p.eventIndex, event: p.event as unknown as Partial<ComponentEvent> } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'updateEvent', params: { nodeId: p.nodeId, eventIndex: p.eventIndex, event: p.event as unknown as Partial<ComponentEvent> } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -154,50 +131,40 @@ export function registerScreenTools(server: McpServer): void {
     add: {
       description: '添加一个新的空白屏幕（页面）',
       schema: z.object({ projectId: z.string(), name: z.string().describe('如"登录页"、"首页"') }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'addScreen', params: { name: p.name } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'addScreen', params: { name: p.name } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     remove: {
       description: '删除指定屏幕',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'removeScreen', params: { screenId: p.screenId } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'removeScreen', params: { screenId: p.screenId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     activate: {
       description: '切换当前激活的屏幕',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'setActiveScreen', params: { screenId: p.screenId } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'setActiveScreen', params: { screenId: p.screenId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     rename: {
       description: '重命名指定屏幕',
       schema: z.object({ projectId: z.string(), screenId: z.string(), name: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'renameScreen', params: { screenId: p.screenId, name: p.name } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'renameScreen', params: { screenId: p.screenId, name: p.name } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     reorder: {
       description: '调整屏幕排列顺序',
       schema: z.object({ projectId: z.string(), screenId: z.string(), newIndex: z.number() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'reorderScreen', params: { screenId: p.screenId, newIndex: p.newIndex } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'reorderScreen', params: { screenId: p.screenId, newIndex: p.newIndex } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -216,20 +183,16 @@ export function registerViewportTools(server: McpServer): void {
           devicePixelRatio: z.number().optional(), platform: z.enum(['pc','mobile','tablet']),
         }),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'switchViewport', params: { viewport: p.viewport } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'switchViewport', params: { viewport: p.viewport } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     add_preset: {
       description: '添加自定义视口预设',
       schema: z.object({ projectId: z.string(), viewport: z.record(z.string(), z.unknown()) }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'addViewportPreset', params: { viewport: p.viewport } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'addViewportPreset', params: { viewport: p.viewport } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
@@ -245,20 +208,16 @@ export function registerAnnotationTools(server: McpServer): void {
         projectId: z.string(), parentId: z.string(), content: z.string(),
         author: z.string().optional(), styles: z.record(z.string(), z.unknown()).optional(), position: z.number().optional(),
       }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'addAnnotation', params: { parentId: p.parentId, content: p.content, author: p.author, styles: p.styles, position: p.position } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'addAnnotation', params: { parentId: p.parentId, content: p.content, author: p.author, styles: p.styles, position: p.position } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },
     remove: {
       description: '删除指定标注',
       schema: z.object({ projectId: z.string(), annotationId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js');
-        const result = await api2.default.executeOperation(p.projectId, { type: 'removeAnnotation', params: { annotationId: p.annotationId } });
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, { type: 'removeAnnotation', params: { annotationId: p.annotationId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     },

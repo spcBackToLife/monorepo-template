@@ -66,7 +66,29 @@ import type {
   LottieEditableInfo,
   ExternalAnimationConfig,
 } from '@globallink/material-operations';
+import type { AnimationItem } from 'lottie-web';
 import { editorStore } from '@/stores/editor';
+import type { DataPayload } from '@/types/editor';
+
+// ---- 最小类型声明（动态导入的库无静态类型导出） ----
+
+/** libpag PAGView 实例 — play/pause/stop/destroy */
+interface PAGViewInstance {
+  destroy(): void;
+  play(): Promise<void>;
+  pause(): void;
+  stop(): void;
+  setRepeatCount(count: number): void;
+}
+
+/** @rive-app/canvas Rive 实例 — play/pause/reset/cleanup */
+interface RiveInstance {
+  cleanup(): void;
+  play(animationName?: string): void;
+  pause(animationName?: string): void;
+  reset(params?: { autoplay?: boolean }): void;
+  resizeDrawingSurfaceToCanvas(): void;
+}
 
 // ===== 主组件：AnimationResourceEditor =====
 
@@ -94,13 +116,13 @@ export function AnimationResourceEditor() {
   // Lottie 预览容器
   const lottieContainerRef = useRef<HTMLDivElement>(null);
   // lottie-web 实例
-  const lottieAnimRef = useRef<unknown>(null);
+  const lottieAnimRef = useRef<AnimationItem | null>(null);
   // PAG canvas + 实例
   const pagCanvasRef = useRef<HTMLCanvasElement>(null);
-  const pagViewRef = useRef<unknown>(null);
+  const pagViewRef = useRef<PAGViewInstance | null>(null);
   // Rive canvas + 实例
   const riveCanvasRef = useRef<HTMLCanvasElement>(null);
-  const riveInstanceRef = useRef<unknown>(null);
+  const riveInstanceRef = useRef<RiveInstance | null>(null);
 
   // 初始化管理器
   useEffect(() => {
@@ -136,8 +158,7 @@ export function AnimationResourceEditor() {
   const destroyLottieInstance = useCallback(() => {
     if (lottieAnimRef.current) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (lottieAnimRef.current as any).destroy?.();
+        lottieAnimRef.current?.destroy?.();
       } catch { /* ignore */ }
       lottieAnimRef.current = null;
     }
@@ -147,8 +168,7 @@ export function AnimationResourceEditor() {
   const destroyPagInstance = useCallback(() => {
     if (pagViewRef.current) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (pagViewRef.current as any).destroy?.();
+        pagViewRef.current?.destroy?.();
       } catch { /* ignore */ }
       pagViewRef.current = null;
     }
@@ -158,8 +178,7 @@ export function AnimationResourceEditor() {
   const destroyRiveInstance = useCallback(() => {
     if (riveInstanceRef.current) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (riveInstanceRef.current as any).cleanup?.();
+        riveInstanceRef.current?.cleanup?.();
       } catch { /* ignore */ }
       riveInstanceRef.current = null;
     }
@@ -235,7 +254,7 @@ export function AnimationResourceEditor() {
     }
   }, [config.autoplay, destroyRiveInstance]);
 
-  const initLottiePlayer = useCallback(async (animData: Record<string, unknown>) => {
+  const initLottiePlayer = useCallback(async (animData: DataPayload) => {
     destroyLottieInstance();
 
     const container = lottieContainerRef.current;
@@ -310,34 +329,25 @@ export function AnimationResourceEditor() {
   // ===== 播放控制 =====
 
   const handlePlay = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (lottieAnimRef.current) (lottieAnimRef.current as any).play?.();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (pagViewRef.current) void (pagViewRef.current as any).play?.();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (riveInstanceRef.current) (riveInstanceRef.current as any).play?.();
+    if (lottieAnimRef.current) lottieAnimRef.current.play?.();
+    if (pagViewRef.current) void pagViewRef.current.play?.();
+    if (riveInstanceRef.current) riveInstanceRef.current.play?.();
     managerRef.current?.play();
     setIsPlaying(true);
   }, []);
 
   const handlePause = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (lottieAnimRef.current) (lottieAnimRef.current as any).pause?.();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (pagViewRef.current) (pagViewRef.current as any).pause?.();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (riveInstanceRef.current) (riveInstanceRef.current as any).pause?.();
+    if (lottieAnimRef.current) lottieAnimRef.current.pause?.();
+    if (pagViewRef.current) pagViewRef.current.pause?.();
+    if (riveInstanceRef.current) riveInstanceRef.current.pause?.();
     managerRef.current?.pause();
     setIsPlaying(false);
   }, []);
 
   const handleStop = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (lottieAnimRef.current) (lottieAnimRef.current as any).stop?.();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (pagViewRef.current) (pagViewRef.current as any).stop?.();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (riveInstanceRef.current) (riveInstanceRef.current as any).reset?.();
+    if (lottieAnimRef.current) lottieAnimRef.current.stop?.();
+    if (pagViewRef.current) pagViewRef.current.stop?.();
+    if (riveInstanceRef.current) riveInstanceRef.current.reset?.();
     managerRef.current?.stop();
     setIsPlaying(false);
   }, []);
@@ -347,8 +357,7 @@ export function AnimationResourceEditor() {
     managerRef.current?.setSpeed(speed);
 
     if (lottieAnimRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (lottieAnimRef.current as any).setSpeed?.(speed);
+      lottieAnimRef.current.setSpeed?.(speed);
     }
   }, []);
 
@@ -357,8 +366,7 @@ export function AnimationResourceEditor() {
     managerRef.current?.setLoop(loop);
 
     if (lottieAnimRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (lottieAnimRef.current as any).loop = loop;
+      lottieAnimRef.current.loop = loop;
     }
   }, []);
 

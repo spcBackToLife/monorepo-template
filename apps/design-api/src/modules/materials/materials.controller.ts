@@ -35,7 +35,7 @@ export class MaterialsController {
   @UseInterceptors(FileInterceptor('file'))
   async upload(
     @Param('projectId') projectId: string,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
       throw new BadRequestException('未上传文件');

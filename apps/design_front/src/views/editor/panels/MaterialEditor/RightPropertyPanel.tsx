@@ -12,6 +12,7 @@ import type { GradientDef } from '@globallink/material-operations';
 import { FilterEditor } from './FilterEditor';
 import { ShadowEditor } from './ShadowEditor';
 import { editorStore } from '@/stores/editor';
+import type { MaterialPropertyUpdates } from '@/types/editor';
 
 /** 右侧面板模式 */
 export type RightPanelMode =
@@ -61,7 +62,7 @@ interface RightPropertyPanelProps {
   mode: RightPanelMode;
   selectedObject: SelectedObjectInfo | null;
   selectionCount: number;
-  onPropertyChange: (updates: Record<string, unknown>) => void;
+  onPropertyChange: (updates: MaterialPropertyUpdates) => void;
   // 效果工具数据
   currentBackground?: string;
   currentFilter?: string;
@@ -113,7 +114,7 @@ function ObjectPropsPanel({
   onPropertyChange,
 }: {
   selectedObject: SelectedObjectInfo;
-  onPropertyChange: (updates: Record<string, unknown>) => void;
+  onPropertyChange: (updates: MaterialPropertyUpdates) => void;
 }) {
   const obj = selectedObject;
   const [blendMode, setBlendMode] = useState('normal');
@@ -448,7 +449,7 @@ function FillPanel({
   onPropertyChange,
 }: {
   selectedObject: SelectedObjectInfo | null;
-  onPropertyChange: (updates: Record<string, unknown>) => void;
+  onPropertyChange: (updates: MaterialPropertyUpdates) => void;
 }) {
   return (
     <>

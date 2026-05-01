@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsArray, IsIn } from 'class-validator';
+import type { ComponentAssetSchema } from '../../shared/types';
 
 export class CreateAssetDto {
   @IsString()
@@ -25,7 +26,7 @@ export class CreateAssetDto {
   projectId?: string;
 
   /** ComponentNode JSON */
-  schema: Record<string, unknown>;
+  schema: ComponentAssetSchema;
 
   @IsOptional()
   @IsString()
@@ -51,7 +52,7 @@ export class UpdateAssetDto {
   tags?: string[];
 
   @IsOptional()
-  schema?: Record<string, unknown>;
+  schema?: ComponentAssetSchema;
 
   @IsOptional()
   @IsString()

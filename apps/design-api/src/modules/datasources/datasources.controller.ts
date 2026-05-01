@@ -8,6 +8,7 @@ import {
   Body,
 } from '@nestjs/common';
 import { DatasourcesService } from './datasources.service';
+import type { DataPayload } from '../../shared/types';
 
 /**
  * Phase 6 — DataSource REST（/datasources），内部仍走 Operation 持久化。
@@ -37,7 +38,7 @@ export class DatasourcesController {
       scenario: {
         id: string;
         name: string;
-        data: Record<string, unknown>;
+        data: DataPayload;
         description?: string;
         isDefault?: boolean;
       };
@@ -71,7 +72,7 @@ export class DatasourcesController {
     @Param('scenarioId') scenarioId: string,
     @Body()
     body: {
-      data?: Record<string, unknown>;
+      data?: DataPayload;
       name?: string;
       description?: string;
       author?: string;

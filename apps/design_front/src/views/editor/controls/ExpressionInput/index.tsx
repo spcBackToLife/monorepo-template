@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
+import type { DataPayload } from '@/types/editor';
 
 /**
  * Task 3.4.6 — Expression Input
@@ -32,7 +33,7 @@ export const ExpressionInput = observer(function ExpressionInput({
   const screen = editorStore.activeScreen;
   const activeDataSet = useMemo(() => {
     if (!screen) return null;
-    const merged: Record<string, unknown> = {};
+    const merged: DataPayload = {};
     for (const ds of screen.dataSources ?? []) {
       if (ds.activePhase !== 'loaded') continue;
       const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
@@ -154,19 +155,19 @@ export const ExpressionInput = observer(function ExpressionInput({
 // ===== Utility functions =====
 
 /** Flatten a nested object into dot-separated key paths */
-function flattenKeys(obj: Record<string, unknown>, prefix: string): string[] {
+function flattenKeys(obj: DataPayload, prefix: string): string[] {
   const keys: string[] = [];
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = `${prefix}.${key}`;
     keys.push(fullKey);
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      keys.push(...flattenKeys(value as Record<string, unknown>, fullKey));
+      keys.push(...flattenKeys(value as DataPayload, fullKey));
     }
     if (Array.isArray(value)) {
       value.forEach((_, i) => {
         keys.push(`${fullKey}[${i}]`);
         if (value[i] && typeof value[i] === 'object') {
-          keys.push(...flattenKeys(value[i] as Record<string, unknown>, `${fullKey}[${i}]`));
+          keys.push(...flattenKeys(value[i] as DataPayload, `${fullKey}[${i}]`));
         }
       });
     }
@@ -175,7 +176,7 @@ function flattenKeys(obj: Record<string, unknown>, prefix: string): string[] {
 }
 
 /** Get a preview of a nested value */
-function getNestedValuePreview(data: Record<string, unknown>, path: string): string {
+function getNestedValuePreview(data: DataPayload, path: string): string {
   const value = resolveDataPath(data, path);
   if (value === undefined) return 'undefined';
   if (typeof value === 'string') return `"${value.slice(0, 20)}"`;
@@ -184,7 +185,7 @@ function getNestedValuePreview(data: Record<string, unknown>, path: string): str
 }
 
 /** Resolve a data path like "data.user.name" against data object */
-function resolveDataPath(data: Record<string, unknown>, path: string): unknown {
+function resolveDataPath(data: DataPayload, path: string): unknown {
   // Remove leading "data." prefix
   const stripped = path.startsWith('data.') ? path.slice(5) : path;
   const parts = stripped.split(/[.[]]+/).filter(Boolean);
@@ -192,7 +193,7 @@ function resolveDataPath(data: Record<string, unknown>, path: string): unknown {
   for (const part of parts) {
     if (current === null || current === undefined) return undefined;
     if (typeof current === 'object') {
-      current = (current as Record<string, unknown>)[part];
+      current = (current as DataPayload)[part];
     } else {
       return undefined;
     }
@@ -201,7 +202,7 @@ function resolveDataPath(data: Record<string, unknown>, path: string): unknown {
 }
 
 /** Resolve {{data.xxx}} expressions — returns raw value when the entire string is one expression */
-function resolveExpression(expression: string, data: Record<string, unknown>): unknown {
+function resolveExpression(expression: string, data: DataPayload): unknown {
   const fullMatch = expression.match(/^\{\{(.*?)\}\}$/);
   if (fullMatch) {
     const value = resolveDataPath(data, fullMatch[1].trim());
@@ -222,7 +223,7 @@ function formatPreviewValue(value: unknown): string {
     return `数组 (${value.length} 项)`;
   }
   if (value && typeof value === 'object') {
-    const keys = Object.keys(value as Record<string, unknown>);
+    const keys = Object.keys(value as DataPayload);
     return `对象 {${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '…' : ''}}`;
   }
   return String(value ?? '');

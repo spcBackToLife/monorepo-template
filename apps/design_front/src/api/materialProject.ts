@@ -7,6 +7,7 @@
  * 素材槽位 API — 管理节点与素材工程的多对多关联。
  */
 import { apiJson, API_BASE } from '@/api/client';
+import type { CanvasJSON } from '@/types/editor';
 import { authStore } from '@/stores/auth';
 
 function token() {
@@ -35,7 +36,7 @@ export interface MaterialProjectSummary {
 
 /** 工程详情（含完整 canvasJSON） */
 export interface MaterialProjectDetail extends MaterialProjectSummary {
-  canvasJSON: Record<string, unknown>;
+  canvasJSON: CanvasJSON;
   backgroundColor: string;
   fileVersion: number;
 }
@@ -46,7 +47,7 @@ export interface CreateMaterialProjectParams {
   targetNodeId?: string;
   canvasWidth: number;
   canvasHeight: number;
-  canvasJSON: Record<string, unknown>;
+  canvasJSON: CanvasJSON;
   backgroundColor?: string;
   referenceFrameWidth?: number;
   referenceFrameHeight?: number;
@@ -59,7 +60,7 @@ export interface UpdateMaterialProjectParams {
   targetNodeId?: string;
   canvasWidth?: number;
   canvasHeight?: number;
-  canvasJSON?: Record<string, unknown>;
+  canvasJSON?: CanvasJSON;
   backgroundColor?: string;
   referenceFrameWidth?: number;
   referenceFrameHeight?: number;

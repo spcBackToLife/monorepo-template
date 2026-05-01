@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import type { CreateAssetDto, UpdateAssetDto } from './dto/create-asset.dto';
+import type { ComponentAssetSchema } from '../shared/types';
 
 export interface AssetRow {
   id: string;
@@ -13,7 +14,7 @@ export interface AssetRow {
   tags: string[] | null;
   scope: string;
   project_id: string | null;
-  schema: Record<string, unknown>;
+  schema: ComponentAssetSchema;
   thumbnail: string | null;
   created_at: Date;
   updated_at: Date;

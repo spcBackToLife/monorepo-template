@@ -12,8 +12,8 @@ import {
   defaultVoiceHaloColorStops,
 } from '@globallink/material-operations';
 import { registerDomainTool } from '../helpers/registerDomainTool.js';
-import * as api from '../../api-client.js';
-import type { DomainToolParams } from './domainToolParams.js';
+import { apiClient } from '../../api-client.js';
+import type { CanvasObjectProps, CanvasSchema, GradientDefLike, ApiJsonResponse } from '../../types/canvas.js';
 
 // ── 服务端渲染辅助函数 ──
 
@@ -22,16 +22,16 @@ import type { DomainToolParams } from './domainToolParams.js';
  * Schema 里子对象的 x/y 相对组原点；服务端 renderObject 不处理 group，此前整组会漏画。
  */
 function expandMaterialGroupsForServerRender(
-  objects: Array<Record<string, unknown>>,
-): Array<Record<string, unknown>> {
-  const out: Array<Record<string, unknown>> = [];
-  const walk = (list: Array<Record<string, unknown>>, parentX: number, parentY: number) => {
+  objects: CanvasObjectProps[],
+): CanvasObjectProps[] {
+  const out: CanvasObjectProps[] = [];
+  const walk = (list: CanvasObjectProps[], parentX: number, parentY: number) => {
     for (const raw of list) {
       const t = String(raw.type ?? '');
       if (t === 'group') {
         const gx = Number(raw.x ?? 0) + parentX;
         const gy = Number(raw.y ?? 0) + parentY;
-        const kids = (raw.children as Array<Record<string, unknown>> | undefined) ?? [];
+        const kids = raw.children ?? [];
         walk(kids, gx, gy);
       } else {
         const o = { ...raw };
@@ -56,7 +56,7 @@ function expandMaterialGroupsForServerRender(
 async function renderObject(
   /** node-canvas 2D 上下文（与 DOM CanvasRenderingContext2D 类型名相同但结构不同） */
   ctx: import('canvas').CanvasRenderingContext2D,
-  obj: Record<string, unknown>,
+  obj: CanvasObjectProps,
   _canvasW: number,
   _canvasH: number,
 ): Promise<void> {
@@ -135,8 +135,8 @@ async function renderObject(
         // polygon 在 fabric 中是相对坐标
         for(let i=0;i<points.length;i++){
           const pt=points[i]!;
-          const baseW = Number((obj as Record<string, unknown>)._width ?? width);
-          const baseH = Number((obj as Record<string, unknown>)._height ?? height);
+          const baseW = Number(obj._width ?? width);
+          const baseH = Number(obj._height ?? height);
           const px=ox+pt.x*(width/baseW);
           const py=oy+pt.y*(height/baseH);
           i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
@@ -173,13 +173,13 @@ async function renderObject(
       const lines=sampleProfiledStrokeCircle({
         width:Number(obj.width??0),
         height:Number(obj.height??0),
-        gapDegrees:Number((obj as Record<string,unknown>).profiledGapDegrees??16),
-        gapFeatherDegrees:(obj as Record<string,unknown>).profiledGapFeatherDegrees as number|undefined,
-        segments:Number((obj as Record<string,unknown>).profiledSampleSegments??128),
-        widthStops:((obj as Record<string,unknown>).profiledWidthStops as {t:number;width:number}[])??[],
-        colorStops:((obj as Record<string,unknown>).profiledColorStops as {t:number;color:string}[])??[],
+        gapDegrees:Number(obj.profiledGapDegrees??16),
+        gapFeatherDegrees:obj.profiledGapFeatherDegrees as number|undefined,
+        segments:Number(obj.profiledSampleSegments??128),
+        widthStops:(obj.profiledWidthStops as {t:number;width:number}[])??[],
+        colorStops:(obj.profiledColorStops as {t:number;color:string}[])??[],
       });
-      const cap=String((obj as Record<string,unknown>).profiledLineCap??'round')==='butt'?'butt':'round';
+      const cap=String(obj.profiledLineCap??'round')==='butt'?'butt':'round';
       ctx.lineCap=cap as CanvasLineCap;
       for(const ln of lines){
         ctx.beginPath();
@@ -243,21 +243,12 @@ async function renderObject(
   ctx.restore();
 }
 
-/** 结构化渐变定义（与 features/material-operations 的 GradientDef、前端 GradientDefs.tsx 同构） */
-interface GradientDefLike {
-  type: 'linear' | 'radial' | 'conic';
-  angle?: number;
-  stops: Array<{ color: string; offset: number }>;
-  cx?: number;
-  cy?: number;
-  r?: number;
-}
-
+/** Type guard: check if value is a GradientDef-like structure */
 function isGradientDefObject(v: unknown): v is GradientDefLike {
   return !!v
     && typeof v === 'object'
-    && 'type' in (v as Record<string, unknown>)
-    && Array.isArray((v as Record<string, unknown>).stops);
+    && 'type' in (v as object)
+    && Array.isArray((v as { stops?: unknown }).stops);
 }
 
 /**
@@ -413,7 +404,7 @@ export function registerCanvasTools(server: McpServer): void {
     get_schema: {
       description: '获取素材工程完整 Schema。理解画布状态的首要工具。',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
-      handler: async (p: DomainToolParams) => ({ content: [{ type:'text', text: JSON.stringify(await api.getMaterialSchema(p.projectId, p.materialId), null, 2) }] }),
+      handler: async (p) => ({ content: [{ type:'text', text: JSON.stringify(await api.getMaterialSchema(p.projectId, p.materialId), null, 2) }] }),
     },
     get_canvas_info: {
       description:
@@ -424,10 +415,10 @@ export function registerCanvasTools(server: McpServer): void {
         '  - add_object / update_object / draw_arcs 等的 x/y 直接使用画布绝对坐标，无隐式转换\n' +
         '  - 要在参考框内绘制：x ≥ referenceFrameX, y ≥ referenceFrameY',
       schema: z.object({ projectId: z.string(), materialId: z.string() }),
-      handler: async (p: DomainToolParams) => {
-        const s = await api.getMaterialSchema(p.projectId, p.materialId) as Record<string, unknown>;
-        const bw = (s.canvasWidth as number)??600, bh = (s.canvasHeight as number)??400;
-        const rf = s.referenceFrame as {enabled?:boolean;width?:number;height?:number}|undefined;
+      handler: async (p) => {
+        const s = await api.getMaterialSchema(p.projectId, p.materialId) as CanvasSchema;
+        const bw = s.canvasWidth ?? 600, bh = s.canvasHeight ?? 400;
+        const rf = s.referenceFrame;
         const rw = rf?.width??bw, rh = rf?.height??bh;
 
         // 参考框居中偏移（与后端 createMaterialProject 一致）
@@ -440,7 +431,7 @@ export function registerCanvasTools(server: McpServer): void {
           referenceFrameEnabled:rf?.enabled??true,
           referenceFrameX:rfx, referenceFrameY:rfy,
           backgroundColor:s.backgroundColor??'#ffffff',
-          objectCount:((s.objects as unknown[])??[]).length,
+          objectCount:(s.objects??[]).length,
           defaultElementId:s.defaultElementId??null,
         }, null, 2) }] };
       },
@@ -450,17 +441,17 @@ export function registerCanvasTools(server: McpServer): void {
     set_background_color: {
       description: '设置画布背景色',
       schema: z.object({ projectId:z.string(), materialId:z.string(), color:z.string() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setBackgroundColor',params:{color:p.color}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setBackgroundColor',params:{color:p.color}}),null,2)}] }),
     },
     resize_canvas: {
       description: '调整画布尺寸',
       schema: z.object({ projectId:z.string(), materialId:z.string(), width:z.number().positive(), height:z.number().positive() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:resizeCanvas',params:{width:p.width,height:p.height}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:resizeCanvas',params:{width:p.width,height:p.height}}),null,2)}] }),
     },
     resize_reference_frame: {
       description: '调整参考框尺寸',
       schema: z.object({ projectId:z.string(), materialId:z.string(), width:z.number().positive(), height:z.number().positive(), enabled:z.boolean().optional() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:resizeReferenceFrame',params:{width:p.width,height:p.height,enabled:p.enabled}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:resizeReferenceFrame',params:{width:p.width,height:p.height,enabled:p.enabled}}),null,2)}] }),
     },
 
     // ── Object CRUD ──
@@ -495,14 +486,14 @@ export function registerCanvasTools(server: McpServer): void {
         profiledColorStops: z.array(z.object({ t: z.number(), color: z.string() })).optional(),
         profiledLineCap: z.enum(['round', 'butt']).optional(),
       }),
-      handler: async (raw: DomainToolParams) => {
-        const rp = raw as Record<string, unknown>;
+      handler: async (raw) => {
+        const rp = raw as CanvasObjectProps & { projectId: string; materialId: string };
         const projectId = String(rp.projectId ?? '');
         const materialId = String(rp.materialId ?? '');
         const opRest = Object.fromEntries(
           Object.entries(rp).filter(([k]) => k !== 'projectId' && k !== 'materialId'),
         );
-        const op = opRest as Record<string, unknown>;
+        const op = opRest as Partial<CanvasObjectProps>;
 
         // ★ 方案 A：存什么就是什么，无隐式坐标转换
         // 调用者负责传入画布绝对坐标（可通过 get_canvas_info 获取 referenceFrameX/Y）
@@ -510,7 +501,7 @@ export function registerCanvasTools(server: McpServer): void {
 
         const apiExtra =
           typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
-            ? (apiResult as Record<string, unknown>)
+            ? (apiResult as ApiJsonResponse)
             : {};
         return {
           content:[{
@@ -545,13 +536,13 @@ export function registerCanvasTools(server: McpServer): void {
         colorStops: z.array(z.object({ t: z.number(), color: z.string() })).optional(),
         lineCap: z.enum(['round', 'butt']).optional(),
       }),
-      handler: async (raw: DomainToolParams) => {
-        const rp = raw as Record<string, unknown>;
+      handler: async (raw) => {
+        const rp = raw as CanvasObjectProps & { projectId: string; materialId: string; gapDegrees?: number; gapFeatherDegrees?: number; sampleSegments?: number; widthStops?: Array<{ t: number; width: number }>; colorStops?: Array<{ t: number; color: string }>; lineCap?: string };
         const projectId = String(rp.projectId ?? '');
         const materialId = String(rp.materialId ?? '');
 
         // ★ 方案 A：存什么就是什么，无隐式坐标转换
-        const object: Record<string, unknown> = {
+        const object: CanvasObjectProps = {
           type: 'profiledStroke',
           name: (rp.name as string) ?? '渐变光环',
           x: Number(rp.x ?? 0),
@@ -584,7 +575,7 @@ export function registerCanvasTools(server: McpServer): void {
 
         const apiExtra =
           typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
-            ? (apiResult as Record<string, unknown>)
+            ? (apiResult as ApiJsonResponse)
             : {};
         return {
           content: [
@@ -602,7 +593,7 @@ export function registerCanvasTools(server: McpServer): void {
     remove_object: {
       description: '删除指定对象',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:removeObject',params:{objectId:p.objectId}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:removeObject',params:{objectId:p.objectId}}),null,2)}] }),
     },
     update_object: {
       description: [
@@ -612,12 +603,12 @@ export function registerCanvasTools(server: McpServer): void {
         '⚠️ 如需在参考框内移动，先通过 get_canvas_info 获取 referenceFrameX/Y 再计算目标位置。',
       ].join('\n'),
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),updates:z.record(z.string(),z.unknown()) }),
-      handler: async (p: DomainToolParams)=>{
+      handler: async (p)=>{
         // ★ 方案 A：存什么就是什么，无隐式坐标转换
         const apiResult = await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:updateObject',params:{objectId:p.objectId,props:p.updates}});
         const apiExtra =
           typeof apiResult === 'object' && apiResult !== null && !Array.isArray(apiResult)
-            ? (apiResult as Record<string, unknown>)
+            ? (apiResult as ApiJsonResponse)
             : {};
         return { content:[{type:'text',text:JSON.stringify({...apiExtra, _note:'坐标为画布绝对坐标'},null,2)}] };
       },
@@ -625,27 +616,27 @@ export function registerCanvasTools(server: McpServer): void {
     duplicate_object: {
       description: '复制对象并偏移放置',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),offsetX:z.number().optional(),offsetY:z.number().optional() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:duplicateObject',params:{objectId:p.objectId,offsetX:p.offsetX,offsetY:p.offsetY}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:duplicateObject',params:{objectId:p.objectId,offsetX:p.offsetX,offsetY:p.offsetY}}),null,2)}] }),
     },
     reorder_object: {
       description: '调整对象图层位置',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),newIndex:z.number() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:reorderObject',params:{objectId:p.objectId,newIndex:p.newIndex}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:reorderObject',params:{objectId:p.objectId,newIndex:p.newIndex}}),null,2)}] }),
     },
     set_visibility: {
       description: '设置对象可见性',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),visible:z.boolean() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setVisibility',params:{objectId:p.objectId,visible:p.visible}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setVisibility',params:{objectId:p.objectId,visible:p.visible}}),null,2)}] }),
     },
     set_lock: {
       description: '设置对象锁定',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),locked:z.boolean() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setLock',params:{objectId:p.objectId,locked:p.locked}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setLock',params:{objectId:p.objectId,locked:p.locked}}),null,2)}] }),
     },
     rename_object: {
       description: '重命名对象',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),name:z.string() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:renameObject',params:{objectId:p.objectId,name:p.name}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:renameObject',params:{objectId:p.objectId,name:p.name}}),null,2)}] }),
     },
 
     // ── Style ──
@@ -677,17 +668,17 @@ export function registerCanvasTools(server: McpServer): void {
           }),
         ]),
       }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setFill',params:{objectId:p.objectId,fill:p.fill}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setFill',params:{objectId:p.objectId,fill:p.fill}}),null,2)}] }),
     },
     set_stroke: {
       description: '设置描边颜色和宽度',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),color:z.string().optional(),width:z.number().optional() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setStroke',params:{objectId:p.objectId,color:p.color,width:p.width}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setStroke',params:{objectId:p.objectId,color:p.color,width:p.width}}),null,2)}] }),
     },
     set_opacity: {
       description: '设置透明度(0~1)',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),opacity:z.number().min(0).max(1) }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setOpacity',params:{objectId:p.objectId,opacity:p.opacity}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setOpacity',params:{objectId:p.objectId,opacity:p.opacity}}),null,2)}] }),
     },
     set_shadow: {
       description: '设置或移除阴影(传null移除)',
@@ -695,7 +686,7 @@ export function registerCanvasTools(server: McpServer): void {
         projectId:z.string(),materialId:z.string(),objectId:z.string(),
         shadow:z.object({color:z.string().optional(),blur:z.number().optional(),offsetX:z.number().optional(),offsetY:z.number().optional()}).nullable().optional()
       }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setShadow',params:{objectId:p.objectId,shadow:p.shadow}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setShadow',params:{objectId:p.objectId,shadow:p.shadow}}),null,2)}] }),
     },
     set_blend_mode: {
       description: '设置混合模式（16种CSS blend-mode）',
@@ -703,19 +694,19 @@ export function registerCanvasTools(server: McpServer): void {
         projectId:z.string(),materialId:z.string(),objectId:z.string(),
         mode:z.enum(['normal','multiply','screen','overlay','darken','lighten','color-dodge','color-burn','hard-light','soft-light','difference','exclusion','hue','saturation','color','luminosity'])
       }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setBlendMode',params:{objectId:p.objectId,blendMode:p.mode}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setBlendMode',params:{objectId:p.objectId,blendMode:p.mode}}),null,2)}] }),
     },
 
     // ── Group ──
     group_objects: {
       description: '将多个对象编为一组',
       schema: z.object({ projectId:z.string(),materialId:z.string(),objectIds:z.array(z.string()).min(2),groupName:z.string().optional() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:groupObjects',params:{objectIds:p.objectIds,groupName:p.groupName}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:groupObjects',params:{objectIds:p.objectIds,groupName:p.groupName}}),null,2)}] }),
     },
     ungroup_objects: {
       description: '解散组',
       schema: z.object({ projectId:z.string(),materialId:z.string(),groupId:z.string() }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:ungroupObjects',params:{groupId:p.groupId}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:ungroupObjects',params:{groupId:p.groupId}}),null,2)}] }),
     },
 
     // ── Text ──
@@ -727,7 +718,7 @@ export function registerCanvasTools(server: McpServer): void {
         fontWeight:z.union([z.string(),z.number()]).optional(),textAlign:z.enum(['left','center','right']).optional(),
         lineHeight:z.number().optional(),underline:z.boolean().optional(),fontStyle:z.enum(['normal','italic']).optional(),
       }),
-      handler: async (raw: DomainToolParams) => {
+      handler: async (raw) => {
         const { projectId, materialId, objectId, ...rest } = raw as {
           projectId: string;
           materialId: string;
@@ -754,9 +745,9 @@ export function registerCanvasTools(server: McpServer): void {
 
     // ── Undo/Redo ──
     undo: { description:'撤销最近一次画布操作', schema:z.object({projectId:z.string(),materialId:z.string()}),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.materialUndo(p.projectId,p.materialId),null,2)}] }) },
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.materialUndo(p.projectId,p.materialId),null,2)}] }) },
     redo: { description:'重做撤销的操作', schema:z.object({projectId:z.string(),materialId:z.string()}),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.materialRedo(p.projectId,p.materialId),null,2)}] }) },
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.materialRedo(p.projectId,p.materialId),null,2)}] }) },
 
     // ── Advanced Drawing ──
     draw_arcs: {
@@ -768,14 +759,14 @@ export function registerCanvasTools(server: McpServer): void {
         colorStart:z.string().optional(),colorEnd:z.string().optional(),
         strokeWidth:z.number().optional(),opacity:z.number().min(0).max(1).optional(),
       }),
-      handler: async (params: DomainToolParams) => {
+      handler: async (params) => {
         const {projectId,materialId,count,origin,colorStart,colorEnd,strokeWidth:sw,opacity}=params as {
           projectId:string;materialId:string;count?:number;origin?:'top-left'|'top-right'|'bottom-left'|'bottom-right';
           colorStart?:string;colorEnd?:string;strokeWidth?:number;opacity?:number;
         };
-        const s=await api.getMaterialSchema(projectId,materialId) as Record<string,unknown>;
-        const bw=(s.canvasWidth as number)??600,bh=(s.canvasHeight as number)??400;
-        const rf=s.referenceFrame as {width?:number;height?:number}|undefined;
+        const s=await api.getMaterialSchema(projectId,materialId) as CanvasSchema;
+        const bw=s.canvasWidth??600,bh=s.canvasHeight??400;
+        const rf=s.referenceFrame;
         const W=rf?.width??bw,H=rf?.height??bh;
         // 计算参考框在画布中的位置 → 直接作为对象 x/y（画布绝对坐标）
         const fx=(bw-W)/2,fy=(bh-H)/2;
@@ -804,10 +795,10 @@ export function registerCanvasTools(server: McpServer): void {
     clear_objects: {
       description: '清除画布上所有对象（保留默认框/参考框）。includeDefault=true则连默认框也删。',
       schema: z.object({ projectId:z.string(),materialId:z.string(),includeDefault:z.boolean().optional() }),
-      handler: async (p: DomainToolParams)=>{
-        const s=await api.getMaterialSchema(p.projectId,p.materialId) as Record<string,unknown>;
-        const objs=(s.objects as Array<{id:string}>)??[];
-        const defId=s.defaultElementId as string|undefined;
+      handler: async (p)=>{
+        const s=await api.getMaterialSchema(p.projectId,p.materialId) as CanvasSchema;
+        const objs=s.objects??[];
+        const defId=s.defaultElementId;
         const toDel=objs.filter(o=>p.includeDefault||o.id!==defId);
         if(toDel.length===0)return{content:[{type:'text',text:JSON.stringify({success:true,message:'已是空的'})}]};
         const ops=toDel.map(o=>({type:'me:removeObject'as const,params:{objectId:o.id}}));
@@ -823,7 +814,7 @@ export function registerCanvasTools(server: McpServer): void {
         type:z.enum(['linear','radial','conic']),colorStops:z.array(z.object({color:z.string(),position:z.number().min(0).max(1)})).min(2),
         angle:z.number().optional(),centerX:z.number().optional(),centerY:z.number().optional(),shape:z.enum(['circle','ellipse']).optional()
       }),
-      handler: (args: DomainToolParams) => {
+      handler: (args) => {
         const { type, colorStops, angle, centerX, centerY, shape } = args as {
           type: 'linear' | 'radial' | 'conic';
           colorStops: { color: string; position: number }[];
@@ -843,7 +834,7 @@ export function registerCanvasTools(server: McpServer): void {
     generate_shadow_css: {
       description: '生成CSS阴影代码(box-shadow/text-shadow)',
       schema: z.object({shadows:z.array(z.object({type:z.enum(['box-shadow','text-shadow']),x:z.number(),y:z.number(),blur:z.number(),spread:z.number().optional(),color:z.string(),inset:z.boolean().optional()})).min(1)}),
-      handler: (args: DomainToolParams) => {
+      handler: (args) => {
         const { shadows } = args as {
           shadows: Array<{
             type: 'box-shadow' | 'text-shadow';
@@ -864,8 +855,8 @@ export function registerCanvasTools(server: McpServer): void {
     generate_filter_css: {
       description: '生成CSS filter代码，支持所有原生滤镜组合',
       schema: z.object({blur:z.number().optional(),brightness:z.number().optional(),contrast:z.number().optional(),grayscale:z.number().optional(),hueRotate:z.number().optional(),invert:z.number().optional(),opacity:z.number().optional(),saturate:z.number().optional(),sepia:z.number().optional(),dropShadow:z.string().optional()}),
-      handler: (f: DomainToolParams) => {
-        const fr = f as Record<string, unknown>;
+      handler: (f) => {
+        const fr = f as ApiJsonResponse;
         const parts:string[]=[];
         const map:Record<string,string>={blur:'blur(px)',brightness:'brightness',contrast:'contrast',grayscale:'grayscale',hueRotate:'hue-rotate(deg)',invert:'invert',opacity:'opacity',saturate:'saturate',sepia:'sepia'};
         Object.entries(map).forEach(([k,v])=>{if(fr[k]!==undefined)parts.push(`${v.replace('(px)','')}( ${String(fr[k])})`);});
@@ -882,7 +873,7 @@ export function registerCanvasTools(server: McpServer): void {
         keyframes:z.array(z.object({offset:z.number().min(0).max(1),styles:z.record(z.string(),z.union([z.string(),z.number()]))})).optional(),
         preset:z.enum(['fadeIn','fadeOut','slideInUp','slideInDown','slideInLeft','slideInRight','bounceIn','pulse','shake','spin','swing','tada']).optional(),
       }),
-      handler: (args: DomainToolParams) => {
+      handler: (args) => {
         const { name, duration, timingFunction, delay, iterationCount, direction, fillMode, keyframes, preset } = args as {
           name?: string;
           duration?: string;
@@ -905,14 +896,14 @@ export function registerCanvasTools(server: McpServer): void {
     list_presets: {
       description: '列出素材编辑器所有预设（渐变、阴影等）',
       schema: z.object({ type:z.enum(['gradients','shadows','all']).optional() }),
-      handler: async (_p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.getMaterialEditorPresets(),null,2)}] }),
+      handler: async (_p)=>({ content:[{type:'text',text:JSON.stringify(await api.getMaterialEditorPresets(),null,2)}] }),
     },
 
     // ── Design Integration ──
     apply_material_design: {
       description: '将素材编辑器的CSS属性集合应用到设计Schema的目标节点（素材编辑器↔设计编辑器的桥梁）',
       schema: z.object({ projectId:z.string(),nodeId:z.string(),styleUpdates:z.record(z.string(),z.union([z.string(),z.number()])) }),
-      handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeOperation(p.projectId,{type:'applyMaterialDesign',params:{nodeId:p.nodeId,styleUpdates:p.styleUpdates}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeOperation(p.projectId,{type:'applyMaterialDesign',params:{nodeId:p.nodeId,styleUpdates:p.styleUpdates}}),null,2)}] }),
     },
 
     // ── Server-side Export & Apply (MCP 独有能力) ──
@@ -949,8 +940,8 @@ export function registerCanvasTools(server: McpServer): void {
         quality: z.number().min(0).max(100).optional().describe('jpeg 质量，默认 92'),
         scale: z.number().min(0.5).max(4).optional().describe('缩放倍数，默认 2x 高清'),
       }),
-      handler: async (p: DomainToolParams)=>{
-        const { projectId, materialId, nodeId, format = 'png', quality = 92, scale: scaleIn = 2 } = p as Record<string, unknown> & {
+      handler: async (p)=>{
+        const { projectId, materialId, nodeId, format = 'png', quality = 92, scale: scaleIn = 2 } = p as ApiJsonResponse & {
           projectId: string;
           materialId: string;
           nodeId: string;
@@ -961,11 +952,11 @@ export function registerCanvasTools(server: McpServer): void {
         const scale = Number(scaleIn);
 
         // 1. 获取素材 Schema（⚠️ 必须用 /materials/{id}/schema 端点）
-        const schema = await api.getMaterialSchema(projectId,materialId) as Record<string,unknown>;
-        const cw = (schema.canvasWidth as number)??600;
-        const ch = (schema.canvasHeight as number)??400;
-        const bg = (schema.backgroundColor as string)??'#ffffff';
-        const objects = (schema.objects as Array<Record<string,unknown>>) ?? [];
+        const schema = await api.getMaterialSchema(projectId,materialId) as CanvasSchema;
+        const cw = schema.canvasWidth??600;
+        const ch = schema.canvasHeight??400;
+        const bg = schema.backgroundColor??'#ffffff';
+        const objects = schema.objects ?? [];
 
         if(objects.length===0){
           return{content:[{type:'text',text:JSON.stringify({error:'画布对象数为 0，无法导出空素材',hint:'请先在画布上添加对象再调用此工具',schemaKeys:Object.keys(schema)},null,2)}]};
@@ -982,7 +973,7 @@ export function registerCanvasTools(server: McpServer): void {
 
         // 3. 计算坐标偏移（前端画布坐标 → 后端局部坐标）
         //    schema 中对象的 x/y 是前端大画布坐标，需要减去 referenceFrame 偏移才能正确渲染到 cw×ch 画布上
-        const rf = schema.referenceFrame as {width?:number;height?:number}|undefined;
+        const rf = schema.referenceFrame;
         const rw = rf?.width ?? cw;
         const rh = rf?.height ?? ch;
         // ★ 使用实际画布尺寸计算参考框偏移（反向：存储坐标→局部坐标）
@@ -1024,7 +1015,7 @@ export function registerCanvasTools(server: McpServer): void {
 
         // 5. 上传到 export 端点
         const uploadResult = await api.uploadExportedMaterial(projectId,materialId,buf,
-          `material-export.${format}`) as Record<string,unknown>;
+          `material-export.${format}`) as ApiJsonResponse;
         const imgUrl = uploadResult?.url as string|undefined;
         if(!imgUrl){
           return{content:[{type:'text',text:JSON.stringify({error:'上传成功但未返回 url',uploadResult},null,2)}]};
@@ -1120,7 +1111,7 @@ export function registerCanvasTools(server: McpServer): void {
           success: true,
           message: `✅ 素材已导出 (${format}, ${w}×${h} ref ${rw}×${rh}, ${buf.length}B) 并应用到节点 ${nodeId}（${applyCssTarget}）`,
           imageUrl: imgUrl,
-          assetId: (uploadResult as Record<string, unknown>).assetId,
+          assetId: uploadResult.assetId,
           operationApplied: 'applyMaterialDesign' as string,
           applyCssTarget,
           applyResult,

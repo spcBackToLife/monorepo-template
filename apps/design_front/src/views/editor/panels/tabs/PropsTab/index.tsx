@@ -11,6 +11,7 @@ import {
   type PrimitiveNodeType,
 } from '@globallink/design-schema';
 import { API_BASE } from '@/api/client';
+import type { ElementProps, DataPayload } from '@/types/editor';
 import { NumericInput } from '../../../controls/NumericInput';
 import { ColorPicker } from '../../../controls/ColorPicker';
 import { ExpressionInput } from '../../../controls/ExpressionInput';
@@ -43,9 +44,9 @@ export const PropsTab = observer(function PropsTab() {
     : nodeActiveState;
 
   // Merge base props + state delta for display
-  const baseProps = (node.props ?? {}) as Record<string, unknown>;
+  const baseProps = (node.props ?? {}) as ElementProps;
   const stateProps = effectiveState !== 'default'
-    ? (node.states?.find((s) => s.name === effectiveState)?.props as Record<string, unknown> | undefined)
+    ? (node.states?.find((s) => s.name === effectiveState)?.props as ElementProps | undefined)
     : undefined;
   const mergedProps = { ...baseProps, ...(stateProps ?? {}) };
 
@@ -138,8 +139,8 @@ export const PropsTab = observer(function PropsTab() {
 // ===================================================================
 
 /** 从数据源合并出当前页面的顶层数据对象 */
-function getMergedScreenData(screen: { dataSources?: import('@globallink/design-schema').DataSource[] }): Record<string, unknown> {
-  const merged: Record<string, unknown> = {};
+function getMergedScreenData(screen: { dataSources?: import('@globallink/design-schema').DataSource[] }): DataPayload {
+  const merged: DataPayload = {};
   for (const ds of screen.dataSources ?? []) {
     if (ds.activePhase !== 'loaded') continue;
     const sc = (ds.scenarios ?? []).find((s) => s.id === ds.activeScenarioId);
@@ -149,13 +150,13 @@ function getMergedScreenData(screen: { dataSources?: import('@globallink/design-
 }
 
 /** 解析 {{data.xxx}} 表达式，从 merged data 中取出值 */
-function resolveDataPath(merged: Record<string, unknown>, expr: string): unknown {
+function resolveDataPath(merged: DataPayload, expr: string): unknown {
   const match = expr.match(/\{\{data\.(.+?)\}\}/);
   if (!match) return undefined;
   let current: unknown = merged;
   for (const seg of match[1].split('.')) {
     if (current && typeof current === 'object') {
-      current = (current as Record<string, unknown>)[seg];
+      current = (current as DataPayload)[seg];
     } else return undefined;
   }
   return current;
@@ -166,7 +167,7 @@ function extractItemFields(arr: unknown[]): string[] {
   if (arr.length === 0) return [];
   const first = arr[0];
   if (first && typeof first === 'object' && !Array.isArray(first)) {
-    return Object.keys(first as Record<string, unknown>);
+    return Object.keys(first as ElementProps);
   }
   return [];
 }
@@ -344,7 +345,7 @@ function ElementTypeSection({
 interface ElementPropsSectionProps {
   nodeType: PrimitiveNodeType;
   nodeId: string;
-  props: Record<string, unknown>;
+  props: ElementProps;
   onChange: (key: string, value: unknown) => void;
   searchFilter?: string;
 }
@@ -403,7 +404,7 @@ const ElementPropsSection = observer(function ElementPropsSection({
 
 interface ComponentInstancePropsSectionProps {
   nodeId: string;
-  props: Record<string, unknown>;
+  props: ElementProps;
   templateRef?: { templateId: string; mode: string };
   onChange: (key: string, value: unknown) => void;
   searchFilter?: string;
@@ -531,7 +532,7 @@ function TemplateRefActions({
 interface ComponentPropGroupProps {
   groupName: string;
   definitions: ComponentPropDefinition[];
-  props: Record<string, unknown>;
+  props: ElementProps;
   onChange: (key: string, value: unknown) => void;
   nodeId?: string;
 }
@@ -576,7 +577,7 @@ const TEXT_ELEMENTS: PrimitiveNodeType[] = ['p', 'h1', 'h2', 'h3', 'span', 'butt
 function TextContentSection({ nodeType, nodeId, children }: TextContentSectionProps) {
   const [open, setOpen] = useState(true);
   const node = findNodeInScreens(editorStore.screens, nodeId);
-  const textContentProp = (node?.props as Record<string, unknown> | undefined)?.textContent;
+  const textContentProp = (node?.props as ElementProps | undefined)?.textContent;
 
   const existingText = useMemo(() => {
     if (typeof textContentProp === 'string') return textContentProp;
@@ -762,7 +763,7 @@ function PropControl({
   const nodeForBind = nodeId ? findNodeInScreens(editorStore.screens, nodeId) : null;
   const boundExpression = nodeForBind
     ? (() => {
-        const p = (nodeForBind.props ?? {}) as Record<string, unknown>;
+        const p = (nodeForBind.props ?? {}) as ElementProps;
         const legacy = p[`__bind:${propKey}`];
         if (typeof legacy === 'string') return legacy;
         const raw = p[propKey];
@@ -987,7 +988,7 @@ function CustomAttributesSection({
   onChange,
 }: {
   nodeId: string;
-  props: Record<string, unknown>;
+  props: ElementProps;
   onChange: (key: string, value: unknown) => void;
 }) {
   const [open, setOpen] = useState(false);
