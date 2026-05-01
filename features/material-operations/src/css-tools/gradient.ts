@@ -7,7 +7,6 @@
 
 import type {
   GradientLayerConfig,
-  GradientType,
   ColorStop,
   GradientPreset,
 } from './types';

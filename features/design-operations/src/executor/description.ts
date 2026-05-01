@@ -127,6 +127,25 @@ export function getAvailableOperations(): OperationDescription[] {
       ],
     },
     {
+      type: 'setNodeRole',
+      description:
+        'Set semantic role on a node (ComponentNode.role). Role expresses product intent independent of CSS:\n' +
+        '- sticky-bottom: anchor to viewport (camera) bottom — typical for floating tab bars; exported as `position: sticky; bottom: 0`.\n' +
+        '- sticky-top: anchor to viewport top.\n' +
+        '- scroll-container: runtime overflow:auto.\n' +
+        '- null: clear role.',
+      category: 'element',
+      params: [
+        { name: 'nodeId', type: 'string', required: true, description: 'Target node id' },
+        {
+          name: 'role',
+          type: "'scroll-container' | 'sticky-bottom' | 'sticky-top' | null",
+          required: true,
+          description: 'Semantic role to apply, or null to clear',
+        },
+      ],
+    },
+    {
       type: 'setNodeVisible',
       description:
         'Set editor visibility (ComponentNode.visible). When false, the node is not rendered on the canvas (editor-only, not CSS visibility).',

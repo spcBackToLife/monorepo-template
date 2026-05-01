@@ -603,7 +603,11 @@ export const Canvas = observer(function Canvas() {
           transform: `translate(${editorStore.canvasPanX}px, ${editorStore.canvasPanY}px) scale(${editorStore.canvasScale})`,
         }}
       >
-        <ViewportContainer viewport={viewport} backgroundColor="transparent">
+        <ViewportContainer
+          viewport={viewport}
+          backgroundColor="transparent"
+          unfoldFrame={!editorStore.previewMode}
+        >
           <div ref={containerRef} className="editor-canvas-stack">
             <div
               className={`editor-canvas-dom-layer ${

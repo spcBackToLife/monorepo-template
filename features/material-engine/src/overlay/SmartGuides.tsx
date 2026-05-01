@@ -29,7 +29,7 @@ interface GuideLine {
 
 export function SmartGuides({ enabled = false }: SmartGuidesProps) {
   const { state } = useMaterialEditor();
-  const { project, selectedIds, zoom, panX, panY } = state;
+  const { project, selectedIds, zoom } = state;
 
   const guides = useMemo((): GuideLine[] => {
     if (!enabled || selectedIds.length === 0) return [];

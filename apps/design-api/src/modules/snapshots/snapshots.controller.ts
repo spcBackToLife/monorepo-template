@@ -5,12 +5,13 @@ import {
   Param,
   Body,
 } from '@nestjs/common';
-import { SnapshotsService } from './snapshots.service';
+import { SnapshotsService, SnapshotMode } from './snapshots.service';
 
 interface GenerateSnapshotsBody {
   screenIds: string[];
   viewportIds?: string[];
   format?: 'png' | 'jpeg' | 'webp';
+  mode?: SnapshotMode;
 }
 
 /**
@@ -33,6 +34,7 @@ export class SnapshotsController {
       screenIds: body.screenIds,
       viewportIds: body.viewportIds,
       format: body.format ?? 'png',
+      mode: body.mode ?? 'viewport',
     });
   }
 

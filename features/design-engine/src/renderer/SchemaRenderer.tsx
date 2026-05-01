@@ -1,5 +1,9 @@
 import React, { useCallback, useMemo } from 'react';
-import type { ComponentNode, ComponentTemplate, Screen } from '@globallink/design-schema';
+import type {
+  ComponentNode,
+  ComponentTemplate,
+  Screen,
+} from '@globallink/design-schema';
 import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
@@ -153,7 +157,6 @@ export function SchemaRenderer({
             data-screen-id={screen.id}
             style={{
               width: '100%',
-              minHeight: '100%',
               height: '100%',
               boxSizing: 'border-box',
               backgroundColor: pageBackground,
@@ -296,7 +299,6 @@ function NodeRenderer({
           top: undefined,
           right: undefined,
           bottom: undefined,
-          minHeight: baseStyles.minHeight ?? '100%',
           height: baseStyles.height ?? '100%',
           width: baseStyles.width ?? '100%',
           boxSizing: 'border-box' as const,

@@ -15,7 +15,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { makeToolError } from './toolResponse.js';
 
 /** 从 inputSchema 对象提取字段名列表 */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractFieldNames(schemaObj: Record<string, z.ZodTypeAny>): string[] {
   return Object.keys(schemaObj);
 }
@@ -32,30 +31,25 @@ export function registerSafeTool(
   name: string,
   config: {
     description: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    inputSchema: Record<string, z.ZodTypeAny> | z.ZodType<any>;
+    inputSchema: Record<string, z.ZodTypeAny> | z.ZodType<unknown>;
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  handler: (params: any) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>,
+  handler: (params: Record<string, unknown>) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawInput = config.inputSchema as any;
-  const isZodObject = rawInput && typeof rawInput.shape === 'object';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fieldNames = isZodObject ? extractFieldNames(rawInput.shape as any) : [];
+  const rawInput = config.inputSchema;
+  const isZodObject = rawInput && typeof (rawInput as { shape?: unknown }).shape === 'object';
+  const fieldNames = isZodObject ? extractFieldNames((rawInput as { shape: Record<string, z.ZodTypeAny> }).shape) : [];
 
   // 用宽松 schema 注册：让 SDK 放行所有参数
   const looseSchema = z.object({}).passthrough();
 
-  (server as any).registerTool(
+  (server as unknown as { registerTool: (...args: Parameters<McpServer['registerTool']>) => void }).registerTool(
     name,
     {
       description: config.description,
       inputSchema: looseSchema as unknown as Record<string, z.ZodTypeAny>,
     },
     async (rawParams: unknown) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const params = rawParams as any;
+      const params = rawParams as Record<string, unknown>;
 
       // ── 手动 Zod 校验 ──
       if (isZodObject) {
@@ -64,7 +58,7 @@ export function registerSafeTool(
           const issues = parseResult.error.issues ?? [];
           const fieldErrors = issues.map((i: z.ZodIssue) => {
             const path = i.path.join('.');
-            const received = path ? JSON.stringify((params as any)?.[path] ?? params) : JSON.stringify(params);
+            const received = path ? JSON.stringify(params?.[path] ?? params) : JSON.stringify(params);
             return `  • 字段 "${path}": ${i.message} (收到值: ${received})`;
           });
 

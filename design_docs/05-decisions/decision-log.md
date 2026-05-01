@@ -24,6 +24,9 @@
 | 14 | 新建 `div` 默认尺寸策略？ | 默认 `200px x 50px`（非 root） | 避免默认 100% 宽导致新增元素“不可辨识/像背景层”，提升首触达可见性与可操作性 | 2026-03-27 |
 | 15 | 编辑操作是否逐条同步保存？ | 否，采用 Local-first + 异步批量持久化 | 逐条同步会把网络延迟暴露为编辑卡顿。批量上报 + 重试可兼顾流畅性与可靠性 | 2026-03-27 |
 | 16 | 拖拽落点坐标如何持久化？ | 存父容器局部坐标（local x/y） | 屏幕绝对坐标在缩放/响应式下语义不稳定；局部坐标更可解释、可导出、可迁移 | 2026-03-27 |
+| 17 | 画布与设备视口的关系？ | Frame / Viewport / Canvas 三层解耦：编辑画布通过 `ViewportContainer.unfoldFrame=true` 在视图层把 Frame 拉长展示长内容；预览/导出按 `viewport` 严格裁剪。**关键修订（2026-04-30 晚）**：原方案把 `Screen.frame` / `Screen.defaultViewport` / `ComponentNode.role` 写进 schema 污染了渲染契约，改为**全部移出 schema**——viewport 由调用方显式传入 ViewportContainer，`role` 下沉到 `node.editorMetadata.role`（仅编辑器 UI 读取，渲染契约不读）。MCP `generate_snapshots` 仍提供 `mode` 参数 | 现状把"设备框"等同于"画布物理边界"，导致长滚动页内容被裁、Agent 截图只能拿首屏，违反 first-principles.md Q3 "屏幕选择 = 选择初始视口"。但**绝不能让"编辑期辅助字段"污染 schema**——schema 必须等于真实设计产物。详见 [产品方案 §10](../02-product/editor/01-canvas/frame-viewport-canvas-redesign.md) + [技术实现](../03-tech/editor/frame-viewport-canvas-redesign.md) | 2026-04-30 |
+| 18 | 素材渐变填充的几何公式？ | 前端 SVG 渲染（GradientDefs.tsx）和后端 cairo 渲染（resolveGradientDef）共用 `objectBoundingBox` 等价的同一公式 | 之前后端只支持 CSS 字符串渐变（且与前端公式略有出入），导致 MCP 写入与画布所见不一致；统一后"画布所见 = 导出 PNG = 设计稿展示"成立 | 2026-04-30 |
+| 19 | 组件实例（reference 模式）的"子节点身份"如何处理？ | 实例化时一次性把子树物化进 Schema，子节点 ID 在 op.params 预生成；渲染期 `resolveComponentInstance` 不再调 `instantiateTemplate`，直接返回 node；模板更新由用户主动 `syncInstance` 触发 | 旧实现每次渲染都 `regenerateIds` 给子节点新 ID，UI 选中的"瞬时 ID"在持久态 Schema 不存在 → 选中/删除/改样式全部失败。物化后 ID 收敛到三类合法入口（用户行为、DB 兜底、executor 复用），事件溯源严格幂等，删除/选中/改样式与普通节点一致。详见 [产品 ADR](../02-product/editor/07-asset-management/component-instance-id-stability.md) + [技术 ADR](../03-tech/editor/component-instance-id-stability.md) | 2026-04-30 |
 
 ---
 

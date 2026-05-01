@@ -28,6 +28,15 @@ export const CanvasContextBar = observer(function CanvasContextBar() {
       className={`flex flex-wrap items-center gap-2 px-2 py-1.5 text-[10px] border-b border-gray-200 ${
         nonDefault ? 'bg-indigo-50/90 text-indigo-900' : 'bg-gray-50/95 text-gray-700'
       }`}
+      style={{
+        // 钉在画布顶部，浮于 transform 层之上 —— Frame 平移到画布上方时不会被覆盖。
+        // 与右下角工具栏一样属于"画布悬浮 UI"层。
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+      }}
     >
       <span className="font-semibold text-gray-500 shrink-0">上下文</span>
       {dataSources.map((ds) => {

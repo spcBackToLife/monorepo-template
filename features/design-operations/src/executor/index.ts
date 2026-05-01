@@ -27,6 +27,7 @@ import {
   executeChangeElementType,
   executeSetNodeVisibilityWhen,
   executeSetNodeLocked,
+  executeSetNodeRole,
   executeSetNodeVisible,
 } from '../operations/element';
 import {
@@ -305,6 +306,8 @@ export class OperationExecutor {
         return executeSetNodeVisibilityWhen(project, op.params);
       case 'setNodeLocked':
         return executeSetNodeLocked(project, op.params);
+      case 'setNodeRole':
+        return executeSetNodeRole(project, op.params);
       case 'setNodeVisible':
         return executeSetNodeVisible(project, op.params);
 

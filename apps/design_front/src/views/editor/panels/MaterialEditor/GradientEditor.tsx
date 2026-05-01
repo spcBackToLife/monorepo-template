@@ -6,6 +6,7 @@
  *
  * 增强：
  *   - 自动从选中元素的 background 解析并初始化渐变
+ *   - 素材编辑器内：可将渐变写入选中图形的 SVG fill（GradientDef），而非页面 background
  *   - 色标支持自定义 rgba 颜色
  *   - 渐变方向拨盘（角度可视化调节）
  */
@@ -23,14 +24,29 @@ import {
   parseGradientCSS,
   GRADIENT_PRESETS,
 } from '@globallink/material-operations';
-import type { GradientLayerConfig, ColorStop, GradientType } from '@globallink/material-operations';
+import type {
+  GradientLayerConfig,
+  ColorStop,
+  GradientType,
+  GradientDef,
+} from '@globallink/material-operations';
 import { editorStore } from '@/stores/editor';
+
+/** 素材画布：把渐变应用到选中对象的 fill */
+export interface MaterialGradientFillTarget {
+  selectedIds: string[];
+  /** 当前图层 fill（纯色字符串 / GradientDef / null） */
+  initialFill: string | GradientDef | null | undefined;
+  onApply: (def: GradientDef) => void;
+}
 
 interface GradientEditorProps {
   /** 当前节点的 background/backgroundImage 值，用于自动初始化 */
   currentBackground?: string;
   /** 应用渐变到选中节点后的回调 */
   onApply?: (css: string) => void;
+  /** 若在素材编辑器中传入，则「应用」写入素材对象 SVG 渐变填充 */
+  materialGradientFill?: MaterialGradientFillTarget;
 }
 
 /**
@@ -46,7 +62,70 @@ function tryParseExistingGradient(bg?: string): GradientLayerConfig | null {
   return null;
 }
 
-export function GradientEditor({ currentBackground, onApply }: GradientEditorProps) {
+/** GradientLayerConfig（CSS 工具）→ 素材 schema 的 GradientDef（SVG defs） */
+function layerConfigToGradientDef(cfg: GradientLayerConfig): GradientDef {
+  const stops = cfg.colorStops.map((s) => ({ color: s.color, offset: s.position }));
+  if (cfg.gradientType === 'linear') {
+    return { type: 'linear', angle: cfg.angle ?? 135, stops };
+  }
+  if (cfg.gradientType === 'radial') {
+    return {
+      type: 'radial',
+      stops,
+      cx: cfg.centerX ?? 0.5,
+      cy: cfg.centerY ?? 0.5,
+      r: cfg.radiusX ?? cfg.radiusY ?? 0.5,
+    };
+  }
+  // 锥形：SVG 渲染暂不支持，按线性近似写入
+  return { type: 'linear', angle: cfg.angle ?? 135, stops };
+}
+
+function gradientDefToLayerConfig(def: GradientDef): GradientLayerConfig {
+  const colorStops = def.stops.map((s) => ({ color: s.color, position: s.offset }));
+  if (def.type === 'linear') {
+    return {
+      type: 'gradient',
+      gradientType: 'linear',
+      angle: def.angle ?? 135,
+      colorStops,
+      centerX: 0.5,
+      centerY: 0.5,
+    };
+  }
+  if (def.type === 'radial') {
+    const r = def.r ?? 0.5;
+    return {
+      type: 'gradient',
+      gradientType: 'radial',
+      angle: 0,
+      colorStops,
+      centerX: def.cx ?? 0.5,
+      centerY: def.cy ?? 0.5,
+      radiusX: r,
+      radiusY: r,
+    };
+  }
+  return {
+    type: 'gradient',
+    gradientType: 'conic',
+    angle: def.angle ?? 0,
+    colorStops,
+    centerX: def.cx ?? 0.5,
+    centerY: def.cy ?? 0.5,
+  };
+}
+
+const DEFAULT_ICON_GRADIENT_STOPS: ColorStop[] = [
+  { color: '#f472b6', position: 0 },
+  { color: '#fb923c', position: 1 },
+];
+
+export function GradientEditor({
+  currentBackground,
+  onApply,
+  materialGradientFill,
+}: GradientEditorProps) {
   const { message } = AntdApp.useApp();
   const [gradientType, setGradientType] = useState<GradientType>('linear');
   const [angle, setAngle] = useState(135);
@@ -57,9 +136,11 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
   const [centerX, setCenterX] = useState(0.5);
   const [centerY, setCenterY] = useState(0.5);
   const initializedRef = useRef(false);
+  const materialInitKeyRef = useRef('');
 
-  // 自动从选中元素的 background 解析并初始化
+  // 页面节点：自动从 background 解析并初始化（素材模式不走此分支）
   useEffect(() => {
+    if (materialGradientFill) return;
     if (initializedRef.current) return;
     const parsed = tryParseExistingGradient(currentBackground);
     if (parsed) {
@@ -70,9 +151,45 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
       if (parsed.centerY != null) setCenterY(parsed.centerY);
       initializedRef.current = true;
     }
-  }, [currentBackground]);
+  }, [currentBackground, materialGradientFill]);
 
-  // 手动同步当前元素的渐变
+  // 素材对象：随选中图层与 fill 同步编辑器状态
+  useEffect(() => {
+    if (!materialGradientFill) return;
+    const { selectedIds, initialFill } = materialGradientFill;
+    const key = `${selectedIds.join(',')}:${typeof initialFill === 'object' && initialFill != null ? JSON.stringify(initialFill) : String(initialFill ?? '')}`;
+    if (materialInitKeyRef.current === key) return;
+    materialInitKeyRef.current = key;
+
+    if (initialFill && typeof initialFill === 'object' && 'stops' in initialFill) {
+      const cfg = gradientDefToLayerConfig(initialFill as GradientDef);
+      setGradientType(cfg.gradientType);
+      setAngle(cfg.angle ?? 135);
+      setColorStops([...cfg.colorStops]);
+      setCenterX(cfg.centerX ?? 0.5);
+      setCenterY(cfg.centerY ?? 0.5);
+      return;
+    }
+    if (typeof initialFill === 'string' && /gradient/i.test(initialFill)) {
+      const parsed = tryParseExistingGradient(initialFill);
+      if (parsed) {
+        setGradientType(parsed.gradientType);
+        setAngle(parsed.angle ?? 135);
+        setColorStops(parsed.colorStops);
+        if (parsed.centerX != null) setCenterX(parsed.centerX);
+        if (parsed.centerY != null) setCenterY(parsed.centerY);
+        return;
+      }
+    }
+    // 纯色或无填充：预置常见图标渐变，便于一键应用
+    setGradientType('linear');
+    setAngle(135);
+    setColorStops(DEFAULT_ICON_GRADIENT_STOPS.map((s) => ({ ...s })));
+    setCenterX(0.5);
+    setCenterY(0.5);
+  }, [materialGradientFill]);
+
+  // 手动同步：页面节点 background
   const syncFromElement = useCallback(() => {
     const parsed = tryParseExistingGradient(currentBackground);
     if (parsed) {
@@ -86,6 +203,40 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
       message.info('当前元素没有渐变背景');
     }
   }, [currentBackground, message]);
+
+  const syncFromMaterialFill = useCallback(() => {
+    const init = materialGradientFill?.initialFill;
+    if (!init) {
+      message.info('当前图层无填充可同步');
+      return;
+    }
+    if (typeof init === 'object' && 'stops' in init) {
+      const cfg = gradientDefToLayerConfig(init as GradientDef);
+      setGradientType(cfg.gradientType);
+      setAngle(cfg.angle ?? 135);
+      setColorStops([...cfg.colorStops]);
+      setCenterX(cfg.centerX ?? 0.5);
+      setCenterY(cfg.centerY ?? 0.5);
+      message.success('已从图层填充同步');
+      return;
+    }
+    if (typeof init === 'string' && /gradient/i.test(init)) {
+      const parsed = tryParseExistingGradient(init);
+      if (parsed) {
+        setGradientType(parsed.gradientType);
+        setAngle(parsed.angle ?? 135);
+        setColorStops(parsed.colorStops);
+        if (parsed.centerX != null) setCenterX(parsed.centerX);
+        if (parsed.centerY != null) setCenterY(parsed.centerY);
+        message.success('已从图层填充同步');
+        return;
+      }
+    }
+    message.info('当前为纯色或无渐变字符串，已切换为默认粉橙渐变模板');
+    setGradientType('linear');
+    setAngle(135);
+    setColorStops(DEFAULT_ICON_GRADIENT_STOPS.map((s) => ({ ...s })));
+  }, [materialGradientFill?.initialFill, message]);
 
   // 构建渐变配置
   const gradientConfig: GradientLayerConfig = useMemo(() => ({
@@ -134,6 +285,19 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
   }, []);
 
   const applyToElement = useCallback(() => {
+    if (materialGradientFill) {
+      if (materialGradientFill.selectedIds.length === 0) {
+        message.warning('请先在画布选中一个图形');
+        return;
+      }
+      if (gradientType === 'conic') {
+        message.warning('锥形渐变在 SVG 填充中暂不支持，将按线性渐变写入');
+      }
+      const def = layerConfigToGradientDef(gradientConfig);
+      materialGradientFill.onApply(def);
+      return;
+    }
+
     const nodeId = editorStore.selectedNodeIds[0];
     if (!nodeId) {
       message.warning('请先选中一个元素');
@@ -150,7 +314,7 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
 
     onApply?.(cssValue);
     message.success('渐变已应用');
-  }, [cssValue, onApply, message]);
+  }, [cssValue, onApply, message, materialGradientFill, gradientType, gradientConfig]);
 
   const copyCSS = useCallback(async () => {
     await navigator.clipboard.writeText(`background: ${cssValue};`);
@@ -159,6 +323,11 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
 
   return (
     <div className="space-y-3">
+      {materialGradientFill && (
+        <p className="text-[10px] text-gray-500 leading-snug m-0">
+          正在编辑<strong>素材图层</strong>填充：点击下方「应用到选中图层」写入 SVG 渐变（非页面 background）。
+        </p>
+      )}
       {/* 预览区 */}
       <div
         style={{ ...previewStyle, height: 80, borderRadius: 8, border: '1px solid #e5e7eb' }}
@@ -303,9 +472,13 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
           type="primary"
           icon={<CheckOutlined />}
           onClick={applyToElement}
-          disabled={!editorStore.selectedNodeIds[0]}
+          disabled={
+            materialGradientFill
+              ? materialGradientFill.selectedIds.length === 0
+              : !editorStore.selectedNodeIds[0]
+          }
         >
-          应用到元素
+          {materialGradientFill ? '应用到选中图层' : '应用到元素'}
         </Button>
         <Button
           size="small"
@@ -314,12 +487,12 @@ export function GradientEditor({ currentBackground, onApply }: GradientEditorPro
         >
           复制 CSS
         </Button>
-        {currentBackground && (
-          <Tooltip title="从当前元素同步渐变">
+        {(currentBackground || materialGradientFill?.initialFill) && (
+          <Tooltip title={materialGradientFill ? '从当前图层填充同步' : '从当前元素同步渐变'}>
             <Button
               size="small"
               icon={<SyncOutlined />}
-              onClick={syncFromElement}
+              onClick={materialGradientFill ? syncFromMaterialFill : syncFromElement}
             >
               同步
             </Button>

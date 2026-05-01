@@ -12,13 +12,17 @@ import { makeToolError } from './toolResponse.js';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface ActionDef {
+  description: string;
+  schema: z.ZodType<unknown>;
+  handler: (params: Record<string, unknown>) => Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }>;
+}
+
 export function registerDomainTool(
   server: McpServer,
   toolName: string,
   toolDescription: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  actions: Record<string, any>,
+  actions: Record<string, ActionDef>,
 ): void {
   const entries = Object.entries(actions);
   if (entries.length === 0) return;
@@ -26,11 +30,10 @@ export function registerDomainTool(
   const actionList = entries.map(([k]) => k);
 
   // 为每个 action 构造 variant
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const variants = entries.map(([name, def]) =>
     z.object({
       action: z.literal(name),
-      ...(def.schema.shape as any),
+      ...(def.schema.shape as Record<string, z.ZodTypeAny>),
     }),
   );
 
@@ -43,15 +46,13 @@ export function registerDomainTool(
     .join('\n');
 
   // ── 提取各 action 的可用字段名，用于错误提示 ──
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actionFieldMap: Record<string, string[]> = {};
   for (const [name, def] of entries) {
-    const shape = (def.schema?.shape ?? {}) as Record<string, any>;
+    const shape = (def.schema?.shape ?? {}) as Record<string, z.ZodTypeAny>;
     actionFieldMap[name] = Object.keys(shape);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (server as any).registerTool(
+  (server as unknown as { registerTool: (...args: Parameters<McpServer['registerTool']>) => void }).registerTool(
     toolName,
     {
       description: `${toolDescription}\n\n可用操作 (action):\n${actionDescriptions}`,
@@ -59,9 +60,8 @@ export function registerDomainTool(
       inputSchema: z.object({ action: z.string() }).passthrough() as unknown as Record<string, z.ZodTypeAny>,
     },
     async (rawParams: unknown) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const params = rawParams as any;
-      const actionKey = params.action;
+      const params = rawParams as Record<string, unknown>;
+      const actionKey = String(params.action ?? '');
 
       // ── 1. action 存在性检查 ──
       if (!actionKey) {
@@ -85,7 +85,7 @@ export function registerDomainTool(
         const zodErr = parseResult.error;
         const fieldErrors = zodErr.issues?.map(i => {
           const path = i.path.join('.');
-          return `  • 字段 "${path}": ${i.message} (收到值: ${JSON.stringify((params as any)?.[i.path[0] ?? '__root__'])})`;
+          return `  • 字段 "${path}": ${i.message} (收到值: ${JSON.stringify(params?.[String(i.path?.[0] ?? '__root__')])})`;
         }) ?? [];
 
         const expectedFields = actionFieldMap[actionKey] ?? [];
@@ -100,7 +100,9 @@ export function registerDomainTool(
       }
 
       // ── 3. 执行业务逻辑 ──
-      const { action: _action, ...rest } = params;
+      const rest = Object.fromEntries(
+        Object.entries(params).filter(([k]) => k !== 'action'),
+      );
       try {
         return await def.handler(rest);
       } catch (err) {

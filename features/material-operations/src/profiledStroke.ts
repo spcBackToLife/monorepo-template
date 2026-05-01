@@ -49,7 +49,8 @@ function clamp01(t: number): number {
   return t;
 }
 
-/** Kenney smoothstep for 0≤t≤1 */
+/** Kenney smoothstep for 0≤t≤1 — reserved for future profile curves */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function smoothstep01(t: number): number {
   const x = clamp01(t);
   return x * x * (3 - 2 * x);

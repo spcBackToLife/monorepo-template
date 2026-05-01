@@ -18,6 +18,7 @@ import type {
   ChangeElementTypeOp,
   SetNodeVisibilityWhenOp,
   SetNodeLockedOp,
+  SetNodeRoleOp,
   SetNodeVisibleOp,
   OperationResult,
   InverseData,
@@ -360,14 +361,26 @@ export function executeDuplicateElement(
   const originalNode = parentInfo.parent.children![parentInfo.index];
   const cloned = deepClone(originalNode);
 
-  // Regenerate all IDs in the cloned tree
-  // 根节点 ID 由 Service 层 ensureDeterministicIds() 通过 params.newElementId 预填充，
-  // 子节点仍用随机生成（子树内部一致性由重放时相同遍历顺序保证）
-  const rootId = (params as Record<string, unknown>).newElementId as string | undefined;
+  // 关键：根 ID 来自 params.newElementId，子节点 ID 来自 params._childIds（DFS 顺序）。
+  // 二者均由服务端 ensureDeterministicIds 在 op 入 DB 前预生成，
+  // executor 不再做随机生成（fallback 仅兜底老 op，由 ProjectsService.findOne 物化）。
+  // 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
+  const rootId = params.newElementId;
+  const childIds = params._childIds;
+  let cursor = 0;
   let isFirst = true;
   walkTree(cloned, (n) => {
-    n.id = isFirst && rootId ? rootId : generateNodeId();
-    isFirst = false;
+    if (isFirst) {
+      n.id = rootId ?? generateNodeId();
+      isFirst = false;
+      return;
+    }
+    if (childIds && cursor < childIds.length) {
+      n.id = childIds[cursor]!;
+      cursor += 1;
+    } else {
+      n.id = generateNodeId();
+    }
   });
 
   // Insert right after the original
@@ -801,6 +814,60 @@ export function executeSetNodeLocked(
     inverse: {
       type: 'setNodeLocked',
       params: { nodeId: params.nodeId, locked: previous },
+    },
+  };
+}
+
+/**
+ * 设置节点的"编辑期角色（editor role）"——仅服务编辑画布的视觉锚定，**不影响渲染**。
+ *
+ * 写入位置：`node.editorMetadata.role`（编辑期 metadata 命名空间）。
+ * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
+ */
+export function executeSetNodeRole(
+  project: DesignProject,
+  params: SetNodeRoleOp['params'],
+): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  const newProject = deepClone(project);
+  let node: ComponentNode | undefined;
+  for (const screen of newProject.screens) {
+    node = findNodeById(screen.rootNode, params.nodeId);
+    if (node) break;
+  }
+
+  if (!node) {
+    return {
+      project,
+      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const previous = node.editorMetadata?.role ?? null;
+  if (params.role === null) {
+    if (node.editorMetadata) {
+      delete node.editorMetadata.role;
+      // 清空命名空间，避免遗留空对象
+      if (Object.keys(node.editorMetadata).length === 0) {
+        delete node.editorMetadata;
+      }
+    }
+  } else {
+    if (!node.editorMetadata) node.editorMetadata = {};
+    node.editorMetadata.role = params.role;
+  }
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Set editorMetadata.role=${params.role ?? 'null'} on ${params.nodeId}`,
+      affectedNodeIds: [params.nodeId],
+    },
+    inverse: {
+      type: 'setNodeRole',
+      params: { nodeId: params.nodeId, role: previous },
     },
   };
 }

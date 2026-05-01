@@ -71,6 +71,15 @@ export interface DuplicateElementOp {
   type: 'duplicateElement';
   params: {
     elementId: string;
+    /** 新 root 节点 ID（由 ensureDeterministicIds 预生成；executor 不应再调随机生成） */
+    newElementId?: string;
+    /**
+     * DFS 顺序的子节点 ID 序列（不含 root；root 用 `newElementId`）。
+     *
+     * 由 `ensureDeterministicIds` 在 op 入 DB 前预生成。详见
+     * `design_docs/03-tech/editor/component-instance-id-stability.md`。
+     */
+    _childIds?: string[];
   };
 }
 
@@ -265,6 +274,15 @@ export interface InstantiateTemplateOp {
     parentId: string;
     position?: number;
     mode?: 'reference' | 'detached';
+    /**
+     * DFS 顺序的节点 ID 序列（含 root）。
+     *
+     * 由 `ensureDeterministicIds` 在 op 入 DB 前预生成，executor 直接消费——
+     * 保证事件溯源严格幂等：同一条 op 不论何时重放、由谁重放，子节点 ID 都不变。
+     *
+     * 详见 `design_docs/03-tech/editor/component-instance-id-stability.md`。
+     */
+    _nodeIds?: string[];
   };
 }
 
@@ -342,6 +360,20 @@ export interface SetNodeLockedOp {
   params: {
     nodeId: string;
     locked: boolean;
+  };
+}
+
+/**
+ * 设置节点的"编辑期角色"——写到 `node.editorMetadata.role`，渲染契约不读取，
+ * **仅服务编辑画布的视觉锚定**。
+ *
+ * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
+ */
+export interface SetNodeRoleOp {
+  type: 'setNodeRole';
+  params: {
+    nodeId: string;
+    role: 'scroll-container' | 'sticky-bottom' | 'sticky-top' | null;
   };
 }
 
@@ -868,6 +900,7 @@ export type Operation =
   | BatchUpdateStyleOp
   | ChangeElementTypeOp
   | SetNodeLockedOp
+  | SetNodeRoleOp
   | SetNodeVisibleOp
   | SetNodeVisibilityWhenOp
   | AddDomainStateOp

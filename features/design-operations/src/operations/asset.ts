@@ -2,6 +2,7 @@ import type { DesignProject, ComponentNode } from '@globallink/design-schema';
 import {
   deepClone,
   instantiateTemplate,
+  generateNodeId,
   saveAsTemplate as schemaSaveAsTemplate,
   syncInstance as schemaSyncInstance,
 } from '@globallink/design-schema';
@@ -54,7 +55,23 @@ export function executeInstantiateTemplate(
     parent.children = [];
   }
 
-  const instance = instantiateTemplate(template);
+  // 关键：从 op.params._nodeIds 按 DFS 顺序消费 ID。
+  // 服务端 ensureDeterministicIds 已在 op 入 DB 前预填充；老 op（无 _nodeIds）
+  // 才会落入 generateNodeId fallback——这只发生在历史快照重放期间，且
+  // 后续 ProjectsService.findOne 的迁移层会把展开结果一次性物化到 schema。
+  // 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
+  const ids = params._nodeIds;
+  let cursor = 0;
+  const idGen = () => {
+    if (ids && cursor < ids.length) {
+      const id = ids[cursor]!;
+      cursor += 1;
+      return id;
+    }
+    return generateNodeId();
+  };
+
+  const instance = instantiateTemplate(template, { idGen });
 
   // Apply mode override if specified
   if (params.mode === 'detached' && instance.templateRef) {

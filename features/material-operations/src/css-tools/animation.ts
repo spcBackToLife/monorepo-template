@@ -4,7 +4,7 @@
  * 提供 CSS 关键帧动画的生成、解析和预设模板。
  */
 
-import type { CSSAnimationConfig, CSSKeyframe, AnimationPreset } from './types';
+import type { CSSAnimationConfig, AnimationPreset } from './types';
 
 /** 将动画配置转为 CSS @keyframes + animation 声明 */
 export function animationToCSS(config: CSSAnimationConfig): {

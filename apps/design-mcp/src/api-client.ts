@@ -185,6 +185,7 @@ export async function generateSnapshots(
     screenIds: string[];
     viewportIds?: string[];
     format?: 'png' | 'jpeg' | 'webp';
+    mode?: 'viewport' | 'frame' | 'multi-viewport';
   },
 ): Promise<unknown> {
   return request(`/api/projects/${projectId}/snapshots/generate`, {
@@ -669,7 +670,6 @@ export async function deleteSlot(
 }
 
 // Default export for compatibility with dynamic import().default patterns used in domain tools
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const apiClient = {
   getProject, listProjects, deleteProject,
   executeOperation, executeBatch, getOperationsSince, undo,
@@ -686,5 +686,4 @@ const apiClient = {
   findSlotsByNode, findSlot, createSlot, updateSlot, deleteSlot,
   uploadExportedMaterial,
 };
-// eslint-disable-next-line import/no-default-export
 export { apiClient as default };

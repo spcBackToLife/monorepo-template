@@ -577,17 +577,34 @@ export class EditorStore {
     this.canvasViewportHeight = Math.max(0, height);
   }
 
-  /** Cmd+0：按当前设备视口逻辑尺寸适配到编辑区 */
+  /**
+   * Cmd+0：按当前 Screen 的 Frame 真实尺寸适配到编辑区。
+   *
+   * Frame / Viewport / Canvas 三层解耦后，Frame 高度由内容自然撑开（可能远大于 viewport.height）。
+   * 优先按 DOM 实测的 Frame `offsetHeight` 计算，兜底用 viewport.height —— 让长页面也能"一眼看全貌"。
+   */
   fitCanvasToViewport(): void {
     const vp = this.currentViewport;
     if (!vp || this.canvasViewportWidth <= 0) return;
     const pad = 48;
     const aw = Math.max(1, this.canvasViewportWidth - pad);
     const ah = Math.max(1, this.canvasViewportHeight - pad);
-    const s = Math.min(aw / vp.width, ah / vp.height, 4);
+
+    // 优先用 DOM 实测高度（Frame 内容撑开后的实际高度）
+    let frameW = vp.width;
+    let frameH = vp.height;
+    if (typeof document !== 'undefined') {
+      const frameEl = document.querySelector('[data-frame]') as HTMLElement | null;
+      if (frameEl && frameEl.offsetHeight > 0) {
+        frameW = frameEl.offsetWidth || frameW;
+        frameH = frameEl.offsetHeight;
+      }
+    }
+
+    const s = Math.min(aw / frameW, ah / frameH, 4);
     const scale = Math.max(0.1, s);
-    const scaledW = vp.width * scale;
-    const scaledH = vp.height * scale;
+    const scaledW = frameW * scale;
+    const scaledH = frameH * scale;
     runInAction(() => {
       this.canvasScale = scale;
       this.canvasPanX = (this.canvasViewportWidth - scaledW) / 2;
@@ -617,13 +634,62 @@ export class EditorStore {
     });
   }
 
+  /**
+   * 编辑态画布视图缓存：进入预览时备份，退出时还原。
+   * Frame / Viewport / Canvas 三层解耦后，预览态需要按 viewport 居中（模拟真机），
+   * 不能复用编辑态可能任意平移/缩放过的视图。
+   */
+  private editorCanvasViewBackup: { scale: number; panX: number; panY: number } | null = null;
+
   setPreviewMode(preview: boolean): void {
+    const wasPreview = this.previewMode;
     this.previewMode = preview;
     if (preview && this.activeScreenId) {
       this.previewNavStackIds = [this.activeScreenId];
+      // 进入预览：备份编辑视图，按 viewport 大小居中显示
+      if (!wasPreview) {
+        this.editorCanvasViewBackup = {
+          scale: this.canvasScale,
+          panX: this.canvasPanX,
+          panY: this.canvasPanY,
+        };
+        this.fitCanvasToActiveViewport();
+      }
     } else if (!preview) {
       this.previewNavStackIds = [];
+      // 退出预览：还原编辑视图
+      if (wasPreview && this.editorCanvasViewBackup) {
+        const b = this.editorCanvasViewBackup;
+        runInAction(() => {
+          this.canvasScale = b.scale;
+          this.canvasPanX = b.panX;
+          this.canvasPanY = b.panY;
+        });
+        this.editorCanvasViewBackup = null;
+        this.persistCanvasView();
+      }
     }
+  }
+
+  /**
+   * 按当前 Viewport（设备首屏）居中显示。预览态默认调用 —— 让用户看到的就是
+   * "手机尺寸的取景窗口居中浮在画布中央"，跟真机预览的心智一致。
+   */
+  fitCanvasToActiveViewport(): void {
+    const vp = this.currentViewport;
+    if (!vp || this.canvasViewportWidth <= 0) return;
+    const pad = 48;
+    const aw = Math.max(1, this.canvasViewportWidth - pad);
+    const ah = Math.max(1, this.canvasViewportHeight - pad);
+    const s = Math.min(aw / vp.width, ah / vp.height, 1);
+    const scale = Math.max(0.1, s);
+    const scaledW = vp.width * scale;
+    const scaledH = vp.height * scale;
+    runInAction(() => {
+      this.canvasScale = scale;
+      this.canvasPanX = (this.canvasViewportWidth - scaledW) / 2;
+      this.canvasPanY = (this.canvasViewportHeight - scaledH) / 2;
+    });
   }
 
   /** 切换状态预览缩略图条展开/折叠 */

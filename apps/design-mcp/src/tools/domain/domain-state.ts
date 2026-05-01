@@ -21,9 +21,9 @@ export function registerDomainStateTools(server: McpServer): void {
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
       handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js') as any;
+        const api2 = await import('../../api-client.js') as typeof import('../../api-client.js');
         const proj = await api2.default.getProject(p.projectId);
-        const scr = proj.screens?.find((s:any) => s.id === p.screenId);
+        const scr = proj.screens?.find((s: { id: string }) => s.id === p.screenId);
         if (!scr) return { content: [{ type:'text', text: JSON.stringify({error:'not found'}) }] };
         const onNodes: Array<{ownerType:'node';ownerId:string;variables:unknown[]}> = [];
         walkCollect(scr.rootNode, onNodes);

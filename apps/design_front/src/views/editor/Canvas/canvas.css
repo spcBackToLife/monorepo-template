@@ -8,6 +8,10 @@
   height: 100%;
   overflow: hidden;
   position: relative;
+  /* 阻止 macOS 触控板横向手势触发浏览器后退/前进、阻止 wheel 反弹冒泡到外层 */
+  overscroll-behavior: none;
+  /* 编辑模式下整个画布不应触发文字选择 */
+  user-select: none;
 }
 
 .editor-canvas-transform {

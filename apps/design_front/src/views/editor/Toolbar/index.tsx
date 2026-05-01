@@ -131,13 +131,26 @@ export const Toolbar = observer(function Toolbar() {
           </Tooltip>
         )}
         {viewport && (
-          <span className="viewport-size">
-            {viewport.width} × {viewport.height}
-          </span>
+          <Tooltip
+            title={
+              <span>
+                Viewport 是<b>观察窗口</b>，不裁剪 Frame：
+                <br />
+                Frame 自适应内容高度，画布上虚线框就是当前 Viewport 边界。
+                <br />
+                需要同设备真实裁剪效果，请进入预览模式。
+              </span>
+            }
+          >
+            <span className="viewport-size" style={{ cursor: 'help' }}>
+              {viewport.width} × {viewport.height}
+              <span style={{ marginLeft: 4, opacity: 0.5 }}>ⓘ</span>
+            </span>
+          </Tooltip>
         )}
         {editorStore.viewportOverflow && (
-          <Tooltip title="有节点超出当前设备视口范围，请检查布局或切换更大视口">
-            <span className="toolbar-overflow-badge">溢出</span>
+          <Tooltip title="有节点超出当前 Viewport（观察窗口）。Frame 已撑开容纳，可继续设计；如需在真机模拟下查看，进入预览模式。">
+            <span className="toolbar-overflow-badge">超出 Viewport</span>
           </Tooltip>
         )}
         <div className="zoom-wrap">

@@ -173,7 +173,7 @@ export function MaterialEditorCanvas({
   showRuler = true,
 }: MaterialEditorCanvasProps) {
   const { state, execute, setZoom, setTool, setSelected } = useMaterialEditor();
-  const { project, zoom, tool, selectedIds } = state;
+  const { project, zoom, tool } = state;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);

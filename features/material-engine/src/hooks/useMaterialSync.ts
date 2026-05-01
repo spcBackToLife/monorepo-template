@@ -38,7 +38,7 @@ export function useMaterialSync({
   materialId,
   enabled = true,
 }: UseMaterialSyncOptions) {
-  const { execute, setProject, getExecutor } = useMaterialEditor();
+  const { execute, setProject } = useMaterialEditor();
 
   const socketRef = useRef<Socket | null>(null);
   const outgoingFingerprintsRef = useRef(new Set<string>());

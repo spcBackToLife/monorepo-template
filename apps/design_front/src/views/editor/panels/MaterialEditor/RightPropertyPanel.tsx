@@ -7,7 +7,8 @@
 import { useState } from 'react';
 import { InputNumber, Slider, Select, Button, Divider, ColorPicker, Tooltip } from 'antd';
 import type { EffectToolType } from './LeftToolbar';
-import { GradientEditor } from './GradientEditor';
+import { GradientEditor, type MaterialGradientFillTarget } from './GradientEditor';
+import type { GradientDef } from '@globallink/material-operations';
 import { FilterEditor } from './FilterEditor';
 import { ShadowEditor } from './ShadowEditor';
 import { editorStore } from '@/stores/editor';
@@ -25,6 +26,8 @@ export type RightPanelMode =
 export interface SelectedObjectInfo {
   type: string;
   fill?: string;
+  /** 与 schema 一致：可为纯色字符串或 SVG 渐变对象 */
+  rawFill?: string | GradientDef | null;
   stroke?: string;
   strokeWidth?: number;
   opacity?: number;
@@ -64,6 +67,8 @@ interface RightPropertyPanelProps {
   currentFilter?: string;
   currentBoxShadow?: string;
   currentTextShadow?: string;
+  /** 渐变工具写入素材对象 fill */
+  materialGradientFill?: MaterialGradientFillTarget;
 }
 
 /** 属性行 */
@@ -133,13 +138,30 @@ function ObjectPropsPanel({
       {/* 填充色 — profiledStroke 无填充语义 */}
       {obj.type !== 'profiledStroke' && (
         <PropRow label="填充">
-          <ColorPicker
-            size="small"
-            value={obj.fill ?? '#ffffff'}
-            onChange={(_, hex) => onPropertyChange({ fill: hex })}
-            showText
-            format="hex"
-          />
+          {obj.rawFill != null && typeof obj.rawFill === 'object' && 'stops' in obj.rawFill ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-gray-600">当前为 SVG 渐变填充</span>
+              <span className="text-[9px] text-gray-400 leading-tight">
+                点左侧「渐变」工具可调角度与色标，再点「应用到选中图层」。
+              </span>
+              <Button
+                size="small"
+                type="link"
+                className="p-0 h-auto text-[10px]"
+                onClick={() => onPropertyChange({ fill: '#ffffff' })}
+              >
+                改回纯色填充
+              </Button>
+            </div>
+          ) : (
+            <ColorPicker
+              size="small"
+              value={obj.fill ?? '#ffffff'}
+              onChange={(_, hex) => onPropertyChange({ fill: hex })}
+              showText
+              format="hex"
+            />
+          )}
         </PropRow>
       )}
 
@@ -514,6 +536,7 @@ export function RightPropertyPanel({
   currentFilter,
   currentBoxShadow,
   currentTextShadow,
+  materialGradientFill,
 }: RightPropertyPanelProps) {
   return (
     <div
@@ -523,7 +546,10 @@ export function RightPropertyPanel({
       <div className="px-3 py-2 flex-1 min-h-0 overflow-y-auto">
         {/* 根据模式切换内容 */}
         {mode === 'gradient-edit' && (
-          <GradientEditor currentBackground={currentBackground} />
+          <GradientEditor
+            currentBackground={currentBackground}
+            materialGradientFill={materialGradientFill}
+          />
         )}
 
         {mode === 'filter-edit' && (

@@ -31,7 +31,7 @@ const ROTATE_OFFSET = 20;
 const SNAP_THRESHOLD = 5;
 
 export function SelectionOverlay({ className, onDraggingChange }: SelectionOverlayProps) {
-  const { state, execute, setSelected, getSelectedObjects } =
+  const { state, execute, getSelectedObjects } =
     useMaterialEditor();
   const { project, selectedIds, hoveredId, zoom } = state;
 

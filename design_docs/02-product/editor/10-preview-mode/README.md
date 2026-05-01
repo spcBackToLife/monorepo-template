@@ -403,16 +403,27 @@ Step 4: 重新注册事件
 
 ## 六、预览视口与设备模拟
 
-### 6.1 视口尺寸
+> Frame / Viewport / Canvas 三层模型详见
+> [01-canvas/README §九](../01-canvas/README.md#九framevcanvasviewport三层模型)
+> 与 [Frame / Viewport / Canvas 三层解耦 — 产品方案](../01-canvas/frame-viewport-canvas-redesign.md)。
+
+### 6.1 视口尺寸（取景窗口）
 
 ```
-预览模式下视口的行为：
+预览模式下"viewport"是真正的"取景窗口"——按所选设备宽高裁剪 Frame，
+模拟真机滚动行为：
 
-  · 视口尺寸 = 当前选择的设备尺寸（如 375×812）
-  · 居中显示在深灰背景上
-  · 如果视口尺寸小于浏览器窗口 → 不缩放，原始尺寸显示
-  · 如果视口尺寸大于浏览器窗口 → 自动缩放适配（zoomToFit）
+  · 取景窗口尺寸 = 当前选择的设备尺寸（如 375×812）
+  · Frame 自适应内容高度，可能远大于取景窗口
+  · 取景窗口固定大小，DOM 层 overflow:auto
+    → 用户像在真机上一样滚动浏览整页
+  · 编辑模式下虚线"取景框"在预览模式下消失（已成实裁）
+  · 居中显示在深灰背景上；尺寸大于浏览器时自动 zoomToFit
 ```
+
+> 实施要点：`PreviewRenderer` embedded 模式接收 `activeViewport`，外层容器
+> `height = activeViewport.height` + `overflow: auto`，内层根节点高度由 Frame
+> 自然撑开。详见 `features/design-engine/src/preview/PreviewRenderer.tsx`。
 
 ### 6.2 设备框（远期）
 

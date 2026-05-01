@@ -275,7 +275,7 @@ export class MaterialOperationExecutor {
         return executeDistributeObjects(project, op.params);
 
       default: {
-        const _exhaustive: never = op;
+        const _exhaustive: never = op; void _exhaustive; void _exhaustive;
         return {
           project,
           result: { success: false, description: `Unknown operation: ${(op as { type: string }).type}`, affectedObjectIds: [] },

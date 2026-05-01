@@ -58,7 +58,7 @@ export function registerDataSourceTools(server: McpServer): void {
       handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api2 = await import('../../api-client.js');
-        const baseParams:any = { screenId:p.screenId, dataSourceId:p.dataSourceId, scenarioId:p.scenarioId };
+        const baseParams: Record<string, unknown> = { screenId:p.screenId, dataSourceId:p.dataSourceId, scenarioId:p.scenarioId };
         if (p.data !== undefined) baseParams.data = p.data;
         if (p.name !== undefined) baseParams.name = p.name;
         if (p.description !== undefined) baseParams.description = p.description;

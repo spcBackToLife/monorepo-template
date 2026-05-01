@@ -94,6 +94,28 @@ export interface TemplateRef {
   mode: 'reference' | 'detached';
 }
 
+// ===== Editor Metadata =====
+
+/**
+ * 节点的"编辑期辅助"角色——**仅服务编辑画布的视觉锚定**，不参与渲染契约：
+ *
+ * - 渲染管道（SchemaRenderer / PreviewRenderer / 导出代码）一律不读
+ * - 设计师如想让某个角色在最终产品里也成立，应在 styles 里直接表达（CSS-first）
+ *
+ * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
+ */
+export type EditorRole = 'scroll-container' | 'sticky-bottom' | 'sticky-top';
+
+/**
+ * 节点级"编辑期 metadata"命名空间：**渲染契约不读取**。
+ *
+ * 任何只服务设计师编辑体验、不应影响最终产品/导出代码的字段，应放在这里。
+ * 这样保证 schema 主体永远 = 真实设计产物。
+ */
+export interface NodeEditorMetadata {
+  role?: EditorRole;
+}
+
 // ===== Component Node =====
 
 /** Core building block of the design tree */
@@ -148,4 +170,15 @@ export interface ComponentNode {
   animation?: AnimationConfig;
   /** Associated material project ID (links to a material-editor project) */
   materialProjectId?: string;
+
+  // ----- Editor-only metadata（不参与渲染） -----
+
+  /**
+   * 编辑器视图层 metadata 命名空间。**渲染契约不读取**——
+   * 任何只服务编辑画布的辅助字段（如视觉锚定 role）放在这里，
+   * 保证 schema 主体永远 = 真实设计产物。
+   *
+   * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
+   */
+  editorMetadata?: NodeEditorMetadata;
 }

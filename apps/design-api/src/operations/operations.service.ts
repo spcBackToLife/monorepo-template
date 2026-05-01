@@ -13,32 +13,53 @@ import {
   type Operation,
   type OperationResult,
 } from '@globallink/design-operations';
-import { generateNodeId, generateScreenId, generateId } from '@globallink/design-schema';
-import type { DesignProject } from '@globallink/design-schema';
+import {
+  generateNodeId,
+  generateScreenId,
+  generateId,
+  countTemplateNodes,
+  countSubtreeNodes,
+} from '@globallink/design-schema';
+import type { DesignProject, ComponentNode } from '@globallink/design-schema';
 
 /** 每隔多少次操作自动创建快照 */
 const SNAPSHOT_INTERVAL = 100;
 
+/** Walk a ComponentNode tree DFS（操作内部小工具，与 design-schema 中 walkTree 同语义） */
+function walkTreeApi(node: ComponentNode, visitor: (n: ComponentNode) => void): void {
+  visitor(node);
+  if (node.children) {
+    for (const child of node.children) walkTreeApi(child, visitor);
+  }
+}
+
+function findNodeInProjectApi(
+  project: DesignProject,
+  nodeId: string,
+): ComponentNode | undefined {
+  for (const screen of project.screens) {
+    let found: ComponentNode | undefined;
+    walkTreeApi(screen.rootNode, (n) => { if (n.id === nodeId) found = n; });
+    if (found) return found;
+  }
+  return undefined;
+}
+
 /**
  * 事件溯源确定性保证：
  *
- * 事件溯源（Event Sourcing）的核心不变量是：同一组操作日志，无论重放多少次，
- * 必须得到完全相同的结果。如果某个操作在执行时调用了随机 ID 生成器（如
- * generateNodeId / generateScreenId），而该 ID 没有被写回 operation.params，
- * 那么每次重放都会生成不同的 UUID → 节点"找不到"、删除失败、ID 漂移等 bug。
+ * 核心不变量：同一组 operation 日志，无论何时由谁重放，必须得到完全相同的 schema。
+ * 因此**任何**会向 schema 写入新节点 ID 的 op，其 ID 必须在 op 入 DB 前就预生成
+ * 并写回 op.params；executor 不能再调用随机生成器。
  *
- * 本函数在 Service 层（存入 DB 前）统一预填充所有可能缺失的确定性 ID，
- * 确保 DB 中存储的 operation 天然包含完整信息，executor 重放时直接使用即可。
+ * 本函数在 Service 层执行 op 前调用一次。除去 root ID，还预生成"子节点 ID 序列"
+ * （DFS 顺序），覆盖：
+ *   - instantiateTemplate：从 project.componentAssets 找模板，按模板 walkTree 数节点数预生成 _nodeIds
+ *   - duplicateElement：从当前 project 找源节点，按源子树 walkTree 数节点数预生成 _childIds
  *
- * 覆盖场景：
- * - addElement: params.elementId 缺失时预生成
- * - duplicateElement: 克隆树需要确定性 ID
- * - addScreen: params.screenId / params.rootNodeId 缺失时预生成
- * - addEvent: targetScreenId === 'new' 时自动创建 screen 的 ID
- * - addDomainState: id 缺失
- * - addEnvironmentState: id 缺失
+ * 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
  */
-function ensureDeterministicIds(operation: Operation): void {
+function ensureDeterministicIds(operation: Operation, project: DesignProject): void {
   const p = (operation.params ?? {}) as Record<string, unknown>;
 
   switch (operation.type) {
@@ -50,10 +71,35 @@ function ensureDeterministicIds(operation: Operation): void {
     }
 
     case 'duplicateElement': {
-      // duplicateElement 内部会遍历克隆树对每个节点重新生成随机 ID
-      // 必须预先生成并写入 params，让 executor 能读到并复用
-      if (!p.newElementId) {
-        p.newElementId = generateNodeId();
+      if (!p.newElementId) p.newElementId = generateNodeId();
+      if (!p._childIds) {
+        const sourceId = p.elementId as string | undefined;
+        if (sourceId) {
+          const source = findNodeInProjectApi(project, sourceId);
+          if (source) {
+            const total = countSubtreeNodes(source);
+            const childCount = Math.max(0, total - 1); // 不含 root
+            const ids: string[] = [];
+            for (let i = 0; i < childCount; i += 1) ids.push(generateNodeId());
+            p._childIds = ids;
+          }
+        }
+      }
+      break;
+    }
+
+    case 'instantiateTemplate': {
+      if (!p._nodeIds) {
+        const templateId = p.templateId as string | undefined;
+        const template = templateId
+          ? project.componentAssets.find((t) => t.id === templateId)
+          : undefined;
+        if (template) {
+          const total = countTemplateNodes(template);
+          const ids: string[] = [];
+          for (let i = 0; i < total; i += 1) ids.push(generateNodeId());
+          p._nodeIds = ids;
+        }
       }
       break;
     }
@@ -65,10 +111,9 @@ function ensureDeterministicIds(operation: Operation): void {
     }
 
     case 'addEvent': {
-      // targetScreenId === 'new' 时，event 操作会自动创建一个新 screen
       if (p.targetScreenId === 'new') {
-        p._generatedScreenId = generateScreenId(); // 预生成 screen ID
-        p._generatedRootNodeId = generateNodeId(); // 预生成 root node ID
+        p._generatedScreenId = generateScreenId();
+        p._generatedRootNodeId = generateNodeId();
       }
       break;
     }
@@ -80,7 +125,6 @@ function ensureDeterministicIds(operation: Operation): void {
     }
 
     default:
-      // 其他操作类型不涉及随机实体创建，无需处理
       break;
   }
 }
@@ -137,12 +181,14 @@ export class OperationsService {
     const { current_version } = projResult.rows[0]!;
     const newSeq = current_version + 1;
 
-    // ⚠️ 确定性 ID 预处理：在执行前、存入 DB 前，预填充所有随机生成的 ID
-    // 确保 DB 中的 operation 日志包含完整信息，重放时天然一致
-    ensureDeterministicIds(operation);
-
-    // 先验证操作可执行
+    // 先取最新 project（已经过 findOne 的迁移层，reference 实例都已物化）
     const project = await this.projects.findOne(projectId);
+
+    // ⚠️ 确定性 ID 预处理：基于当前 project 状态预填充所有缺失的 ID
+    // （包括 instantiateTemplate / duplicateElement 的子节点 ID 序列），
+    // 确保 DB 中的 operation 日志包含完整信息，重放时天然一致
+    ensureDeterministicIds(operation, project);
+
     const executor = new OperationExecutor(project);
     const result = executor.execute(operation);
     if (!result.success) {
@@ -202,17 +248,16 @@ export class OperationsService {
 
       const { current_version } = projResult.rows[0]!;
 
-      // ⚠️ 确定性 ID 预处理：批量操作中每个操作都预填充随机 ID
-      for (const op of operations) {
-        ensureDeterministicIds(op);
-      }
-
-      // 先验证所有操作可执行
+      // 先取最新 project（已经过 findOne 的迁移层，reference 实例都已物化）
       const project = await this.projects.findOne(projectId);
       const executor = new OperationExecutor(project);
       const results: OperationResult[] = [];
 
+      // 批量场景下，每条 op 必须基于"前面所有 op 累计执行后"的 schema 预生成 ID
+      // （否则 addElement → duplicateElement 这种依赖链路找不到源节点）。
+      // 因此 ensureDeterministicIds 与 executor.execute 必须交替进行。
       for (const op of operations) {
+        ensureDeterministicIds(op, executor.getProject());
         const result = executor.execute(op);
         if (!result.success) {
           throw new BadRequestException(result.description || '批量操作中有失败项');

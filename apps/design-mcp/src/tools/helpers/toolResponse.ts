@@ -55,7 +55,7 @@ function classifyError(err: unknown): ToolError['error']['code'] {
   return 'INTERNAL_ERROR';
 }
 
-function buildHint(code: ToolError['error']['code'], msg: string, toolName?: string): string | undefined {
+function buildHint(code: ToolError['error']['code'], msg: string, _toolName?: string): string | undefined {
   switch (code) {
     case 'NOT_FOUND':
       return `资源不存在。请检查 ID 是否正确，或先用 query 工具获取最新列表。`;
@@ -129,12 +129,12 @@ export function wrapToolHandler<TArgs extends unknown[], TReturn>(
   action: string | undefined,
   fn: (...args: TArgs) => Promise<TReturn>,
 ) {
-  return async (...args: TArgs): Promise<TReturn extends { content: any; isError?: boolean } ? TReturn : { content: Array<{ type: 'text'; text: string }>; isError: false }> => {
+  return async (...args: TArgs): Promise<{ content: Array<{ type: 'text'; text: string }>; isError: boolean }> => {
     try {
       const result = await fn(...args);
-      return result as any;
+      return result as { content: Array<{ type: 'text'; text: string }>; isError: boolean };
     } catch (err) {
-      return makeToolError(toolName, action, err) as any;
+      return makeToolError(toolName, action, err);
     }
   };
 }

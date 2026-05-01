@@ -8,6 +8,8 @@ import {
   type DesignProject,
   type Screen,
   type Viewport,
+  type ComponentNode,
+  type ComponentTemplate,
   MOBILE_VIEWPORTS,
   TABLET_VIEWPORTS,
   DESKTOP_VIEWPORTS,
@@ -15,6 +17,8 @@ import {
   generateScreenId,
   generateNodeId,
   normalizeNode,
+  instantiateTemplate,
+  isComponentInstanceType,
 } from '@globallink/design-schema';
 import {
   OperationExecutor,
@@ -200,6 +204,12 @@ export class ProjectsService {
       if (asset.schema) normalizeNode(asset.schema);
     }
 
+    // 6. 旧 reference 实例（轻量、children 为空）一次性物化为完整子树。
+    //    新写入的实例由 executeInstantiateTemplate 通过 op.params._nodeIds 物化；
+    //    此处仅兜底历史数据。详见
+    //    design_docs/03-tech/editor/component-instance-id-stability.md。
+    materializeLegacyInstances(project);
+
     return project;
   }
 
@@ -222,3 +232,59 @@ export class ProjectsService {
     );
   }
 }
+
+// ===== Legacy reference-instance migration =====
+
+/**
+ * 把旧 schema 中"轻量 reference 实例"（root + templateRef、children 为空）
+ * 一次性展开为完整子树，使用**确定性派生 ID**（基于实例 root id + DFS 序号）。
+ *
+ * - 不修改 DB；这是 read-path migration，结果在内存中。
+ * - 后续 op 若改这些子节点（例如 updateStyle），op 会以新 ID 进入历史链；
+ *   下次重放时本函数再展开同一份 ID（确定性派生），op.params 仍能命中。
+ * - 同步触发 Schema 自然演进：当 ProjectsService 触发周期快照时，物化结果
+ *   就被永久写入 design_snapshots，旧轻量实例自然淘汰。
+ *
+ * 详见 design_docs/03-tech/editor/component-instance-id-stability.md §四。
+ */
+function materializeLegacyInstances(project: DesignProject): void {
+  const assetMap = new Map<string, ComponentTemplate>(
+    project.componentAssets.map((t) => [t.id, t]),
+  );
+  for (const screen of project.screens ?? []) {
+    if (!screen.rootNode) continue;
+    walkNode(screen.rootNode, assetMap);
+  }
+}
+
+function walkNode(
+  node: ComponentNode,
+  assetMap: Map<string, ComponentTemplate>,
+): void {
+  if (
+    isComponentInstanceType(node.type) &&
+    node.templateRef?.mode === 'reference' &&
+    (node.children?.length ?? 0) === 0
+  ) {
+    const template = assetMap.get(node.templateRef.templateId);
+    if (template && (template.schema.children?.length ?? 0) > 0) {
+      let counter = 0;
+      const idGen = () => {
+        if (counter === 0) {
+          counter += 1;
+          return node.id;
+        }
+        const id = `${node.id}__legacy_${counter}`;
+        counter += 1;
+        return id;
+      };
+      const expanded = instantiateTemplate(template, { idGen });
+      node.children = expanded.children ?? [];
+    }
+  }
+
+  if (node.children) {
+    for (const child of node.children) walkNode(child, assetMap);
+  }
+}
+

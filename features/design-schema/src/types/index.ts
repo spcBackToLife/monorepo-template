@@ -10,6 +10,8 @@ export type {
   CSSAnimationConfigSchema,
   ExternalAnimationConfigSchema,
   AnimationConfig,
+  EditorRole,
+  NodeEditorMetadata,
 } from './node';
 export type { ComponentState } from './state';
 export type {

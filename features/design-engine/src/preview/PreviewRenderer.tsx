@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ComponentNode, ComponentTemplate, Screen, ToastType, ToastPosition } from '@globallink/design-schema';
+import type {
+  ComponentNode,
+  ComponentTemplate,
+  Screen,
+  ToastType,
+  ToastPosition,
+} from '@globallink/design-schema';
 import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';

@@ -26,9 +26,9 @@ export function registerComponentPropsTools(server: McpServer): void {
       schema: z.object({ projectId: z.string(), templateId: z.string() }),
       handler: async (p: DomainToolParams) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api2 = await import('../../api-client.js') as any;
+        const api2 = await import('../../api-client.js') as typeof import('../../api-client.js');
         const proj = await api2.default.getProject(p.projectId);
-        const tpl = proj.templates?.find((t:any) => t.id === p.templateId);
+        const tpl = proj.templates?.find((t: { id: string }) => t.id === p.templateId);
         if (!tpl) return { content: [{ type:'text', text: JSON.stringify({error:`not found`}) }] };
         return { content: [{ type:'text', text: JSON.stringify({ templateId:tpl.id, name:tpl.name, propDefinitions:tpl.propDefinitions }, null, 2) }] };
       },

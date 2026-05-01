@@ -7,7 +7,6 @@ import type {
   MaterialObject,
   MaterialProjectSchema,
   GradientDef,
-  ShadowDef,
   FilterEntry,
 } from '@globallink/material-operations';
 

@@ -73,6 +73,7 @@ export type {
   ApplyMaterialDesignOp,
   SetNodeVisibilityWhenOp,
   SetNodeLockedOp,
+  SetNodeRoleOp,
   SetNodeVisibleOp,
   AddApiEndpointOp,
   RemoveApiEndpointOp,

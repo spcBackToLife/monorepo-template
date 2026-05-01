@@ -65,7 +65,8 @@ async function renderObject(
   const top = Number(obj.top??obj.y??0);
   const width = Number(obj.width??obj.w??0);
   const height = Number(obj.height??obj.h??0);
-  const fill = obj.fill as string|undefined;
+  // fill 既可能是字符串（纯色 / CSS 渐变），也可能是 GradientDef 对象（与前端 GradientEditor / GradientDefs.tsx 同构）
+  const fill = obj.fill as unknown;
   const stroke = obj.stroke as string|undefined;
   const strokeWidth = Number(obj.strokeWidth??(stroke?1:0));
   const opacity = Number(obj.opacity??1);
@@ -103,9 +104,10 @@ async function renderObject(
   const ox = 0;
   const oy = 0;
 
-  // 填充色处理（支持渐变）— 局部坐标系内解析
-  if(fill && fill!=='null' && fill!=='none' && fill!=='transparent'){
-    ctx.fillStyle = resolveFill(ctx,fill,width,height,ox,oy);
+  // 填充色处理（支持纯色 / CSS 渐变字符串 / 结构化 GradientDef 对象）— 局部坐标系内解析
+  if(fill != null && fill !== 'null' && fill !== 'none' && fill !== 'transparent'){
+    const resolved = resolveFill(ctx, fill, width, height, ox, oy);
+    if (resolved != null) ctx.fillStyle = resolved;
   }
   if(stroke && stroke!=='null' && stroke!=='none') ctx.strokeStyle = stroke;
   if(strokeWidth>0) ctx.lineWidth = strokeWidth;
@@ -199,7 +201,13 @@ async function renderObject(
       const fontWeight=String(obj.fontWeight??'normal');
       const textAlign=(obj.textAlign as string)??'left';
       ctx.font=`${fontWeight} ${fontSize}px ${fontFamily}`;
-      ctx.fillStyle=fill??'#000000';
+      // fill 为 unknown：仅字符串或未定义时用字色；渐变/结构化 fill 已由上方 resolveFill 写入 ctx.fillStyle
+      if (typeof fill === 'string') {
+        ctx.fillStyle =
+          fill && fill !== 'null' && fill !== 'none' && fill !== 'transparent' ? fill : '#000000';
+      } else if (fill == null) {
+        ctx.fillStyle = '#000000';
+      }
       ctx.textAlign=textAlign as CanvasTextAlign;
       const tx=textAlign==='center'?ox+width/2:textAlign==='right'?ox+width:ox;
       const lines=text.split('\n');
@@ -235,29 +243,106 @@ async function renderObject(
   ctx.restore();
 }
 
-/** 解析填充色：支持纯色 / CSS linear-gradient / rgba */
+/** 结构化渐变定义（与 features/material-operations 的 GradientDef、前端 GradientDefs.tsx 同构） */
+interface GradientDefLike {
+  type: 'linear' | 'radial' | 'conic';
+  angle?: number;
+  stops: Array<{ color: string; offset: number }>;
+  cx?: number;
+  cy?: number;
+  r?: number;
+}
+
+function isGradientDefObject(v: unknown): v is GradientDefLike {
+  return !!v
+    && typeof v === 'object'
+    && 'type' in (v as Record<string, unknown>)
+    && Array.isArray((v as Record<string, unknown>).stops);
+}
+
+/**
+ * 解析填充色为 cairo Canvas 可用的 fillStyle。
+ *
+ * 支持：
+ *   - 纯色字符串（hex / rgb / rgba / named color）
+ *   - CSS `linear-gradient(<deg>deg, <stops>)` 字符串
+ *   - 结构化 `GradientDef` 对象（linear / radial），与前端 SVG 渲染器 `GradientDefs.tsx`
+ *     一致使用 `objectBoundingBox` 等价的几何（渐变线就在对象包围盒内一边到另一边）。
+ *
+ * 返回 null 表示「无法解析」，调用方应跳过 fillStyle 赋值。
+ */
 function resolveFill(
   ctx: import('canvas').CanvasRenderingContext2D,
-  fill: string,
+  fill: unknown,
   w: number,
   h: number,
   x: number,
-  y: string | number,
-): string | ReturnType<import('canvas').CanvasRenderingContext2D['createLinearGradient']> {
-  if(!fill)return '#000000';
-  // 检查是否为线性渐变
-  const lgMatch=fill.match(/linear-gradient\s*\(\s*(-?\d+(?:\.\d+)?)deg\s*,\s*(.+)\s*\)/i);
-  if(lgMatch){
-    const deg=parseFloat(lgMatch[1]!)%360;
-    const stopsStr=lgMatch[2]!;
-    // 计算渐变线端点
-    const rad=((deg-90)*Math.PI)/180;
-    const cx=x+w/2,cy=Number(y)+h/2,len=Math.sqrt(w*w+h*h)/2;
-    const grad=ctx.createLinearGradient(cx-Math.cos(rad)*len,cy-Math.sin(rad)*len,cx+Math.cos(rad)*len,cy+Math.sin(rad)*len);
-    parseColorStops(stopsStr).forEach(s=>grad.addColorStop(s.pos,s.color));
-    return grad;
+  y: number,
+): string | ReturnType<import('canvas').CanvasRenderingContext2D['createLinearGradient']> | null {
+  if (fill == null) return '#000000';
+
+  // 结构化 GradientDef 对象（MCP set_fill / 前端 GradientEditor 写入此格式）
+  if (isGradientDefObject(fill)) {
+    return resolveGradientDef(ctx, fill, w, h, x, y);
+  }
+
+  if (typeof fill !== 'string') return null;
+  if (!fill) return '#000000';
+
+  // CSS linear-gradient 字符串（兼容历史用法）
+  const lgMatch = fill.match(/linear-gradient\s*\(\s*(-?\d+(?:\.\d+)?)deg\s*,\s*(.+)\s*\)/i);
+  if (lgMatch) {
+    const deg = parseFloat(lgMatch[1]!) % 360;
+    const stopsStr = lgMatch[2]!;
+    const stops = parseColorStops(stopsStr).map((s) => ({ color: s.color, offset: s.pos }));
+    return resolveGradientDef(ctx, { type: 'linear', angle: deg, stops }, w, h, x, y);
   }
   return fill;
+}
+
+/**
+ * 把结构化 GradientDef 转为 cairo CanvasGradient。
+ *
+ * 几何与前端 `GradientDefs.tsx`（`gradientUnits="objectBoundingBox"`）保持一致：
+ *   - linear：角度 → 单位向量在 [0,1]² 包围盒内的两端点 → 缩放到对象局部坐标
+ *   - radial：cx/cy/r 都是 [0,1] 比例；半径乘以 max(w, h)（与 SVG `objectBoundingBox` 的对角线
+ *     标准略有差异，但视觉上对常见用例足够接近）
+ */
+function resolveGradientDef(
+  ctx: import('canvas').CanvasRenderingContext2D,
+  def: GradientDefLike,
+  w: number,
+  h: number,
+  x: number,
+  y: number,
+): ReturnType<import('canvas').CanvasRenderingContext2D['createLinearGradient']> | string {
+  if (def.type === 'linear') {
+    const angle = def.angle ?? 0;
+    const rad = ((angle - 90) * Math.PI) / 180;
+    const u1 = 0.5 - Math.cos(rad) * 0.5;
+    const v1 = 0.5 - Math.sin(rad) * 0.5;
+    const u2 = 0.5 + Math.cos(rad) * 0.5;
+    const v2 = 0.5 + Math.sin(rad) * 0.5;
+    const grad = ctx.createLinearGradient(x + w * u1, y + h * v1, x + w * u2, y + h * v2);
+    for (const s of def.stops) grad.addColorStop(clamp01(s.offset), s.color);
+    return grad;
+  }
+  if (def.type === 'radial') {
+    const cx = x + w * (def.cx ?? 0.5);
+    const cy = y + h * (def.cy ?? 0.5);
+    const r = Math.max(w, h) * (def.r ?? 0.5);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    for (const s of def.stops) grad.addColorStop(clamp01(s.offset), s.color);
+    return grad;
+  }
+  // conic：cairo 无原生支持；回退为第一个色标的纯色（与前端一致：SVG 也不渲染 conic）
+  return def.stops[0]?.color ?? '#000000';
+}
+
+function clamp01(v: number): number {
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
 }
 
 /** 解析颜色停靠点 — 支持带/不带百分号，自动插值缺失位置 */
@@ -414,7 +499,9 @@ export function registerCanvasTools(server: McpServer): void {
         const rp = raw as Record<string, unknown>;
         const projectId = String(rp.projectId ?? '');
         const materialId = String(rp.materialId ?? '');
-        const { projectId: _a, materialId: _b, ...opRest } = rp;
+        const opRest = Object.fromEntries(
+          Object.entries(rp).filter(([k]) => k !== 'projectId' && k !== 'materialId'),
+        );
         const op = opRest as Record<string, unknown>;
 
         // ★ 方案 A：存什么就是什么，无隐式坐标转换
@@ -563,8 +650,33 @@ export function registerCanvasTools(server: McpServer): void {
 
     // ── Style ──
     set_fill: {
-      description: '设置填充色（支持纯色/CSS渐变）',
-      schema: z.object({ projectId:z.string(),materialId:z.string(),objectId:z.string(),fill:z.string() }),
+      description:
+        '设置填充色。支持三种写法（按推荐顺序）：\n' +
+        '  1) 结构化渐变对象 GradientDef：{type:"linear"|"radial", angle?, stops:[{color,offset}], cx?, cy?, r?}\n' +
+        '     —— 与前端「素材编辑器 → 渐变编辑器 → 应用到选中图层」写入的格式 100% 一致，\n' +
+        '     前端 SVG 渲染器（GradientDefs.tsx）和后端 cairo 导出（resolveGradientDef）共用同一几何，\n' +
+        '     是「画布所见 = 导出 PNG = 设计稿展示」的唯一保证。\n' +
+        '  2) 纯色字符串：#hex / rgb() / rgba() / 颜色关键字\n' +
+        '  3) CSS 渐变字符串 "linear-gradient(135deg, #f472b6, #fb923c)"（兼容历史用法，\n' +
+        '     角度公式与 (1) 一致）\n' +
+        '传 null 表示清空填充。',
+      schema: z.object({
+        projectId: z.string(),
+        materialId: z.string(),
+        objectId: z.string(),
+        fill: z.union([
+          z.string(),
+          z.null(),
+          z.object({
+            type: z.enum(['linear', 'radial', 'conic']),
+            angle: z.number().optional(),
+            stops: z.array(z.object({ color: z.string(), offset: z.number().min(0).max(1) })).min(1),
+            cx: z.number().optional(),
+            cy: z.number().optional(),
+            r: z.number().optional(),
+          }),
+        ]),
+      }),
       handler: async (p: DomainToolParams)=>({ content:[{type:'text',text:JSON.stringify(await api.executeMaterialOperation(p.projectId,p.materialId,{type:'me:setFill',params:{objectId:p.objectId,fill:p.fill}}),null,2)}] }),
     },
     set_stroke: {
@@ -928,6 +1040,27 @@ export function registerCanvasTools(server: McpServer): void {
         const slotForMaterial = slots.find((s) => s.materialProjectId === materialId);
         const applyCssTarget = slotForMaterial?.cssTarget ?? 'background-image';
 
+        // ★ 智能检测 backgroundColor：优先用画布背景色，其次检测首个大尺寸底形填充色
+        let detectedBgColor = (bg && bg !== 'transparent') ? bg : null;
+        if (!detectedBgColor && objects.length > 0) {
+          // 找到尺寸最大且可见的 rect/ellipse 作为"底形"，取其 fill 作为 backgroundColor
+          let maxArea = 0;
+          for (const obj of objects) {
+            if (!obj.visible && obj.visible !== undefined) continue;
+            const t = (obj.type as string) ?? '';
+            if (t !== 'rect' && t !== 'ellipse') continue;
+            const ow = Number(obj.width ?? obj.r ?? 0);
+            const oh = Number(obj.height ?? obj.ry ?? 0);
+            if (ow * oh > maxArea) {
+              maxArea = ow * oh;
+              const fill = obj.fill as string | null | undefined;
+              if (fill && typeof fill === 'string' && !fill.startsWith('url(') && !fill.includes('gradient')) {
+                detectedBgColor = fill;
+              }
+            }
+          }
+        }
+
         const applyResult = await api.executeOperation(projectId, {
           type: 'applyMaterialDesign',
           params:
@@ -948,18 +1081,21 @@ export function registerCanvasTools(server: McpServer): void {
                 }
               : {
                   nodeId,
+                  clearStyleKeys: ['backgroundColor', 'boxShadow', 'background'],
                   styleUpdates: {
-                    backgroundImage: `url("${imgUrl}"), linear-gradient(180deg, #1a1a22 0%, #1e1e28 100%)`,
-                    backgroundSize: 'contain, cover',
-                    backgroundPosition: 'center center, center center',
-                    backgroundRepeat: 'no-repeat, no-repeat',
+                    // ⚠️ 不再写入 backgroundColor！backgroundColor 由用户通过右侧面板控制。
+                    // 素材 PNG/SVG 应该是透明底的，让用户设置的 backgroundColor 能透出来。
+                    // 如果之前写了 backgroundColor（旧行为），用 clearStyleKeys 清除它
+                    backgroundImage: `url("${imgUrl}")`,
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center center',
+                    backgroundRepeat: 'no-repeat',
                     border: 'none',
                     borderWidth: 0,
                     boxSizing: 'border-box',
                     backgroundClip: 'border-box',
                     backgroundOrigin: 'border-box',
-                    boxShadow:
-                      '0 0 36px rgba(236, 72, 153, 0.28), 0 0 72px rgba(168, 85, 247, 0.2), 0 0 96px rgba(251, 146, 60, 0.12), inset 0 0 26px rgba(99, 102, 241, 0.07)',
+                    // ✅ 移除硬编码 boxShadow：光晕等效果应由调用者按需添加，不应在此写死
                   },
                   materialProjectId: materialId,
                 },

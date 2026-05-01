@@ -49,6 +49,8 @@ export type {
   Platform,
   Viewport,
   Screen,
+  EditorRole,
+  NodeEditorMetadata,
   TemplateScope,
   TemplateKind,
   ComponentTemplate,
@@ -160,7 +162,10 @@ export {
   saveAsTemplate,
   detachInstance,
   syncInstance,
+  countTemplateNodes,
+  countSubtreeNodes,
 } from './assets';
+export type { InstantiateOptions } from './assets';
 
 // ===== Serialization =====
 export {

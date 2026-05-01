@@ -62,6 +62,7 @@ import {
   type MaterialProjectSchema,
   type BooleanOpType,
   type AlignmentType,
+  type GradientDef,
 } from '@globallink/material-operations';
 import {
   materialEditorSync,
@@ -566,6 +567,8 @@ function ModalContent({
     const base = {
       type: obj.type ?? '',
       fill: typeof obj.fill === 'string' ? obj.fill : undefined,
+      /** 原始 fill（含 GradientDef），供判断是否为渐变 */
+      rawFill: obj.fill,
       stroke: typeof obj.stroke === 'string' ? obj.stroke : undefined,
       strokeWidth: obj.strokeWidth,
       opacity: obj.opacity,
@@ -698,12 +701,35 @@ function ModalContent({
     }
   }, [setTool]);
 
+  const handleApplyMaterialGradientFill = useCallback(
+    (def: GradientDef) => {
+      for (const id of selectedIds) {
+        execute({ type: 'me:setFill', params: { objectId: id, fill: def } });
+      }
+      message.success('渐变已写入选中图层的填充');
+    },
+    [selectedIds, execute, message],
+  );
+
+  const materialGradientFillTarget = useMemo(() => {
+    if (selectedIds.length === 0) return undefined;
+    const obj = state.project.objects.find((o) => o.id === selectedIds[0]!);
+    return {
+      selectedIds,
+      initialFill: obj?.fill,
+      onApply: handleApplyMaterialGradientFill,
+    };
+  }, [selectedIds, state.project.objects, state.project.version, handleApplyMaterialGradientFill]);
+
   // ===== 属性变更 =====
   const handlePropertyChange = useCallback((updates: Record<string, unknown>) => {
     for (const id of selectedIds) {
       // 专有样式操作
       if (updates.fill !== undefined) {
-        execute({ type: 'me:setFill', params: { objectId: id, fill: updates.fill as string } });
+        execute({
+          type: 'me:setFill',
+          params: { objectId: id, fill: updates.fill as string | GradientDef | null },
+        });
       }
       if (updates.stroke !== undefined || updates.strokeWidth !== undefined) {
         execute({
@@ -1058,6 +1084,7 @@ function ModalContent({
               currentFilter={selectedStyles?.filter}
               currentBoxShadow={selectedStyles?.boxShadow}
               currentTextShadow={selectedStyles?.textShadow}
+              materialGradientFill={materialGradientFillTarget}
             />
           </div>
 
