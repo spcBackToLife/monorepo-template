@@ -85,6 +85,7 @@ export {
   generateObjectId,
   findObjectById,
   findObjectIndex,
+  isMaterialOperationLike,
 } from './utils';
 
 // ===== CSS Tools (migrated from @globallink/material-editor) =====

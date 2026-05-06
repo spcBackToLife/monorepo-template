@@ -129,7 +129,7 @@ export class MaterialEditorGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: {
       materialId: string;
-      operation: MaterialOperation;
+      operation: unknown;
       fingerprint?: string;
     },
   ) {
@@ -143,13 +143,8 @@ export class MaterialEditorGateway
       return { status: 'error', message: 'materialId is required' };
     }
 
-    if (data.operation == null || typeof (data.operation as { type?: unknown }).type !== 'string') {
-      return {
-        status: 'error',
-        message:
-          '无效的 me:operation 负载：需要 { materialId, operation: { type, params } }，且 operation.type 为字符串',
-      };
-    }
+    // operation 结构性校验由 service 守卫统一处理（避免重复实现）；
+    // 这里只透传 unknown，service 内会抛 BadRequestException 由下面的 catch 接住。
 
     try {
       const { seq, result } = await this.editorService.execute(
@@ -178,7 +173,7 @@ export class MaterialEditorGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: {
       materialId: string;
-      operations: MaterialOperation[];
+      operations: unknown[];
       fingerprints?: string[];
     },
   ) {
@@ -195,9 +190,7 @@ export class MaterialEditorGateway
     if (!Array.isArray(data.operations) || data.operations.length === 0) {
       return { status: 'error', message: 'operations 必须为非空数组' };
     }
-    if (data.operations.some((op) => op == null || typeof (op as { type?: unknown }).type !== 'string')) {
-      return { status: 'error', message: 'operations 中含有无效项（缺少 type 或为 null）' };
-    }
+    // 单项结构性校验由 service 守卫统一处理（避免重复实现）
 
     try {
       const result = await this.editorService.executeBatch(

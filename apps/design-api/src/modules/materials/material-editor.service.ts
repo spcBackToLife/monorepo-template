@@ -15,6 +15,7 @@ import {
   reconcileDefaultElementWithReferenceFrame,
   expandMaterialProjectCanvasIfTooTight,
   normalizeMaterialEditorSchema,
+  isMaterialOperationLike,
   type MaterialOperation,
   type MaterialProjectSchema,
   type OperationResult,
@@ -82,12 +83,14 @@ export class MaterialEditorService {
   async execute(
     projectId: string,
     materialId: string,
-    operation: MaterialOperation | undefined,
+    operation: unknown,
     author?: string,
     fingerprint?: string,
     authorId?: string,
   ): Promise<{ seq: number; result: OperationResult }> {
-    if (operation == null || typeof (operation as { type?: unknown }).type !== 'string') {
+    // 守卫收窄：unknown → MaterialOperation（最小契约校验）；
+    // 联合成员的精确判定推迟到 Executor.dispatch（运行时唯一真相来源）。
+    if (!isMaterialOperationLike(operation)) {
       throw new BadRequestException(
         '请求体缺少有效素材操作：请使用 { "operation": { "type": "me:...", "params": { ... } } }，或顶层直接传 { "type", "params" }',
       );
@@ -202,7 +205,7 @@ export class MaterialEditorService {
   async executeBatch(
     projectId: string,
     materialId: string,
-    operations: MaterialOperation[],
+    operations: unknown[],
     author?: string,
     fingerprints?: string[],
     authorId?: string,
@@ -210,9 +213,12 @@ export class MaterialEditorService {
     if (!operations?.length) {
       throw new BadRequestException('操作列表不能为空');
     }
-    if (operations.some((op) => op == null || typeof (op as { type?: unknown }).type !== 'string')) {
+    // 用统一守卫收窄；TS 5+ 的 Array.every 守卫推断会把 operations 类型自动缩窄为 MaterialOperation[]
+    if (!operations.every(isMaterialOperationLike)) {
       throw new BadRequestException('操作列表中含有无效项（缺少 type 或为 null）');
     }
+    // 经守卫后 operations 已被 TS 自动收窄为 MaterialOperation[]；
+    // 联合成员精确判定由 Executor.dispatch 在运行时完成。
 
     const pool = this.db.getPool();
     const client = await pool.connect();

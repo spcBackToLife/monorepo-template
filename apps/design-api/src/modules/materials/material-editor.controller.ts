@@ -7,7 +7,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { MaterialEditorService } from './material-editor.service';
-import type { MaterialOperation } from '@globallink/material-operations';
 
 /**
  * 素材编辑器 API
@@ -35,26 +34,38 @@ export class MaterialEditorController {
 
   /**
    * 执行单条素材操作
+   *
+   * 兼容两种 body 形状：
+   *   1. 标准：{ operation: { type, params }, author?, fingerprint?, authorId? }
+   *   2. 简写：{ type, params, author?, fingerprint?, authorId? }（脚本/MCP 易写错时容错）
+   *
+   * 注意：本控制器仅做"形状归一"，不做类型校验。
+   * 候选 operation 以 unknown 传入 service，由 service 用 isMaterialOperationLike 守卫
+   * 做结构性校验，再交给 Executor 做联合成员的语义校验。
    */
   @Post('api/projects/:projectId/materials/:materialId/operations')
   async execute(
     @Param('projectId') projectId: string,
     @Param('materialId') materialId: string,
-    @Body() body: Record<string, unknown> & {
-      operation?: MaterialOperation;
+    @Body() body: {
+      operation?: unknown;
       author?: string;
       fingerprint?: string;
       authorId?: string;
+      // 简写形式的可能字段（不强约束，由 service 守卫识别）
+      type?: unknown;
+      params?: unknown;
     },
   ) {
-    // 兼容：既支持 { operation: { type, params } }，也支持顶层直接传 { type, params }（脚本/MCP 易写错）
-    const operation =
+    // 标准形状优先；简写形状回退：把顶层 { type, params } 当作 operation
+    const candidate: unknown =
       body.operation ??
-      (typeof body.type === 'string' ? (body as MaterialOperation) : undefined);
+      (typeof body.type === 'string' ? { type: body.type, params: body.params } : undefined);
+
     return this.service.execute(
       projectId,
       materialId,
-      operation,
+      candidate,
       body.author,
       body.fingerprint,
       body.authorId,
@@ -63,13 +74,15 @@ export class MaterialEditorController {
 
   /**
    * 批量执行操作（事务）
+   *
+   * operations 以 unknown[] 接收，由 service 守卫做结构性校验。
    */
   @Post('api/projects/:projectId/materials/:materialId/operations/batch')
   async executeBatch(
     @Param('projectId') projectId: string,
     @Param('materialId') materialId: string,
     @Body() body: {
-      operations: MaterialOperation[];
+      operations: unknown[];
       author?: string;
       fingerprints?: string[];
       authorId?: string;
