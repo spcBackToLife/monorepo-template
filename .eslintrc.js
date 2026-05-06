@@ -4,7 +4,12 @@ module.exports = {
   plugins: ['@typescript-eslint'],
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
   rules: {
-    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-explicit-any': ['error', {
+      fixToUnknown: false,
+      ignoreRestArgs: false,
+    }],
+    '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+    '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     'no-console': ['warn', { allow: ['warn', 'error'] }],
   },
