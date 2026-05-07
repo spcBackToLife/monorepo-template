@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { Empty, Popconfirm } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
@@ -39,31 +39,6 @@ const ACTION_TYPES = [
 ] as const;
 
 type TriggerType = typeof TRIGGER_OPTIONS[number]['value'];
-type ActionType = typeof ACTION_TYPES[number]['value'];
-
-const SUB_ACTION_TYPES = ACTION_TYPES.filter((a) => a.value !== 'apiRequest');
-
-interface ActionConfig {
-  type: ActionType;
-  screenId?: string;
-  nodeId?: string;
-  stateName?: string;
-  variableName?: string;
-  value?: string;
-  url?: string;
-  openInNewTab?: boolean;
-  duration?: number;
-  handler?: string;
-  autoRevertMs?: number;
-  // showToast
-  toastType?: 'success' | 'error' | 'warning' | 'info';
-  message?: string;
-  toastDuration?: number;
-  // apiRequest
-  requestId?: string;
-  onSuccess?: Array<{ type: string; [key: string]: unknown }>;
-  onFailure?: Array<{ type: string; [key: string]: unknown }>;
-}
 
 /**
  * Task 4.5.1–4.5.4 — Interactions Tab
@@ -173,28 +148,6 @@ const EventCard = observer(function EventCard({ event, eventIndex, nodeId }: Eve
     setEditing(false);
   }, [nodeId, eventIndex, editTrigger, editActions, event.trigger]);
 
-  const addActionToChain = () => {
-    setEditActions((prev) => [...prev, { type: 'navigate' }]);
-  };
-
-  const removeActionFromChain = (idx: number) => {
-    setEditActions((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const moveAction = (idx: number, dir: -1 | 1) => {
-    setEditActions((prev) => {
-      const next = [...prev];
-      const target = idx + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
-    });
-  };
-
-  const updateActionType = (idx: number, type: string) => {
-    setEditActions((prev) => prev.map((a, i) => (i === idx ? { type } : a)));
-  };
-
   const triggerLabel = TRIGGER_OPTIONS.find((t) => t.value === event.trigger)?.label ?? event.trigger;
 
   if (editing) {
@@ -212,44 +165,12 @@ const EventCard = observer(function EventCard({ event, eventIndex, nodeId }: Eve
         </div>
 
         <div className="text-[10px] text-gray-500 font-medium mt-1">动作链 ({editActions.length})</div>
-        {editActions.map((action, i) => (
-          <div key={i} className="flex flex-col gap-1 pl-2 border-l-2 border-blue-200">
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
-              <select
-                className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
-                value={action.type}
-                onChange={(e) => updateActionType(i, e.target.value)}
-              >
-                {ACTION_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-              </select>
-              <button type="button" className="text-gray-400 hover:text-gray-600 text-[10px]" onClick={() => moveAction(i, -1)} title="上移">↑</button>
-              <button type="button" className="text-gray-400 hover:text-gray-600 text-[10px]" onClick={() => moveAction(i, 1)} title="下移">↓</button>
-              <button type="button" className="text-gray-400 hover:text-red-400 text-[10px]" onClick={() => removeActionFromChain(i)} title="删除">×</button>
-            </div>
-            {action.type === 'apiRequest' && (
-              <div className="ml-5 flex flex-col gap-1">
-                <SubActionChainEditor
-                  label="✅ 成功时执行"
-                  labelColor="text-green-700 bg-green-50 border-green-200"
-                  actions={(action.onSuccess ?? []) as Array<{ type: string; [key: string]: unknown }>}
-                  onChange={(subActions) => setEditActions((prev) => prev.map((a, j) => j === i ? { ...a, onSuccess: subActions } : a))}
-                />
-                <SubActionChainEditor
-                  label="❌ 失败时执行"
-                  labelColor="text-red-700 bg-red-50 border-red-200"
-                  actions={(action.onFailure ?? []) as Array<{ type: string; [key: string]: unknown }>}
-                  onChange={(subActions) => setEditActions((prev) => prev.map((a, j) => j === i ? { ...a, onFailure: subActions } : a))}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-        <button
-          type="button"
-          className="h-5 px-2 text-[10px] border border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-500"
-          onClick={addActionToChain}
-        >+ 添加动作步骤</button>
+        <ActionChainEditor
+          variant="inline"
+          actions={editActions}
+          onChange={setEditActions}
+          allowApiRequest
+        />
 
         <div className="flex items-center gap-1 justify-end mt-1">
           <button type="button" className="h-5 px-2 bg-blue-500 text-white rounded text-[10px]" onClick={handleSaveInline}>保存</button>
@@ -403,79 +324,126 @@ function collectFlatNodes(node: NodeWithChildren, depth = 0): FlatNode[] {
   return result;
 }
 
-// ===== Sub Action Chain Editor (for apiRequest onSuccess/onFailure) =====
+// ===== Action Chain Editor =====
+// 通用动作链编辑器。顶层事件动作链 / apiRequest 的 onSuccess/onFailure 子链共用本组件。
+// - variant='collapsible' 用于 apiRequest 的子链（带标签、可折叠、不允许嵌套 apiRequest，避免无限递归 UI）
+// - variant='inline'     用于顶层动作链（无折叠容器，允许 apiRequest）
+// - 设计决策：AGENTS.md §9.1 禁止双版本。本组件是唯一的动作链编辑器，覆盖所有动作类型。
 
-function SubActionChainEditor({
-  label,
-  labelColor,
+type LooseAction = { type: string; [key: string]: unknown };
+
+interface ActionChainEditorProps {
+  actions: LooseAction[];
+  onChange: (actions: LooseAction[]) => void;
+  /** 顶层事件链：inline；apiRequest 子链：collapsible */
+  variant?: 'inline' | 'collapsible';
+  /** collapsible 模式下顶部标签 */
+  label?: string;
+  /** collapsible 模式下标签配色 */
+  labelColor?: string;
+  /** 是否允许 apiRequest 类型（apiRequest 子链内应为 false，禁止二层嵌套） */
+  allowApiRequest?: boolean;
+}
+
+function ActionChainEditor({
   actions,
   onChange,
-}: {
-  label: string;
-  labelColor: string;
-  actions: Array<{ type: string; [key: string]: unknown }>;
-  onChange: (actions: Array<{ type: string; [key: string]: unknown }>) => void;
-}) {
+  variant = 'inline',
+  label,
+  labelColor = '',
+  allowApiRequest = true,
+}: ActionChainEditorProps) {
   const [expanded, setExpanded] = useState(true);
   const screens = editorStore.screens;
   const activeScreen = editorStore.activeScreen;
   const allNodes = activeScreen ? collectFlatNodes(activeScreen.rootNode) : [];
 
-  const addSubAction = () => {
-    onChange([...actions, { type: 'setState' }]);
+  const availableActionTypes = allowApiRequest
+    ? ACTION_TYPES
+    : ACTION_TYPES.filter((a) => a.value !== 'apiRequest');
+
+  const addAction = () => {
+    onChange([...actions, { type: 'navigate' }]);
   };
 
-  const removeSubAction = (idx: number) => {
+  const removeAction = (idx: number) => {
     onChange(actions.filter((_, i) => i !== idx));
   };
 
-  const updateSubActionType = (idx: number, type: string) => {
-    onChange(actions.map((a, i) => (i === idx ? { type } : a)));
+  const moveAction = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= actions.length) return;
+    const next = [...actions];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
   };
 
-  const updateSubActionField = (idx: number, field: string, value: unknown) => {
+  /**
+   * 切换动作类型：**保留跨类型共享字段**（nodeId/targetId/variableName/value/duration 等），
+   * 旧实现 `{ type }` 会清空所有参数——这是一个旧 bug，导致用户切类型后"选择的页面"消失。
+   */
+  const updateActionType = (idx: number, type: string) => {
+    onChange(actions.map((a, i) => (i === idx ? { ...a, type } : a)));
+  };
+
+  const updateActionField = (idx: number, field: string, value: unknown) => {
     onChange(actions.map((a, i) => (i === idx ? { ...a, [field]: value } : a)));
   };
 
-  const updateSubActionFields = (idx: number, fields: EventPayload) => {
+  const updateActionFields = (idx: number, fields: EventPayload) => {
     onChange(actions.map((a, i) => (i === idx ? { ...a, ...fields } : a)));
   };
 
-  return (
-    <div className={`border rounded p-1.5 ${labelColor}`}>
-      <button
-        type="button"
-        className="flex items-center gap-1 w-full text-[10px] font-medium"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <svg className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6.293 7.293a1 1 0 011.414 0L10 9.586l2.293-2.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" /></svg>
-        {label} ({actions.length})
-      </button>
-      {expanded && (
-        <div className="mt-1 flex flex-col gap-1">
-          {actions.map((action, i) => (
-            <div key={i} className="flex flex-col gap-1 pl-2 border-l-2 border-current/20 bg-white/60 rounded p-1">
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] text-gray-400 w-3">{i + 1}.</span>
+  const chainBody = (
+    <div className={variant === 'collapsible' ? 'mt-1 flex flex-col gap-1' : 'flex flex-col gap-1'}>
+      {actions.map((action, i) => {
+        const stepRowClass = variant === 'collapsible'
+          ? 'flex flex-col gap-1 pl-2 border-l-2 border-current/20 bg-white/60 rounded p-1'
+          : 'flex flex-col gap-1 pl-2 border-l-2 border-blue-200';
+        return (
+          <div key={i} className={stepRowClass}>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-400 w-4 flex-shrink-0">{i + 1}.</span>
+              <select
+                className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                value={action.type}
+                onChange={(e) => updateActionType(i, e.target.value)}
+              >
+                {availableActionTypes.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
+              <button type="button" className="text-gray-400 hover:text-gray-600 text-[10px]" onClick={() => moveAction(i, -1)} title="上移">↑</button>
+              <button type="button" className="text-gray-400 hover:text-gray-600 text-[10px]" onClick={() => moveAction(i, 1)} title="下移">↓</button>
+              <button type="button" className="text-gray-400 hover:text-red-400 text-[10px]" onClick={() => removeAction(i)} title="删除">×</button>
+            </div>
+
+            {/* Per-type parameter editors */}
+            {action.type === 'navigate' && (
+              <div className="flex items-center gap-1 pl-4">
+                <span className="text-[10px] text-gray-500 w-10">页面:</span>
                 <select
-                  className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none"
-                  value={action.type}
-                  onChange={(e) => updateSubActionType(i, e.target.value)}
+                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                  value={(action.targetScreenId ?? action.screenId ?? '') as string}
+                  onChange={(e) => updateActionFields(i, { targetScreenId: e.target.value, screenId: e.target.value })}
                 >
-                  {SUB_ACTION_TYPES.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                  <option value="">选择页面</option>
+                  {screens.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                <button type="button" className="text-gray-400 hover:text-red-400 text-[10px]" onClick={() => removeSubAction(i)}>×</button>
               </div>
-              {/* Inline config for common sub-action types */}
-              {action.type === 'setState' && (() => {
-                const targetId = (action.nodeId ?? action.targetId ?? '') as string;
-                const targetNode = allNodes.find((n) => n.id === targetId);
-                const availableStates = targetNode?.states ?? [];
-                return (
-                <div className="flex flex-col gap-0.5 pl-4">
+            )}
+
+            {action.type === 'setState' && (() => {
+              const targetId = (action.nodeId ?? action.targetId ?? '') as string;
+              const targetNode = allNodes.find((n) => n.id === targetId);
+              const availableStates = targetNode?.states ?? [];
+              return (
+                <div className="flex flex-col gap-1 pl-4">
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-500 w-8">目标:</span>
-                    <select className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none" value={targetId} onChange={(e) => updateSubActionFields(i, { targetId: e.target.value, state: '' })}>
+                    <span className="text-[10px] text-gray-500 w-10">目标:</span>
+                    <select
+                      className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                      value={targetId}
+                      onChange={(e) => updateActionFields(i, { nodeId: e.target.value, targetId: e.target.value, stateName: '', state: '' })}
+                    >
                       <option value="">选择节点</option>
                       {allNodes.map((n) => (
                         <option key={n.id} value={n.id}>
@@ -485,103 +453,342 @@ function SubActionChainEditor({
                     </select>
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-500 w-8">状态:</span>
+                    <span className="text-[10px] text-gray-500 w-10">状态:</span>
                     {availableStates.length > 0 ? (
-                      <select className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none" value={(action.stateName ?? action.state ?? '') as string} onChange={(e) => updateSubActionField(i, 'state', e.target.value)}>
+                      <select
+                        className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                        value={(action.stateName ?? action.state ?? '') as string}
+                        onChange={(e) => updateActionFields(i, { stateName: e.target.value, state: e.target.value })}
+                      >
                         <option value="">选择状态</option>
                         <option value="default">default</option>
                         {availableStates.map((s) => <option key={s.name} value={s.name}>{s.name}</option>)}
                       </select>
                     ) : (
-                      <input type="text" className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none" placeholder="先选择有状态的节点" value={(action.stateName ?? action.state ?? '') as string} onChange={(e) => updateSubActionField(i, 'state', e.target.value)} />
+                      <input
+                        type="text"
+                        className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
+                        placeholder="先选择有状态的节点"
+                        value={(action.stateName ?? action.state ?? '') as string}
+                        onChange={(e) => updateActionFields(i, { stateName: e.target.value, state: e.target.value })}
+                      />
                     )}
                   </div>
-                  <label className="flex items-center gap-1 text-[9px] text-gray-500">
-                    <input type="checkbox" checked={((action.autoRevertMs as number) ?? 0) > 0} onChange={(e) => updateSubActionField(i, 'autoRevertMs', e.target.checked ? 3000 : undefined)} />
+                  <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <input
+                      type="checkbox"
+                      checked={((action.autoRevertMs as number) ?? 0) > 0}
+                      onChange={(e) => updateActionField(i, 'autoRevertMs', e.target.checked ? 3000 : undefined)}
+                    />
                     自动回退
                     {((action.autoRevertMs as number) ?? 0) > 0 && (
                       <>
-                        <input type="number" min={500} className="w-14 h-4 px-1 border border-gray-200 rounded text-[9px] outline-none" value={(action.autoRevertMs as number) ?? 3000} onChange={(e) => updateSubActionField(i, 'autoRevertMs', Number(e.target.value) || 3000)} />
+                        <input
+                          type="number"
+                          min={500}
+                          className="w-16 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none"
+                          value={(action.autoRevertMs as number) ?? 3000}
+                          onChange={(e) => updateActionField(i, 'autoRevertMs', Number(e.target.value) || 3000)}
+                        />
                         <span>ms</span>
                       </>
                     )}
                   </label>
                 </div>
-                );
-              })()}
-              {action.type === 'showToast' && (
-                <div className="flex flex-col gap-0.5 pl-4">
+              );
+            })()}
+
+            {action.type === 'setDomainState' && (() => {
+              const domainStates = activeScreen?.domainStates ?? [];
+              const selectedVar = domainStates.find((g) => g.name === action.variableName);
+              return (
+                <div className="flex flex-col gap-1 pl-4">
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-500 w-8">类型:</span>
-                    <select className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none" value={(action.toastType as string) ?? 'success'} onChange={(e) => updateSubActionField(i, 'toastType', e.target.value)}>
-                      <option value="success">成功</option>
-                      <option value="error">错误</option>
-                      <option value="warning">警告</option>
-                      <option value="info">信息</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-500 w-8">内容:</span>
-                    <input type="text" className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none" placeholder="{{response.message}}" value={(action.message ?? '') as string} onChange={(e) => updateSubActionField(i, 'message', e.target.value)} />
-                  </div>
-                </div>
-              )}
-              {action.type === 'navigate' && (
-                <div className="flex items-center gap-1 pl-4">
-                  <span className="text-[9px] text-gray-500 w-8">页面:</span>
-                  <select className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none" value={(action.targetScreenId ?? action.screenId ?? '') as string} onChange={(e) => updateSubActionField(i, 'targetScreenId', e.target.value)}>
-                    <option value="">选择页面</option>
-                    {screens.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              )}
-              {action.type === 'setDomainState' && (() => {
-                const domainStates = activeScreen?.domainStates ?? [];
-                const selectedVar = domainStates.find((g) => g.name === action.variableName);
-                return (
-                <div className="flex flex-col gap-0.5 pl-4">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-500 w-8">变量:</span>
-                    <select className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none" value={(action.variableName ?? '') as string} onChange={(e) => updateSubActionField(i, 'variableName', e.target.value)}>
+                    <span className="text-[10px] text-gray-500 w-10">变量:</span>
+                    <select
+                      className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                      value={(action.variableName ?? '') as string}
+                      onChange={(e) => updateActionFields(i, { variableName: e.target.value, value: '' })}
+                    >
                       <option value="">选择变量</option>
                       {domainStates.map((g) => <option key={g.name} value={g.name}>{g.label || g.name}</option>)}
                     </select>
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] text-gray-500 w-8">值:</span>
+                    <span className="text-[10px] text-gray-500 w-10">值:</span>
                     {selectedVar ? (
-                      <select className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] bg-white outline-none" value={(action.value ?? '') as string} onChange={(e) => updateSubActionField(i, 'value', e.target.value)}>
+                      <select
+                        className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                        value={(action.value ?? '') as string}
+                        onChange={(e) => updateActionField(i, 'value', e.target.value)}
+                      >
                         <option value="">选择值</option>
                         {selectedVar.values.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
                       </select>
                     ) : (
-                      <input type="text" className="flex-1 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none" placeholder="值" value={(action.value ?? '') as string} onChange={(e) => updateSubActionField(i, 'value', e.target.value)} />
+                      <input
+                        type="text"
+                        className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
+                        placeholder="目标值"
+                        value={(action.value ?? '') as string}
+                        onChange={(e) => updateActionField(i, 'value', e.target.value)}
+                      />
                     )}
                   </div>
                 </div>
-                );
-              })()}
-              {action.type === 'delay' && (
-                <div className="flex items-center gap-1 pl-4">
-                  <span className="text-[9px] text-gray-500 w-8">时长:</span>
-                  <input type="number" min={1} className="w-16 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none" placeholder="300" value={(action.duration ?? '') as number} onChange={(e) => updateSubActionField(i, 'duration', Number(e.target.value) || 300)} />
-                  <span className="text-[9px] text-gray-400">ms</span>
+              );
+            })()}
+
+            {action.type === 'switchDataSourcePhase' && (() => {
+              const dataSources = activeScreen?.dataSources ?? [];
+              const ds = dataSources.find((d) => d.id === action.dataSourceId);
+              const phases = ds?.phases ?? [];
+              return (
+                <div className="flex flex-col gap-1 pl-4">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-500 w-10">数据源:</span>
+                    <select
+                      className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                      value={(action.dataSourceId ?? '') as string}
+                      onChange={(e) => updateActionFields(i, { dataSourceId: e.target.value, phase: '' })}
+                    >
+                      <option value="">选择数据源</option>
+                      {dataSources.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-500 w-10">阶段:</span>
+                    {phases.length > 0 ? (
+                      <select
+                        className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                        value={(action.phase ?? '') as string}
+                        onChange={(e) => updateActionField(i, 'phase', e.target.value)}
+                      >
+                        <option value="">选择阶段</option>
+                        {phases.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
+                        placeholder="阶段名"
+                        value={(action.phase ?? '') as string}
+                        onChange={(e) => updateActionField(i, 'phase', e.target.value)}
+                      />
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            className="h-5 px-2 text-[9px] border border-dashed border-current/30 rounded hover:border-current/60"
-            onClick={addSubAction}
-          >+ 添加</button>
-        </div>
-      )}
+              );
+            })()}
+
+            {action.type === 'toggleVisible' && (
+              <div className="flex items-center gap-1 pl-4">
+                <span className="text-[10px] text-gray-500 w-10">目标:</span>
+                <select
+                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                  value={(action.nodeId ?? action.targetId ?? '') as string}
+                  onChange={(e) => updateActionFields(i, { nodeId: e.target.value, targetId: e.target.value })}
+                >
+                  <option value="">选择节点</option>
+                  {allNodes.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {'\u00A0\u00A0'.repeat(n.depth)}{n.name} ({n.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {action.type === 'openUrl' && (
+              <div className="flex flex-col gap-1 pl-4">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-500 w-10">URL:</span>
+                  <input
+                    type="text"
+                    className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
+                    placeholder="https://..."
+                    value={(action.url ?? '') as string}
+                    onChange={(e) => updateActionField(i, 'url', e.target.value)}
+                  />
+                </div>
+                <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                  <input
+                    type="checkbox"
+                    checked={(action.openInNewTab as boolean) ?? true}
+                    onChange={(e) => updateActionField(i, 'openInNewTab', e.target.checked)}
+                  />
+                  新标签页打开
+                </label>
+              </div>
+            )}
+
+            {action.type === 'delay' && (
+              <div className="flex items-center gap-1 pl-4">
+                <span className="text-[10px] text-gray-500 w-10">时长:</span>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-20 h-6 px-1 border border-gray-200 rounded text-xs outline-none"
+                  placeholder="300"
+                  value={(action.duration as number | undefined) ?? ''}
+                  onChange={(e) => updateActionField(i, 'duration', Number(e.target.value) || 300)}
+                />
+                <span className="text-[10px] text-gray-400">ms</span>
+              </div>
+            )}
+
+            {action.type === 'showToast' && (
+              <div className="flex flex-col gap-1 pl-4">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-500 w-10">类型:</span>
+                  <select
+                    className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                    value={(action.toastType as string) ?? 'success'}
+                    onChange={(e) => updateActionField(i, 'toastType', e.target.value)}
+                  >
+                    <option value="success">成功</option>
+                    <option value="error">错误</option>
+                    <option value="warning">警告</option>
+                    <option value="info">信息</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-500 w-10">内容:</span>
+                  <input
+                    type="text"
+                    className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
+                    placeholder="提示消息，支持 {{response.message}}"
+                    value={(action.message ?? '') as string}
+                    onChange={(e) => updateActionField(i, 'message', e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-500 w-10">时长:</span>
+                  <input
+                    type="number"
+                    min={500}
+                    className="w-20 h-6 px-1 border border-gray-200 rounded text-xs outline-none"
+                    placeholder="3000"
+                    value={(action.duration as number | undefined) ?? ''}
+                    onChange={(e) => updateActionField(i, 'duration', e.target.value === '' ? undefined : Number(e.target.value))}
+                  />
+                  <span className="text-[10px] text-gray-400">ms</span>
+                </div>
+              </div>
+            )}
+
+            {action.type === 'apiRequest' && (
+              <div className="flex flex-col gap-1 pl-4">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-500 w-10">接口:</span>
+                  <select
+                    className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                    value={(action.requestId ?? '') as string}
+                    onChange={(e) => updateActionField(i, 'requestId', e.target.value)}
+                  >
+                    <option value="">选择接口</option>
+                    {(activeScreen?.apiEndpoints ?? []).map((ep) => (
+                      <option key={ep.definition.id} value={ep.definition.id}>
+                        {ep.definition.method} {ep.definition.path} — {ep.definition.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {!(activeScreen?.apiEndpoints?.length) && (
+                  <div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    暂无接口定义，请先在左侧「数据」面板创建。
+                  </div>
+                )}
+                <ActionChainEditor
+                  variant="collapsible"
+                  label="✅ 成功时执行"
+                  labelColor="text-green-700 bg-green-50 border-green-200"
+                  actions={(action.onSuccess as LooseAction[] | undefined) ?? []}
+                  onChange={(subActions) => updateActionField(i, 'onSuccess', subActions)}
+                  allowApiRequest={false}
+                />
+                <ActionChainEditor
+                  variant="collapsible"
+                  label="❌ 失败时执行"
+                  labelColor="text-red-700 bg-red-50 border-red-200"
+                  actions={(action.onFailure as LooseAction[] | undefined) ?? []}
+                  onChange={(subActions) => updateActionField(i, 'onFailure', subActions)}
+                  allowApiRequest={false}
+                />
+              </div>
+            )}
+
+            {action.type === 'cancelApiRequest' && (
+              <div className="flex items-center gap-1 pl-4">
+                <span className="text-[10px] text-gray-500 w-10">接口:</span>
+                <select
+                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                  value={(action.requestId ?? '') as string}
+                  onChange={(e) => updateActionField(i, 'requestId', e.target.value || undefined)}
+                >
+                  <option value="">全部（不填）</option>
+                  {(activeScreen?.apiEndpoints ?? []).map((ep) => (
+                    <option key={ep.definition.id} value={ep.definition.id}>
+                      {ep.definition.method} {ep.definition.path}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {action.type === 'custom' && (
+              <div className="flex items-center gap-1 pl-4">
+                <span className="text-[10px] text-gray-500 w-10">标识:</span>
+                <input
+                  type="text"
+                  className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none font-mono"
+                  placeholder="handler 名称"
+                  value={(action.handler ?? '') as string}
+                  onChange={(e) => updateActionField(i, 'handler', e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className={
+          variant === 'collapsible'
+            ? 'h-5 px-2 text-[10px] border border-dashed border-current/30 rounded hover:border-current/60'
+            : 'h-6 px-2 text-[10px] border border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-500'
+        }
+        onClick={addAction}
+      >+ 添加动作步骤</button>
     </div>
   );
+
+  if (variant === 'collapsible') {
+    return (
+      <div className={`border rounded p-1.5 ${labelColor}`}>
+        <button
+          type="button"
+          className="flex items-center gap-1 w-full text-[10px] font-medium"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <svg className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path d="M6.293 7.293a1 1 0 011.414 0L10 9.586l2.293-2.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" /></svg>
+          {label} ({actions.length})
+        </button>
+        {expanded && chainBody}
+      </div>
+    );
+  }
+
+  return chainBody;
 }
 
 // ===== Add Event Form =====
+// 新建事件的内联表单。结构简单：
+//   1. 触发器下拉
+//   2. 动作链编辑器（复用 ActionChainEditor，支持多步动作 + apiRequest）
+//   3. 可选执行条件
+// 设计决策（AGENTS.md §9.1 无双版本）：所有动作参数表单都在 ActionChainEditor 里；
+// 本组件不再持有 actionConfig / handleSave switch 表驱动，避免与编辑态重复。
 
 const AddEventForm = observer(function AddEventForm({
   hostNodeId,
@@ -593,32 +800,20 @@ const AddEventForm = observer(function AddEventForm({
   onClose: () => void;
 }) {
   const [adding, setAdding] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [trigger, setTrigger] = useState<TriggerType>('click');
-  const [actionConfig, setActionConfig] = useState<ActionConfig>({ type: 'navigate' });
-  /** 在画布/树中点选目标节点：选中变化且与锚点不同时写入目标 id */
-  const [pickTargetMode, setPickTargetMode] = useState(false);
-  const pickAnchorRef = useRef<string | null>(null);
-
-  const screens = editorStore.screens;
+  const [actions, setActions] = useState<LooseAction[]>(() => [{ type: 'navigate' }]);
   const activeScreen = editorStore.activeScreen;
 
-  useEffect(() => {
-    if (!pickTargetMode) return;
-    const sid = editorStore.selectedNodeIds[0] ?? null;
-    if (sid !== null && sid !== pickAnchorRef.current) {
-      setActionConfig((c) => ({ ...c, nodeId: sid }));
-      setPickTargetMode(false);
-    }
-    pickAnchorRef.current = sid;
-  }, [editorStore.selectedNodeIds.join('|'), pickTargetMode]);
+  const [conditionEnabled, setConditionEnabled] = useState(false);
+  const [conditionType, setConditionType] = useState<'domainState' | 'expression'>('domainState');
+  const [conditionVar, setConditionVar] = useState('');
+  const [conditionVal, setConditionVal] = useState('');
+  const [conditionExpr, setConditionExpr] = useState('');
 
   const reset = () => {
     setAdding(false);
-    setStep(1);
     setTrigger('click');
-    setActionConfig({ type: 'navigate' });
-    setPickTargetMode(false);
+    setActions([{ type: 'navigate' }]);
     setConditionEnabled(false);
     setConditionType('domainState');
     setConditionVar('');
@@ -627,71 +822,19 @@ const AddEventForm = observer(function AddEventForm({
     onClose();
   };
 
-  const beginPickTarget = () => {
-    pickAnchorRef.current = editorStore.selectedNodeIds[0] ?? null;
-    setPickTargetMode(true);
-  };
-
-  const useCurrentSelectionAsTarget = () => {
-    const id = editorStore.selectedNodeIds[0];
-    if (id) setActionConfig((c) => ({ ...c, nodeId: id }));
-  };
-
-  const [conditionEnabled, setConditionEnabled] = useState(false);
-  const [conditionType, setConditionType] = useState<'domainState' | 'expression'>('domainState');
-  const [conditionVar, setConditionVar] = useState('');
-  const [conditionVal, setConditionVal] = useState('');
-  const [conditionExpr, setConditionExpr] = useState('');
-
+  /**
+   * 保存：setState 的默认目标节点兜底为宿主节点（用户不选节点也能用）。
+   * 其他类型的参数全部由 ActionChainEditor 负责，这里不再做 switch 转换。
+   */
   const handleSave = () => {
-    const action: EventPayload = { type: actionConfig.type };
+    const normalizedActions: LooseAction[] = actions.map((a) => {
+      if (a.type === 'setState' && !a.nodeId && !a.targetId) {
+        return { ...a, nodeId: hostNodeId, targetId: hostNodeId };
+      }
+      return a;
+    });
 
-    switch (actionConfig.type) {
-      case 'navigate':
-        action.targetScreenId = actionConfig.screenId;
-        action.screenId = actionConfig.screenId;
-        break;
-      case 'setState':
-        action.nodeId = actionConfig.nodeId || hostNodeId;
-        action.targetId = action.nodeId;
-        action.stateName = actionConfig.stateName;
-        action.state = actionConfig.stateName;
-        if (actionConfig.autoRevertMs && actionConfig.autoRevertMs > 0) {
-          action.autoRevertMs = actionConfig.autoRevertMs;
-        }
-        break;
-      case 'setDomainState':
-        action.variableName = actionConfig.variableName;
-        action.value = actionConfig.value;
-        break;
-      case 'toggleVisible':
-        action.nodeId = actionConfig.nodeId;
-        action.targetId = actionConfig.nodeId;
-        break;
-      case 'openUrl':
-        action.url = actionConfig.url;
-        action.openInNewTab = actionConfig.openInNewTab ?? true;
-        break;
-      case 'delay':
-        action.duration = actionConfig.duration ?? 300;
-        break;
-      case 'showToast':
-        action.toastType = actionConfig.toastType ?? 'success';
-        action.message = actionConfig.message ?? '';
-        action.position = 'top';
-        if (actionConfig.toastDuration) action.duration = actionConfig.toastDuration;
-        break;
-      case 'apiRequest':
-        action.requestId = actionConfig.requestId;
-        action.onSuccess = actionConfig.onSuccess ?? [];
-        action.onFailure = actionConfig.onFailure ?? [];
-        break;
-      case 'custom':
-        action.handler = actionConfig.handler ?? 'handler';
-        break;
-    }
-
-    const eventPayload: EventPayload = { trigger, actions: [action] };
+    const eventPayload: EventPayload = { trigger, actions: normalizedActions };
     if (conditionEnabled) {
       if (conditionType === 'domainState' && conditionVar) {
         eventPayload.condition = { type: 'domainState', variableName: conditionVar, value: conditionVal };
@@ -731,454 +874,110 @@ const AddEventForm = observer(function AddEventForm({
 
   return (
     <div className="border border-blue-200 rounded bg-blue-50/30 p-2 flex flex-col gap-2">
-      {pickTargetMode && (
-        <div className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-          请在画布或左侧树中点击<strong>目标元素</strong>（与当前选中不同时会填入）。也可点「使用当前选中」。
-        </div>
-      )}
-      {/* Step indicator */}
-      <div className="flex items-center gap-1 text-[10px] text-gray-500">
-        <span className={step >= 1 ? 'text-blue-600 font-medium' : ''}>1.触发</span>
-        <span>→</span>
-        <span className={step >= 2 ? 'text-blue-600 font-medium' : ''}>2.动作</span>
-        <span>→</span>
-        <span className={step >= 3 ? 'text-blue-600 font-medium' : ''}>3.配置</span>
+      {/* Trigger */}
+      <div className="flex items-center gap-1">
+        <span className="text-gray-500 text-[10px] w-12 flex-shrink-0">触发器:</span>
+        <select
+          className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
+          value={trigger}
+          onChange={(e) => setTrigger(e.target.value as TriggerType)}
+        >
+          {TRIGGER_OPTIONS.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Step 1: Select trigger */}
-      {step >= 1 && (
-        <div className="flex items-center gap-1">
-          <span className="text-gray-500 text-[10px] w-12 flex-shrink-0">触发器:</span>
-          <select
-            className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-            value={trigger}
-            onChange={(e) => {
-              setTrigger(e.target.value as TriggerType);
-              if (step === 1) setStep(2);
-            }}
-          >
-            {TRIGGER_OPTIONS.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Action chain */}
+      <div className="text-[10px] text-gray-500 font-medium">动作链 ({actions.length})</div>
+      <ActionChainEditor
+        variant="inline"
+        actions={actions}
+        onChange={setActions}
+        allowApiRequest
+      />
 
-      {/* Step 2: Select action type */}
-      {step >= 2 && (
-        <div className="flex items-center gap-1">
-          <span className="text-gray-500 text-[10px] w-12 flex-shrink-0">动作:</span>
-          <select
-            className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-            value={actionConfig.type}
-            onChange={(e) => {
-              setActionConfig({ type: e.target.value as ActionType });
-              setStep(3);
-            }}
-          >
-            {ACTION_TYPES.map((a) => (
-              <option key={a.value} value={a.value}>{a.label}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Step 3: Configure action params */}
-      {step >= 3 && (
-        <div className="flex flex-col gap-1.5 pl-2 border-l-2 border-blue-200">
-          {actionConfig.type === 'navigate' && (
-            <div className="flex items-center gap-1">
-              <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">目标页面:</span>
-              <select
-                className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-                value={actionConfig.screenId ?? ''}
-                onChange={(e) => setActionConfig({ ...actionConfig, screenId: e.target.value })}
-              >
-                <option value="">选择页面</option>
-                {screens.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {actionConfig.type === 'setState' && (
-            <>
+      {/* Condition (optional) */}
+      <div className="flex flex-col gap-1.5 border-t border-gray-200 pt-1.5">
+        <label className="flex items-center gap-1.5 text-[10px] text-gray-600">
+          <input
+            type="checkbox"
+            checked={conditionEnabled}
+            onChange={(e) => setConditionEnabled(e.target.checked)}
+          />
+          执行条件
+        </label>
+        {conditionEnabled && (
+          <div className="flex flex-col gap-1 pl-2 border-l-2 border-purple-200">
+            <select
+              className="h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+              value={conditionType}
+              onChange={(e) => setConditionType(e.target.value as 'domainState' | 'expression')}
+            >
+              <option value="domainState">全局状态匹配</option>
+              <option value="expression">自定义表达式</option>
+            </select>
+            {conditionType === 'domainState' && (
               <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">状态名:</span>
-                <input
-                  type="text"
-                  className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
-                  placeholder="例: hover"
-                  value={actionConfig.stateName ?? ''}
-                  onChange={(e) => setActionConfig({ ...actionConfig, stateName: e.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">目标节点</span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    className="flex-1 min-w-0 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
-                    placeholder="留空 = 当前宿主节点"
-                    value={actionConfig.nodeId ?? ''}
-                    onChange={(e) => setActionConfig({ ...actionConfig, nodeId: e.target.value })}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    type="button"
-                    className="h-6 px-1.5 text-[10px] rounded border border-gray-200 bg-white hover:bg-gray-50"
-                    onClick={useCurrentSelectionAsTarget}
-                  >
-                    使用当前选中
-                  </button>
-                  <button
-                    type="button"
-                    className={`h-6 px-1.5 text-[10px] rounded border ${
-                      pickTargetMode
-                        ? 'border-amber-400 bg-amber-50 text-amber-900'
-                        : 'border-gray-200 bg-white hover:bg-gray-50'
-                    }`}
-                    onClick={beginPickTarget}
-                  >
-                    在画布点选…
-                  </button>
-                </div>
-              </div>
-              <label className="flex items-center gap-1.5 text-[10px] text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={(actionConfig.autoRevertMs ?? 0) > 0}
-                  onChange={(e) =>
-                    setActionConfig({
-                      ...actionConfig,
-                      autoRevertMs: e.target.checked ? 3000 : undefined,
-                    })
-                  }
-                />
-                自动回退
-                {(actionConfig.autoRevertMs ?? 0) > 0 && (
-                  <input
-                    type="number"
-                    min={500}
-                    className="w-16 h-5 px-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
-                    value={actionConfig.autoRevertMs ?? 3000}
-                    onChange={(e) =>
-                      setActionConfig({ ...actionConfig, autoRevertMs: Number(e.target.value) || 3000 })
-                    }
-                  />
-                )}
-                {(actionConfig.autoRevertMs ?? 0) > 0 && <span className="text-gray-400">ms 后</span>}
-              </label>
-            </>
-          )}
-
-          {actionConfig.type === 'setDomainState' && (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">变量名:</span>
                 <select
-                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-                  value={actionConfig.variableName ?? ''}
-                  onChange={(e) => setActionConfig({ ...actionConfig, variableName: e.target.value, value: '' })}
+                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                  value={conditionVar}
+                  onChange={(e) => setConditionVar(e.target.value)}
                 >
                   <option value="">选择变量</option>
                   {(activeScreen?.domainStates ?? []).map((gs) => (
                     <option key={gs.name} value={gs.name}>{gs.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">值:</span>
+                <span className="text-gray-400 text-[10px]">=</span>
                 {(() => {
-                  const gsVar = (activeScreen?.domainStates ?? []).find((g) => g.name === actionConfig.variableName);
-                  if (gsVar) {
+                  const gs = (activeScreen?.domainStates ?? []).find((g) => g.name === conditionVar);
+                  if (gs) {
                     return (
                       <select
-                        className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-                        value={actionConfig.value ?? ''}
-                        onChange={(e) => setActionConfig({ ...actionConfig, value: e.target.value })}
+                        className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
+                        value={conditionVal}
+                        onChange={(e) => setConditionVal(e.target.value)}
                       >
                         <option value="">选择值</option>
-                        {gsVar.values.map((v) => (
-                          <option key={v.value} value={v.value}>{v.label}</option>
-                        ))}
+                        {gs.values.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
                       </select>
                     );
                   }
                   return (
                     <input
                       type="text"
-                      className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
-                      placeholder="目标值"
-                      value={actionConfig.value ?? ''}
-                      onChange={(e) => setActionConfig({ ...actionConfig, value: e.target.value })}
+                      className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
+                      placeholder="匹配值"
+                      value={conditionVal}
+                      onChange={(e) => setConditionVal(e.target.value)}
                     />
                   );
                 })()}
               </div>
-            </>
-          )}
-
-          {actionConfig.type === 'toggleVisible' && (
-            <div className="flex flex-col gap-1">
-              <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">目标节点</span>
+            )}
+            {conditionType === 'expression' && (
               <input
                 type="text"
-                className="w-full h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
-                placeholder="节点 ID"
-                value={actionConfig.nodeId ?? ''}
-                onChange={(e) => setActionConfig({ ...actionConfig, nodeId: e.target.value })}
+                className="w-full h-6 px-1.5 border border-gray-200 rounded text-xs outline-none font-mono"
+                placeholder="globalStates.theme === 'dark'"
+                value={conditionExpr}
+                onChange={(e) => setConditionExpr(e.target.value)}
               />
-              <div className="flex flex-wrap gap-1">
-                <button
-                  type="button"
-                  className="h-6 px-1.5 text-[10px] rounded border border-gray-200 bg-white hover:bg-gray-50"
-                  onClick={useCurrentSelectionAsTarget}
-                >
-                  使用当前选中
-                </button>
-                <button
-                  type="button"
-                  className={`h-6 px-1.5 text-[10px] rounded border ${
-                    pickTargetMode
-                      ? 'border-amber-400 bg-amber-50 text-amber-900'
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
-                  }`}
-                  onClick={beginPickTarget}
-                >
-                  在画布点选…
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+      </div>
 
-          {actionConfig.type === 'openUrl' && (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">URL:</span>
-                <input
-                  type="text"
-                  className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
-                  placeholder="https://..."
-                  value={actionConfig.url ?? ''}
-                  onChange={(e) => setActionConfig({ ...actionConfig, url: e.target.value })}
-                />
-              </div>
-              <label className="flex items-center gap-1.5 text-[10px] text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={actionConfig.openInNewTab ?? true}
-                  onChange={(e) => setActionConfig({ ...actionConfig, openInNewTab: e.target.checked })}
-                />
-                在新标签页中打开
-              </label>
-            </>
-          )}
-
-          {actionConfig.type === 'delay' && (
-            <div className="flex items-center gap-1">
-              <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">时长(ms):</span>
-              <input
-                type="number"
-                min={1}
-                className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
-                placeholder="300"
-                value={actionConfig.duration ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value === '' ? undefined : Number(e.target.value);
-                  setActionConfig({ ...actionConfig, duration: v });
-                }}
-              />
-            </div>
-          )}
-
-          {actionConfig.type === 'showToast' && (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">类型:</span>
-                <select
-                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-                  value={actionConfig.toastType ?? 'success'}
-                  onChange={(e) => setActionConfig({ ...actionConfig, toastType: e.target.value as ActionConfig['toastType'] })}
-                >
-                  <option value="success">成功</option>
-                  <option value="error">错误</option>
-                  <option value="warning">警告</option>
-                  <option value="info">信息</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">内容:</span>
-                <input
-                  type="text"
-                  className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
-                  placeholder="提示消息，支持 {{response.message}}"
-                  value={actionConfig.message ?? ''}
-                  onChange={(e) => setActionConfig({ ...actionConfig, message: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">时长(ms):</span>
-                <input
-                  type="number"
-                  min={500}
-                  className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400"
-                  placeholder="3000"
-                  value={actionConfig.toastDuration ?? ''}
-                  onChange={(e) => setActionConfig({ ...actionConfig, toastDuration: e.target.value === '' ? undefined : Number(e.target.value) })}
-                />
-              </div>
-            </>
-          )}
-
-          {actionConfig.type === 'apiRequest' && (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">接口:</span>
-                <select
-                  className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none focus:border-blue-400"
-                  value={actionConfig.requestId ?? ''}
-                  onChange={(e) => setActionConfig({ ...actionConfig, requestId: e.target.value })}
-                >
-                  <option value="">选择接口</option>
-                  {(activeScreen?.apiEndpoints ?? []).map((ep) => (
-                    <option key={ep.definition.id} value={ep.definition.id}>
-                      {ep.definition.method} {ep.definition.path} — {ep.definition.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {!(activeScreen?.apiEndpoints?.length) && (
-                <div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                  暂无接口定义，请先在左侧「数据」面板的「接口定义」中创建。
-                </div>
-              )}
-              <SubActionChainEditor
-                label="✅ 成功时执行"
-                labelColor="text-green-700 bg-green-50 border-green-200"
-                actions={actionConfig.onSuccess ?? []}
-                onChange={(actions) => setActionConfig({ ...actionConfig, onSuccess: actions })}
-              />
-              <SubActionChainEditor
-                label="❌ 失败时执行"
-                labelColor="text-red-700 bg-red-50 border-red-200"
-                actions={actionConfig.onFailure ?? []}
-                onChange={(actions) => setActionConfig({ ...actionConfig, onFailure: actions })}
-              />
-            </>
-          )}
-
-          {actionConfig.type === 'custom' && (
-            <div className="flex items-center gap-1">
-              <span className="text-gray-500 text-[10px] w-14 flex-shrink-0">标识:</span>
-              <input
-                type="text"
-                className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none focus:border-blue-400 font-mono"
-                placeholder="handler 名称"
-                value={actionConfig.handler ?? ''}
-                onChange={(e) => setActionConfig({ ...actionConfig, handler: e.target.value })}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Condition (optional) */}
-      {step >= 3 && (
-        <div className="flex flex-col gap-1.5 mt-1 border-t border-gray-200 pt-1.5">
-          <label className="flex items-center gap-1.5 text-[10px] text-gray-600">
-            <input
-              type="checkbox"
-              checked={conditionEnabled}
-              onChange={(e) => setConditionEnabled(e.target.checked)}
-            />
-            执行条件
-          </label>
-          {conditionEnabled && (
-            <div className="flex flex-col gap-1 pl-2 border-l-2 border-purple-200">
-              <select
-                className="h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
-                value={conditionType}
-                onChange={(e) => setConditionType(e.target.value as 'domainState' | 'expression')}
-              >
-                <option value="domainState">全局状态匹配</option>
-                <option value="expression">自定义表达式</option>
-              </select>
-              {conditionType === 'domainState' && (
-                <div className="flex items-center gap-1">
-                  <select
-                    className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
-                    value={conditionVar}
-                    onChange={(e) => setConditionVar(e.target.value)}
-                  >
-                    <option value="">选择变量</option>
-                    {(activeScreen?.domainStates ?? []).map((gs) => (
-                      <option key={gs.name} value={gs.name}>{gs.name}</option>
-                    ))}
-                  </select>
-                  <span className="text-gray-400 text-[10px]">=</span>
-                  {(() => {
-                    const gs = (activeScreen?.domainStates ?? []).find((g) => g.name === conditionVar);
-                    if (gs) {
-                      return (
-                        <select
-                          className="flex-1 h-6 px-1 border border-gray-200 rounded text-xs bg-white outline-none"
-                          value={conditionVal}
-                          onChange={(e) => setConditionVal(e.target.value)}
-                        >
-                          <option value="">选择值</option>
-                          {gs.values.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
-                        </select>
-                      );
-                    }
-                    return (
-                      <input
-                        type="text"
-                        className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none"
-                        placeholder="匹配值"
-                        value={conditionVal}
-                        onChange={(e) => setConditionVal(e.target.value)}
-                      />
-                    );
-                  })()}
-                </div>
-              )}
-              {conditionType === 'expression' && (
-                <input
-                  type="text"
-                  className="w-full h-6 px-1.5 border border-gray-200 rounded text-xs outline-none font-mono"
-                  placeholder="globalStates.theme === 'dark'"
-                  value={conditionExpr}
-                  onChange={(e) => setConditionExpr(e.target.value)}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Actions */}
+      {/* Save / Cancel */}
       <div className="flex items-center gap-1 justify-end">
-        {step < 3 && step >= 1 && (
-          <button
-            type="button"
-            className="h-6 px-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-            onClick={() => setStep((step + 1) as 2 | 3)}
-          >
-            下一步
-          </button>
-        )}
-        {step === 3 && (
-          <button
-            type="button"
-            className="h-6 px-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-            onClick={handleSave}
-          >
-            保存
-          </button>
-        )}
+        <button
+          type="button"
+          className="h-6 px-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+          onClick={handleSave}
+        >
+          保存
+        </button>
         <button
           type="button"
           className="h-6 px-2 border border-gray-200 text-gray-500 rounded text-xs hover:bg-gray-50"
