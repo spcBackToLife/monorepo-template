@@ -4,7 +4,25 @@
  * 目标：
  * 1. AI 调用工具失败时能立刻知道「什么错 + 怎么修」
  * 2. 所有工具返回一致的结构化数据
- * 3. isError 标志让 MCP 客户端可区分成败
+ *
+ * ⚠️ 关键设计决策（2026-05-06）：业务错误一律返回 `isError: false`
+ *
+ * 背景：
+ *   MCP SDK 顶层 try-catch 会把 handler 抛的异常包装成 `{isError:true,
+ *   content:[{text}]}`，但 **某些 MCP 客户端（包括 CodeBuddy IDE）**
+ *   看到 isError:true 就会把 content 整段丢弃，只给 AI 看一句通用的
+ *   "MCP tool execution failed"，导致 AI 完全看不到我们精心构造的
+ *   结构化错误信息（code/message/hint）—— 这就是今天调试一整天的黑盒源头。
+ *
+ * 解决方案：
+ *   - 业务层错误（参数校验失败、API 调用失败、节点不存在等）：
+ *     返回 `isError: false`，让客户端把错误内容当作"成功响应"原样
+ *     转发给 AI；JSON body 里的 `status: "error"` 字段供 AI 识别。
+ *   - 真正的协议层错误（SDK 输入 schema 验证失败等无法干预的）：
+ *     仍由 SDK 自动抛 McpError，那种确实会被客户端吞掉，但通过
+ *     passthrough loose schema 已基本不会触发。
+ *
+ * 这样改之后：**任何业务错误 AI 都能 100% 拿到结构化 JSON**。
  */
 
 /** 结构化错误对象 — 让 AI 能读懂并自纠 */
@@ -28,15 +46,6 @@ export interface ToolError {
     /** 原始错误栈（仅 debug 用） */
     stack?: string;
   };
-  /** MCP 协议标志 */
-  isError: true;
-}
-
-/** 成功的标准化响应 */
-export interface ToolSuccess<T = unknown> {
-  status: 'success';
-  data: T;
-  isError: false;
 }
 
 // ── 构造器 ──
@@ -81,13 +90,15 @@ function buildHint(code: ToolError['error']['code'], msg: string, _toolName?: st
  * @param toolName   - 工具名（如 element / canvas / generate_snapshots）
  * @param action     - 子操作名（如 remove / export_and_apply），domain 工具传
  * @param err        - 捕获到的异常
- * @returns          - MCP 可用的 { content, isError } 对象
+ * @returns          - MCP 可用的 { content, isError: false } 对象
+ *
+ * ⚠️ 注意：返回 `isError: false` 是有意为之，详见文件顶部说明。
  */
 export function makeToolError(
   toolName: string,
   action: string | undefined,
   err: unknown,
-): { content: Array<{ type: 'text'; text: string }>; isError: true } {
+): { content: Array<{ type: 'text'; text: string }>; isError: false } {
   const code = classifyError(err);
   const message = err instanceof Error ? err.message : String(err);
   const apiPath = err instanceof ApiHttpError ? err.apiPath : undefined;
@@ -105,12 +116,11 @@ export function makeToolError(
       hint: buildHint(code, message, toolName),
       ...(err instanceof Error && err.stack ? { stack: err.stack.split('\n').slice(0, 5).join('\n') } : {}),
     },
-    isError: true,
   };
 
   return {
     content: [{ type: 'text', text: JSON.stringify(errorObj, null, 2) }],
-    isError: true,
+    isError: false, // ← 关键：让 IDE 客户端不会吞掉 content
   };
 }
 
@@ -129,10 +139,12 @@ export function wrapToolHandler<TArgs extends unknown[], TReturn>(
   action: string | undefined,
   fn: (...args: TArgs) => Promise<TReturn>,
 ) {
-  return async (...args: TArgs): Promise<{ content: Array<{ type: 'text'; text: string }>; isError: boolean }> => {
+  return async (...args: TArgs): Promise<{ content: Array<{ type: 'text'; text: string }>; isError: false }> => {
     try {
       const result = await fn(...args);
-      return result as { content: Array<{ type: 'text'; text: string }>; isError: boolean };
+      // 成功响应也强制 isError: false（即使 handler 返回了 true 也不让其逃逸）
+      const r = result as { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+      return { content: r.content, isError: false };
     } catch (err) {
       return makeToolError(toolName, action, err);
     }

@@ -87,10 +87,20 @@ export function registerDomainTool(
   }
 
   // 🔒 宽松 schema：让 SDK 放行所有参数，由我们在 handler 里手动验证
-  // SDK registerTool 的 inputSchema 期望 ZodRawShapeCompat (Record<string, z.ZodTypeAny>)
-  const looseInputSchema: Record<string, z.ZodTypeAny> = {
-    action: z.string(),
-  };
+  //
+  // ⚠️ 关键陷阱（2026-05-06 修复）：
+  // 之前用 `Record<string, ZodTypeAny>` raw shape 形式，SDK 内部会用
+  // `z.object(shape)` 包装，默认是 **strip 模式** —— 未声明的字段（如
+  // projectId / nodeId 等业务参数）会在 SDK 的 validateToolInput 阶段
+  // 被静默丢弃，导致我们 handler 里的 fullSchema.safeParse 永远抱怨
+  // "projectId: Required (收到值: undefined)"。
+  //
+  // 修复：直接传一个 **完整的 ZodObject 实例 + passthrough()**，
+  // SDK 的 getZodSchemaObject 检测到是 schema 实例就会原样使用，
+  // 未声明字段全部透传给 handler，由我们的 fullSchema 二次校验。
+  const looseInputSchema = z
+    .object({ action: z.string() })
+    .passthrough();
 
   server.registerTool(
     toolName,
@@ -152,13 +162,19 @@ export function registerDomainTool(
 }
 
 // ── 内联辅助：构造结构化错误（不走 makeToolError，避免重复包装）──
+//
+// ⚠️ 注意：返回 `isError: false` 是**有意**的。
+//   某些 MCP 客户端（包括 CodeBuddy IDE）看到 isError:true 会把 content
+//   整段丢弃，只给 AI 看 "MCP tool execution failed"。
+//   通过 isError:false + JSON body 里的 status:"error"，AI 永远能拿到结构化错误。
+//   详见 toolResponse.ts 顶部说明。
 function makeStructuredError(
   toolName: string,
   action: string | undefined,
   code: 'VALIDATION_ERROR' | 'API_ERROR' | 'NOT_FOUND' | 'UNAUTHORIZED' | 'INTERNAL_ERROR',
   message: string,
   hint: string,
-): { content: Array<{ type: 'text'; text: string }>; isError: true } {
+): { content: Array<{ type: 'text'; text: string }>; isError: false } {
   const errorObj = {
     status: 'error' as const,
     error: {
@@ -168,11 +184,10 @@ function makeStructuredError(
       ...(action ? { action } : {}),
       hint,
     },
-    isError: true as const,
   };
 
   return {
     content: [{ type: 'text', text: JSON.stringify(errorObj, null, 2) }],
-    isError: true,
+    isError: false,
   };
 }

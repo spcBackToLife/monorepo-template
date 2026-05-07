@@ -17,7 +17,8 @@ export function registerHistoryTools(server: McpServer): void {
       description: '重做被撤销的操作（当前后端使用快照模式实现 undo，redo 暂不可用）',
       schema: z.object({ projectId: z.string() }),
       handler: () => ({
-        content: [{ type:'text', text: 'Redo 功能尚未在后端实现。请使用 undo 进行撤销操作。', isError:true as const }],
+        content: [{ type:'text' as const, text: JSON.stringify({ status:'error', error:{ code:'INTERNAL_ERROR', message:'Redo 功能尚未在后端实现。请使用 undo 进行撤销操作。', toolName:'history', action:'redo' } }, null, 2) }],
+        isError: false,
       }),
     }),
   });

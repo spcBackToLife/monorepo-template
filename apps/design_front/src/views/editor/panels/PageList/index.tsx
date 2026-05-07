@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
 import type { Screen } from '@globallink/design-schema';
+import { SchemaRenderer } from '@globallink/design-engine';
 import { editorStore } from '@/stores/editor';
+import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 
 function computeReorderNewIndex(
   screens: Screen[],
@@ -21,33 +23,62 @@ function computeReorderNewIndex(
   return targetIndex + 1;
 }
 
-function PageThumbnail({ screen }: { screen: Screen }) {
-  const rootNode = screen.rootNode;
-  const bgColor = screen.backgroundColor ?? '#ffffff';
-  const children = rootNode.children ?? [];
+/**
+ * 屏幕缩略图。
+ *
+ * 直接复用真实 SchemaRenderer + transform: scale 缩放到小尺寸，
+ * 这样能完整还原 backgroundImage / 渐变 / 数据绑定 / 布局，
+ * 而不会出现"画板有内容、缩略图却是白板"的不一致。
+ *
+ * 性能：缩略图 hideGhostNodes、editorCanvasOptimize=false、pointer-events:none，
+ * 屏幕数较少（通常 < 20）时无明显开销；如未来量大可加 IntersectionObserver 懒渲染。
+ */
+const THUMB_W = 48;
+const THUMB_H = 32;
+
+const PageThumbnail = observer(function PageThumbnail({ screen }: { screen: Screen }) {
+  const project = editorStore.project;
+  const viewport = editorStore.currentViewport;
+  const vpW = viewport?.width ?? 375;
+  const vpH = viewport?.height ?? 667;
+  const scale = Math.min(THUMB_W / vpW, THUMB_H / vpH);
+  const bgColor =
+    (typeof screen.rootNode.styles?.backgroundColor === 'string' &&
+      screen.rootNode.styles.backgroundColor) ||
+    screen.backgroundColor ||
+    '#ffffff';
 
   return (
     <div
-      className="w-12 h-8 rounded border border-gray-200 flex-shrink-0 overflow-hidden"
-      style={{ backgroundColor: bgColor }}
+      className="rounded border border-gray-200 flex-shrink-0 overflow-hidden"
+      style={{ width: THUMB_W, height: THUMB_H, backgroundColor: bgColor }}
     >
-      <div className="w-full h-full flex flex-wrap gap-px p-0.5 content-start">
-        {children.slice(0, 6).map((child) => (
-          <div
-            key={child.id}
-            className="rounded-sm"
-            style={{
-              width: '30%',
-              height: '40%',
-              backgroundColor: child.styles?.backgroundColor ?? '#e0e0e0',
-              opacity: 0.6,
-            }}
-          />
-        ))}
+      <div
+        // 内层走真机视口尺寸 + 缩放，让 SchemaRenderer 看到的父高度与正常画布一致，
+        // 避免 root 节点 minHeight:100% 在缩略图里失效。
+        style={{
+          width: vpW,
+          height: vpH,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          pointerEvents: 'none',
+          // SchemaRenderer 的 wrapper 是 flex:1，需要父级是 flex column 才能撑满。
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <SchemaRenderer
+          screen={screen}
+          assets={project?.componentAssets ?? []}
+          globalStates={editorStore.currentGlobalStates}
+          staticAssetOrigin={getEditorStaticAssetOrigin()}
+          hideGhostNodes
+          editorCanvasOptimize={false}
+        />
       </div>
     </div>
   );
-}
+});
 
 type DropIndicator = { targetId: string; edge: 'before' | 'after' };
 

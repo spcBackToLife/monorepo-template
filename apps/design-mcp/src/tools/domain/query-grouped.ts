@@ -28,7 +28,7 @@ export function registerQueryTools(server: McpServer): void {
       handler: async (p) => {
         const prj = await apiClient.getProject(p.projectId);
         const scr = prj.screens.find(s => s.id === p.screenId);
-        if (!scr) return { content: [{ type:'text', text: `屏幕 ${p.screenId} 不存在`, isError:true as const }] };
+        if (!scr) return { content: [{ type:'text' as const, text: JSON.stringify({ status:'error', error:{ code:'NOT_FOUND', message:`屏幕 ${p.screenId} 不存在`, toolName:'query', action:'screen_schema' } }, null, 2) }], isError: false };
         return { content: [{ type:'text', text: JSON.stringify(scr, null, 2) }] };
       },
     }),

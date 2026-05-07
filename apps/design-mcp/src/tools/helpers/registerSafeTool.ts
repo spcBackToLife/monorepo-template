@@ -93,16 +93,15 @@ function makeStructuredError(
   code: 'VALIDATION_ERROR' | 'API_ERROR' | 'INTERNAL_ERROR' | 'NOT_FOUND' | 'UNAUTHORIZED',
   message: string,
   hint: string,
-): { content: Array<{ type: 'text'; text: string }>; isError: true } {
+): { content: Array<{ type: 'text'; text: string }>; isError: false } {
   return {
     content: [{
       type: 'text',
       text: JSON.stringify({
         status: 'error',
         error: { code, message, toolName, hint },
-        isError: true,
       }, null, 2),
     }],
-    isError: true,
+    isError: false, // ← 与 toolResponse.ts 保持一致，让 IDE 不吞 content
   };
 }

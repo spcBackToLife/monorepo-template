@@ -58,19 +58,40 @@ export function ViewportContainer({
   );
 
   const frameStyle = useMemo<React.CSSProperties>(() => {
-    return {
+    // ===== 关键：unfold 模式用 grid 让子元素能继承"已定值的高度"=====
+    //
+    // 问题：unfoldFrame=true 时 frame 只有 min-height 没有显式 height，CSS 规范下子元素
+    // 的 height:100% / min-height:100% 会因为父 height:auto 而退化失效，导致用户
+    // schema root 节点的 minHeight:100% 在画板里不生效（chat 屏中间消息区不撑高）。
+    //
+    // 解法：frame 改为 `display: grid; grid-template-rows: minmax(viewport.height, auto)`。
+    // - grid 子元素默认 `align: stretch`，会被拉伸到 cell 高度
+    // - cell 高度 = max(min-track-size, max-track-size 被内容撑开值)，是**运行时已定值**
+    // - 这样子元素（editor-canvas-stack）的 height:100% 取到 cell 高度，逐级向下传递
+    //
+    // 预览态 unfoldFrame=false：沿用老逻辑（显式 height + overflow:hidden），不受影响。
+    const base: React.CSSProperties = {
       width: `${viewport.width}px`,
-      // 展开模式：高度由内容撑开，保留 viewport.height 作 minHeight 兜底
-      // 预览/真机：严格按 viewport 高度 + 裁剪
-      height: unfoldFrame ? undefined : `${viewport.height}px`,
-      minHeight: unfoldFrame ? `${viewport.height}px` : undefined,
       backgroundColor,
-      overflow: unfoldFrame ? 'visible' : 'hidden',
       position: 'relative' as const,
       transform: scale !== 1 ? `scale(${scale})` : undefined,
       transformOrigin: 'top center',
       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       flexShrink: 0,
+    };
+    if (unfoldFrame) {
+      return {
+        ...base,
+        display: 'grid',
+        gridTemplateColumns: '100%',
+        gridTemplateRows: `minmax(${viewport.height}px, auto)`,
+        overflow: 'visible',
+      };
+    }
+    return {
+      ...base,
+      height: `${viewport.height}px`,
+      overflow: 'hidden',
     };
   }, [viewport.width, viewport.height, backgroundColor, scale, unfoldFrame]);
 

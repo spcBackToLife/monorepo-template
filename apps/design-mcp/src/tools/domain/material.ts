@@ -34,19 +34,19 @@ export function registerMaterialTools(server: McpServer): void {
         const { projectId, url: materialUrl, name, category, tags } = args;
         try {
           const res = await fetch(materialUrl);
-          if (!res.ok) return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `HTTP ${res.status}` }) }], isError: true };
+          if (!res.ok) return { content: [{ type: 'text' as const, text: JSON.stringify({ status:'error', error:{ code:'NETWORK_ERROR', message:`HTTP ${res.status}`, toolName:'material', action:'upload' } }) }], isError: false };
           const ct = res.headers.get('content-type') ?? 'application/octet-stream';
           const buf = Buffer.from(await res.arrayBuffer());
           const orig = name ?? new URL(materialUrl).pathname.split('/').pop() ?? 'uploaded-material';
           const fd = new FormData(); fd.append('file', new Blob([buf], { type: ct }), orig);
           const BASE = process.env.DESIGN_API_URL ?? 'http://localhost:3001';
           const up = await fetch(`${BASE}/api/projects/${projectId}/materials/upload`, { method: 'POST', body: fd });
-          if (!up.ok) return { content: [{ type: 'text' as const, text: JSON.stringify({ error: await up.text() }) }], isError: true };
+          if (!up.ok) return { content: [{ type: 'text' as const, text: JSON.stringify({ status:'error', error:{ code:'API_ERROR', message: await up.text(), toolName:'material', action:'upload' } }) }], isError: false };
           const result = await up.json();
           if (tags || category) { const mid = (result as Record<string,string>).id; if (mid) await apiClient.updateMaterialMeta(projectId, mid, { ...(category?{category}:{}), ...(tags?{tags}:{}) }); }
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         } catch (err) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: String(err) }) }], isError: true };
+          return { content: [{ type: 'text' as const, text: JSON.stringify({ status:'error', error:{ code:'INTERNAL_ERROR', message: String(err), toolName:'material', action:'upload' } }) }], isError: false };
         }
       },
     }),

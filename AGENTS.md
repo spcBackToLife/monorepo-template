@@ -238,7 +238,81 @@ subject: 中文或英文，简短描述做了什么
 
 ---
 
-## 九、ESLint 配置建议（应同步更新）
+## 九、版本演进与遗留代码（红线）
+
+### 9.1 永远只保留最新版本，禁止"双版本并存"
+
+**原则**：当某个模块/工具/能力被新版本替代时，**必须立刻删除旧版本**，不允许新旧版本同时存在于代码库中。
+
+```
+❌ 禁止：
+  src/tools/element.ts          (旧版)
+  src/tools/domain/element.ts   (新版)
+  ↑ 双版本共存，AI 搜代码时被误导，build 产物不可预测
+
+✅ 正确：
+  src/tools/domain/element.ts   (唯一版本)
+  ↑ 旧版直接 git rm，不留 .legacy / .old / .bak 后缀文件
+```
+
+**适用场景**：
+- 工具/handler 重构（如 MCP 单 action 工具 → 合并 domain 工具）
+- API 接口升级（v1 → v2）
+- 组件重写（OldButton → Button）
+- 类型定义迁移（types.ts → schema.ts）
+
+**唯一允许的过渡期**：
+- 跨进程/跨服务的兼容期（如对外 API 必须保留旧路径让客户端迁移），**且必须有明确的删除时间表**写在代码注释或 issue 里
+
+### 9.2 禁止"防御性兼容代码"
+
+```typescript
+// ❌ 禁止：if 分支兼容老格式
+function parse(input: unknown) {
+  if (typeof input === 'string') {
+    // 兼容老版本：v1 直接传字符串
+    return parseV1(input);
+  }
+  return parseV2(input as { content: string });
+}
+
+// ✅ 正确：一次性迁移所有调用方，删掉旧分支
+function parse(input: { content: string }) {
+  return parseV2(input);
+}
+```
+
+**理由**：
+1. **AI 编程助手会被误导** —— 看到双分支以为两种格式都合法，继续生产老格式调用
+2. **测试矩阵爆炸** —— N 个兼容分支需要 2^N 组合测试
+3. **死代码堆积** —— 永远没人敢删，因为"可能还在用"
+
+**正确做法**：
+- 用 grep / IDE 全局搜索找出所有调用点
+- 一次性改完所有调用方
+- 在 PR 中删掉旧分支
+- 提交信息明确："refactor: drop legacy parseV1, migrate all callers"
+
+### 9.3 兼容代码的判断检查清单
+
+在添加任何"兼容""向后兼容""legacy""fallback""老版本"相关代码前，必须回答：
+
+- [ ] 这是**对外契约**（公开 API、文件格式、协议），不能立即破坏吗？
+- [ ] 是否有明确的**删除时间表**（issue/注释）？
+- [ ] 旧调用方**不能一次性改完**吗（跨服务/跨仓库）？
+
+**三个问题任何一个答"否"，就直接删旧的、改所有调用方，不写兼容**。
+
+### 9.4 MCP 工具源码与产物同步
+
+针对 `apps/design-mcp`：
+- 改完 `src/**` 后必须 `pnpm build` 重新生成 `dist/**`
+- IDE 加载的是 `dist/index.js`，源码改了不 build = MCP 跑老代码
+- 推荐工作流：开 `pnpm dev`（tsup --watch）+ 改完后 Reload Window
+
+---
+
+## 十、ESLint 配置建议（应同步更新）
 
 当前 `.eslintrc.js` 中 `no-explicit-any` 为 `'off'`，**建议改为 `'error'`**：
 
@@ -255,5 +329,5 @@ rules: {
 
 ---
 
-> 最后更新：2026-05-06
+> 最后更新：2026-05-06（新增第九章「无双版本」红线）
 > 维护者：@pikun
