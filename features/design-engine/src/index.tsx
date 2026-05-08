@@ -171,8 +171,8 @@ export {
 } from './overlay/interactions/draw';
 export type { DrawState, DrawBounds } from './overlay/interactions/draw';
 
-// ===== State / Action / Effect (v2) =====
-// Store + Reducer + Dispatcher + EffectExecutor；替代 v1 EventExecutionEngine / MockExecutor。
+// ===== State / Action / Effect =====
+// Store + Reducer + Dispatcher + EffectExecutor。
 export {
   createStore,
   createEmptyState,

@@ -20,14 +20,10 @@ export interface ListRendererProps {
 }
 
 /**
- * v2 ListRenderer：基于 `node.repeat` 表达式求值得数组，把 children 重复渲染。
+ * ListRenderer：基于 `node.repeat` 表达式求值得数组，把 children 重复渲染。
  *
- * 与 v1 差异：
- *   - 旧：从 `node.props.__listData` 读字符串表达式
- *   - 新：从 `node.repeat` 读 Expression（`{{ state.data.messages }}` 等），
- *     在 children 内可访问 `{{ item.x }}` / `{{ index }}`
- *
- * 容器节点本身不由 ListRenderer 渲染 —— 调用方负责包外层。
+ * - 在 children 内可访问 `{{ item.x }}` / `{{ index }}`
+ * - 容器节点本身不由 ListRenderer 渲染 —— 调用方负责包外层
  */
 export function ListRenderer({
   node,

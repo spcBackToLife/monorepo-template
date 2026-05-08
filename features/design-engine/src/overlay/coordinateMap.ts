@@ -15,7 +15,7 @@
  * 可能不完全重合（设备框、安全区、嵌套包装等）。凡 `buildCoordinateMap` / 放置 / 命中
  * 应以 `getEditorCoordinateRoot(stack)` 为原点，与 Schema 设备内容区一致。
  *
- * **实例键（根治列表重复 DOM）**：`__listData` 展开时多个 DOM 共用同一 `data-node-id`。
+ * **实例键（根治列表重复 DOM）**：`node.repeat` 展开时多个 DOM 共用同一 `data-node-id`。
  * 坐标图必须以 `data-node-instance-key` 为 Map 键，值为 `{ nodeId, rect }`；命中仍返回 Schema `nodeId`，
  * 拖拽/缩放用 `hitTestAt` 得到的 `instanceKey` 锁定具体那一块 DOM。
  */

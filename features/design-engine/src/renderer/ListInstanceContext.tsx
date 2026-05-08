@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
 /**
- * 列表（__listData）展开时，从根到当前子树的「第几行」路径。
+ * 列表 `repeat` 展开时，从根到当前子树的「第几行」路径。
  * 用于生成全局唯一的 DOM `data-node-instance-key`，使坐标图与命中不再依赖启发式。
  */
 export interface ListInstanceSegment {

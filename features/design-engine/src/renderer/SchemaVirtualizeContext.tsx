@@ -6,7 +6,7 @@ export interface SchemaVirtualizeContextValue {
   enabled: boolean;
   layoutMap: CoordinateMap;
   cullRect: { x: number; y: number; width: number; height: number };
-  /** __listData 等子树：禁用裁剪，避免重复 node id 与多实例错位 */
+  /** `repeat` 展开的列表子树：禁用裁剪，避免重复 node id 与多实例错位 */
   cullDisabledForSubtree: boolean;
 }
 

@@ -50,13 +50,11 @@ export interface PreviewRendererProps {
 }
 
 /**
- * v2 预览模式：
+ * 预览模式：
  *   - 内部建一个 Store + EffectExecutor + Dispatcher
- *   - state.set/append/... 写入 Store；
+ *   - state.* 写入 Store；
  *   - effect.fetch 由 EffectExecutor 走 mock/http；
  *   - nav/ui/node/custom 通过 host adapters 委托
- *
- * 不再依赖 v1 globalStates / EventExecutionEngine / MockExecutor。
  */
 export function PreviewRenderer(props: PreviewRendererProps) {
   return <PreviewInteractiveShell {...props} />;

@@ -70,7 +70,7 @@ function coordMapToBoundingRects(map: CoordinateMap): BoundingRect[] {
  * Vertical guides are drawn as full-height vertical lines,
  * horizontal guides as full-width horizontal lines.
  */
-/** W6-050：列表绑定（__listData）节点左上角 ≡ 标记 */
+/** W6-050：列表绑定（`node.repeat`）节点左上角 ≡ 标记 */
 function drawListBindingBadges(
   ctx: CanvasRenderingContext2D,
   map: CoordinateMap,
@@ -232,7 +232,7 @@ export interface EditorOverlayProps {
   onNodeDoubleClick?: (nodeId: string) => void;
   /** 非文本节点双击：例如在容器内插入文案（由宿主实现） */
   onNonTextDoubleClick?: (nodeId: string) => void;
-  /** 配置了 __listData 列表绑定的节点 id（画布 ≡ 角标） */
+  /** 配置了 `node.repeat` 列表绑定的节点 id（画布 ≡ 角标） */
   nodeIdsWithListBinding?: string[];
   /** W7-023：画布上不可选/拖/缩放的节点（含祖先锁定子树） */
   lockedNodeIds?: Set<string>;

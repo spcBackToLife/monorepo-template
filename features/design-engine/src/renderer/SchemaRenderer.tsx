@@ -75,10 +75,10 @@ export interface SchemaRendererProps {
  * Core renderer that recursively converts a Screen's ComponentNode tree
  * into a real React DOM tree.
  *
- * v2 模型：
+ * 渲染模型：
  * - styles/props 字段含 `{{ }}` 表达式时由 expression 引擎在 dataContext 下求值
- * - visibleWhen 表达式驱动可见性（替代 v1 visibilityWhen）
- * - 列表容器用 `node.repeat: Expression<unknown[]>` 渲染（替代 v1 props.__listData）
+ * - `visibleWhen: Expression<boolean>` 驱动节点可见性
+ * - 列表容器用 `node.repeat: Expression<unknown[]>` 渲染重复子项
  */
 export function SchemaRenderer({
   screen,

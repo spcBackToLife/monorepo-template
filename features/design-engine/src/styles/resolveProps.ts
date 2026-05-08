@@ -9,16 +9,13 @@ export interface ResolvedProps {
 }
 
 /**
- * v2 props + visibility resolution:
+ * Props + visibility resolution（4 层）：
  *   1. base:        node.props + node.visible
  *   2. business:    node.states[activeState].props（activeState ≠ 'default'）
  *   3. interaction: hover/active/focus 等 visualState
- *   4. visibleWhen: 表达式驱动的运行时可见性（替代 v1 visibilityWhen）
+ *   4. visibleWhen: 表达式驱动的运行时可见性（任一布尔假值即隐藏）
  *
- * 与 v1 的差异：
- *   - 删除 domainStateBindings / environmentBindings 层
- *   - visibilityWhen{ variableName, equals } → visibleWhen: Expression<boolean>
- *   - props 不在此层做表达式求值（由 NodeRenderer 调 resolvePropsExpressions）
+ * 注意：props 不在此层做表达式求值，由调用方走 resolvePropsForRender。
  */
 export function resolveNodeProps(
   node: ComponentNode,

@@ -102,13 +102,13 @@ export function resolveStyles(
 }
 
 /**
- * v2 节点样式解析（3 层）：
+ * 节点样式解析（3 层）：
  *   1. base:        node.styles
  *   2. business:    node.states[activeState].styles（activeState ≠ 'default'）
  *   3. interaction: hover/active/focus 等 visualState（来自 panorama / preview）
  *
- * v1 的 globalStateBindings / domainStateBindings / environmentBindings 已删除 —— 那部分
- * 在 v2 中由 expression 直接表达（`backgroundColor: '{{ state.view.theme === "dark" ? ... }}'`）。
+ * 跨数据驱动的样式分支统一用表达式表达，例如：
+ *   `backgroundColor: '{{ state.view.theme === "dark" ? "#222" : "#fff" }}'`。
  */
 export function resolveNodeStyles(
   node: ComponentNode,
