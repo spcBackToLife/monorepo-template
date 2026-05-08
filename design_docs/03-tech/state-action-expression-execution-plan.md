@@ -35,7 +35,7 @@
 | **A.1** design-schema：v2 类型反转 | ✅ | A 底层契约 | ❌ | — | 2026-05-08 | `8486948` |
 | **A.2** design-engine：表达式引擎 | ✅ | A 底层契约 | ❌ | A.1 | 2026-05-08 | `1e188bc` |
 | **A.3** design-engine：State store + Action dispatcher + EffectExecutor | ✅ | A 底层契约 | ❌ | A.1, A.2 | 2026-05-08 | `101f5c4` |
-| **B.1** design-engine：渲染器接入新模型 | ⬜ | B 渲染器 | ❌ | A.1, A.2, A.3 | — | — |
+| **B.1** design-engine：渲染器接入新模型 | ✅ | B 渲染器 | ❌ | A.1, A.2, A.3 | 2026-05-08 | `f3d62f6` |
 | **B.2** design-engine：清理 v1 残留 | ⬜ | B 渲染器 | ❌ | B.1 | — | — |
 | **C.1** design-operations：所有 op 重写 | ⬜ | C 业务层 | ❌ | A.1 | — | — |
 | **C.2** design-api：迁移层 + 一次性 migration script | ⬜ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | — | — |
@@ -62,10 +62,10 @@
 | 指标 | 值 |
 |------|---|
 | 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 5（P.0, P.1, A.1, A.2, A.3） |
-| 进行中 | B.1（待开工） |
+| 已完成 | 6（P.0, P.1, A.1, A.2, A.3, B.1） |
+| 进行中 | B.2（待开工） |
 | 阻塞中 | — |
-| 最新 commit | `101f5c4` feat(engine): state store + action dispatcher + effect executor |
+| 最新 commit | `f3d62f6` refactor(engine): renderers consume v2 schema with state/expression |
 
 ---
 
@@ -347,3 +347,4 @@
 | 2026-05-08 | A.1 完成（commit `8486948`）— design-schema v2 类型反转，typecheck + build 通过，下游包按预期全断 | AI 助手 |
 | 2026-05-08 | A.2 完成（commit `1e188bc`）— expression 引擎落地：自实现 Parser/Evaluator/BuiltinFunctions，40 条 bun:test 全绿，含安全沙箱（禁 globalThis/Function/原型链/任意方法调用） | AI 助手 |
 | 2026-05-08 | A.3 完成（commit `101f5c4`）— Store + Reducer + EffectExecutor（Mock+Http Driver）+ Dispatcher；删除 EventExecutionEngine + MockExecutor；39 条 bun:test 全绿 | AI 助手 |
+| 2026-05-08 | B.1 完成（commit `f3d62f6`）— design-engine 全套渲染器迁到 v2：data/dataContext + 重写 ListRenderer/SchemaRenderer/PreviewRenderer/styles/codegen/schemaLayoutMap；typecheck + build 全过；79 条单测仍绿 | AI 助手 |
