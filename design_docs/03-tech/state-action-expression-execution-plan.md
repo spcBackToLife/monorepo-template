@@ -37,7 +37,7 @@
 | **A.3** design-engine：State store + Action dispatcher + EffectExecutor | ✅ | A 底层契约 | ❌ | A.1, A.2 | 2026-05-08 | `101f5c4` |
 | **B.1** design-engine：渲染器接入新模型 | ✅ | B 渲染器 | ❌ | A.1, A.2, A.3 | 2026-05-08 | `f3d62f6` |
 | **B.2** design-engine：清理 v1 残留 | ✅ | B 渲染器 | ❌ | B.1 | 2026-05-08 | `7b5bf36` |
-| **C.1** design-operations：所有 op 重写 | ⬜ | C 业务层 | ❌ | A.1 | — | — |
+| **C.1** design-operations：所有 op 重写 | ✅ | C 业务层 | ❌ | A.1 | 2026-05-08 | `b59bc00` |
 | **C.2** design-api：迁移层 + 一次性 migration script | ⬜ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | — | — |
 | **D.1** design_front：状态面板（state.view + state.data） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
 | **D.2** design_front：事件/动作链面板按新动词 | ⬜ | D 编辑器 | ✅ | C.2, D.1 | — | — |
@@ -349,3 +349,4 @@
 | 2026-05-08 | A.3 完成（commit `101f5c4`）— Store + Reducer + EffectExecutor（Mock+Http Driver）+ Dispatcher；删除 EventExecutionEngine + MockExecutor；39 条 bun:test 全绿 | AI 助手 |
 | 2026-05-08 | B.1 完成（commit `f3d62f6`）— design-engine 全套渲染器迁到 v2：data/dataContext + 重写 ListRenderer/SchemaRenderer/PreviewRenderer/styles/codegen/schemaLayoutMap；typecheck + build 全过；79 条单测仍绿 | AI 助手 |
 | 2026-05-08 | B.2 完成（commit `7b5bf36`）— 全文清理 v1 注释残留；删空 migration 目录；grep 零匹配 | AI 助手 |
+| 2026-05-08 | C.1 完成（commit `b59bc00`）— design-operations 重写：types 按域拆分、op 名 dot-namespace 化、删除 domain-state/environment/api-endpoint；新增 data-source/screen-state/global-state；executor 拆 dispatch/inverse；pnpm build 全过；grep 零匹配 | AI 助手 |
