@@ -197,6 +197,14 @@ export class EditorStore {
   /** 代码分屏视图开关 */
   codeSplitView = false;
 
+  /**
+   * 预览期 effect.fetch 的路由目标（v2 EffectExecutor.env）。
+   * - 'mock'：编辑器内用 ApiDataSource.mock 的 responseBody；默认
+   * - 'http'：走真实接口（HttpDriver）
+   * 由 DataTab 顶部全局开关控制，后续接入 PreviewRenderer 的 EffectExecutor 时消费。
+   */
+  previewEffectEnv: 'mock' | 'http' = 'mock';
+
   /** 素材编辑器弹窗状态（右键菜单"设计素材…" / 属性面板"高级编辑"打开） */
   materialEditorOpen = false;
   materialEditorTargetNodeId: string | null = null;
@@ -807,6 +815,10 @@ export class EditorStore {
 
   setShowCanvasContextBar(show: boolean): void {
     this.showCanvasContextBar = show;
+  }
+
+  setPreviewEffectEnv(env: 'mock' | 'http'): void {
+    this.previewEffectEnv = env;
   }
 
   /** 打开素材编辑器弹窗（右键菜单 / 高级编辑按钮） */
