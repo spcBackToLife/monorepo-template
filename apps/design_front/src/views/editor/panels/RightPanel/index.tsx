@@ -7,6 +7,7 @@ import { PropsTab } from '../tabs/PropsTab';
 import { DataTab } from '../tabs/DataTab';
 import { InteractionsTab } from '../tabs/InteractionsTab';
 import { CodeTab } from '../tabs/CodeTab';
+import { StatePanel } from '../StatePanel';
 import { StateContextBar } from './StateContextBar';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ChildrenVisibilitySection } from './ChildrenVisibilitySection';
@@ -122,20 +123,26 @@ export const RightPanel = observer(function RightPanel() {
 
         {/* 5. 高级 */}
         <CollapsibleSection id="sec-advanced" title="高级" defaultOpen={false}>
-          {/* 5a. Domain state response (low-frequency) */}
+          {/* 5a. 页面状态（v2 state.view + state.data）—— D.1 新增 */}
+          <div data-right-section="page-state" className="mb-2">
+            <div className="text-[10px] text-gray-500 font-medium mb-1 px-2">页面状态</div>
+            <StatePanel />
+          </div>
+
+          {/* 5b. Domain state response (low-frequency) */}
           {node && (
             <div data-right-section="states" className="mb-2">
               <DomainStateResponseSection nodeId={node.id} />
             </div>
           )}
 
-          {/* 5b. Data (kept inline for now) */}
+          {/* 5c. Data (kept inline for now) */}
           <div data-right-section="data" className="mb-2">
             <div className="text-[10px] text-gray-500 font-medium mb-1 px-2">数据</div>
             <DataTab />
           </div>
 
-          {/* 5c. Code preview */}
+          {/* 5d. Code preview */}
           <div data-right-section="code">
             <div className="text-[10px] text-gray-500 font-medium mb-1 px-2">代码预览</div>
             <CodeTab />
