@@ -38,6 +38,32 @@ function resolvedInlineOrTreeChildren(
 }
 
 /**
+ * 从 resolvedProps 抽出"可透传到 DOM 的 React 事件 handler"。
+ *
+ * PreviewRenderer 把 schema 事件（click / doubleClick / focus / blur / submit …）
+ * 组装成 React 风格的 onClick/onDoubleClick/… 并合并进 resolvedProps；
+ * PrimitiveRenderer 必须把这些函数真正绑到元素上，否则预览下点击不触发 nav.go。
+ *
+ * 仅透传函数类型的 `onXxx` 字段（过滤掉 children、textContent、src 等业务字段）。
+ * `onChange` 单独由各分支（input/textarea/select）按需处理，不在这里自动透传，
+ * 避免对非表单元素产生无效绑定。
+ */
+const TRANSFER_EVENT_PROP_PATTERN = /^on[A-Z][A-Za-z]*$/;
+function extractDomEventHandlers(
+  resolvedProps: Record<string, unknown>,
+): Record<string, (e: React.SyntheticEvent) => void> {
+  const out: Record<string, (e: React.SyntheticEvent) => void> = {};
+  for (const [k, v] of Object.entries(resolvedProps)) {
+    if (typeof v !== 'function') continue;
+    if (!TRANSFER_EVENT_PROP_PATTERN.test(k)) continue;
+    // onChange 归各受控分支管，onSubmit 归 form-like 分支管；此处均不自动透传
+    if (k === 'onChange' || k === 'onSubmit') continue;
+    out[k] = v as (e: React.SyntheticEvent) => void;
+  }
+  return out;
+}
+
+/**
  * Renders a primitive node type as its corresponding HTML element.
  *
  * Maps the node's `type` (div, button, img, etc.) to a real HTML element,
@@ -52,11 +78,13 @@ export function PrimitiveRenderer({
 }: PrimitiveRendererProps) {
   const listPath = useListInstancePath();
   const instanceKey = encodeNodeInstanceKey(listPath, node.id);
+  const domHandlers = extractDomEventHandlers(resolvedProps);
   const commonProps = {
     'data-node-id': node.id,
     'data-node-instance-key': instanceKey,
     'data-node-type': node.type,
     style,
+    ...domHandlers,
   };
 
   switch (node.type) {
@@ -163,18 +191,24 @@ export function PrimitiveRenderer({
       return <p {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</p>;
     case 'span':
       return <span {...commonProps}>{resolvedInlineOrTreeChildren(resolvedProps, children)}</span>;
-    case 'a':
+    case 'a': {
+      // preventDefault 避免真跳 href；若用户挂了 onClick（schema 事件），仍需执行
+      const userOnClick = domHandlers.onClick;
       return (
         <a
           {...commonProps}
           href={resolvedProps.href as string}
           target={resolvedProps.target as string}
           rel={resolvedProps.rel as string}
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            userOnClick?.(e);
+          }}
         >
           {resolvedInlineOrTreeChildren(resolvedProps, children)}
         </a>
       );
+    }
 
     // --- Container / structural elements ---
     case 'button':

@@ -71,13 +71,23 @@ export function buildScreenDataContext(
 }
 
 /**
- * 把 Screen.dataSources 中所有 static 源的 initial 注入一个空 ScreenState 的 data。
+ * 把 Screen.stateInit + dataSources 组装成一个 ScreenState，用于：
+ *   1. 编辑画布（SchemaRenderer）的表达式求值基底
+ *   2. 预览模式（PreviewRenderer）的 store 初始 state
  *
- * 编辑期"无 store"渲染时使用：让画布也能看到 static 数据驱动的列表。
- * api 数据源不在此函数处理 —— 编辑期的 mock 数据由 EffectExecutor + 一次 fetch 写入 store。
+ * 合并顺序（后者覆盖前者，保证 stateInit 优先级最高）：
+ *   a. dataSources.static → data[ds.name] = ds.initial（v2 契约：按 ds.name 嵌套）
+ *   b. dataSources.api    → data[ds.name] = scenario.responseBody（编辑/预览期 mock 预渲染）
+ *   c. screen.stateInit.data.*   → 覆盖到 data（用户手写初值，最高优先级）
+ *   d. screen.stateInit.view.*   → view[name] = previewValue ?? defaultValue
+ *
+ * 不处理运行时 effect 状态（state.effects）—— 那个由 EffectExecutor 写入 store。
  */
 export function buildEditorPreviewState(screen: Screen): ScreenState {
   const data: Record<string, unknown> = {};
+  const view: Record<string, unknown> = {};
+
+  // a + b: dataSources 注入到 data[ds.name]
   for (const ds of screen.dataSources ?? []) {
     if (ds.type === 'static') {
       data[ds.name] = ds.initial;
@@ -93,5 +103,25 @@ export function buildEditorPreviewState(screen: Screen): ScreenState {
       }
     }
   }
-  return { data, view: {}, effects: {} };
+
+  // c: screen.stateInit.data 覆盖（用户手写初值，如 `stateInit.data.messages = [...]`）
+  const dataInit = screen.stateInit?.data;
+  if (dataInit && typeof dataInit === 'object') {
+    for (const [k, v] of Object.entries(dataInit)) {
+      data[k] = v;
+    }
+  }
+
+  // d: screen.stateInit.view 注入 previewValue (编辑期) 或 defaultValue (兜底)
+  const viewInit = screen.stateInit?.view;
+  if (viewInit && typeof viewInit === 'object') {
+    for (const [name, varDef] of Object.entries(viewInit)) {
+      if (varDef && typeof varDef === 'object') {
+        const def = varDef as { previewValue?: unknown; defaultValue?: unknown };
+        view[name] = def.previewValue !== undefined ? def.previewValue : def.defaultValue;
+      }
+    }
+  }
+
+  return { data, view, effects: {} };
 }
