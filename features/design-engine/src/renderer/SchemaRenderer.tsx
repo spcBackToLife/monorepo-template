@@ -7,12 +7,12 @@ import type {
 import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
-import { resolveNodeProps } from '../styles/resolveProps';
+import { resolveNodeProps, resolvePropsForRender } from '../styles/resolveProps';
 import { mergeStateMaps } from '../styles/mergeStateMaps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
-import { DataContextProvider, useDataContext } from '../data/DataContext';
-import type { DataContext } from '../data/resolveExpression';
-import { buildScreenDataContext, hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
+import { DataContextProvider, useDataContext } from '../data/DataContextProvider';
+import type { DataContext } from '../data/dataContext';
+import { buildScreenDataContext, buildEditorPreviewState } from '../data/dataContext';
 import { ListRenderer } from '../data/ListRenderer';
 import type { CoordinateMap } from '../overlay/coordinateMap';
 import { buildSchemaLayoutMap, expandCullRect } from '../overlay/schemaLayoutMap';
@@ -28,9 +28,10 @@ export interface SchemaRendererProps {
   screen: Screen;
   /** Component template assets (for resolving component instances) */
   assets?: ComponentTemplate[];
-  /** Runtime global state values (variableName → current value) */
-  globalStates?: Record<string, string>;
-  /** External data context (optional, overrides active dataset) */
+  /**
+   * v2 渲染期 ctx —— 含 ScreenState；不传时由 buildEditorPreviewState 从
+   * screen.dataSources（static 与 api mock）生成最小 state。
+   */
   dataContext?: DataContext;
   /** 对选中节点临时预览 hover/active 等（与 setActiveState 独立） */
   interactionPreview?: InteractionPreview | null;
@@ -74,19 +75,14 @@ export interface SchemaRendererProps {
  * Core renderer that recursively converts a Screen's ComponentNode tree
  * into a real React DOM tree.
  *
- * Features:
- * - Resolves component instances from the asset library
- * - 4-layer style/props merge (base → global state → business state → interaction)
- * - Visibility resolution through all layers
- * - Converts schema CSSProperties to React-compatible styles
- * - Injects data-node-id on every rendered element
- * - Resolves data binding expressions ({{data.xxx}}) from active dataset
- * - Supports list rendering via __listData prop
+ * v2 模型：
+ * - styles/props 字段含 `{{ }}` 表达式时由 expression 引擎在 dataContext 下求值
+ * - visibleWhen 表达式驱动可见性（替代 v1 visibilityWhen）
+ * - 列表容器用 `node.repeat: Expression<unknown[]>` 渲染（替代 v1 props.__listData）
  */
 export function SchemaRenderer({
   screen,
   assets = [],
-  globalStates = {},
   dataContext,
   interactionPreview = null,
   hideGhostNodes = false,
@@ -102,8 +98,8 @@ export function SchemaRenderer({
   staticAssetOrigin,
 }: SchemaRendererProps) {
   const activeDataContext: DataContext = useMemo(
-    () => dataContext ?? buildScreenDataContext(screen, globalStates),
-    [dataContext, screen, globalStates],
+    () => dataContext ?? buildScreenDataContext(screen, buildEditorPreviewState(screen)),
+    [dataContext, screen],
   );
 
   const virtualizeCtx = useMemo(() => {
@@ -116,7 +112,6 @@ export function SchemaRenderer({
           ? buildSchemaLayoutMap(screen, {
               viewportWidth: vw,
               viewportHeight: vh,
-              globalStates,
               assets,
               interactionPreview,
               dataContext: activeDataContext,
@@ -136,13 +131,12 @@ export function SchemaRenderer({
     virtualizeViewportWidth,
     virtualizeViewportHeight,
     virtualizeMarginPx,
-    globalStates,
     assets,
     interactionPreview,
     activeDataContext,
   ]);
 
-  // 页面底色：根节点样式优先（用户改 Root 背景即期望整页变色）；否则用 Screen 元数据（与 updateStyle 同步根背景到 screen 后两者一致）
+  // 页面底色：根节点样式优先（用户改 Root 背景即期望整页变色）；否则用 Screen 元数据
   const rootBg = screen.rootNode.styles?.backgroundColor;
   const pageBackground =
     typeof rootBg === 'string' && rootBg !== ''
@@ -168,7 +162,6 @@ export function SchemaRenderer({
               node={screen.rootNode}
               rootNodeId={screen.rootNode.id}
               assets={assets}
-              globalStates={globalStates}
               interactionPreview={interactionPreview}
               hideGhostNodes={hideGhostNodes}
               onNodeClick={onNodeClick}
@@ -187,8 +180,8 @@ export function SchemaRenderer({
 const TEXT_PRIMITIVE_TYPES = new Set<string>(['p', 'span', 'h1', 'h2', 'h3', 'a']);
 
 /**
- * 列表容器样式覆盖：当节点绑定了 __listData，强制 flex column 布局，
- * 使重复渲染的子项能自动纵向排列，而不是因 absolute 叠在一起。
+ * 列表容器样式覆盖：当节点声明了 repeat，强制 flex column 布局，
+ * 使重复渲染的子项能自动纵向排列。
  */
 function applyListContainerStyleOverrides(
   styles: React.CSSProperties,
@@ -197,15 +190,13 @@ function applyListContainerStyleOverrides(
     ...styles,
     display: 'flex',
     flexDirection: 'column',
-    // 固定 height 会截断列表项，改为最小高度
     height: undefined,
     minHeight: styles.height ?? styles.minHeight,
   };
 }
 
 /**
- * 列表子项样式覆盖：将被重复渲染的直接子元素从 absolute 切换到
- * relative，使其参与父容器的 flex 流式布局。
+ * 列表子项样式覆盖：absolute → relative，让其参与父容器 flex 流。
  */
 function applyListItemStyleOverrides(
   styles: React.CSSProperties,
@@ -225,7 +216,6 @@ interface NodeRendererProps {
   node: ComponentNode;
   rootNodeId?: string;
   assets: ComponentTemplate[];
-  globalStates: Record<string, string>;
   interactionPreview?: InteractionPreview | null;
   hideGhostNodes?: boolean;
   /** State override from parent's childrenStates mapping */
@@ -250,7 +240,6 @@ function NodeRenderer({
   node: rawNode,
   rootNodeId,
   assets,
-  globalStates,
   interactionPreview = null,
   hideGhostNodes = false,
   parentStateOverride = null,
@@ -274,23 +263,22 @@ function NodeRenderer({
     return null;
   }
 
-  // Step 2: Resolve props + visibility through 4-layer merge
-  const nodeForProps: ComponentNode = hasExpression(node.props?.__listData)
-    ? { ...node, props: { ...node.props, __listData: undefined } }
-    : node;
-  const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates, interactionForNode, parentStateOverride);
+  // Step 2: Resolve props + visibility
+  const { props: mergedProps, visible } = resolveNodeProps(
+    node,
+    dataContext,
+    interactionForNode,
+    parentStateOverride,
+  );
+  const resolvedProps = resolvePropsForRender(mergedProps, dataContext);
 
-  // Step 2.5: Resolve data binding expressions in props
-  const resolvedProps = resolveDataExpressions(mergedProps, dataContext);
-
-  // Step 3: Skip only when explicitly hidden (undefined defaults to visible in resolveNodeProps)
   if (visible === false) {
     return null;
   }
 
-  // Step 4: Resolve styles through 4-layer merge and convert to React.CSSProperties
-  const baseStyles = resolveNodeStyles(node, globalStates, interactionForNode, dataContext, parentStateOverride);
-  const isListContainer = hasExpression(node.props?.__listData);
+  // Step 3: Resolve styles
+  const baseStyles = resolveNodeStyles(node, dataContext, interactionForNode, parentStateOverride);
+  const isListContainer = node.repeat !== undefined;
   let reactStyles =
     rootNodeId && node.id === rootNodeId
       ? {
@@ -305,11 +293,9 @@ function NodeRenderer({
         }
       : baseStyles;
 
-  // 列表容器：强制 flex column，让重复子项自动排列
   if (isListContainer) {
     reactStyles = applyListContainerStyleOverrides(reactStyles);
   }
-  // 列表子项：从 absolute 切到 relative，参与父容器 flex 流
   if (isListItem) {
     reactStyles = applyListItemStyleOverrides(reactStyles);
   }
@@ -321,7 +307,7 @@ function NodeRenderer({
     ) as React.CSSProperties;
   }
 
-  // Step 5: Event handlers
+  // Step 4: Event handlers
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -356,7 +342,7 @@ function NodeRenderer({
     [node.id, node.type, onNodeDoubleClick],
   );
 
-  // Step 6: Render children — if this node has __listData, repeat children per list item
+  // Step 5: Render children — node.repeat 时让 ListRenderer 重复 children
   let children: React.ReactNode;
   if (isListContainer) {
     children = (
@@ -368,7 +354,6 @@ function NodeRenderer({
             node={child}
             rootNodeId={rootNodeId}
             assets={assets}
-            globalStates={globalStates}
             interactionPreview={interactionPreview}
             hideGhostNodes={hideGhostNodes}
             isListItem
@@ -380,10 +365,7 @@ function NodeRenderer({
       />
     );
   } else {
-    // Determine childrenVisibility and childrenStates using the
-    // "default + delta" merge model: the default state provides the
-    // baseline; the active/preview state's map is merged on top so
-    // that only explicitly overridden keys differ from default.
+    // 默认 + delta 合并 visualState 的 childrenVisibility / childrenStates
     const rawPreviewState = interactionPreview?.nodeId === node.id
       ? interactionPreview.state
       : null;
@@ -440,7 +422,6 @@ function NodeRenderer({
               node={child}
               rootNodeId={rootNodeId}
               assets={assets}
-              globalStates={globalStates}
               interactionPreview={interactionPreview}
               hideGhostNodes={hideGhostNodes}
               parentStateOverride={childStateOverride}
@@ -457,7 +438,6 @@ function NodeRenderer({
           node={child}
           rootNodeId={rootNodeId}
           assets={assets}
-          globalStates={globalStates}
           interactionPreview={interactionPreview}
           hideGhostNodes={hideGhostNodes}
           parentStateOverride={childStateOverride}
@@ -474,7 +454,6 @@ function NodeRenderer({
       ? { ...resolvedProps, src: rewriteMediaSrc(resolvedProps.src, staticOrigin) ?? resolvedProps.src }
       : resolvedProps;
 
-  // Step 7: Wrap with click/hover handlers
   return (
     <div
       onClick={handleClick}
@@ -492,19 +471,6 @@ function NodeRenderer({
       </PrimitiveRenderer>
     </div>
   );
-}
-
-/** Resolve data expressions in a props object using the current data context */
-function resolveDataExpressions(
-  props: Record<string, unknown>,
-  context: DataContext,
-): Record<string, unknown> {
-  // Quick check: does any prop have an expression?
-  const hasAnyExpression = Object.values(props).some(hasExpression);
-  if (!hasAnyExpression) {
-    return props;
-  }
-  return resolvePropsExpressions(props, context);
 }
 
 // ===== childrenVisibility: Ghost Wrapper for state-hidden components =====

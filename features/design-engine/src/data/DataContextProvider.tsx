@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
-import type { DataContext } from './resolveExpression';
+import type { DataContext } from './dataContext';
 
-const DataContextReact = createContext<DataContext>({ data: {} });
+const DataContextReact = createContext<DataContext>({ state: { data: {}, view: {}, effects: {} } });
 
 export const DataContextProvider = DataContextReact.Provider;
 

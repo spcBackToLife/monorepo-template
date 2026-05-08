@@ -1,8 +1,8 @@
 import React from 'react';
 import type { ComponentNode } from '@globallink/design-schema';
-import { DataContextProvider, useDataContext } from './DataContext';
-import type { DataContext } from './resolveExpression';
-import { resolveExpression } from './resolveExpression';
+import { DataContextProvider, useDataContext } from './DataContextProvider';
+import type { DataContext } from './dataContext';
+import { resolveExpression } from './dataContext';
 import { SchemaVirtualizeContext, useSchemaVirtualize } from '../renderer/SchemaVirtualizeContext';
 import { ListInstanceContext, useListInstancePath } from '../renderer/ListInstanceContext';
 
@@ -10,7 +10,7 @@ import { ListInstanceContext, useListInstancePath } from '../renderer/ListInstan
 const MAX_LIST_ITEMS = 50;
 
 export interface ListRendererProps {
-  /** The node that has __listData in its props (the list container) */
+  /** 列表容器节点（其 `repeat` 字段为表达式） */
   node: ComponentNode;
   /** Render a single child node within a list-item data context */
   renderChild: (
@@ -20,20 +20,14 @@ export interface ListRendererProps {
 }
 
 /**
- * ListRenderer resolves the __listData expression on a container node to an array,
- * then repeats the node's **children** once per array item, each wrapped in a
- * DataContext that provides `item` and `index`.
+ * v2 ListRenderer：基于 `node.repeat` 表达式求值得数组，把 children 重复渲染。
  *
- * The container node itself is NOT rendered by ListRenderer — the caller is
- * responsible for rendering the container and using ListRenderer's output as children.
+ * 与 v1 差异：
+ *   - 旧：从 `node.props.__listData` 读字符串表达式
+ *   - 新：从 `node.repeat` 读 Expression（`{{ state.data.messages }}` 等），
+ *     在 children 内可访问 `{{ item.x }}` / `{{ index }}`
  *
- * Usage (in NodeRenderer / PreviewNodeRenderer):
- * ```
- *   const listChildren = (
- *     <ListRenderer node={node} renderChild={(child, idx) => <NodeRenderer node={child} ... />} />
- *   );
- *   return <PrimitiveRenderer ...>{listChildren}</PrimitiveRenderer>;
- * ```
+ * 容器节点本身不由 ListRenderer 渲染 —— 调用方负责包外层。
  */
 export function ListRenderer({
   node,
@@ -42,13 +36,13 @@ export function ListRenderer({
   const parentContext = useDataContext();
   const parentVirtualize = useSchemaVirtualize();
   const parentListPath = useListInstancePath();
-  const listExpression = node.props?.__listData as string;
 
-  // Resolve the expression to get the array
-  const resolvedData = resolveExpression(listExpression, parentContext);
+  const repeatExpr = node.repeat;
+  const resolvedData = repeatExpr !== undefined
+    ? resolveExpression(repeatExpr, parentContext)
+    : undefined;
   const items = Array.isArray(resolvedData) ? resolvedData : [];
 
-  // Limit to MAX_LIST_ITEMS
   const visibleItems = items.slice(0, MAX_LIST_ITEMS);
 
   const listVirtualizeValue = {
@@ -59,7 +53,7 @@ export function ListRenderer({
   const nodeChildren = node.children ?? [];
 
   if (visibleItems.length === 0) {
-    // Render children once with parent context as placeholder (no item context)
+    // 没有数据时：用父 ctx 渲一遍占位（不暴露 item / index）
     return (
       <SchemaVirtualizeContext.Provider value={listVirtualizeValue}>
         <ListInstanceContext.Provider value={parentListPath}>
@@ -73,10 +67,12 @@ export function ListRenderer({
     <>
       {visibleItems.map((item, index) => {
         const childContext: DataContext = {
-          data: parentContext.data,
+          state: parentContext.state,
           item,
           index,
-          parent: parentContext,
+          parent: parentContext.item,
+          $: parentContext.$,
+          $last: parentContext.$last,
         };
         const rowPath = [...parentListPath, { listHostId: node.id, index }];
 

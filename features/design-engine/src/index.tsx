@@ -59,7 +59,7 @@ export type {
 // ===== Data Binding & Context =====
 // v1 的 resolveExpression / buildScreenDataContext 等已删除；
 // 由 expression 引擎 + Store（A.3 交付）接管。渲染器层清理在 B.1 完成。
-export { DataContextProvider, useDataContext } from './data/DataContext';
+export { DataContextProvider, useDataContext } from './data/DataContextProvider';
 export { ListRenderer } from './data/ListRenderer';
 export type { ListRendererProps } from './data/ListRenderer';
 

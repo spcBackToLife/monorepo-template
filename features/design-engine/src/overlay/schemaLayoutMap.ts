@@ -3,8 +3,7 @@ import { isComponentInstanceType } from '@globallink/design-schema';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { resolveNodeStyles } from '../styles/resolveStyles';
 import { resolveNodeProps } from '../styles/resolveProps';
-import type { DataContext } from '../data/resolveExpression';
-import { hasExpression } from '../data/resolveExpression';
+import type { DataContext } from '../data/dataContext';
 import type { CoordinateMap, CoordinateMapEntry, NodeRect } from './coordinateMap';
 
 export type SchemaLayoutInteractionPreview = { nodeId: string; state: string } | null;
@@ -12,11 +11,10 @@ export type SchemaLayoutInteractionPreview = { nodeId: string; state: string } |
 export interface BuildSchemaLayoutMapOptions {
   viewportWidth: number;
   viewportHeight: number;
-  globalStates: Record<string, string>;
   assets: ComponentTemplate[];
   interactionPreview?: SchemaLayoutInteractionPreview;
-  /** 与 SchemaRenderer 一致：样式中的 `{{data.*}}` 需在布局估算前解析 */
-  dataContext?: DataContext;
+  /** v2: 渲染期 ctx，含 state；用于估算 styles 中的表达式 */
+  dataContext: DataContext;
 }
 
 function resolveInteractionForNode(
@@ -106,21 +104,22 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
 
     const interactionForNode = resolveInteractionForNode(resolved.id, options.interactionPreview ?? null);
 
-    if (hasExpression(resolved.props?.__listData)) {
+    // v2 列表容器：node.repeat 表达式存在时，children 由 ListRenderer 在每个 item 下渲染，
+    // 估算阶段把直接子项当作各自参与 offsetParent 计算（保留 v1 行为）。
+    if (resolved.repeat !== undefined) {
       for (const child of resolved.children ?? []) {
         walk(child, offsetParentRect, false);
       }
       return;
     }
 
-    const { visible } = resolveNodeProps(resolved, options.globalStates, interactionForNode);
+    const { visible } = resolveNodeProps(resolved, options.dataContext, interactionForNode);
     if (visible === false) return;
 
     const styles = resolveNodeStyles(
       resolved,
-      options.globalStates,
-      interactionForNode,
       options.dataContext,
+      interactionForNode,
     );
     const pos = ((styles.position as string | undefined) ?? 'static') as string;
 

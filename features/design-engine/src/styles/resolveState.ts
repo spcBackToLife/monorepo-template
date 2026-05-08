@@ -1,17 +1,16 @@
 import type { ComponentNode, CSSProperties } from '@globallink/design-schema';
 
 /**
- * Resolve the active state of a ComponentNode.
+ * 解析节点的当前 visualState（activeState）：把对应态的 styles/props 叠在 base 上。
  *
- * If the node's activeState matches one of its defined states,
- * merge that state's style/prop overrides onto the base values.
- * Returns the final styles and props.
+ * 注：返回的 styles 类型仍是 schema CSSProperties（每值可为表达式），调用方拿到后再用
+ * resolveStyles 求值并转成 React.CSSProperties。
  */
 export function resolveActiveState(node: ComponentNode): {
   styles: CSSProperties;
   props: Record<string, unknown>;
 } {
-  const baseStyles = { ...node.styles };
+  const baseStyles: CSSProperties = { ...node.styles } as CSSProperties;
   const baseProps = { ...node.props };
 
   // "default" means no state override
@@ -24,8 +23,10 @@ export function resolveActiveState(node: ComponentNode): {
     return { styles: baseStyles, props: baseProps };
   }
 
-  // Merge state overrides
-  const mergedStyles = { ...baseStyles, ...activeState.styles };
+  const mergedStyles: CSSProperties = {
+    ...baseStyles,
+    ...(activeState.styles as CSSProperties),
+  };
   const mergedProps = { ...baseProps, ...(activeState.props ?? {}) };
 
   return { styles: mergedStyles, props: mergedProps };

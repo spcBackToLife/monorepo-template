@@ -1,4 +1,7 @@
 import type { ComponentNode } from '@globallink/design-schema';
+import type { DataContext } from '../data/dataContext';
+import { resolveExpression } from '../data/dataContext';
+import { compileExpression } from '../expression';
 
 export interface ResolvedProps {
   props: Record<string, unknown>;
@@ -6,61 +9,30 @@ export interface ResolvedProps {
 }
 
 /**
- * 4-layer props + visibility resolution for a ComponentNode.
+ * v2 props + visibility resolution:
+ *   1. base:        node.props + node.visible
+ *   2. business:    node.states[activeState].props（activeState ≠ 'default'）
+ *   3. interaction: hover/active/focus 等 visualState
+ *   4. visibleWhen: 表达式驱动的运行时可见性（替代 v1 visibilityWhen）
  *
- * Merge order (later layers override earlier):
- * 1. **base**: node.props + node.visible
- * 2. **global**: matching globalStateBindings[].props / visible
- * 3. **business**: node.states[activeState].props (if activeState is not 'default')
- * 4. **interaction**: hover/active/focus prop overrides from interactionState
- * 5. **visibilityWhen**: optional global-state equality gate (hides if mismatch)
- *
- * Visibility is resolved through all layers — any layer can hide the node.
+ * 与 v1 的差异：
+ *   - 删除 domainStateBindings / environmentBindings 层
+ *   - visibilityWhen{ variableName, equals } → visibleWhen: Expression<boolean>
+ *   - props 不在此层做表达式求值（由 NodeRenderer 调 resolvePropsExpressions）
  */
 export function resolveNodeProps(
   node: ComponentNode,
-  globalStates: Record<string, string>,
+  dataContext: DataContext,
   interactionState?: string | null,
   /** State override from parent's childrenStates mapping */
   parentStateOverride?: string | null,
 ): ResolvedProps {
   // Layer 1: base props + visible
-  // undefined 必须视为「可见」：旧数据/接口若省略 visible，不能当成隐藏，否则整棵子树不渲染且无 data-node-id，选区也无法绘制
+  // undefined 必须视为「可见」，否则旧数据 / 接口若省略 visible 会整棵子树消失
   let mergedProps: Record<string, unknown> = { ...node.props };
   let visible = node.visible !== false;
 
-  // Layer 2: domain state bindings
-  if (node.domainStateBindings?.length) {
-    for (const binding of node.domainStateBindings) {
-      const currentValue = globalStates[binding.variableName];
-      if (currentValue === binding.value) {
-        if (binding.props) {
-          mergedProps = { ...mergedProps, ...binding.props };
-        }
-        if (binding.visible !== undefined) {
-          visible = binding.visible;
-        }
-      }
-    }
-  }
-
-  // Layer 2b: environment state bindings
-  if (node.environmentBindings?.length) {
-    for (const binding of node.environmentBindings) {
-      const currentValue = globalStates[binding.variableName];
-      if (currentValue === binding.value) {
-        if (binding.props) {
-          mergedProps = { ...mergedProps, ...binding.props };
-        }
-        if (binding.visible !== undefined) {
-          visible = binding.visible;
-        }
-      }
-    }
-  }
-
-  // Layer 3: business state (activeState override)
-  // Priority: interactionState > parentStateOverride > node.activeState
+  // Layer 2: business state (activeState override)
   const effectiveStateName = parentStateOverride ?? node.activeState;
   if (!interactionState && effectiveStateName && effectiveStateName !== 'default') {
     const activeState = node.states?.find((s) => s.name === effectiveStateName);
@@ -69,7 +41,7 @@ export function resolveNodeProps(
     }
   }
 
-  // Layer 4: interaction state (hover, active, focus, etc.)
+  // Layer 3: interaction state (hover / active / focus / ...)
   if (interactionState) {
     let interactionStateObj = node.states?.find((s) => s.name === interactionState);
     if (!interactionStateObj && interactionState === 'active') {
@@ -80,13 +52,35 @@ export function resolveNodeProps(
     }
   }
 
-  // Layer 5: visibilityWhen — global-state equality gate
-  if (visible && node.visibilityWhen) {
-    const currentValue = globalStates[node.visibilityWhen.variableName];
-    if (currentValue !== undefined && currentValue !== node.visibilityWhen.equals) {
+  // Layer 4: visibleWhen — 表达式驱动可见性
+  if (visible && node.visibleWhen) {
+    const fn = compileExpression(node.visibleWhen);
+    const result = fn(dataContext);
+    if (result === false || result === 0 || result === '' || result === null || result === undefined) {
       visible = false;
     }
   }
 
-  return { props: mergedProps, visible: visible !== false };
+  return { props: mergedProps, visible };
+}
+
+/**
+ * 在 ctx 下批量求 props 中的表达式字段。
+ * 与 dataContext.resolvePropsExpressions 等价，仅作 styles 层一致命名导出。
+ */
+export function resolvePropsForRender(
+  props: Record<string, unknown>,
+  ctx: DataContext,
+): Record<string, unknown> {
+  let changed = false;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) {
+    if (typeof v === 'string' && /\{\{[\s\S]+?\}\}/.test(v)) {
+      out[k] = resolveExpression(v, ctx);
+      changed = true;
+    } else {
+      out[k] = v;
+    }
+  }
+  return changed ? out : props;
 }

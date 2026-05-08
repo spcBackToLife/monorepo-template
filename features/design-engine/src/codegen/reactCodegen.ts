@@ -1,4 +1,4 @@
-import type { Screen, ComponentNode, ComponentEvent, EventAction } from '@globallink/design-schema';
+import type { Screen, ComponentNode, ComponentEvent, Action } from '@globallink/design-schema';
 
 export interface CodegenOptions {
   format?: 'react-tsx' | 'html';
@@ -220,63 +220,94 @@ function generateEventHandlerBody(evt: ComponentEvent, stateNodes: Map<string, s
   const parts: string[] = [];
   for (const action of evt.actions ?? []) {
     switch (action.type) {
-      case 'navigate':
-        parts.push(`/* navigate to ${action.targetScreenId} */`);
+      case 'nav.go':
+        parts.push(`/* nav.go to ${action.targetScreenId} */`);
         break;
-      case 'setState': {
-        const hookBase = idToHookBase(action.targetId);
-        if (stateNodes.has(action.targetId)) {
+      case 'nav.back':
+        parts.push(`/* nav.back */`);
+        break;
+      case 'node.setVisualState': {
+        const targetId = action.nodeId;
+        if (targetId && stateNodes.has(targetId)) {
+          const hookBase = idToHookBase(targetId);
           parts.push(`set${toPascalCase(hookBase)}State('${action.state}')`);
         } else {
-          parts.push(`/* setState: ${action.targetId}.${action.state} */`);
+          parts.push(`/* node.setVisualState: ${targetId ?? '(host)'}.${action.state} */`);
         }
         break;
       }
-      case 'setDomainState':
-        parts.push(`/* setDomainState: ${action.variableName} = ${action.value} */`);
+      case 'state.set':
+        parts.push(`/* state.set: ${action.path} = ${JSON.stringify(action.value)} */`);
         break;
-      case 'setEnvironmentState':
-        parts.push(`/* setEnvironmentState: ${action.variableName} = ${action.value} */`);
+      case 'state.append':
+        parts.push(`/* state.append: ${action.path} << ${JSON.stringify(action.value)} */`);
         break;
-      case 'openUrl':
-        parts.push(`window.open('${action.url ?? ''}', '_blank')`);
+      case 'state.remove':
+        parts.push(`/* state.remove: ${action.path} [${action.index ?? action.predicate ?? '?'}] */`);
         break;
-      case 'toggleVisible':
-        parts.push(`/* toggleVisible: ${action.targetId} */`);
+      case 'state.merge':
+        parts.push(`/* state.merge: ${action.path} += ${JSON.stringify(action.value)} */`);
         break;
-      case 'delay':
-        parts.push(`/* delay: ${action.duration ?? 0}ms */`);
+      case 'state.toggle':
+        parts.push(`/* state.toggle: ${action.path} */`);
+        break;
+      case 'effect.fetch':
+        parts.push(`/* effect.fetch: ${action.dataSourceId} */`);
+        break;
+      case 'effect.cancel':
+        parts.push(`/* effect.cancel: ${action.dataSourceId ?? 'all'} */`);
+        break;
+      case 'ui.openUrl':
+        parts.push(`window.open('${typeof action.url === 'string' ? action.url : ''}', '_blank')`);
+        break;
+      case 'ui.showToast':
+        parts.push(`/* ui.showToast: ${action.toastType} "${typeof action.message === 'string' ? action.message : ''}" */`);
+        break;
+      case 'ui.delay':
+        parts.push(`/* ui.delay: ${action.duration}ms */`);
         break;
       case 'custom':
-        parts.push(`/* custom: ${action.handler ?? ''} */`);
+        parts.push(`/* custom: ${action.handler} */`);
         break;
+      default: {
+        const _exhaustive: never = action;
+        void _exhaustive;
+      }
     }
   }
   return parts.join('; ') || `/* ${formatEventSummary(evt)} */`;
 }
 
-function actionSummary(a: EventAction): string {
+function actionSummary(a: Action): string {
   switch (a.type) {
-    case 'navigate':
-      return `navigate:${a.targetScreenId}`;
-    case 'setState':
-      return `setState:${a.targetId}.${a.state}`;
-    case 'openUrl':
-      return `openUrl:${a.url}`;
-    case 'setDomainState':
-      return `setDomainState:${a.variableName}=${a.value}`;
-    case 'setEnvironmentState':
-      return `setEnvironmentState:${a.variableName}=${a.value}`;
-    case 'toggleVisible':
-      return `toggleVisible:${a.targetId}`;
-    case 'delay':
-      return `delay:${a.duration}ms`;
+    case 'nav.go':
+      return `nav.go:${a.targetScreenId}`;
+    case 'nav.back':
+      return `nav.back`;
+    case 'node.setVisualState':
+      return `node.setVisualState:${a.nodeId ?? '(host)'}.${a.state}`;
+    case 'state.set':
+      return `state.set:${a.path}`;
+    case 'state.append':
+      return `state.append:${a.path}`;
+    case 'state.remove':
+      return `state.remove:${a.path}`;
+    case 'state.merge':
+      return `state.merge:${a.path}`;
+    case 'state.toggle':
+      return `state.toggle:${a.path}`;
+    case 'effect.fetch':
+      return `effect.fetch:${a.dataSourceId}`;
+    case 'effect.cancel':
+      return `effect.cancel:${a.dataSourceId ?? 'all'}`;
+    case 'ui.openUrl':
+      return `ui.openUrl:${typeof a.url === 'string' ? a.url : ''}`;
+    case 'ui.showToast':
+      return `ui.showToast:${a.toastType}`;
+    case 'ui.delay':
+      return `ui.delay:${a.duration}ms`;
     case 'custom':
       return `custom:${a.handler}`;
-    case 'showToast':
-      return `toast:${a.toastType}:"${a.message}"`;
-    case 'apiRequest':
-      return `apiRequest:${a.requestId}`;
     default:
       return `unknown`;
   }

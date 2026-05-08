@@ -5,194 +5,208 @@ import type {
   Screen,
   ToastType,
   ToastPosition,
+  Action,
+  NavTransitionAnimation,
 } from '@globallink/design-schema';
 import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
-import { resolveNodeProps } from '../styles/resolveProps';
+import { resolveNodeProps, resolvePropsForRender } from '../styles/resolveProps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
-import { DataContextProvider, useDataContext } from '../data/DataContext';
+import { DataContextProvider, useDataContext } from '../data/DataContextProvider';
 import { StaticAssetOriginProvider, useStaticAssetOrigin } from '../renderer/StaticAssetOriginContext';
 import { rewriteMediaSrc, rewriteStyleObjectUrls } from '../assets/rewriteLocalAssetRefs';
-import type { DataContext } from '../data/resolveExpression';
-import { buildScreenDataContext, hasExpression, resolvePropsExpressions } from '../data/resolveExpression';
+import type { DataContext } from '../data/dataContext';
+import { buildScreenDataContext, buildEditorPreviewState } from '../data/dataContext';
 import { ListRenderer } from '../data/ListRenderer';
-import {
-  EventExecutionEngine,
-  type PreviewContext,
-  type TransitionAnimation,
-} from './EventExecutionEngine';
 import { CSSPseudoInjector } from './CSSPseudoInjector';
 import { ToastRenderer, type ToastItem } from './ToastRenderer';
-import { MockExecutor } from './MockExecutor';
+import {
+  createStore,
+  createEmptyState,
+  Dispatcher,
+  EffectExecutor,
+  MockDriver,
+  HttpDriver,
+  type HostAdapters,
+  type Env,
+} from '../state';
 
 export interface PreviewRendererProps {
   screen: Screen;
   assets?: ComponentTemplate[];
-  globalStates?: Record<string, string>;
-  /** 可选：仅使用该数据源的活跃场景数据；不传则合并全部已加载数据源 */
-  currentDataSet?: string;
-  onNavigate?: (screenId: string, animation?: TransitionAnimation) => void;
-  /** 预览内切换数据源生命周期阶段（由宿主写入可观察 screen） */
-  onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
+  /**
+   * 切换运行环境：'mock' 走 mock scenarios（默认）；'http' 走 HttpDriver 真实接口
+   */
+  env?: Env;
+  /** 静态资源根 origin（与 SchemaRenderer.staticAssetOrigin 一致） */
+  staticAssetOrigin?: string;
   /** 嵌在编辑器视口内时去掉外层灰底，避免与设备框叠两层底色 */
   embedded?: boolean;
+  /** 跳转回调（宿主决定如何切屏） */
+  onNavigate?: (screenId: string, animation?: NavTransitionAnimation) => void;
   /** 宿主调用此函数以触发 navigateBack 生命周期事件；返回 true 表示已处理（阻止默认后退） */
   onNavigateBackRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
-  /** 与 SchemaRenderer.staticAssetOrigin 一致：补全 `/uploads/` 等资源 URL */
-  staticAssetOrigin?: string;
 }
 
 /**
- * 预览模式：无编辑 Overlay，DOM 可交互；数据绑定与编辑态共用 DataContext；
- * 挂载 EventExecutionEngine（点击/跳转等）与 CSSPseudoInjector（:hover 等交互态样式）。
+ * v2 预览模式：
+ *   - 内部建一个 Store + EffectExecutor + Dispatcher
+ *   - state.set/append/... 写入 Store；
+ *   - effect.fetch 由 EffectExecutor 走 mock/http；
+ *   - nav/ui/node/custom 通过 host adapters 委托
+ *
+ * 不再依赖 v1 globalStates / EventExecutionEngine / MockExecutor。
  */
-export function PreviewRenderer({
-  screen,
-  assets = [],
-  globalStates = {},
-  currentDataSet,
-  onNavigate,
-  onSwitchDataSourcePhase,
-  embedded = false,
-  onNavigateBackRef,
-  staticAssetOrigin,
-}: PreviewRendererProps) {
-  return (
-    <PreviewInteractiveShell
-      screen={screen}
-      assets={assets}
-      globalStates={globalStates}
-      currentDataSet={currentDataSet}
-      onNavigate={onNavigate}
-      onSwitchDataSourcePhase={onSwitchDataSourcePhase}
-      embedded={embedded}
-      onNavigateBackRef={onNavigateBackRef}
-      staticAssetOrigin={staticAssetOrigin}
-    />
-  );
+export function PreviewRenderer(props: PreviewRendererProps) {
+  return <PreviewInteractiveShell {...props} />;
 }
 
 function PreviewInteractiveShell({
   screen,
-  assets,
-  globalStates,
-  currentDataSet,
-  onNavigate,
-  onSwitchDataSourcePhase,
-  embedded,
-  onNavigateBackRef,
+  assets = [],
+  env = 'mock',
   staticAssetOrigin,
-}: {
-  screen: Screen;
-  assets: ComponentTemplate[];
-  globalStates: Record<string, string>;
-  currentDataSet?: string;
-  onNavigate?: (screenId: string, animation?: TransitionAnimation) => void;
-  onSwitchDataSourcePhase?: (dataSourceId: string, phase: string) => void;
-  embedded: boolean;
-  onNavigateBackRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
-  staticAssetOrigin?: string;
-}) {
+  embedded = false,
+  onNavigate,
+  onNavigateBackRef,
+}: PreviewRendererProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const engineRef = useRef(new EventExecutionEngine());
   const pseudoRef = useRef(new CSSPseudoInjector());
-  const mockRef = useRef(new MockExecutor());
-  const [runtimeGlobals, setRuntimeGlobals] = useState<Record<string, string>>(() => ({
-    ...globalStates,
-  }));
-  /** 预览内节点的运行时 activeState 覆盖（setState action 修改） */
+
+  // 预览态运行时容器（每个 screen 独立一份）
+  const storeRef = useRef(createStore(buildEditorPreviewState(screen) ?? createEmptyState()));
+  const effectsRef = useRef(new EffectExecutor({ mock: new MockDriver(), http: new HttpDriver() }, env));
+  /** 节点 activeState 覆盖（来自 node.setVisualState） */
   const [runtimeNodeStates, setRuntimeNodeStates] = useState<Record<string, string>>({});
-  /** 预览内 toggleVisible 切换的节点 id（与 schema 可见性叠加，再次切换可恢复） */
-  const [previewHiddenIds, setPreviewHiddenIds] = useState<Set<string>>(() => new Set());
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const toastIdRef = useRef(0);
 
-  const addToast = useCallback((type: ToastType, message: string, duration: number, position?: ToastPosition) => {
-    const id = `toast-${++toastIdRef.current}`;
-    setToasts((prev) => [...prev, { id, type, message, duration, position: position ?? 'top-center' }]);
-  }, []);
+  /** 让外部可以"重画"（store.subscribe 后 forceUpdate） */
+  const [, forceTick] = useState(0);
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const togglePreviewVisible = useCallback((nodeId: string) => {
-    setPreviewHiddenIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) next.delete(nodeId);
-      else next.add(nodeId);
-      return next;
-    });
-  }, []);
-
+  // 订阅 store 变化重新 render
   useEffect(() => {
-    setPreviewHiddenIds(new Set());
+    const unsub = storeRef.current.subscribe(() => forceTick((n) => n + 1));
+    return unsub;
+  }, []);
+
+  // 切屏时重置 store + state 覆盖
+  useEffect(() => {
+    storeRef.current.setState(() => buildEditorPreviewState(screen));
+    setRuntimeNodeStates({});
+    setToasts([]);
   }, [screen.id]);
 
+  // env 切换
   useEffect(() => {
-    setRuntimeGlobals({ ...globalStates });
-  }, [globalStates]);
+    effectsRef.current.setEnv(env);
+  }, [env]);
 
-  const previewDataContext: DataContext = useMemo(
-    () => buildScreenDataContext(screen, runtimeGlobals, currentDataSet),
-    [screen, runtimeGlobals, currentDataSet],
-  );
-
+  // CSS 伪类注入
   useEffect(() => {
     pseudoRef.current.inject(screen.rootNode);
     return () => pseudoRef.current.clear();
   }, [screen.rootNode]);
 
+  const addToast = useCallback(
+    (type: ToastType, message: string, duration: number, position?: ToastPosition) => {
+      const id = `toast-${++toastIdRef.current}`;
+      setToasts((prev) => [...prev, { id, type, message, duration, position: position ?? 'top-center' }]);
+    },
+    [],
+  );
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // 构造 host adapters
+  const hostAdaptersRef = useRef<HostAdapters>({});
   useEffect(() => {
-    mockRef.current.load(screen.apiEndpoints ?? []);
-  }, [screen.apiEndpoints]);
-
-  // ===== Helper: build a PreviewContext (avoid repeating this everywhere) =====
-  const buildCtx = useCallback((): PreviewContext => {
-    const mock = mockRef.current;
-    const merge = (name: string, value: string) => {
-      setRuntimeGlobals((g) => ({ ...g, [name]: value }));
-    };
-    return {
-      currentScreenId: screen.id,
-      globalStates: runtimeGlobals,
-      onNavigate: (id, anim) => onNavigate?.(id, anim),
-      onSetState: (nodeId, stateName) => {
-        setRuntimeNodeStates((prev) => ({ ...prev, [nodeId]: stateName }));
+    hostAdaptersRef.current = {
+      onNavGo: (id, anim) => onNavigate?.(id, anim as NavTransitionAnimation | undefined),
+      onShowToast: ({ toastType, message, duration, position }) => {
+        addToast(toastType, message, duration ?? 3000, position);
       },
-      onSetGlobalState: merge,
-      onSetDomainState: merge,
-      onSetEnvironmentState: merge,
-      onSwitchDataSourcePhase,
-      onToggleVisible: togglePreviewVisible,
-      getNodeState: (nodeId: string) => runtimeNodeStates[nodeId] ?? 'default',
-      onShowToast: addToast,
-      onApiRequest: (requestId, _paramOverrides) => mock.execute(requestId),
-      onCancelApiRequest: (requestId) => mock.cancel(requestId),
+      onOpenUrl: (url, openInNewTab) => {
+        if (openInNewTab) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        } else {
+          window.location.href = url;
+        }
+      },
+      onSetVisualState: (nodeId, stateName, autoRevertMs) => {
+        if (!nodeId) return;
+        setRuntimeNodeStates((prev) => ({ ...prev, [nodeId]: stateName }));
+        if (autoRevertMs && autoRevertMs > 0) {
+          setTimeout(() => {
+            setRuntimeNodeStates((prev) => {
+              const next = { ...prev };
+              delete next[nodeId];
+              return next;
+            });
+          }, autoRevertMs);
+        }
+      },
+      // onNavBack / onCustomAction 留给宿主在外层注入
+      onNavBack: () => onNavigate?.(''),
     };
-  }, [screen.id, runtimeGlobals, onNavigate, onSwitchDataSourcePhase, togglePreviewVisible, addToast, runtimeNodeStates]);
+  }, [onNavigate, addToast]);
 
-  /** Helper: find lifecycle events by trigger name on rootNode */
-  const getLifecycleEvents = useCallback((trigger: string) => {
-    return (screen.rootNode.events ?? []).filter(
-      (e: { trigger: string; disabled?: boolean }) => e.trigger === trigger && !e.disabled,
-    );
-  }, [screen.rootNode.events]);
+  // dataSource resolver
+  const dataSources = useMemo(() => {
+    const map = new Map(screen.dataSources?.map((ds) => [ds.id, ds]) ?? []);
+    return (id: string) => map.get(id);
+  }, [screen.dataSources]);
 
-  /** Helper: execute all events of a given trigger */
-  const fireLifecycleEvents = useCallback(async (trigger: string) => {
-    const events = getLifecycleEvents(trigger);
-    if (events.length === 0) return;
-    const engine = engineRef.current;
-    const ctx = buildCtx();
-    for (const event of events) {
-      const actions = (event as { actions?: unknown[] }).actions ?? [];
-      await engine.executeActionsAsync(actions as never[], ctx);
-    }
-  }, [getLifecycleEvents, buildCtx]);
+  const dispatcher = useMemo(
+    () =>
+      new Dispatcher({
+        store: storeRef.current,
+        effects: effectsRef.current,
+        dataSources,
+        host: {
+          onNavGo: (id, anim) => hostAdaptersRef.current.onNavGo?.(id, anim),
+          onNavBack: () => hostAdaptersRef.current.onNavBack?.(),
+          onShowToast: (args) => hostAdaptersRef.current.onShowToast?.(args),
+          onOpenUrl: (url, openInNewTab) => hostAdaptersRef.current.onOpenUrl?.(url, openInNewTab),
+          onSetVisualState: (nodeId, state, ms) =>
+            hostAdaptersRef.current.onSetVisualState?.(nodeId, state, ms),
+          onCustomAction: (h, p) => hostAdaptersRef.current.onCustomAction?.(h, p),
+        },
+      }),
+    [dataSources],
+  );
 
-  // ===== screenEnter: auto-execute on page mount / navigate =====
+  /** 当前 ScreenState → DataContext */
+  const previewDataContext: DataContext = useMemo(
+    () => buildScreenDataContext(screen, storeRef.current.getState()),
+    // 依赖 forceTick 让 subscribe 后重新计算
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [screen, storeRef.current.getState()],
+  );
+
+  // ===== 生命周期事件 =====
+  const getLifecycleEvents = useCallback(
+    (trigger: string) => {
+      return (screen.rootNode.events ?? []).filter((e) => e.trigger === trigger && !e.disabled);
+    },
+    [screen.rootNode.events],
+  );
+
+  const fireLifecycleEvents = useCallback(
+    async (trigger: string) => {
+      const events = getLifecycleEvents(trigger);
+      if (events.length === 0) return;
+      for (const event of events) {
+        await dispatcher.run(event.actions as Action[]);
+      }
+    },
+    [getLifecycleEvents, dispatcher],
+  );
+
+  // screenEnter
   const screenEnterFiredRef = useRef<string | null>(null);
   useEffect(() => {
     if (screenEnterFiredRef.current === screen.id) return;
@@ -202,33 +216,16 @@ function PreviewInteractiveShell({
     fireLifecycleEvents('screenEnter');
   }, [screen.id, getLifecycleEvents, fireLifecycleEvents]);
 
-  // ===== screenExit: execute before navigating away =====
-  // We wrap onNavigate to intercept and run screenExit first
-  const screenExitNavigateRef = useRef(onNavigate);
-  screenExitNavigateRef.current = onNavigate;
-  const wrappedOnNavigate = useCallback(async (targetId: string, animation?: TransitionAnimation) => {
-    const exitEvents = getLifecycleEvents('screenExit');
-    if (exitEvents.length > 0) {
-      // Execute screenExit with a 2s timeout to prevent blocking
-      const engine = engineRef.current;
-      const ctx = buildCtx();
-      const exitPromise = (async () => {
-        for (const event of exitEvents) {
-          const actions = (event as { actions?: unknown[] }).actions ?? [];
-          await engine.executeActionsAsync(actions as never[], ctx);
-        }
-      })();
-      await Promise.race([
-        exitPromise,
-        new Promise((resolve) => setTimeout(resolve, 2000)),
-      ]);
+  // 自动 fetch：autoFetchOnEnter 的 api 数据源
+  useEffect(() => {
+    for (const ds of screen.dataSources ?? []) {
+      if (ds.type === 'api' && ds.autoFetchOnEnter !== false) {
+        dispatcher.run([{ type: 'effect.fetch', dataSourceId: ds.id }]);
+      }
     }
-    // Reset screenEnter ref so it fires again on return
-    screenEnterFiredRef.current = null;
-    screenExitNavigateRef.current?.(targetId, animation);
-  }, [getLifecycleEvents, buildCtx]);
+  }, [screen.id, screen.dataSources, dispatcher]);
 
-  // ===== screenVisible / screenHidden: tab visibility change =====
+  // screenVisible / screenHidden
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible') {
@@ -241,11 +238,10 @@ function PreviewInteractiveShell({
     return () => document.removeEventListener('visibilitychange', handler);
   }, [fireLifecycleEvents]);
 
-  // ===== scrollReachBottom / scrollReachTop: scroll detection =====
+  // scrollReachBottom / scrollReachTop
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    // Find the scrollable container (rootRef's parent with overflow:auto, or rootRef itself)
     const scrollContainer = el.closest('[data-preview-root]') as HTMLElement | null;
     if (!scrollContainer) return;
 
@@ -253,8 +249,7 @@ function PreviewInteractiveShell({
     const topEvents = getLifecycleEvents('scrollReachTop');
     if (bottomEvents.length === 0 && topEvents.length === 0) return;
 
-    // Get scroll config from the first scroll event
-    const scrollEvent = [...bottomEvents, ...topEvents][0] as { scrollConfig?: { threshold?: number; debounce?: number } } | undefined;
+    const scrollEvent = [...bottomEvents, ...topEvents][0];
     const threshold = scrollEvent?.scrollConfig?.threshold ?? 100;
     const debounceMs = scrollEvent?.scrollConfig?.debounce ?? 300;
 
@@ -268,15 +263,12 @@ function PreviewInteractiveShell({
         const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
         const now = Date.now();
 
-        // scrollReachBottom
         if (bottomEvents.length > 0 && scrollHeight - scrollTop - clientHeight < threshold) {
           if (now - lastBottomFire > debounceMs) {
             lastBottomFire = now;
             fireLifecycleEvents('scrollReachBottom');
           }
         }
-
-        // scrollReachTop
         if (topEvents.length > 0 && scrollTop === 0) {
           if (now - lastTopFire > debounceMs) {
             lastTopFire = now;
@@ -293,33 +285,22 @@ function PreviewInteractiveShell({
     };
   }, [getLifecycleEvents, fireLifecycleEvents]);
 
-  // ===== navigateBack: expose handler for host to call =====
+  // navigateBack — 暴露给宿主
   useEffect(() => {
     if (!onNavigateBackRef) return;
     onNavigateBackRef.current = async () => {
       const backEvents = getLifecycleEvents('navigateBack');
-      if (backEvents.length === 0) return false; // no handler, let host proceed
+      if (backEvents.length === 0) return false;
       await fireLifecycleEvents('navigateBack');
-      return true; // handled — host should NOT auto-back
+      return true;
     };
     return () => {
       if (onNavigateBackRef) onNavigateBackRef.current = null;
     };
   }, [onNavigateBackRef, getLifecycleEvents, fireLifecycleEvents]);
 
-  // ===== DOM event binding (existing — use wrappedOnNavigate for screenExit) =====
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const engine = engineRef.current;
-    const ctx = buildCtx();
-    // Override onNavigate in ctx to use wrappedOnNavigate for screenExit support
-    ctx.onNavigate = (id, anim) => wrappedOnNavigate(id, anim);
-    engine.bind(el, screen.rootNode, ctx);
-    return () => engine.unbind();
-  }, [screen, screen.rootNode, buildCtx, wrappedOnNavigate]);
-
   const fillViewport = embedded;
+
   return (
     <StaticAssetOriginProvider origin={staticAssetOrigin}>
       <DataContextProvider value={previewDataContext}>
@@ -334,29 +315,27 @@ function PreviewInteractiveShell({
             overflow: embedded ? 'hidden' : 'auto',
           }}
         >
-        <div
-          ref={rootRef}
-          data-screen-id={screen.id}
-          style={{
-            width: '100%',
-            minHeight: '100%',
-            ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
-            backgroundColor: screen.backgroundColor,
-            position: 'relative' as const,
-          }}
-        >
-          <PreviewNodeRenderer
-            node={screen.rootNode}
-            rootNodeId={screen.rootNode.id}
-            assets={assets}
-            globalStates={runtimeGlobals}
-            onNavigate={onNavigate}
-            previewHiddenIds={previewHiddenIds}
-            runtimeNodeStates={runtimeNodeStates}
-          />
-          <ToastRenderer toasts={toasts} onDismiss={dismissToast} />
+          <div
+            ref={rootRef}
+            data-screen-id={screen.id}
+            style={{
+              width: '100%',
+              minHeight: '100%',
+              ...(fillViewport ? { height: '100%', boxSizing: 'border-box' as const } : {}),
+              backgroundColor: screen.backgroundColor,
+              position: 'relative' as const,
+            }}
+          >
+            <PreviewNodeRenderer
+              node={screen.rootNode}
+              rootNodeId={screen.rootNode.id}
+              assets={assets}
+              dispatcher={dispatcher}
+              runtimeNodeStates={runtimeNodeStates}
+            />
+            <ToastRenderer toasts={toasts} onDismiss={dismissToast} />
+          </div>
         </div>
-      </div>
       </DataContextProvider>
     </StaticAssetOriginProvider>
   );
@@ -364,25 +343,14 @@ function PreviewInteractiveShell({
 
 interface PreviewNodeRendererProps {
   node: ComponentNode;
-  /** 与编辑态 SchemaRenderer 一致：根节点铺满设备视口，避免 flex 子项在 overflow:hidden 下高度塌陷导致整页空白 */
   rootNodeId: string;
   assets: ComponentTemplate[];
-  globalStates: Record<string, string>;
-  onNavigate?: (screenId: string) => void;
-  previewHiddenIds: ReadonlySet<string>;
-  /** 运行时节点 activeState 覆盖（来自 setState action） */
-  runtimeNodeStates?: Record<string, string>;
-  /** 标记当前节点是列表容器的直接子项（被重复渲染），需覆盖定位样式 */
+  dispatcher: Dispatcher;
+  runtimeNodeStates: Record<string, string>;
   isListItem?: boolean;
 }
 
-/**
- * 列表容器样式覆盖：当节点绑定了 __listData，强制 flex column 布局，
- * 使重复渲染的子项能自动纵向排列，而不是因 absolute 叠在一起。
- */
-function applyListContainerStyleOverrides(
-  styles: React.CSSProperties,
-): React.CSSProperties {
+function applyListContainerStyleOverrides(styles: React.CSSProperties): React.CSSProperties {
   return {
     ...styles,
     display: 'flex',
@@ -392,13 +360,7 @@ function applyListContainerStyleOverrides(
   };
 }
 
-/**
- * 列表子项样式覆盖：将被重复渲染的直接子元素从 absolute 切换到
- * relative，使其参与父容器的 flex 流式布局。
- */
-function applyListItemStyleOverrides(
-  styles: React.CSSProperties,
-): React.CSSProperties {
+function applyListItemStyleOverrides(styles: React.CSSProperties): React.CSSProperties {
   if (styles.position !== 'absolute') return styles;
   return {
     ...styles,
@@ -414,9 +376,7 @@ function PreviewNodeRenderer({
   node: rawNode,
   rootNodeId,
   assets,
-  globalStates,
-  onNavigate,
-  previewHiddenIds,
+  dispatcher,
   runtimeNodeStates,
   isListItem = false,
 }: PreviewNodeRendererProps) {
@@ -427,32 +387,21 @@ function PreviewNodeRenderer({
     ? resolveComponentInstance(rawNode, assets)
     : rawNode;
 
-  if (node.type === 'annotation') {
-    return null;
-  }
+  if (node.type === 'annotation') return null;
 
-  if (previewHiddenIds.has(node.id)) {
-    return null;
-  }
-
-  // 运行时 activeState 覆盖（来自 setState action）
-  const runtimeState = runtimeNodeStates?.[node.id];
+  // 运行时 visualState 覆盖
+  const runtimeState = runtimeNodeStates[node.id];
   const effectiveNode = runtimeState && runtimeState !== node.activeState
     ? { ...node, activeState: runtimeState }
     : node;
 
-  const isListContainer = hasExpression(effectiveNode.props?.__listData);
-  const nodeForProps: ComponentNode = isListContainer
-    ? { ...effectiveNode, props: { ...effectiveNode.props, __listData: undefined } }
-    : effectiveNode;
-  const { props: mergedProps, visible } = resolveNodeProps(nodeForProps, globalStates);
-  const resolvedProps = resolveDataExpressions(mergedProps, dataContext);
+  const { props: mergedProps, visible } = resolveNodeProps(effectiveNode, dataContext);
+  const resolvedProps = resolvePropsForRender(mergedProps, dataContext);
 
-  if (visible === false) {
-    return null;
-  }
+  if (visible === false) return null;
 
-  const baseStyles = resolveNodeStyles(effectiveNode, globalStates, undefined, dataContext);
+  const baseStyles = resolveNodeStyles(effectiveNode, dataContext);
+  const isListContainer = effectiveNode.repeat !== undefined;
   let reactStyles =
     rootNodeId && node.id === rootNodeId
       ? {
@@ -468,14 +417,8 @@ function PreviewNodeRenderer({
         }
       : baseStyles;
 
-  // 列表容器：强制 flex column，让重复子项自动排列
-  if (isListContainer) {
-    reactStyles = applyListContainerStyleOverrides(reactStyles);
-  }
-  // 列表子项：从 absolute 切到 relative，参与父容器 flex 流
-  if (isListItem) {
-    reactStyles = applyListItemStyleOverrides(reactStyles);
-  }
+  if (isListContainer) reactStyles = applyListContainerStyleOverrides(reactStyles);
+  if (isListItem) reactStyles = applyListItemStyleOverrides(reactStyles);
 
   if (staticOrigin) {
     reactStyles = rewriteStyleObjectUrls(
@@ -484,17 +427,71 @@ function PreviewNodeRenderer({
     ) as React.CSSProperties;
   }
 
+  // ===== 事件绑定 =====
+  // 受控双向绑定：bind.path 存在时把 value 注入 props，并加 onChange 写回 store
+  const bindPath = effectiveNode.bind?.path;
+  let propsForRender: Record<string, unknown> = resolvedProps;
+  if (bindPath) {
+    const segs = bindPath.split('.');
+    let cur: unknown = dataContext.state;
+    for (const s of segs) {
+      if (cur && typeof cur === 'object') cur = (cur as Record<string, unknown>)[s];
+      else { cur = undefined; break; }
+    }
+    propsForRender = {
+      ...resolvedProps,
+      value: cur ?? '',
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const newValue = e.target.value;
+        dispatcher.run([{ type: 'state.set', path: bindPath, value: newValue }]);
+      },
+    };
+  }
+
+  // 节点级事件（click / change / focus / blur 等）
+  const handlers: Record<string, (e: React.SyntheticEvent) => void> = {};
+  for (const event of effectiveNode.events ?? []) {
+    if (event.disabled) continue;
+    if (event.trigger === 'click') {
+      const prev = handlers.onClick;
+      handlers.onClick = (e) => {
+        prev?.(e);
+        dispatcher.run(event.actions as Action[]);
+      };
+    } else if (event.trigger === 'doubleClick') {
+      handlers.onDoubleClick = () => dispatcher.run(event.actions as Action[]);
+    } else if (event.trigger === 'focus') {
+      handlers.onFocus = () => dispatcher.run(event.actions as Action[]);
+    } else if (event.trigger === 'blur') {
+      handlers.onBlur = () => dispatcher.run(event.actions as Action[]);
+    } else if (event.trigger === 'change') {
+      const prev = propsForRender.onChange as ((e: React.ChangeEvent) => void) | undefined;
+      propsForRender = {
+        ...propsForRender,
+        onChange: (e: React.ChangeEvent) => {
+          prev?.(e);
+          dispatcher.run(event.actions as Action[]);
+        },
+      };
+    } else if (event.trigger === 'submit') {
+      handlers.onSubmit = (e) => {
+        e.preventDefault();
+        dispatcher.run(event.actions as Action[]);
+      };
+    }
+    // hover / longPress / 其它在 PrimitiveRenderer 内更合适，由 CSSPseudoInjector + 后续 B.2 处理
+  }
+
   const previewStyles: React.CSSProperties = {
     ...reactStyles,
     pointerEvents: 'auto',
   };
 
-  const propsForRender =
-    staticOrigin && effectiveNode.type === 'img' && typeof resolvedProps.src === 'string'
-      ? { ...resolvedProps, src: rewriteMediaSrc(resolvedProps.src, staticOrigin) ?? resolvedProps.src }
-      : resolvedProps;
+  if (staticOrigin && effectiveNode.type === 'img' && typeof propsForRender.src === 'string') {
+    propsForRender = { ...propsForRender, src: rewriteMediaSrc(propsForRender.src, staticOrigin) ?? propsForRender.src };
+  }
 
-  // Render children — if this node has __listData, repeat children per list item
+  // children 渲染
   let children: React.ReactNode;
   if (isListContainer) {
     children = (
@@ -506,9 +503,7 @@ function PreviewNodeRenderer({
             node={child}
             rootNodeId={rootNodeId}
             assets={assets}
-            globalStates={globalStates}
-            onNavigate={onNavigate}
-            previewHiddenIds={previewHiddenIds}
+            dispatcher={dispatcher}
             runtimeNodeStates={runtimeNodeStates}
             isListItem
           />
@@ -516,48 +511,42 @@ function PreviewNodeRenderer({
       />
     );
   } else {
-    const runtimeState = runtimeNodeStates?.[node.id] ?? 'default';
-    const activeStateDef = effectiveNode.states?.find((s) => s.name === runtimeState);
+    const activeStateDef = effectiveNode.states?.find((s) => s.name === (effectiveNode.activeState ?? 'default'));
     const cvMap = activeStateDef?.childrenVisibility;
-
-    // 对于 default 状态且没有显式的 default 状态定义时，
-    // 需要从其他状态的 childrenVisibility 推导出哪些子节点应被隐藏：
-    // 如果某子节点在任何自定义状态中被显式设为 false，说明它是条件可见的，
-    // 在 default 状态下应当隐藏。
-    const implicitDefaultCvMap = !activeStateDef && runtimeState === 'default'
+    const implicitDefaultCvMap = !activeStateDef && (effectiveNode.activeState ?? 'default') === 'default'
       ? buildImplicitDefaultVisibility(effectiveNode)
       : undefined;
     const effectiveCvMap = cvMap ?? implicitDefaultCvMap;
 
-    children = node.children?.filter((child) => {
-      if (effectiveCvMap && effectiveCvMap[child.id] === false) return false;
-      return true;
-    }).map((child) => (
-      <PreviewNodeRenderer
-        key={child.id}
-        node={child}
-        rootNodeId={rootNodeId}
-        assets={assets}
-        globalStates={globalStates}
-        onNavigate={onNavigate}
-        previewHiddenIds={previewHiddenIds}
-        runtimeNodeStates={runtimeNodeStates}
-      />
-    ));
+    children = effectiveNode.children
+      ?.filter((child) => !(effectiveCvMap && effectiveCvMap[child.id] === false))
+      .map((child) => (
+        <PreviewNodeRenderer
+          key={child.id}
+          node={child}
+          rootNodeId={rootNodeId}
+          assets={assets}
+          dispatcher={dispatcher}
+          runtimeNodeStates={runtimeNodeStates}
+        />
+      ));
   }
 
   return (
-    <PrimitiveRenderer node={effectiveNode} style={previewStyles} resolvedProps={propsForRender} interactive>
+    <PrimitiveRenderer
+      node={effectiveNode}
+      style={previewStyles}
+      resolvedProps={{ ...propsForRender, ...handlers }}
+      interactive
+    >
       {children}
     </PrimitiveRenderer>
   );
 }
 
 /**
- * 当节点处于 default 状态且 states 数组中没有显式 default 条目时，
- * 从所有自定义状态推导出隐式的 childrenVisibility。
- * 逻辑：如果某个子节点在任何状态的 childrenVisibility 中被设为 false，
- * 说明它是条件可见的，在 default 状态下应被隐藏。
+ * default 状态下未显式定义 default visualState 时，从其它态的 childrenVisibility
+ * 推导出 default 应隐藏哪些子节点（与 SchemaRenderer 同语义）。
  */
 function buildImplicitDefaultVisibility(
   node: ComponentNode,
@@ -580,15 +569,4 @@ function buildImplicitDefaultVisibility(
   }
 
   return hasAny ? result : undefined;
-}
-
-function resolveDataExpressions(
-  props: Record<string, unknown>,
-  context: DataContext,
-): Record<string, unknown> {
-  const hasAnyExpression = Object.values(props).some(hasExpression);
-  if (!hasAnyExpression) {
-    return props;
-  }
-  return resolvePropsExpressions(props, context);
 }
