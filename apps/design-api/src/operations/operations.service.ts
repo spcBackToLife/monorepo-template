@@ -16,7 +16,6 @@ import {
 import {
   generateNodeId,
   generateScreenId,
-  generateId,
   countTemplateNodes,
   countSubtreeNodes,
 } from '@globallink/design-schema';
@@ -65,14 +64,14 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
   const p = (operation.params ?? {}) as Record<string, unknown>;
 
   switch (operation.type) {
-    case 'addElement': {
+    case 'element.add': {
       if (!p.elementId) {
         p.elementId = generateNodeId();
       }
       break;
     }
 
-    case 'duplicateElement': {
+    case 'element.duplicate': {
       if (!p.newElementId) p.newElementId = generateNodeId();
       if (!p._childIds) {
         const sourceId = p.elementId as string | undefined;
@@ -90,7 +89,7 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
       break;
     }
 
-    case 'instantiateTemplate': {
+    case 'asset.instantiateTemplate': {
       if (!p._nodeIds) {
         const templateId = p.templateId as string | undefined;
         const template = templateId
@@ -106,23 +105,17 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
       break;
     }
 
-    case 'addScreen': {
+    case 'screen.add': {
       if (!p.screenId) p.screenId = generateScreenId();
       if (!p.rootNodeId) p.rootNodeId = generateNodeId();
       break;
     }
 
-    case 'addEvent': {
+    case 'event.addNavigation': {
       if (p.targetScreenId === 'new') {
         p._generatedScreenId = generateScreenId();
         p._generatedRootNodeId = generateNodeId();
       }
-      break;
-    }
-
-    case 'addDomainState':
-    case 'addEnvironmentState': {
-      if (!p._id) p._id = generateId();
       break;
     }
 

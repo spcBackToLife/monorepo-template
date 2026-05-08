@@ -8,8 +8,6 @@ import {
   type DesignProject,
   type Screen,
   type Viewport,
-  type ComponentNode,
-  type ComponentTemplate,
   MOBILE_VIEWPORTS,
   TABLET_VIEWPORTS,
   DESKTOP_VIEWPORTS,
@@ -17,13 +15,12 @@ import {
   generateScreenId,
   generateNodeId,
   normalizeNode,
-  instantiateTemplate,
-  isComponentInstanceType,
 } from '@globallink/design-schema';
 import {
   OperationExecutor,
   type Operation,
 } from '@globallink/design-operations';
+import { migrateV1toV2 } from '../migrations/v1-to-v2-state-model';
 
 // ===== DB row types =====
 
@@ -43,7 +40,8 @@ interface SnapshotRow {
   id: string;
   project_id: string;
   version: number;
-  schema: DesignProject;
+  /** DB 存 JSONB；可能是 v1 或 v2，findOne 统一过迁移层得到 v2 */
+  schema: unknown;
   created_at: Date;
 }
 
@@ -70,7 +68,7 @@ export class ProjectsService {
       : DESKTOP_VIEWPORTS;
   }
 
-  /** 创建项目（含初始 Screen + V0 快照） */
+  /** 创建项目（含初始 Screen + V0 快照，v2 schema） */
   async create(dto: CreateProjectDto): Promise<DesignProject> {
     const pool = this.db.getPool();
     const presets = this.getViewportCandidates(dto.platform);
@@ -80,7 +78,7 @@ export class ProjectsService {
         : undefined) ?? getDefaultViewport(dto.platform);
     const now = new Date().toISOString();
 
-    // 构建初始空 Screen
+    // v2 初始 Screen（删除 v1 字段 domainStates；state init 默认留空）
     const initialScreen: Screen = {
       id: generateScreenId(),
       name: 'Screen 1',
@@ -103,11 +101,9 @@ export class ProjectsService {
         visible: true,
       },
       backgroundColor: '#ffffff',
-      domainStates: [],
       dataSources: [],
     };
 
-    // INSERT project
     const projResult = await pool.query<{ id: string }>(
       `INSERT INTO design_projects (name, platform, default_viewport, current_version, latest_snapshot)
        VALUES ($1, $2, $3, 0, 0)
@@ -116,7 +112,7 @@ export class ProjectsService {
     );
     const projectId = projResult.rows[0]!.id;
 
-    // 构建完整 DesignProject 对象
+    // v2 DesignProject（删除 v1 字段 environmentStates）
     const project: DesignProject = {
       id: projectId,
       name: dto.name,
@@ -126,12 +122,10 @@ export class ProjectsService {
       viewportPresets: presets,
       screens: [initialScreen],
       componentAssets: [],
-      environmentStates: [],
       createdAt: now,
       updatedAt: now,
     };
 
-    // 写入 V0 快照
     await pool.query(
       `INSERT INTO design_snapshots (project_id, version, schema)
        VALUES ($1, 0, $2)`,
@@ -151,11 +145,20 @@ export class ProjectsService {
     return r.rows;
   }
 
-  /** 核心：快照 + 重放 → 返回完整 DesignProject */
+  /**
+   * 核心：快照 + 重放 → 返回完整 DesignProject（v2）
+   *
+   * 关键路径上接入 **v1 → v2 迁移层**（RFC §4.1）：
+   * 1. 查最新快照
+   * 2. 先跑 `migrateV1toV2(snapshot.schema)` —— DB 未升级时得到正确 v2 形态
+   * 3. 重放快照之后的 op（executor 一律按 v2 协议）
+   * 4. 规范化节点
+   *
+   * 迁移层在 F.2 阶段删除（全库永久升级完毕后）。
+   */
   async findOne(id: string): Promise<DesignProject> {
     const pool = this.db.getPool();
 
-    // 1. 查询项目元数据
     const projResult = await pool.query<ProjectRow>(
       `SELECT * FROM design_projects WHERE id = $1`,
       [id],
@@ -165,7 +168,6 @@ export class ProjectsService {
       throw new NotFoundException('项目不存在');
     }
 
-    // 2. 查询最新快照
     const snapResult = await pool.query<SnapshotRow>(
       `SELECT * FROM design_snapshots
        WHERE project_id = $1
@@ -178,7 +180,6 @@ export class ProjectsService {
       throw new NotFoundException('项目快照不存在');
     }
 
-    // 3. 查询快照之后的操作日志
     const opsResult = await pool.query<OperationRow>(
       `SELECT * FROM design_operations
        WHERE project_id = $1 AND seq > $2
@@ -186,8 +187,9 @@ export class ProjectsService {
       [id, snapshot.version],
     );
 
-    // 4. 重放操作
-    let project = snapshot.schema;
+    // 关键：先迁移为 v2，再喂给 v2 executor
+    let project: DesignProject = migrateV1toV2(snapshot.schema);
+
     if (opsResult.rows.length > 0) {
       const executor = new OperationExecutor(project);
       for (const row of opsResult.rows) {
@@ -196,19 +198,13 @@ export class ProjectsService {
       project = executor.getProject();
     }
 
-    // 5. 规范化：确保所有节点的 props/states/events/styles 字段存在
+    // 规范化：确保所有节点的 props/states/events/styles 字段存在
     for (const screen of project.screens ?? []) {
       if (screen.rootNode) normalizeNode(screen.rootNode);
     }
     for (const asset of project.componentAssets ?? []) {
       if (asset.schema) normalizeNode(asset.schema);
     }
-
-    // 6. 旧 reference 实例（轻量、children 为空）一次性物化为完整子树。
-    //    新写入的实例由 executeInstantiateTemplate 通过 op.params._nodeIds 物化；
-    //    此处仅兜底历史数据。详见
-    //    design_docs/03-tech/editor/component-instance-id-stability.md。
-    materializeLegacyInstances(project);
 
     return project;
   }
@@ -232,59 +228,3 @@ export class ProjectsService {
     );
   }
 }
-
-// ===== Legacy reference-instance migration =====
-
-/**
- * 把旧 schema 中"轻量 reference 实例"（root + templateRef、children 为空）
- * 一次性展开为完整子树，使用**确定性派生 ID**（基于实例 root id + DFS 序号）。
- *
- * - 不修改 DB；这是 read-path migration，结果在内存中。
- * - 后续 op 若改这些子节点（例如 updateStyle），op 会以新 ID 进入历史链；
- *   下次重放时本函数再展开同一份 ID（确定性派生），op.params 仍能命中。
- * - 同步触发 Schema 自然演进：当 ProjectsService 触发周期快照时，物化结果
- *   就被永久写入 design_snapshots，旧轻量实例自然淘汰。
- *
- * 详见 design_docs/03-tech/editor/component-instance-id-stability.md §四。
- */
-function materializeLegacyInstances(project: DesignProject): void {
-  const assetMap = new Map<string, ComponentTemplate>(
-    project.componentAssets.map((t) => [t.id, t]),
-  );
-  for (const screen of project.screens ?? []) {
-    if (!screen.rootNode) continue;
-    walkNode(screen.rootNode, assetMap);
-  }
-}
-
-function walkNode(
-  node: ComponentNode,
-  assetMap: Map<string, ComponentTemplate>,
-): void {
-  if (
-    isComponentInstanceType(node.type) &&
-    node.templateRef?.mode === 'reference' &&
-    (node.children?.length ?? 0) === 0
-  ) {
-    const template = assetMap.get(node.templateRef.templateId);
-    if (template && (template.schema.children?.length ?? 0) > 0) {
-      let counter = 0;
-      const idGen = () => {
-        if (counter === 0) {
-          counter += 1;
-          return node.id;
-        }
-        const id = `${node.id}__legacy_${counter}`;
-        counter += 1;
-        return id;
-      };
-      const expanded = instantiateTemplate(template, { idGen });
-      node.children = expanded.children ?? [];
-    }
-  }
-
-  if (node.children) {
-    for (const child of node.children) walkNode(child, assetMap);
-  }
-}
-

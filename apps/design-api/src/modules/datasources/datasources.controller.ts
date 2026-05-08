@@ -8,138 +8,25 @@ import {
   Body,
 } from '@nestjs/common';
 import { DatasourcesService } from './datasources.service';
-import type { DataPayload } from '../../shared/types';
+import type { DataSource } from '@globallink/design-schema';
 
 /**
- * Phase 6 — DataSource REST（/datasources），内部仍走 Operation 持久化。
+ * DataSource REST（/datasources）—— v2 形态。
+ *
+ * 仅保留：
+ *   - GET                     列表
+ *   - GET   :dataSourceId     单个
+ *   - POST                    新增（body: { dataSource: DataSource, author? }）
+ *   - PUT   :dataSourceId     更新名称/描述
+ *   - DELETE :dataSourceId    删除
+ *
+ * v1 的 `:dataSourceId/scenarios/*` 与 `:dataSourceId/phase` 已下架；
+ * mock 场景管理改走 `dataSource.{addMockScenario,updateMockScenario,...}` op，
+ * 由编辑器面板（D.3）/ MCP 工具（E.1）调 `/operations` 走通用 op 接口。
  */
 @Controller('api/projects/:projectId/screens/:screenId/datasources')
 export class DatasourcesController {
   constructor(private readonly datasources: DatasourcesService) {}
-
-  // --- 子资源：必须先于 :dataSourceId 单段路由注册 ---
-
-  @Get(':dataSourceId/scenarios')
-  listScenarios(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-  ) {
-    return this.datasources.listScenarios(projectId, screenId, dataSourceId);
-  }
-
-  @Post(':dataSourceId/scenarios')
-  addScenario(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-    @Body()
-    body: {
-      scenario: {
-        id: string;
-        name: string;
-        data: DataPayload;
-        description?: string;
-        isDefault?: boolean;
-      };
-      author?: string;
-    },
-  ) {
-    return this.datasources.addScenario(
-      projectId,
-      screenId,
-      dataSourceId,
-      body.scenario,
-      body.author,
-    );
-  }
-
-  @Get(':dataSourceId/scenarios/:scenarioId')
-  getScenario(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-    @Param('scenarioId') scenarioId: string,
-  ) {
-    return this.datasources.getScenario(projectId, screenId, dataSourceId, scenarioId);
-  }
-
-  @Put(':dataSourceId/scenarios/:scenarioId')
-  putScenario(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-    @Param('scenarioId') scenarioId: string,
-    @Body()
-    body: {
-      data?: DataPayload;
-      name?: string;
-      description?: string;
-      author?: string;
-    },
-  ) {
-    const { author, ...patch } = body;
-    return this.datasources.updateScenario(
-      projectId,
-      screenId,
-      dataSourceId,
-      scenarioId,
-      patch,
-      author,
-    );
-  }
-
-  @Delete(':dataSourceId/scenarios/:scenarioId')
-  removeScenario(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-    @Param('scenarioId') scenarioId: string,
-    @Body() body?: { author?: string },
-  ) {
-    return this.datasources.removeScenario(
-      projectId,
-      screenId,
-      dataSourceId,
-      scenarioId,
-      body?.author,
-    );
-  }
-
-  @Post(':dataSourceId/scenarios/:scenarioId/switch')
-  switchScenario(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-    @Param('scenarioId') scenarioId: string,
-    @Body() body?: { author?: string },
-  ) {
-    return this.datasources.switchScenario(
-      projectId,
-      screenId,
-      dataSourceId,
-      scenarioId,
-      body?.author,
-    );
-  }
-
-  @Post(':dataSourceId/phase')
-  switchPhase(
-    @Param('projectId') projectId: string,
-    @Param('screenId') screenId: string,
-    @Param('dataSourceId') dataSourceId: string,
-    @Body() body: { phase: string; author?: string },
-  ) {
-    return this.datasources.switchPhase(
-      projectId,
-      screenId,
-      dataSourceId,
-      body.phase,
-      body.author,
-    );
-  }
-
-  // --- 数据源 CRUD ---
 
   @Get()
   list(
@@ -154,15 +41,7 @@ export class DatasourcesController {
     @Param('projectId') projectId: string,
     @Param('screenId') screenId: string,
     @Body()
-    body: {
-      dataSource: {
-        id: string;
-        name: string;
-        lifecycle: 'api' | 'static';
-        description?: string;
-      };
-      author?: string;
-    },
+    body: { dataSource: DataSource; author?: string },
   ) {
     return this.datasources.addDataSource(
       projectId,
@@ -186,12 +65,7 @@ export class DatasourcesController {
     @Param('projectId') projectId: string,
     @Param('screenId') screenId: string,
     @Param('dataSourceId') dataSourceId: string,
-    @Body()
-    body: {
-      name?: string;
-      description?: string;
-      author?: string;
-    },
+    @Body() body: { name?: string; description?: string; author?: string },
   ) {
     const { author, ...patch } = body;
     return this.datasources.updateDataSource(

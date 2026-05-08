@@ -38,7 +38,7 @@
 | **B.1** design-engine：渲染器接入新模型 | ✅ | B 渲染器 | ❌ | A.1, A.2, A.3 | 2026-05-08 | `f3d62f6` |
 | **B.2** design-engine：清理 v1 残留 | ✅ | B 渲染器 | ❌ | B.1 | 2026-05-08 | `7b5bf36` |
 | **C.1** design-operations：所有 op 重写 | ✅ | C 业务层 | ❌ | A.1 | 2026-05-08 | `b59bc00` |
-| **C.2** design-api：迁移层 + 一次性 migration script | ⬜ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | — | — |
+| **C.2** design-api：迁移层 + 一次性 migration script | ✅ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | 2026-05-08 | （随本子项） |
 | **D.1** design_front：状态面板（state.view + state.data） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
 | **D.2** design_front：事件/动作链面板按新动词 | ⬜ | D 编辑器 | ✅ | C.2, D.1 | — | — |
 | **D.3** design_front：数据源面板（endpoint+mock 共存） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
@@ -62,10 +62,10 @@
 | 指标 | 值 |
 |------|---|
 | 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 8（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1） |
-| 进行中 | C.2（待开工） |
+| 已完成 | 9（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2） |
+| 进行中 | D.1（待开工） |
 | 阻塞中 | — |
-| 最新 commit | `b59bc00` refactor(operations): rewrite all ops for v2 schema |
+| 最新 commit | C.2：待 commit（feat(api): v1→v2 migration script + transitional migration layer） |
 
 ---
 
@@ -350,3 +350,4 @@
 | 2026-05-08 | B.1 完成（commit `f3d62f6`）— design-engine 全套渲染器迁到 v2：data/dataContext + 重写 ListRenderer/SchemaRenderer/PreviewRenderer/styles/codegen/schemaLayoutMap；typecheck + build 全过；79 条单测仍绿 | AI 助手 |
 | 2026-05-08 | B.2 完成（commit `7b5bf36`）— 全文清理 v1 注释残留；删空 migration 目录；grep 零匹配 | AI 助手 |
 | 2026-05-08 | C.1 完成（commit `b59bc00`）— design-operations 重写：types 按域拆分、op 名 dot-namespace 化、删除 domain-state/environment/api-endpoint；新增 data-source/screen-state/global-state；executor 拆 dispatch/inverse；pnpm build 全过；grep 零匹配 | AI 助手 |
+| 2026-05-08 | C.2 完成 — `migrations/v1-to-v2-state-model.ts` 纯函数迁移层 + `run-migration.ts` 一次性脚本（含备份表 `design_snapshots_v1_backup`、幂等 + dry-run）；`projects.service.findOne` 接入迁移层并删 `materializeLegacyInstances`；`operations.service` ensureDeterministicIds 升级到 v2 op 名（`element.add` / `element.duplicate` / `asset.instantiateTemplate` / `screen.add` / `event.addNavigation`）；`datasources` 模块精简为 v2 形态（删除 scenarios/phase 路由）；DB 30 行快照中 17 行 v1→v2 迁移成功，第二次重跑 0 migrated（幂等）；design-api typecheck + build 通过；三大 feature 包仍 build 通 | AI 助手 |
