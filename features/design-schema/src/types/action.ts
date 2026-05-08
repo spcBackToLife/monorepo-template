@@ -1,0 +1,201 @@
+import type { Expression } from './expression';
+
+// ===== State 操作动词 =====
+
+/** state.set — 把 state 路径上的值替换为 value 求值结果 */
+export interface StateSetAction {
+  type: 'state.set';
+  /** 路径，如 "view.inputDraft" 或 "data.messages[2].text" */
+  path: string;
+  /** 表达式或字面值 */
+  value: Expression | unknown;
+}
+
+/** state.append — path 必须指向数组，把 value 追加进去 */
+export interface StateAppendAction {
+  type: 'state.append';
+  path: string;
+  value: Expression | unknown;
+}
+
+/** state.remove — path 数组中按索引或 predicate 删除 */
+export interface StateRemoveAction {
+  type: 'state.remove';
+  path: string;
+  /** 索引（负数表示倒数）或谓词表达式 (item, index) => boolean */
+  index?: number;
+  predicate?: Expression<boolean>;
+}
+
+/** state.merge — path 必须指向对象，与 value 浅合并 */
+export interface StateMergeAction {
+  type: 'state.merge';
+  path: string;
+  value: Expression | Record<string, unknown>;
+}
+
+/** state.toggle — path 必须指向 boolean，反转 */
+export interface StateToggleAction {
+  type: 'state.toggle';
+  path: string;
+}
+
+// ===== Effect 副作用动词 =====
+
+/**
+ * effect.fetch — 触发数据源加载（mock 或真实接口由运行时按 env 决定）。
+ * onSuccess/onError 在副作用结束后展开成动作链。
+ */
+export interface EffectFetchAction {
+  type: 'effect.fetch';
+  /** 引用 Screen.dataSources[].id 中的某个 api 类型源 */
+  dataSourceId: string;
+  /** 运行时参数（覆盖 endpoint.query / endpoint.body 默认值） */
+  params?: Record<string, Expression | unknown>;
+  /** 成功后串行执行的子动作链 */
+  onSuccess?: Action[];
+  /** 失败后串行执行的子动作链 */
+  onError?: Action[];
+}
+
+/** effect.cancel — 取消进行中的 fetch */
+export interface EffectCancelAction {
+  type: 'effect.cancel';
+  /** 不传则取消该屏幕所有 pending fetch */
+  dataSourceId?: string;
+}
+
+// ===== 导航动词 =====
+
+/** 导航过渡动画 */
+export interface NavTransitionAnimation {
+  type: 'fade' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'none';
+  duration?: number;
+  easing?: string;
+}
+
+export interface NavGoAction {
+  type: 'nav.go';
+  targetScreenId: string;
+  animation?: NavTransitionAnimation;
+}
+
+export interface NavBackAction {
+  type: 'nav.back';
+}
+
+// ===== 节点视觉态动词 =====
+
+/** 临时切换某节点的 VisualState（含可选自动回退） */
+export interface NodeSetVisualStateAction {
+  type: 'node.setVisualState';
+  /** 目标节点 id（不传则用宿主节点） */
+  nodeId?: string;
+  /** 要切到的 visualState 名 */
+  state: string;
+  /** N ms 后自动回退到 default（不写则永久） */
+  autoRevertMs?: number;
+}
+
+// ===== UI 副作用动词 =====
+
+export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type ToastPosition = 'top-center' | 'bottom-center' | 'top-right';
+
+export interface UiShowToastAction {
+  type: 'ui.showToast';
+  toastType: ToastType;
+  message: Expression<string> | string;
+  /** ms，默认 3000 */
+  duration?: number;
+  position?: ToastPosition;
+}
+
+export interface UiOpenUrlAction {
+  type: 'ui.openUrl';
+  url: Expression<string> | string;
+  openInNewTab?: boolean;
+}
+
+export interface UiDelayAction {
+  type: 'ui.delay';
+  /** ms */
+  duration: number;
+}
+
+// ===== 自定义扩展 =====
+
+export interface CustomAction {
+  type: 'custom';
+  /** 业务方实现：宿主侧注册的 handler 名 */
+  handler: string;
+  /** 任意附加参数 */
+  payload?: Record<string, unknown>;
+}
+
+// ===== 动词联合 =====
+
+export type Action =
+  | StateSetAction
+  | StateAppendAction
+  | StateRemoveAction
+  | StateMergeAction
+  | StateToggleAction
+  | EffectFetchAction
+  | EffectCancelAction
+  | NavGoAction
+  | NavBackAction
+  | NodeSetVisualStateAction
+  | UiShowToastAction
+  | UiOpenUrlAction
+  | UiDelayAction
+  | CustomAction;
+
+export type ActionType = Action['type'];
+
+// ===== Event 触发器 =====
+
+export type EventTrigger =
+  | 'click'
+  | 'doubleClick'
+  | 'hover'
+  | 'focus'
+  | 'blur'
+  | 'longPress'
+  | 'screenEnter'
+  | 'screenExit'
+  | 'screenVisible'
+  | 'screenHidden'
+  | 'scrollReachBottom'
+  | 'scrollReachTop'
+  | 'navigateBack'
+  /** 受控 input 变化时触发（v2 新增） */
+  | 'change'
+  /** 表单提交时触发（v2 新增） */
+  | 'submit';
+
+/** 事件条件 —— 用表达式替代 v1 的 'domainState' / 'expression' 二元 */
+export interface EventCondition {
+  /** boolean 表达式，true 才执行 actions */
+  when: Expression<boolean>;
+}
+
+/** 一个绑定在节点上的交互事件 */
+export interface ComponentEvent {
+  trigger: EventTrigger;
+  /** 串行执行的动作链 */
+  actions: Action[];
+  /** 可选：only execute when condition is met */
+  condition?: EventCondition;
+  /** 可选：人类可读描述 */
+  description?: string;
+  /** 可选：暂时禁用但保留配置 */
+  disabled?: boolean;
+  /** 可选：滚动触发配置（scrollReachBottom/scrollReachTop 专用） */
+  scrollConfig?: {
+    /** 距边缘 px（默认 100） */
+    threshold?: number;
+    /** 防抖间隔 ms（默认 300） */
+    debounce?: number;
+  };
+}

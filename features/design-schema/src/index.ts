@@ -1,9 +1,62 @@
 // ===== Version =====
-export const DESIGN_SCHEMA_VERSION = '0.2.0';
+/**
+ * design-schema 版本。
+ *
+ * v0.3.0 = state/action/expression 模型（RFC 2026-05-08）
+ * v0.2.0 = v1 的 domainState/environmentState 模型（已废弃）
+ */
+export const DESIGN_SCHEMA_VERSION = '0.3.0';
 
 // ===== Types =====
 export type {
   CSSProperties,
+  Platform,
+  Viewport,
+  // v2 expression
+  Expression,
+  ExpressionMeta,
+  // v2 state
+  EffectStatus,
+  ScreenState,
+  ScreenStateInit,
+  ViewVariableDef,
+  GlobalStateInit,
+  ExpressionContext,
+  BuiltinFunctions,
+  // v2 visualState
+  VisualState,
+  // v2 action
+  EventTrigger,
+  EventCondition,
+  ComponentEvent,
+  NavTransitionAnimation,
+  ToastType,
+  ToastPosition,
+  StateSetAction,
+  StateAppendAction,
+  StateRemoveAction,
+  StateMergeAction,
+  StateToggleAction,
+  EffectFetchAction,
+  EffectCancelAction,
+  NavGoAction,
+  NavBackAction,
+  NodeSetVisualStateAction,
+  UiShowToastAction,
+  UiOpenUrlAction,
+  UiDelayAction,
+  CustomAction,
+  Action,
+  ActionType,
+  // v2 data source
+  HttpMethod,
+  ApiEndpoint,
+  MockScenario,
+  MockConfig,
+  StaticDataSource,
+  ApiDataSource,
+  DataSource,
+  // Node / Screen / Project
   PrimitiveNodeType,
   ComponentInstanceType,
   NodeType,
@@ -14,54 +67,24 @@ export type {
   CSSAnimationConfigSchema,
   ExternalAnimationConfigSchema,
   AnimationConfig,
-  ComponentState,
-  DomainStateValue,
-  DomainStateVariable,
-  DomainStateBinding,
-  EnvironmentVariable,
-  EnvironmentStateBinding,
-  DataField,
-  DataSchema,
-  DataSourcePhase,
-  DataScenario,
-  DataSource,
-  EventTrigger,
-  TransitionAnimation,
-  NavigateAction,
-  SetStateAction,
-  OpenUrlAction,
-  DelayAction,
-  CustomAction,
-  SetDomainStateAction,
-  SetEnvironmentStateAction,
-  ToggleVisibleAction,
-  ToastPosition,
-  ToastType,
-  ShowToastAction,
-  ApiRequestAction,
-  EventAction,
-  EventCondition,
-  ComponentEvent,
-  HttpMethod,
-  RequestDefinition,
-  MockScenario,
-  ApiEndpoint,
-  Platform,
-  Viewport,
-  Screen,
   EditorRole,
   NodeEditorMetadata,
+  ExpressionStyles,
+  Screen,
+  DesignProject,
+  // Template / Props
   TemplateScope,
   TemplateKind,
   ComponentTemplate,
   PropType,
   ComponentPropDefinition,
   PropBinding,
-  DesignProject,
+  // Envelope
   OperationEnvelope,
 } from './types';
 
-export { API_DATA_SOURCE_PHASES } from './types';
+// Expression 运行期工具（既是类型也是 runtime）
+export { expr, isExpression } from './types';
 
 // ===== Viewport Presets =====
 export {
@@ -137,10 +160,6 @@ export {
 } from './validators';
 
 export {
-  DomainStateVariableSchema,
-  DomainStateBindingSchema,
-  EnvironmentVariableSchema,
-  EnvironmentStateBindingSchema,
   ComponentPropDefinitionSchema,
   PropBindingSchema,
   PropTypeSchema,
@@ -148,11 +167,32 @@ export {
 
 export {
   DataSourceSchema,
-  DataScenarioSchema,
-  DataSourcePhaseSchema,
-  DataFieldSchema,
-  DataSchemaSchema,
+  ApiDataSourceSchema,
+  StaticDataSourceSchema,
+  ApiEndpointSchema,
+  MockScenarioSchema,
+  MockConfigSchema,
+  HttpMethodSchema,
 } from './validators/data';
+
+export {
+  ActionSchema,
+  EventTriggerSchema,
+  EventConditionSchema,
+} from './validators/action';
+
+export {
+  ExpressionSchema,
+  ExpressionOrValueSchema,
+} from './validators/expression';
+
+export {
+  EffectStatusSchema,
+  ScreenStateSchema,
+  ScreenStateInitSchema,
+  ViewVariableDefSchema,
+  GlobalStateInitSchema,
+} from './validators/state';
 
 export { OperationEnvelopeSchema } from './validators/envelope';
 

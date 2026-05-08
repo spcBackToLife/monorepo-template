@@ -1,8 +1,7 @@
 import type { CSSProperties } from './css';
-import type { ComponentState } from './state';
-import type { ComponentEvent } from './event';
-import type { DomainStateVariable, DomainStateBinding } from './domainState';
-import type { EnvironmentStateBinding } from './environment';
+import type { VisualState } from './visualState';
+import type { ComponentEvent } from './action';
+import type { Expression } from './expression';
 
 // ===== Animation Config =====
 
@@ -101,8 +100,6 @@ export interface TemplateRef {
  *
  * - 渲染管道（SchemaRenderer / PreviewRenderer / 导出代码）一律不读
  * - 设计师如想让某个角色在最终产品里也成立，应在 styles 里直接表达（CSS-first）
- *
- * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
  */
 export type EditorRole = 'scroll-container' | 'sticky-bottom' | 'sticky-top';
 
@@ -110,15 +107,24 @@ export type EditorRole = 'scroll-container' | 'sticky-bottom' | 'sticky-top';
  * 节点级"编辑期 metadata"命名空间：**渲染契约不读取**。
  *
  * 任何只服务设计师编辑体验、不应影响最终产品/导出代码的字段，应放在这里。
- * 这样保证 schema 主体永远 = 真实设计产物。
  */
 export interface NodeEditorMetadata {
   role?: EditorRole;
 }
 
-// ===== Component Node =====
+// ===== Expression-aware Styles =====
 
-/** Core building block of the design tree */
+/**
+ * 表达式样式：CSSProperties 的每个属性都允许是 Expression 或字面值。
+ * 文本样式里可以写 `{{ item.role === 'user' ? '#667eea' : '#fff' }}`。
+ */
+export type ExpressionStyles = {
+  [K in keyof CSSProperties]?: CSSProperties[K] | Expression<CSSProperties[K]>;
+};
+
+// ===== Component Node v2 =====
+
+/** Core building block of the design tree（v2 — state/action/expression 模型） */
 export interface ComponentNode {
   /** Unique node identifier */
   id: string;
@@ -126,59 +132,68 @@ export interface ComponentNode {
   type: NodeType;
   /** Human-readable name given by the designer */
   name?: string;
-  /** CSS styles applied to this node */
-  styles: CSSProperties;
+
+  /**
+   * CSS 样式：每个值都可以是 Expression，如
+   *   backgroundColor: "{{ item.role === 'user' ? '#667eea' : '#fff' }}"。
+   */
+  styles: ExpressionStyles;
+
   /** Child nodes */
   children?: ComponentNode[];
-  /** Element-specific props (e.g., src for img, placeholder for input) */
-  props: Record<string, unknown>;
-  /** Component states (hover, pressed, disabled, custom) */
-  states: ComponentState[];
-  /** Currently active state name */
-  activeState: string;
-  /** Bound interaction events */
-  events: ComponentEvent[];
-  /** Layout constraints for responsive behavior */
-  constraints?: LayoutConstraints;
-  /** Template reference if this node is a component instance */
-  templateRef?: TemplateRef;
-  /** Whether the node is locked (prevents editing via canvas interactions) */
-  locked: boolean;
-  /** Whether the node is visible in the canvas */
-  visible: boolean;
+
   /**
-   * Optional: node is shown only when the named state variable equals `equals`
-   * (evaluated against runtime domain/environment maps in preview).
+   * Element-specific props，每个值都可以是 Expression。
+   * 文本节点的 textContent 也走这条路：textContent: "{{ item.text }}"
    */
-  visibilityWhen?: {
-    variableName: string;
-    equals: string;
+  props: Record<string, Expression | unknown>;
+
+  /** 节点视觉态（hover/pressed/disabled/custom） */
+  states: VisualState[];
+  /** 当前激活的 visualState 名 */
+  activeState: string;
+
+  /** 事件（v2 新动词 Action[]） */
+  events: ComponentEvent[];
+
+  /** 布局约束 */
+  constraints?: LayoutConstraints;
+
+  /** 模板引用 */
+  templateRef?: TemplateRef;
+
+  /** 编辑期锁定 */
+  locked: boolean;
+  /** 静态可见性（编辑期硬开关）；动态可见性走 visibleWhen */
+  visible: boolean;
+
+  // ----- v2 新字段 -----
+
+  /**
+   * 表达式驱动的可见性，运行时求值得 boolean。
+   * 优先级高于 visible（visible=false 则始终不渲染；visible=true 时才看 visibleWhen）。
+   */
+  visibleWhen?: Expression<boolean>;
+
+  /**
+   * 列表重复渲染：求值得数组，children/props 内可用 {{ item.x }} / {{ index }}。
+   * 替代 v1 的 props.__listData。
+   */
+  repeat?: Expression<unknown[]>;
+
+  /**
+   * 受控双向绑定（仅 input/textarea/select 等表单元素）。
+   * value 来自 state[bind.path]，change 事件 dispatch state.set(bind.path, e.target.value)。
+   */
+  bind?: {
+    /** 路径，如 "view.inputDraft" */
+    path: string;
   };
 
-  // ----- Five-layer state system -----
-
-  /** Domain state variables defined on this container node (scoped to descendants) */
-  domainStates?: DomainStateVariable[];
-  /** Bindings that define how this node responds to domain state variable values */
-  domainStateBindings?: DomainStateBinding[];
-  /** Bindings that define how this node responds to environment variable values */
-  environmentBindings?: EnvironmentStateBinding[];
-
-  // ----- Material / Animation -----
-
-  /** Structured animation config (CSS keyframes + external animation resources) */
+  // ----- 素材/动画 -----
   animation?: AnimationConfig;
-  /** Associated material project ID (links to a material-editor project) */
   materialProjectId?: string;
 
-  // ----- Editor-only metadata（不参与渲染） -----
-
-  /**
-   * 编辑器视图层 metadata 命名空间。**渲染契约不读取**——
-   * 任何只服务编辑画布的辅助字段（如视觉锚定 role）放在这里，
-   * 保证 schema 主体永远 = 真实设计产物。
-   *
-   * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
-   */
+  // ----- 编辑器 metadata（不参与渲染） -----
   editorMetadata?: NodeEditorMetadata;
 }

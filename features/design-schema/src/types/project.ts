@@ -1,9 +1,9 @@
 import type { Screen } from './screen';
 import type { Viewport } from './viewport';
 import type { ComponentTemplate } from './template';
-import type { EnvironmentVariable } from './environment';
+import type { GlobalStateInit } from './state';
 
-/** Top-level design project — aggregates all screens, viewports, and assets */
+/** Top-level design project — aggregates all screens, viewports, and assets（v2） */
 export interface DesignProject {
   /** Unique project identifier */
   id: string;
@@ -21,8 +21,8 @@ export interface DesignProject {
   screens: Screen[];
   /** Project-level reusable component assets */
   componentAssets: ComponentTemplate[];
-  /** Project-level environment state variables (theme, locale, etc.) */
-  environmentStates: EnvironmentVariable[];
+  /** 项目级全局 state（替换 v1 environmentStates） */
+  globalStateInit?: GlobalStateInit;
   /** ISO timestamp */
   createdAt: string;
   /** ISO timestamp */

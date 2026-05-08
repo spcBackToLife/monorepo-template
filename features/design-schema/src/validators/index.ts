@@ -1,19 +1,18 @@
 import { z } from 'zod';
-import {
-  DomainStateVariableSchema,
-  DomainStateBindingSchema,
-  EnvironmentVariableSchema,
-  EnvironmentStateBindingSchema,
-  ComponentPropDefinitionSchema,
-  PropBindingSchema,
-} from './props';
+import { ComponentPropDefinitionSchema, PropBindingSchema } from './props';
 import { DataSourceSchema } from './data';
+import { ComponentEventSchema } from './action';
+import { ScreenStateInitSchema, GlobalStateInitSchema } from './state';
 
-// ===== Component State Schema =====
+// ===== VisualState Schema (节点视觉态) =====
+//
+// CSS 值此处宽容地接受 string | number | undefined（含表达式字符串），
+// 表达式语法在运行时由 evaluateExpression 解析。
+const cssValueSchema = z.union([z.string(), z.number()]);
 
-const ComponentStateSchema = z.object({
+const VisualStateSchema = z.object({
   name: z.string().min(1),
-  styles: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
+  styles: z.record(z.string(), cssValueSchema).default({}),
   props: z.record(z.string(), z.unknown()).optional(),
   transition: z
     .object({
@@ -22,89 +21,9 @@ const ComponentStateSchema = z.object({
       properties: z.array(z.string()).optional(),
     })
     .optional(),
+  childrenStates: z.record(z.string(), z.string()).optional(),
   childrenVisibility: z.record(z.string(), z.boolean()).optional(),
   disabledEvents: z.array(z.string()).optional(),
-});
-
-// ===== Transition Animation Schema =====
-
-const TransitionAnimationSchema = z.object({
-  type: z.enum(['fade', 'slide-left', 'slide-right', 'slide-up', 'slide-down', 'none']),
-  duration: z.number().positive().optional(),
-  easing: z.string().optional(),
-});
-
-// ===== Event Action Schemas =====
-
-const NavigateActionSchema = z.object({
-  type: z.literal('navigate'),
-  targetScreenId: z.string().min(1),
-  animation: TransitionAnimationSchema.optional(),
-});
-
-const SetStateActionSchema = z.object({
-  type: z.literal('setState'),
-  targetId: z.string().min(1),
-  state: z.string().min(1),
-});
-
-const OpenUrlActionSchema = z.object({
-  type: z.literal('openUrl'),
-  url: z.string().url(),
-});
-
-const DelayActionSchema = z.object({
-  type: z.literal('delay'),
-  duration: z.number().positive(),
-});
-
-const CustomActionSchema = z.object({
-  type: z.literal('custom'),
-  handler: z.string().min(1),
-});
-
-const SetDomainStateActionSchema = z.object({
-  type: z.literal('setDomainState'),
-  variableName: z.string().min(1),
-  value: z.string().min(1),
-});
-
-const SetEnvironmentStateActionSchema = z.object({
-  type: z.literal('setEnvironmentState'),
-  variableName: z.string().min(1),
-  value: z.string().min(1),
-});
-
-const ToggleVisibleActionSchema = z.object({
-  type: z.literal('toggleVisible'),
-  targetId: z.string().min(1),
-});
-
-const EventActionSchema = z.discriminatedUnion('type', [
-  NavigateActionSchema,
-  SetStateActionSchema,
-  OpenUrlActionSchema,
-  DelayActionSchema,
-  CustomActionSchema,
-  SetDomainStateActionSchema,
-  SetEnvironmentStateActionSchema,
-  ToggleVisibleActionSchema,
-]);
-
-const EventConditionSchema = z.object({
-  type: z.enum(['domainState', 'environmentState', 'dataBinding', 'propValue']),
-  variableName: z.string().min(1),
-  value: z.string().min(1),
-});
-
-// ===== Component Event Schema =====
-
-export const ComponentEventSchema = z.object({
-  trigger: z.enum(['click', 'hover', 'focus', 'blur', 'longPress']),
-  actions: z.array(EventActionSchema).min(1),
-  condition: EventConditionSchema.optional(),
-  description: z.string().optional(),
-  disabled: z.boolean().optional(),
 });
 
 // ===== Layout Constraints Schema =====
@@ -141,24 +60,35 @@ const NodeTypeSchema = z.union([
   z.string().regex(/^component:.+$/),
 ]);
 
-// ===== Component Node Schema (recursive) =====
+// ===== Component Node Schema (recursive, v2) =====
 
 const BaseComponentNodeSchema = z.object({
   id: z.string().min(1),
   type: NodeTypeSchema,
   name: z.string().optional(),
-  styles: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
+  // styles 在 v2 中允许字符串/数字（含表达式字符串）
+  styles: z.record(z.string(), cssValueSchema).default({}),
   props: z.record(z.string(), z.unknown()).default({}),
-  states: z.array(ComponentStateSchema).default([]),
+  states: z.array(VisualStateSchema).default([]),
   activeState: z.string().default('default'),
   events: z.array(ComponentEventSchema).default([]),
   constraints: LayoutConstraintsSchema,
   templateRef: TemplateRefSchema,
   locked: z.boolean().default(false),
   visible: z.boolean().default(true),
-  domainStates: z.array(DomainStateVariableSchema).optional(),
-  domainStateBindings: z.array(DomainStateBindingSchema).optional(),
-  environmentBindings: z.array(EnvironmentStateBindingSchema).optional(),
+  // v2 新字段
+  visibleWhen: z.string().optional(),
+  repeat: z.string().optional(),
+  bind: z.object({ path: z.string().min(1) }).optional(),
+  // 编辑器 metadata
+  editorMetadata: z
+    .object({
+      role: z.enum(['scroll-container', 'sticky-bottom', 'sticky-top']).optional(),
+    })
+    .optional(),
+  // 动画 / 素材
+  animation: z.unknown().optional(),
+  materialProjectId: z.string().optional(),
 });
 
 type ComponentNodeInput = z.input<typeof BaseComponentNodeSchema> & {
@@ -176,8 +106,8 @@ export const ScreenSchema = z.object({
   name: z.string().min(1),
   rootNode: ComponentNodeSchema,
   backgroundColor: z.string().optional(),
-  domainStates: z.array(DomainStateVariableSchema).default([]),
   dataSources: z.array(DataSourceSchema).default([]),
+  stateInit: ScreenStateInitSchema.optional(),
 });
 
 // ===== Viewport Schema =====
@@ -220,7 +150,7 @@ export const DesignProjectSchema = z.object({
   viewportPresets: z.array(ViewportSchema).default([]),
   screens: z.array(ScreenSchema).min(1),
   componentAssets: z.array(ComponentTemplateSchema).default([]),
-  environmentStates: z.array(EnvironmentVariableSchema).default([]),
+  globalStateInit: GlobalStateInitSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -279,3 +209,6 @@ export function validateTemplate(data: unknown): ValidationResult<z.infer<typeof
   }
   return { success: false, errors: result.error };
 }
+
+// ===== Re-export ComponentEventSchema =====
+export { ComponentEventSchema };

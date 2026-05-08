@@ -1,66 +1,68 @@
-// ===== Data Source Model =====
-// A DataSource encapsulates both data content and its lifecycle,
-// replacing the simpler DataSet concept.
+import type { Expression } from './expression';
 
-/** Describes a single field in the data structure (for auto-complete and validation) */
-export interface DataField {
-  /** Dot-notation path, e.g. "user.name", "items[].title" */
+/** HTTP 请求方法 */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+/** 真实接口配置 */
+export interface ApiEndpoint {
+  method: HttpMethod;
+  /** 路径，可含 {{ state.x }} 表达式参数 */
   path: string;
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  label?: string;
+  headers?: Record<string, string | Expression<string>>;
+  query?: Record<string, Expression | unknown>;
+  /** 请求体（POST/PUT/PATCH） */
+  body?: Expression | Record<string, Expression | unknown>;
+  /** 响应数据结构描述（编辑器 hints + codegen 类型用） */
+  responseSchema?: Record<string, unknown>;
 }
 
-/** Schema describing the shape of data a DataSource provides */
-export interface DataSchema {
-  fields: DataField[];
-}
-
-/** A lifecycle phase of a data source (relevant for API-type sources) */
-export interface DataSourcePhase {
-  /** Phase identifier, e.g. "loading", "loaded", "empty", "error" */
-  name: string;
-  /** Human-readable label */
-  label: string;
-}
-
-/** A named mock data scenario within a data source */
-export interface DataScenario {
+/** Mock 场景 */
+export interface MockScenario {
   id: string;
   name: string;
   description?: string;
-  /** The actual mock data — arbitrary JSON structure */
-  data: Record<string, unknown>;
-  /** Whether this is the default scenario */
-  isDefault?: boolean;
+  /** HTTP 状态码 */
+  statusCode: number;
+  /** 模拟网络延迟 ms */
+  delay: number;
+  /** 是否模拟 timeout */
+  isTimeout?: boolean;
+  /** 响应体（任意 JSON） */
+  responseBody: unknown;
+}
+
+/** Mock 配置（仅 type='api' 数据源用） */
+export interface MockConfig {
+  scenarios: MockScenario[];
+  activeScenarioId: string;
 }
 
 /**
- * A data source that provides data to the UI.
- * For API-type sources, lifecycle phases are tracked and automatically
- * bridged to domain state variables.
+ * 数据源 —— v2 模型。
+ * 运行时由 EffectExecutor 消费：static 同步注入，api 触发 effect.fetch。
+ * mock 与 endpoint 共存：编辑器/Storybook 用 mock，生产 codegen 用 endpoint。
  */
-export interface DataSource {
+export type DataSource = StaticDataSource | ApiDataSource;
+
+export interface StaticDataSource {
   id: string;
+  type: 'static';
   name: string;
   description?: string;
-  /** 'api' sources have lifecycle phases (loading/loaded/empty/error); 'static' sources do not */
-  lifecycle: 'api' | 'static';
-  /** Lifecycle phases — populated automatically for 'api' type */
-  phases: DataSourcePhase[];
-  /** Currently active phase for preview */
-  activePhase: string;
-  /** Mock data scenarios (each scenario is a complete data set) */
-  scenarios: DataScenario[];
-  /** Currently active scenario ID for preview */
-  activeScenarioId: string;
-  /** Optional schema for auto-complete and validation */
-  schema?: DataSchema;
+  /** 启动时同步注入到 state.data[name] */
+  initial: unknown;
 }
 
-/** Default lifecycle phases for API-type data sources */
-export const API_DATA_SOURCE_PHASES: DataSourcePhase[] = [
-  { name: 'loading', label: '加载中' },
-  { name: 'loaded', label: '已加载' },
-  { name: 'empty', label: '无数据' },
-  { name: 'error', label: '加载失败' },
-];
+export interface ApiDataSource {
+  id: string;
+  type: 'api';
+  name: string;
+  description?: string;
+  endpoint: ApiEndpoint;
+  /** Mock 配置：可选；缺失时编辑器/storybook 也走真实接口 */
+  mock?: MockConfig;
+  /** 是否在 screenEnter 时自动 fetch（默认 true） */
+  autoFetchOnEnter?: boolean;
+  /** 自动 fetch 时携带的默认参数 */
+  defaultParams?: Record<string, Expression | unknown>;
+}

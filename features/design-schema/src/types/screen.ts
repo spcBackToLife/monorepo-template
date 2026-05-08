@@ -1,9 +1,8 @@
 import type { ComponentNode } from './node';
-import type { DomainStateVariable } from './domainState';
 import type { DataSource } from './dataSource';
-import type { ApiEndpoint } from './api';
+import type { ScreenStateInit } from './state';
 
-/** A single screen/page in the design project */
+/** A single screen/page in the design project（v2） */
 export interface Screen {
   /** Unique screen identifier */
   id: string;
@@ -13,10 +12,14 @@ export interface Screen {
   rootNode: ComponentNode;
   /** Background color (CSS color value) */
   backgroundColor?: string;
-  /** Screen-level domain state variable definitions */
-  domainStates: DomainStateVariable[];
-  /** Data sources for data-driven design */
+
+  /**
+   * v2 数据源（含 endpoint+mock 共存）。
+   * 运行时由 EffectExecutor 消费：static 同步注入 state.data[name]，
+   * api 由 effect.fetch 触发。
+   */
   dataSources: DataSource[];
-  /** API endpoint definitions with mock scenarios for preview */
-  apiEndpoints?: ApiEndpoint[];
+
+  /** 屏幕级 state 初始化（替代 v1 domainStates） */
+  stateInit?: ScreenStateInit;
 }

@@ -1,38 +1,60 @@
 import { z } from 'zod';
 
-// ===== DataSource Validators =====
+// ===== DataSource v2 Validators =====
 
-export const DataFieldSchema = z.object({
+// HTTP 方法
+export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
+
+// 真实接口配置
+export const ApiEndpointSchema = z.object({
+  method: HttpMethodSchema,
   path: z.string().min(1),
-  type: z.enum(['string', 'number', 'boolean', 'array', 'object']),
-  label: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+  body: z.unknown().optional(),
+  responseSchema: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const DataSchemaSchema = z.object({
-  fields: z.array(DataFieldSchema),
-});
-
-export const DataSourcePhaseSchema = z.object({
-  name: z.string().min(1),
-  label: z.string().min(1),
-});
-
-export const DataScenarioSchema = z.object({
+// Mock 场景
+export const MockScenarioSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
-  data: z.record(z.string(), z.unknown()).default({}),
-  isDefault: z.boolean().optional(),
+  statusCode: z.number().int().min(100).max(599),
+  delay: z.number().nonnegative(),
+  isTimeout: z.boolean().optional(),
+  responseBody: z.unknown(),
 });
 
-export const DataSourceSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  lifecycle: z.enum(['api', 'static']),
-  phases: z.array(DataSourcePhaseSchema).default([]),
-  activePhase: z.string().default('loaded'),
-  scenarios: z.array(DataScenarioSchema).default([]),
+// Mock 配置
+export const MockConfigSchema = z.object({
+  scenarios: z.array(MockScenarioSchema).default([]),
   activeScenarioId: z.string().default(''),
-  schema: DataSchemaSchema.optional(),
 });
+
+// Static 数据源
+export const StaticDataSourceSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('static'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  initial: z.unknown(),
+});
+
+// Api 数据源
+export const ApiDataSourceSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('api'),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  endpoint: ApiEndpointSchema,
+  mock: MockConfigSchema.optional(),
+  autoFetchOnEnter: z.boolean().optional(),
+  defaultParams: z.record(z.string(), z.unknown()).optional(),
+});
+
+// 联合
+export const DataSourceSchema = z.discriminatedUnion('type', [
+  StaticDataSourceSchema,
+  ApiDataSourceSchema,
+]);
