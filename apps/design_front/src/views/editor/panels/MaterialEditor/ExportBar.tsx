@@ -148,7 +148,7 @@ function downloadDataURL(dataURL: string, filename: string): void {
   a.click();
 }
 
-export function ExportBar({ targetNodeId, onClose, materialProjectId, onProjectSaved, cssTarget }: ExportBarProps) {
+export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, onProjectSaved: _onProjectSaved, cssTarget }: ExportBarProps) {
   const { message } = AntdApp.useApp();
   const { state } = useMaterialEditor();
   const { project } = state;

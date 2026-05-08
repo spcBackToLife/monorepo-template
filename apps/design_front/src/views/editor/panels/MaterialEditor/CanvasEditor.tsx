@@ -15,7 +15,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
 } from 'react';
 import {
   Button,
@@ -23,8 +22,6 @@ import {
   InputNumber,
   App as AntdApp,
   Dropdown,
-  Select,
-  Upload,
 } from 'antd';
 import {
   UndoOutlined,
@@ -35,8 +32,6 @@ import {
   ZoomInOutlined,
   ZoomOutOutlined,
   ExpandOutlined,
-  SaveOutlined,
-  FolderOpenOutlined,
 } from '@ant-design/icons';
 import {
   MaterialEditorProvider,
@@ -86,7 +81,6 @@ function CanvasToolbar() {
     redo,
     setTool,
     setZoom,
-    getSelectedObjects,
   } = useMaterialEditor();
 
   const { tool: currentTool, zoom, canUndo, canRedo, selectedIds } = state;
@@ -366,7 +360,7 @@ function CanvasToolbar() {
 // ===== 带同步的画布组件 =====
 
 function SyncedCanvas() {
-  const { state, execute } = useMaterialEditor();
+  const { execute } = useMaterialEditor();
 
   // 连接 WebSocket 同步
   useEffect(() => {

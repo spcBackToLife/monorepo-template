@@ -192,7 +192,7 @@ function ModuleSection({ module: mod, index, screen, assets, viewport, onViewInF
           style={{ marginBottom: 16 }}
           dataSource={simple.map((e, i) => ({ ...e, key: i }))}
           columns={[
-            { title: '元素', dataIndex: 'name', width: 120, render: (name: string, r: ElementSpec) => <span style={{ fontWeight: 500 }}>{name}</span> },
+            { title: '元素', dataIndex: 'name', width: 120, render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span> },
             { title: '类型', dataIndex: 'type', width: 80, render: (t: string) => <Tag style={{ fontSize: 10 }}>{t}</Tag> },
             { title: '描述', dataIndex: 'description' },
           ]}

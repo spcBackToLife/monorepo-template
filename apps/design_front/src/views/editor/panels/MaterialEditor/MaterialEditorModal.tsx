@@ -22,7 +22,6 @@ import {
   ZoomInOutlined,
   ZoomOutOutlined,
   ExpandOutlined,
-  AppstoreOutlined,
   DeleteOutlined,
   CopyOutlined,
   GroupOutlined,
@@ -31,7 +30,6 @@ import {
   ScissorOutlined,
   BlockOutlined,
   GatewayOutlined,
-  SplitCellsOutlined,
   AlignLeftOutlined,
   AlignCenterOutlined,
   AlignRightOutlined,
@@ -60,8 +58,6 @@ import {
   computeMaterialWorkspaceCanvasSize,
   type MaterialOperation,
   type MaterialProjectSchema,
-  type BooleanOpType,
-  type AlignmentType,
   type GradientDef,
 } from '@globallink/material-operations';
 import {
@@ -480,7 +476,7 @@ function SyncBridge({ materialProjectId }: { materialProjectId: string | null })
     })();
 
     return () => { cancelled = true; };
-  }, [materialProjectId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [materialProjectId]);
 
   useEffect(() => {
     if (!materialProjectId) return;

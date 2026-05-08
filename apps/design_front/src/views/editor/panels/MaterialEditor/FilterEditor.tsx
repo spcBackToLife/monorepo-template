@@ -18,7 +18,6 @@ import {
   filtersToCSS,
   createFilter,
   parseFilterCSS,
-  FILTER_DEFAULTS,
   FILTER_RANGES,
   FILTER_LABELS,
 } from '@globallink/material-operations';

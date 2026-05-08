@@ -11,7 +11,7 @@ declare global {
   }
 }
 import { toJS } from 'mobx';
-import { ALL_VIEWPORTS, type Screen } from '@globallink/design-schema';
+import { ALL_VIEWPORTS } from '@globallink/design-schema';
 import { generateReactCode } from '@globallink/design-engine';
 import { editorStore } from '@/stores/editor';
 import { SaveStatusIndicator } from '../SaveStatusIndicator';

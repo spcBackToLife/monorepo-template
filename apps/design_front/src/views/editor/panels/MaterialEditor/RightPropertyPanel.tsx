@@ -6,12 +6,10 @@
  */
 import { useState } from 'react';
 import { InputNumber, Slider, Select, Button, Divider, ColorPicker, Tooltip } from 'antd';
-import type { EffectToolType } from './LeftToolbar';
 import { GradientEditor, type MaterialGradientFillTarget } from './GradientEditor';
 import type { GradientDef } from '@globallink/material-operations';
 import { FilterEditor } from './FilterEditor';
 import { ShadowEditor } from './ShadowEditor';
-import { editorStore } from '@/stores/editor';
 import type { MaterialPropertyUpdates } from '@/types/editor';
 
 /** 右侧面板模式 */

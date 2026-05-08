@@ -50,11 +50,6 @@ export const PropsTab = observer(function PropsTab() {
     : undefined;
   const mergedProps = { ...baseProps, ...(stateProps ?? {}) };
 
-  const _overriddenPropKeys = useMemo(
-    () => new Set(Object.keys(stateProps ?? {})),
-    [stateProps],
-  );
-
   const handlePropChange = (key: string, value: unknown) => {
     if (effectiveState === 'default') {
       editorStore.execute({

@@ -34,7 +34,6 @@ import {
   PlayCircleOutlined,
   PauseOutlined,
   CopyOutlined,
-  CheckOutlined,
   ThunderboltOutlined,
   CodeOutlined,
 } from '@ant-design/icons';
@@ -107,7 +106,6 @@ export function AnimationEditor() {
       configChanged: (newConfig) => setConfig({ ...newConfig }),
     });
     managerRef.current = manager;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 同步 config 到管理器
@@ -306,7 +304,7 @@ export function AnimationEditor() {
     syncToManager();
     const result = managerRef.current?.generateCSS();
     return result?.keyframesCSS ?? '';
-  }, [isPlaying, config, syncToManager]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isPlaying, config, syncToManager]);
 
   // 当前选中的关键帧
   const currentKf = config.keyframes[selectedKfIdx] ?? null;
@@ -624,7 +622,7 @@ function BezierCurveEditor({
     const rest = curvePoints.slice(1);
     return `M ${toSvgX(first.x)} ${toSvgY(first.y)} ` +
       rest.map((p) => `L ${toSvgX(p.x)} ${toSvgY(p.y)}`).join(' ');
-  }, [curvePoints]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [curvePoints]);
 
   // 拖拽处理
   useEffect(() => {

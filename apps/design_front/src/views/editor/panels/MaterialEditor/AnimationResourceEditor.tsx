@@ -25,7 +25,6 @@ import {
   Button,
   Input,
   InputNumber,
-  Select,
   Tooltip,
   App as AntdApp,
   Collapse,
@@ -53,7 +52,6 @@ import {
 } from '@ant-design/icons';
 import {
   AnimationResourceManager,
-  detectAnimationType,
   getAnimationTypeName,
   getAnimationTypeIcon,
   getAcceptedExtensions,
@@ -61,7 +59,6 @@ import {
   lottieColorToHex,
 } from '@globallink/material-operations';
 import type {
-  AnimationResourceType,
   AnimationFileInfo,
   LottieEditableInfo,
   ExternalAnimationConfig,
@@ -150,7 +147,6 @@ export function AnimationResourceEditor() {
       destroyPagInstance();
       destroyRiveInstance();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== Lottie 播放器管理 =====

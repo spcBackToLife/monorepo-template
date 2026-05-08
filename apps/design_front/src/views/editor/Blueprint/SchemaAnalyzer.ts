@@ -54,7 +54,7 @@ export function analyzeProject(project: DesignProject): BlueprintAnalysis {
 
 export function buildFlowGraph(
   analysis: BlueprintAnalysis,
-  project: DesignProject,
+  _project: DesignProject,
 ): FlowGraphData {
   const nodes: FlowNode[] = [];
   const edges: FlowEdge[] = [];
@@ -521,7 +521,7 @@ function collectAllNavigations(screen: Screen, screenMap: Map<string, Screen>): 
   return navs;
 }
 
-function collectIncomingNavigations(screen: Screen, project: DesignProject, screenMap: Map<string, Screen>): NavEdge[] {
+function collectIncomingNavigations(screen: Screen, project: DesignProject, _screenMap: Map<string, Screen>): NavEdge[] {
   const navs: NavEdge[] = [];
   for (const other of project.screens ?? []) {
     if (other.id === screen.id) continue;

@@ -80,44 +80,6 @@ function computeOverriddenProperties(
   return overridden;
 }
 
-/**
- * Wrapper component to show blue dot indicator on overridden properties
- * with optional reset-to-default button.
- */
-function PropertyWithIndicator({
-  children,
-  isOverridden,
-  onReset,
-}: {
-  children: React.ReactNode;
-  isOverridden: boolean;
-  onReset?: () => void;
-}) {
-  return (
-    <div className="relative group/prop">
-      {children}
-      {isOverridden && (
-        <>
-          <div
-            className="absolute right-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500 group-hover/prop:hidden"
-            title="此属性已在当前状态中被覆盖"
-          />
-          {onReset && (
-            <button
-              type="button"
-              className="absolute right-0.5 top-1/2 -translate-y-1/2 hidden group-hover/prop:flex items-center justify-center w-4 h-4 text-[10px] text-blue-500 hover:text-blue-700 rounded hover:bg-blue-50"
-              onClick={onReset}
-              title="重置为默认（删除此状态的覆盖）"
-            >
-              ↩
-            </button>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 
 export const StylesTab = observer(function StylesTab() {
   const nodeId = editorStore.selectedNodeIds[0];
@@ -157,19 +119,6 @@ export const StylesTab = observer(function StylesTab() {
       }
     }
   };
-
-  const _handleResetProperty = (key: string) => {
-    if (effectiveState === 'default') return;
-    const ids = allSelectedIds.length > 1 ? allSelectedIds : [nodeId];
-    for (const nid of ids) {
-      editorStore.execute({
-        type: 'resetStateStyle',
-        params: { nodeId: nid, stateName: effectiveState, properties: [key] },
-      });
-    }
-  };
-
-  const _canReset = effectiveState !== 'default';
 
   return (
     <div className="flex flex-col gap-0.5 p-2 text-xs">
