@@ -38,7 +38,7 @@
 | **B.1** design-engine：渲染器接入新模型 | ✅ | B 渲染器 | ❌ | A.1, A.2, A.3 | 2026-05-08 | `f3d62f6` |
 | **B.2** design-engine：清理 v1 残留 | ✅ | B 渲染器 | ❌ | B.1 | 2026-05-08 | `7b5bf36` |
 | **C.1** design-operations：所有 op 重写 | ✅ | C 业务层 | ❌ | A.1 | 2026-05-08 | `b59bc00` |
-| **C.2** design-api：迁移层 + 一次性 migration script | ✅ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | 2026-05-08 | （随本子项） |
+| **C.2** design-api：迁移层 + 一次性 migration script | ✅ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | 2026-05-08 | `81698ca` |
 | **D.1** design_front：状态面板（state.view + state.data） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
 | **D.2** design_front：事件/动作链面板按新动词 | ⬜ | D 编辑器 | ✅ | C.2, D.1 | — | — |
 | **D.3** design_front：数据源面板（endpoint+mock 共存） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
@@ -65,7 +65,7 @@
 | 已完成 | 9（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2） |
 | 进行中 | D.1（待开工） |
 | 阻塞中 | — |
-| 最新 commit | C.2：待 commit（feat(api): v1→v2 migration script + transitional migration layer） |
+| 最新 commit | `81698ca` feat(api): v1→v2 migration script + transitional API guard |
 
 ---
 
