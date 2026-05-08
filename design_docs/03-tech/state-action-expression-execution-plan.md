@@ -42,10 +42,10 @@
 | **D.1** design_front：状态面板（state.view + state.data） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `04dec67` |
 | **D.2** design_front：事件/动作链面板按新动词 | ✅ | D 编辑器 | ✅ | C.2, D.1 | 2026-05-08 | `2ccdbb9` |
 | **D.3** design_front：数据源面板（endpoint+mock 共存） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `0b8b4e1` |
-| **D.4** design_front：表达式编辑器（自动补全 + 校验） | ✅ | D 编辑器 | ✅ | A.2 | 2026-05-08 | （随本次提交） |
-| **D.5** design_front：v1 残留全量清除（typecheck 归零） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | （随本次提交） |
+| **D.4** design_front：表达式编辑器（自动补全 + 校验） | ✅ | D 编辑器 | ✅ | A.2 | 2026-05-08 | `9734464` |
+| **D.5** design_front：v1 残留全量清除（typecheck 归零） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `9734464` |
 | **D.6** design_front：删除的 v1 概念面板按 v2 重写恢复（Blueprint / StatesTab / PreviewBar） | ⬜ | D 编辑器 | ✅ | D.5 | — | — |
-| **E.1** design-mcp：工具按新动词重写 | ✅ | E MCP | ✅ | C.1, C.2 | 2026-05-08 | （随本次提交） |
+| **E.1** design-mcp：工具按新动词重写 | ✅ | E MCP | ✅ | C.1, C.2 | 2026-05-08 | `9734464` |
 | **E.2** design-mcp：build + 重新连接 IDE | 🟡 | E MCP | ✅ | E.1 | — | — |
 | **F.1** 用 MCP 重做 Chat 页面 | ⬜ | F 业务验收 | ✅ | E.2 | — | — |
 | **F.2** 收尾：删迁移层 + 更新 RFC + AGENTS.md | ⬜ | F 业务验收 | ✅ | F.1 | — | — |
@@ -67,7 +67,7 @@
 | 已完成 | 15（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2, D.1, D.2, D.3, D.4, D.5, E.1） |
 | 进行中 | E.2（build + IDE 重连，待用户操作）/ D.6（v1 概念面板按 v2 重建，可与业务并行推进） |
 | 阻塞中 | — |
-| 最新 commit | E.1 + D.5（design_front typecheck 312→0，monorepo lint 0 errors） |
+| 最新 commit | `9734464` — D.4 + E.1 + D.5 三合一（design_front typecheck 312→0，monorepo lint 0 errors，pre-commit 通过） |
 
 ---
 
