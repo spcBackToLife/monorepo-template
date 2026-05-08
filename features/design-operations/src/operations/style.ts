@@ -1,13 +1,17 @@
 import type { DesignProject, CSSProperties } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
-import type { UpdateStyleOp, ResetStyleOp, BatchUpdateStyleOp, OperationResult, InverseData } from '../types';
+import type {
+  StyleUpdateOp,
+  StyleResetOp,
+  StyleBatchUpdateOp,
+  OperationResult,
+  InverseData,
+} from '../types';
 import { findNodeById } from '../utils/tree';
 
-/** Find a node across all screens */
-function findNodeInProject(
-  project: DesignProject,
-  nodeId: string,
-) {
+type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
+
+function findNodeInProject(project: DesignProject, nodeId: string) {
   for (const screen of project.screens) {
     const node = findNodeById(screen.rootNode, nodeId);
     if (node) return node;
@@ -15,12 +19,9 @@ function findNodeInProject(
   return undefined;
 }
 
-// ===== updateStyle =====
+// ===== style.update =====
 
-export function executeUpdateStyle(
-  project: DesignProject,
-  params: UpdateStyleOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeUpdateStyle(project: DesignProject, params: StyleUpdateOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -32,7 +33,6 @@ export function executeUpdateStyle(
     };
   }
 
-  // Save old values for inverse
   const oldStyles: Partial<CSSProperties> = {};
   const removedKeys: string[] = [];
   const stylesRecord = node.styles as Record<string, unknown>;
@@ -45,16 +45,15 @@ export function executeUpdateStyle(
     }
   }
 
-  // Apply new styles
   Object.assign(node.styles, params.styles);
 
-  // 根节点背景 = 画布「页面背景」：同步到 Screen.backgroundColor，与 SchemaRenderer 外层 data-screen-id 一致
+  // 根节点背景同步到 Screen.backgroundColor
   let restoreScreenBackground: { screenId: string; previousValue: string | undefined } | undefined;
   if (Object.prototype.hasOwnProperty.call(params.styles, 'backgroundColor')) {
     for (const screen of newProject.screens) {
       if (screen.rootNode.id !== params.nodeId) continue;
       restoreScreenBackground = { screenId: screen.id, previousValue: screen.backgroundColor };
-      const bg = params.styles.backgroundColor;
+      const bg = (params.styles as Record<string, unknown>).backgroundColor;
       if (bg === undefined || bg === '') {
         delete screen.backgroundColor;
       } else {
@@ -85,12 +84,9 @@ export function executeUpdateStyle(
   };
 }
 
-// ===== resetStyle =====
+// ===== style.reset =====
 
-export function executeResetStyle(
-  project: DesignProject,
-  params: ResetStyleOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeResetStyle(project: DesignProject, params: StyleResetOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -102,7 +98,6 @@ export function executeResetStyle(
     };
   }
 
-  // Save old values for inverse
   const oldStyles: Partial<CSSProperties> = {};
   const stylesRecord = node.styles as Record<string, unknown>;
   const oldStylesRecord = oldStyles as Record<string, unknown>;
@@ -123,21 +118,15 @@ export function executeResetStyle(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'updateStyle',
-      params: {
-        nodeId: params.nodeId,
-        styles: oldStyles,
-      },
+      type: 'style.update',
+      params: { nodeId: params.nodeId, styles: oldStyles },
     },
   };
 }
 
-// ===== batchUpdateStyle =====
+// ===== style.batchUpdate =====
 
-export function executeBatchUpdateStyle(
-  project: DesignProject,
-  params: BatchUpdateStyleOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeBatchUpdateStyle(project: DesignProject, params: StyleBatchUpdateOp['params']): Result {
   if (params.updates.length === 0) {
     return {
       project,
@@ -164,7 +153,6 @@ export function executeBatchUpdateStyle(
       };
     }
 
-    // Save old values for inverse
     const restoreStyles: Record<string, unknown> = {};
     const removeKeys: string[] = [];
     const stylesRecord = node.styles as Record<string, unknown>;
@@ -176,7 +164,6 @@ export function executeBatchUpdateStyle(
       }
     }
 
-    // Apply new styles
     Object.assign(node.styles, update.styles);
     affectedNodeIds.push(update.nodeId);
     restoreEntries.push({ nodeId: update.nodeId, restoreStyles, removeKeys });

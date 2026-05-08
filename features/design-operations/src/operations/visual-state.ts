@@ -1,18 +1,19 @@
-import type { DesignProject, ComponentState } from '@globallink/design-schema';
+import type { DesignProject, VisualState, CSSProperties } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
-  AddStateOp,
-  RemoveStateOp,
-  UpdateStateOp,
-  SetActiveStateOp,
-  SetChildVisibilityOp,
-  ResetStateStyleOp,
+  VisualStateAddOp,
+  VisualStateRemoveOp,
+  VisualStateUpdateOp,
+  VisualStateSetActiveOp,
+  VisualStateSetChildVisibilityOp,
+  VisualStateResetStyleOp,
   OperationResult,
   InverseData,
 } from '../types';
 import { findNodeById } from '../utils/tree';
 
-/** Find a node across all screens */
+type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
+
 function findNodeInProject(project: DesignProject, nodeId: string) {
   for (const screen of project.screens) {
     const node = findNodeById(screen.rootNode, nodeId);
@@ -21,12 +22,9 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
   return undefined;
 }
 
-// ===== addState =====
+// ===== visualState.add =====
 
-export function executeAddState(
-  project: DesignProject,
-  params: AddStateOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeAddState(project: DesignProject, params: VisualStateAddOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -38,9 +36,7 @@ export function executeAddState(
     };
   }
 
-  if (!node.states) {
-    node.states = [];
-  }
+  if (!node.states) node.states = [];
   if (node.states.some((s) => s.name === params.stateName)) {
     return {
       project,
@@ -49,12 +45,14 @@ export function executeAddState(
     };
   }
 
-  const newState: ComponentState = {
+  const newState: VisualState = {
     name: params.stateName,
-    styles: params.styles ?? {},
+    styles: (params.styles ?? {}) as Partial<CSSProperties>,
     props: params.props,
     ...(params.transition != null ? { transition: params.transition } : {}),
     ...(params.childrenStates != null ? { childrenStates: params.childrenStates } : {}),
+    ...(params.childrenVisibility != null ? { childrenVisibility: params.childrenVisibility } : {}),
+    ...(params.disabledEvents != null ? { disabledEvents: params.disabledEvents } : {}),
   };
 
   node.states.push(newState);
@@ -64,22 +62,19 @@ export function executeAddState(
     project: newProject,
     result: {
       success: true,
-      description: `Added state "${params.stateName}" to ${params.nodeId}`,
+      description: `Added visual state "${params.stateName}" to ${params.nodeId}`,
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'removeState',
+      type: 'visualState.remove',
       params: { nodeId: params.nodeId, stateName: params.stateName },
     },
   };
 }
 
-// ===== removeState =====
+// ===== visualState.remove =====
 
-export function executeRemoveState(
-  project: DesignProject,
-  params: RemoveStateOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeRemoveState(project: DesignProject, params: VisualStateRemoveOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -102,7 +97,6 @@ export function executeRemoveState(
 
   const [removedState] = node.states.splice(stateIndex, 1);
 
-  // If the active state was removed, reset to default
   if (node.activeState === params.stateName) {
     node.activeState = 'default';
   }
@@ -113,28 +107,28 @@ export function executeRemoveState(
     project: newProject,
     result: {
       success: true,
-      description: `Removed state "${params.stateName}" from ${params.nodeId}`,
+      description: `Removed visual state "${params.stateName}" from ${params.nodeId}`,
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'addState',
+      type: 'visualState.add',
       params: {
         nodeId: params.nodeId,
         stateName: removedState.name,
         styles: removedState.styles,
         props: removedState.props,
         transition: removedState.transition,
+        childrenStates: removedState.childrenStates,
+        childrenVisibility: removedState.childrenVisibility,
+        disabledEvents: removedState.disabledEvents,
       },
     },
   };
 }
 
-// ===== updateState =====
+// ===== visualState.update =====
 
-export function executeUpdateState(
-  project: DesignProject,
-  params: UpdateStateOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeUpdateState(project: DesignProject, params: VisualStateUpdateOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -157,12 +151,17 @@ export function executeUpdateState(
 
   const oldStyles = { ...state.styles };
   const oldProps = state.props ? { ...state.props } : undefined;
-  const oldTransition =
-    state.transition === undefined ? undefined : { ...state.transition };
+  const oldTransition = state.transition === undefined ? undefined : { ...state.transition };
   const oldChildrenStates =
     state.childrenStates === undefined ? undefined : { ...state.childrenStates };
+  const oldChildrenVisibility =
+    state.childrenVisibility === undefined ? undefined : { ...state.childrenVisibility };
+  const oldDisabledEvents =
+    state.disabledEvents === undefined ? undefined : [...state.disabledEvents];
 
-  state.styles = { ...state.styles, ...params.styles };
+  if (params.styles !== undefined) {
+    state.styles = { ...state.styles, ...(params.styles as Partial<CSSProperties>) };
+  }
   if (params.props !== undefined) {
     state.props = { ...(state.props ?? {}), ...params.props };
   }
@@ -172,6 +171,12 @@ export function executeUpdateState(
   if (params.childrenStates !== undefined) {
     state.childrenStates = { ...(state.childrenStates ?? {}), ...params.childrenStates };
   }
+  if (params.childrenVisibility !== undefined) {
+    state.childrenVisibility = { ...(state.childrenVisibility ?? {}), ...params.childrenVisibility };
+  }
+  if (params.disabledEvents !== undefined) {
+    state.disabledEvents = [...params.disabledEvents];
+  }
 
   newProject.updatedAt = new Date().toISOString();
 
@@ -179,11 +184,11 @@ export function executeUpdateState(
     project: newProject,
     result: {
       success: true,
-      description: `Updated state "${params.stateName}" on ${params.nodeId}`,
+      description: `Updated visual state "${params.stateName}" on ${params.nodeId}`,
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: '_restoreState',
+      type: '_restoreVisualState',
       params: {
         nodeId: params.nodeId,
         stateName: params.stateName,
@@ -191,17 +196,16 @@ export function executeUpdateState(
         props: oldProps,
         transition: oldTransition,
         childrenStates: oldChildrenStates,
+        childrenVisibility: oldChildrenVisibility,
+        disabledEvents: oldDisabledEvents,
       },
     },
   };
 }
 
-// ===== setActiveState =====
+// ===== visualState.setActive =====
 
-export function executeSetActiveState(
-  project: DesignProject,
-  params: SetActiveStateOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeSetActiveState(project: DesignProject, params: VisualStateSetActiveOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -222,22 +226,22 @@ export function executeSetActiveState(
     project: newProject,
     result: {
       success: true,
-      description: `Set active state to "${params.stateName}" on ${params.nodeId}`,
+      description: `Set active visual state to "${params.stateName}" on ${params.nodeId}`,
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'setActiveState',
+      type: 'visualState.setActive',
       params: { nodeId: params.nodeId, stateName: oldState },
     },
   };
 }
 
-// ===== setChildVisibility =====
+// ===== visualState.setChildVisibility =====
 
 export function executeSetChildVisibility(
   project: DesignProject,
-  params: SetChildVisibilityOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+  params: VisualStateSetChildVisibilityOp['params'],
+): Result {
   const newProject = deepClone(project);
   const parent = findNodeInProject(newProject, params.parentNodeId);
 
@@ -251,7 +255,6 @@ export function executeSetChildVisibility(
 
   if (!parent.states) parent.states = [];
 
-  // Ensure target state exists
   let targetState = parent.states.find((s) => s.name === params.stateName);
   if (!targetState) {
     targetState = { name: params.stateName, styles: {} };
@@ -262,11 +265,9 @@ export function executeSetChildVisibility(
     }
   }
 
-  // Save old value for undo
   const oldValue = targetState.childrenVisibility?.[params.childNodeId];
 
   if (params.visible === undefined) {
-    // Remove override → revert to inheriting from default
     if (targetState.childrenVisibility) {
       delete targetState.childrenVisibility[params.childNodeId];
       if (Object.keys(targetState.childrenVisibility).length === 0) {
@@ -274,7 +275,6 @@ export function executeSetChildVisibility(
       }
     }
   } else if (params.visible === true && params.stateName === 'default') {
-    // Default state: visible is the natural default, so just remove the key
     if (targetState.childrenVisibility) {
       delete targetState.childrenVisibility[params.childNodeId];
       if (Object.keys(targetState.childrenVisibility).length === 0) {
@@ -282,7 +282,6 @@ export function executeSetChildVisibility(
       }
     }
   } else {
-    // Set explicit value (false for hiding, or true for non-default override)
     if (!targetState.childrenVisibility) targetState.childrenVisibility = {};
     targetState.childrenVisibility[params.childNodeId] = params.visible;
   }
@@ -308,12 +307,9 @@ export function executeSetChildVisibility(
   };
 }
 
-// ===== resetStateStyle =====
+// ===== visualState.resetStyle =====
 
-export function executeResetStateStyle(
-  project: DesignProject,
-  params: ResetStateStyleOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeResetStateStyle(project: DesignProject, params: VisualStateResetStyleOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -349,11 +345,11 @@ export function executeResetStateStyle(
     project: newProject,
     result: {
       success: true,
-      description: `Reset state style [${params.properties.join(', ')}] on "${params.stateName}" of ${params.nodeId}`,
+      description: `Reset visual state style [${params.properties.join(', ')}] on "${params.stateName}" of ${params.nodeId}`,
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'updateState',
+      type: 'visualState.update',
       params: {
         nodeId: params.nodeId,
         stateName: params.stateName,

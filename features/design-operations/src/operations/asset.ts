@@ -7,10 +7,10 @@ import {
   syncInstance as schemaSyncInstance,
 } from '@globallink/design-schema';
 import type {
-  InstantiateTemplateOp,
-  SaveAsTemplateOp,
-  DetachInstanceOp,
-  SyncInstanceOp,
+  AssetInstantiateTemplateOp,
+  AssetSaveAsTemplateOp,
+  AssetDetachInstanceOp,
+  AssetSyncInstanceOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -29,7 +29,7 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
 
 export function executeInstantiateTemplate(
   project: DesignProject,
-  params: InstantiateTemplateOp['params'],
+  params: AssetInstantiateTemplateOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
@@ -91,7 +91,7 @@ export function executeInstantiateTemplate(
       affectedNodeIds: [instance.id, params.parentId],
     },
     inverse: {
-      type: 'removeElement',
+      type: 'element.remove',
       params: { elementId: instance.id },
     },
   };
@@ -101,7 +101,7 @@ export function executeInstantiateTemplate(
 
 export function executeSaveAsTemplate(
   project: DesignProject,
-  params: SaveAsTemplateOp['params'],
+  params: AssetSaveAsTemplateOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
@@ -144,7 +144,7 @@ export function executeSaveAsTemplate(
 
 export function executeDetachInstance(
   project: DesignProject,
-  params: DetachInstanceOp['params'],
+  params: AssetDetachInstanceOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
@@ -188,7 +188,7 @@ export function executeDetachInstance(
 
 export function executeSyncInstance(
   project: DesignProject,
-  params: SyncInstanceOp['params'],
+  params: AssetSyncInstanceOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 

@@ -1,9 +1,9 @@
 import type { DesignProject } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
-  UpdateComponentPropsOp,
-  AddPropDefinitionOp,
-  RemovePropDefinitionOp,
+  ComponentPropsUpdateOp,
+  ComponentPropsAddDefinitionOp,
+  ComponentPropsRemoveDefinitionOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -22,7 +22,7 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
 
 export function executeUpdateComponentProps(
   project: DesignProject,
-  params: UpdateComponentPropsOp['params'],
+  params: ComponentPropsUpdateOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
@@ -53,7 +53,7 @@ export function executeUpdateComponentProps(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'updateComponentProps',
+      type: 'componentProps.update',
       params: {
         nodeId: params.nodeId,
         props: oldProps,
@@ -66,7 +66,7 @@ export function executeUpdateComponentProps(
 
 export function executeAddPropDefinition(
   project: DesignProject,
-  params: AddPropDefinitionOp['params'],
+  params: ComponentPropsAddDefinitionOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const template = newProject.componentAssets.find((t) => t.id === params.templateId);
@@ -109,7 +109,7 @@ export function executeAddPropDefinition(
       affectedNodeIds: [params.templateId],
     },
     inverse: {
-      type: 'removePropDefinition',
+      type: 'componentProps.removeDefinition',
       params: { templateId: params.templateId, propKey: params.definition.key },
     },
   };
@@ -119,7 +119,7 @@ export function executeAddPropDefinition(
 
 export function executeRemovePropDefinition(
   project: DesignProject,
-  params: RemovePropDefinitionOp['params'],
+  params: ComponentPropsRemoveDefinitionOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const template = newProject.componentAssets.find((t) => t.id === params.templateId);

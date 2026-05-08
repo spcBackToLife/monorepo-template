@@ -1,6 +1,6 @@
 import type { DesignProject, CSSProperties } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
-import type { ApplyMaterialDesignOp, OperationResult, InverseData } from '../types';
+import type { MaterialApplyDesignOp, OperationResult, InverseData } from '../types';
 import { findNodeById } from '../utils/tree';
 
 /** Find a node across all screens */
@@ -21,7 +21,7 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
  */
 export function executeApplyMaterialDesign(
   project: DesignProject,
-  params: ApplyMaterialDesignOp['params'],
+  params: MaterialApplyDesignOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);

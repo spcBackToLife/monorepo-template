@@ -1,8 +1,8 @@
 import type { DesignProject } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
-  SwitchViewportOp,
-  AddViewportPresetOp,
+  ViewportSwitchOp,
+  ViewportAddPresetOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -11,7 +11,7 @@ import type {
 
 export function executeSwitchViewport(
   project: DesignProject,
-  params: SwitchViewportOp['params'],
+  params: ViewportSwitchOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
   const oldViewport = { ...newProject.currentViewport };
@@ -27,7 +27,7 @@ export function executeSwitchViewport(
       affectedNodeIds: [],
     },
     inverse: {
-      type: 'switchViewport',
+      type: 'viewport.switch',
       params: { viewport: oldViewport },
     },
   };
@@ -37,7 +37,7 @@ export function executeSwitchViewport(
 
 export function executeAddViewportPreset(
   project: DesignProject,
-  params: AddViewportPresetOp['params'],
+  params: ViewportAddPresetOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 

@@ -1,9 +1,9 @@
 import type { DesignProject, ComponentTemplate, PropBinding } from '@globallink/design-schema';
 import { deepClone, PropBindingSchema } from '@globallink/design-schema';
 import type {
-  UpdateTemplateOp,
-  DeleteTemplateOp,
-  DuplicateTemplateOp,
+  TemplateUpdateOp,
+  TemplateDeleteOp,
+  TemplateDuplicateOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -12,7 +12,7 @@ import type {
 
 export function executeUpdateTemplate(
   project: DesignProject,
-  params: UpdateTemplateOp['params'],
+  params: TemplateUpdateOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
@@ -94,7 +94,7 @@ export function executeUpdateTemplate(
       affectedNodeIds: [params.templateId],
     },
     inverse: {
-      type: 'updateTemplate',
+      type: 'template.update',
       params: { templateId: params.templateId, patch: oldValues },
     },
   };
@@ -104,7 +104,7 @@ export function executeUpdateTemplate(
 
 export function executeDeleteTemplate(
   project: DesignProject,
-  params: DeleteTemplateOp['params'],
+  params: TemplateDeleteOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
@@ -138,7 +138,7 @@ export function executeDeleteTemplate(
 
 export function executeDuplicateTemplate(
   project: DesignProject,
-  params: DuplicateTemplateOp['params'],
+  params: TemplateDuplicateOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
@@ -169,7 +169,7 @@ export function executeDuplicateTemplate(
       affectedNodeIds: [cloned.id],
     },
     inverse: {
-      type: 'deleteTemplate',
+      type: 'template.delete',
       params: { templateId: cloned.id },
     },
   };

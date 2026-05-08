@@ -1,4 +1,11 @@
-import type { DesignProject, ComponentNode, CSSProperties, PrimitiveNodeType } from '@globallink/design-schema';
+import type {
+  DesignProject,
+  ComponentNode,
+  CSSProperties,
+  ExpressionStyles,
+  PrimitiveNodeType,
+  Expression,
+} from '@globallink/design-schema';
 import {
   generateNodeId,
   deepClone,
@@ -6,29 +13,33 @@ import {
   isPrimitiveType,
 } from '@globallink/design-schema';
 import type {
-  AddElementOp,
-  RemoveElementOp,
-  MoveElementOp,
-  DuplicateElementOp,
-  InsertSubtreeOp,
-  RenameNodeOp,
-  WrapInContainerOp,
-  UnwrapContainerOp,
-  ReorderElementOp,
-  ChangeElementTypeOp,
-  SetNodeVisibilityWhenOp,
-  SetNodeLockedOp,
-  SetNodeRoleOp,
-  SetNodeVisibleOp,
+  ElementAddOp,
+  ElementRemoveOp,
+  ElementMoveOp,
+  ElementDuplicateOp,
+  ElementInsertSubtreeOp,
+  ElementRenameOp,
+  ElementWrapOp,
+  ElementUnwrapOp,
+  ElementReorderOp,
+  ElementChangeTypeOp,
+  ElementSetLockedOp,
+  ElementSetRoleOp,
+  ElementSetVisibleOp,
+  ElementSetVisibleWhenOp,
+  ElementSetRepeatOp,
+  ElementSetBindOp,
   OperationResult,
   InverseData,
 } from '../types';
 import { findNodeById, findParent, isNodeOrAncestorLocked, walkTree } from '../utils/tree';
 
+type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
+
 /** Create a new ComponentNode with defaults */
 function createNode(
   tag: PrimitiveNodeType,
-  styles?: CSSProperties,
+  styles?: ExpressionStyles | CSSProperties,
   props?: Record<string, unknown>,
   explicitId?: string,
 ): ComponentNode {
@@ -37,7 +48,7 @@ function createNode(
   return {
     id: explicitId ?? generateNodeId(),
     type: tag as ComponentNode['type'],
-    styles: { ...defaultStyles, ...practicalDefaults, ...styles },
+    styles: { ...defaultStyles, ...practicalDefaults, ...(styles ?? {}) } as ExpressionStyles,
     children: [],
     props: props ?? {},
     states: [],
@@ -48,11 +59,8 @@ function createNode(
   };
 }
 
-/** Find the screen containing a given nodeId */
-function findScreenContaining(
-  project: DesignProject,
-  nodeId: string,
-): number {
+/** Find the screen index containing a given nodeId */
+function findScreenContaining(project: DesignProject, nodeId: string): number {
   for (let i = 0; i < project.screens.length; i++) {
     if (findNodeById(project.screens[i].rootNode, nodeId)) {
       return i;
@@ -61,12 +69,17 @@ function findScreenContaining(
   return -1;
 }
 
-// ===== addElement =====
+function findNodeAcrossScreens(project: DesignProject, nodeId: string): ComponentNode | undefined {
+  for (const screen of project.screens) {
+    const found = findNodeById(screen.rootNode, nodeId);
+    if (found) return found;
+  }
+  return undefined;
+}
 
-export function executeAddElement(
-  project: DesignProject,
-  params: AddElementOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+// ===== element.add =====
+
+export function executeAddElement(project: DesignProject, params: ElementAddOp['params']): Result {
   const newProject = deepClone(project);
   const screenIdx = findScreenContaining(newProject, params.parentId);
   if (screenIdx === -1) {
@@ -86,9 +99,7 @@ export function executeAddElement(
     };
   }
 
-  if (!parent.children) {
-    parent.children = [];
-  }
+  if (!parent.children) parent.children = [];
 
   if (params.elementId) {
     for (const s of newProject.screens) {
@@ -120,21 +131,17 @@ export function executeAddElement(
       affectedNodeIds: [newNode.id, params.parentId],
     },
     inverse: {
-      type: 'removeElement',
+      type: 'element.remove',
       params: { elementId: newNode.id },
     },
   };
 }
 
-// ===== removeElement =====
+// ===== element.remove =====
 
-export function executeRemoveElement(
-  project: DesignProject,
-  params: RemoveElementOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeRemoveElement(project: DesignProject, params: ElementRemoveOp['params']): Result {
   const newProject = deepClone(project);
 
-  // Find parent across all screens
   let parentInfo: { parent: ComponentNode; index: number } | undefined;
   let screenIdx = -1;
 
@@ -163,7 +170,6 @@ export function executeRemoveElement(
     };
   }
 
-  // Save the removed node for inverse
   const removedNode = deepClone(parentInfo.parent.children![parentInfo.index]);
   parentInfo.parent.children!.splice(parentInfo.index, 1);
 
@@ -187,15 +193,11 @@ export function executeRemoveElement(
   };
 }
 
-// ===== moveElement =====
+// ===== element.move =====
 
-export function executeMoveElement(
-  project: DesignProject,
-  params: MoveElementOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeMoveElement(project: DesignProject, params: ElementMoveOp['params']): Result {
   const newProject = deepClone(project);
 
-  // Find current parent
   let oldParentInfo: { parent: ComponentNode; index: number } | undefined;
   for (const screen of newProject.screens) {
     const result = findParent(screen.rootNode, params.elementId);
@@ -235,10 +237,8 @@ export function executeMoveElement(
     };
   }
 
-  // Remove from old parent
   const [movedNode] = oldParentInfo.parent.children!.splice(oldParentInfo.index, 1);
 
-  // Find new parent
   let newParent: ComponentNode | undefined;
   for (const screen of newProject.screens) {
     newParent = findNodeById(screen.rootNode, params.newParentId);
@@ -253,9 +253,7 @@ export function executeMoveElement(
     };
   }
 
-  if (!newParent.children) {
-    newParent.children = [];
-  }
+  if (!newParent.children) newParent.children = [];
 
   const position = params.position ?? newParent.children.length;
   newParent.children.splice(position, 0, movedNode);
@@ -270,7 +268,7 @@ export function executeMoveElement(
       affectedNodeIds: [params.elementId, oldParentInfo.parent.id, params.newParentId],
     },
     inverse: {
-      type: 'moveElement',
+      type: 'element.move',
       params: {
         elementId: params.elementId,
         newParentId: oldParentInfo.parent.id,
@@ -280,12 +278,9 @@ export function executeMoveElement(
   };
 }
 
-// ===== insertSubtree (paste) =====
+// ===== element.insertSubtree =====
 
-export function executeInsertSubtree(
-  project: DesignProject,
-  params: InsertSubtreeOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeInsertSubtree(project: DesignProject, params: ElementInsertSubtreeOp['params']): Result {
   const newProject = deepClone(project);
   const screenIdx = findScreenContaining(newProject, params.parentId);
   if (screenIdx === -1) {
@@ -305,14 +300,9 @@ export function executeInsertSubtree(
     };
   }
 
-  if (!parent.children) {
-    parent.children = [];
-  }
+  if (!parent.children) parent.children = [];
 
   const cloned = deepClone(params.subtree);
-  // Preserve provided IDs for deterministic replay.
-  // Callers must pre-generate unique IDs before creating this operation.
-
   const position = params.position ?? parent.children.length;
   const safePos = Math.max(0, Math.min(position, parent.children.length));
   parent.children.splice(safePos, 0, cloned);
@@ -327,18 +317,15 @@ export function executeInsertSubtree(
       affectedNodeIds: [cloned.id, params.parentId],
     },
     inverse: {
-      type: 'removeElement',
+      type: 'element.remove',
       params: { elementId: cloned.id },
     },
   };
 }
 
-// ===== duplicateElement =====
+// ===== element.duplicate =====
 
-export function executeDuplicateElement(
-  project: DesignProject,
-  params: DuplicateElementOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeDuplicateElement(project: DesignProject, params: ElementDuplicateOp['params']): Result {
   const newProject = deepClone(project);
 
   let parentInfo: { parent: ComponentNode; index: number } | undefined;
@@ -361,10 +348,6 @@ export function executeDuplicateElement(
   const originalNode = parentInfo.parent.children![parentInfo.index];
   const cloned = deepClone(originalNode);
 
-  // 关键：根 ID 来自 params.newElementId，子节点 ID 来自 params._childIds（DFS 顺序）。
-  // 二者均由服务端 ensureDeterministicIds 在 op 入 DB 前预生成，
-  // executor 不再做随机生成（fallback 仅兜底老 op，由 ProjectsService.findOne 物化）。
-  // 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
   const rootId = params.newElementId;
   const childIds = params._childIds;
   let cursor = 0;
@@ -383,7 +366,6 @@ export function executeDuplicateElement(
     }
   });
 
-  // Insert right after the original
   parentInfo.parent.children!.splice(parentInfo.index + 1, 0, cloned);
 
   newProject.updatedAt = new Date().toISOString();
@@ -396,25 +378,18 @@ export function executeDuplicateElement(
       affectedNodeIds: [params.elementId, cloned.id, parentInfo.parent.id],
     },
     inverse: {
-      type: 'removeElement',
+      type: 'element.remove',
       params: { elementId: cloned.id },
     },
   };
 }
 
-// ===== renameNode =====
+// ===== element.rename =====
 
-export function executeRenameNode(
-  project: DesignProject,
-  params: RenameNodeOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeRenameNode(project: DesignProject, params: ElementRenameOp['params']): Result {
   const newProject = deepClone(project);
 
-  let node: ComponentNode | undefined;
-  for (const screen of newProject.screens) {
-    node = findNodeById(screen.rootNode, params.nodeId);
-    if (node) break;
-  }
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
 
   if (!node) {
     return {
@@ -437,18 +412,15 @@ export function executeRenameNode(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'renameNode',
+      type: 'element.rename',
       params: { nodeId: params.nodeId, name: oldName },
     },
   };
 }
 
-// ===== wrapInContainer =====
+// ===== element.wrap =====
 
-export function executeWrapInContainer(
-  project: DesignProject,
-  params: WrapInContainerOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeWrapInContainer(project: DesignProject, params: ElementWrapOp['params']): Result {
   if (params.nodeIds.length === 0) {
     return {
       project,
@@ -459,7 +431,6 @@ export function executeWrapInContainer(
 
   const newProject = deepClone(project);
 
-  // All nodes must share the same parent
   const screenIdx = findScreenContaining(newProject, params.nodeIds[0]);
   if (screenIdx === -1) {
     return {
@@ -481,7 +452,6 @@ export function executeWrapInContainer(
 
   const parent = firstParentInfo.parent;
 
-  // Verify all nodes share the same parent
   for (const nodeId of params.nodeIds) {
     const info = findParent(root, nodeId);
     if (!info || info.parent.id !== parent.id) {
@@ -493,7 +463,6 @@ export function executeWrapInContainer(
     }
   }
 
-  // Collect indices and sort them
   const indices: number[] = [];
   for (const nodeId of params.nodeIds) {
     const idx = parent.children!.findIndex((c) => c.id === nodeId);
@@ -508,21 +477,16 @@ export function executeWrapInContainer(
   }
   indices.sort((a, b) => a - b);
 
-  // Create the container node
   const containerTag = params.containerTag ?? 'div';
   const container = createNode(containerTag, params.containerStyles);
 
-  // Extract nodes from parent (remove from highest index first to preserve indices)
   const nodesToWrap: ComponentNode[] = [];
   for (let i = indices.length - 1; i >= 0; i--) {
     const [removed] = parent.children!.splice(indices[i], 1);
     nodesToWrap.unshift(removed);
   }
 
-  // Add extracted nodes as children of the container
   container.children = nodesToWrap;
-
-  // Insert container at the position of the first extracted node
   parent.children!.splice(indices[0], 0, container);
 
   newProject.updatedAt = new Date().toISOString();
@@ -535,21 +499,17 @@ export function executeWrapInContainer(
       affectedNodeIds: [container.id, parent.id, ...params.nodeIds],
     },
     inverse: {
-      type: 'unwrapContainer',
+      type: 'element.unwrap',
       params: { containerId: container.id },
     },
   };
 }
 
-// ===== unwrapContainer =====
+// ===== element.unwrap =====
 
-export function executeUnwrapContainer(
-  project: DesignProject,
-  params: UnwrapContainerOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeUnwrapContainer(project: DesignProject, params: ElementUnwrapOp['params']): Result {
   const newProject = deepClone(project);
 
-  // Find the container's parent
   let parentInfo: { parent: ComponentNode; index: number } | undefined;
   let screenIdx = -1;
 
@@ -581,10 +541,9 @@ export function executeUnwrapContainer(
   const container = parentInfo.parent.children![parentInfo.index];
   const children = container.children ?? [];
   const childIds = children.map((c) => c.id);
-  const containerStyles = deepClone(container.styles);
+  const containerStyles = deepClone(container.styles) as Partial<CSSProperties>;
   const containerTag = container.type;
 
-  // Remove the container and insert its children at the same position
   parentInfo.parent.children!.splice(parentInfo.index, 1, ...children);
 
   newProject.updatedAt = new Date().toISOString();
@@ -597,22 +556,19 @@ export function executeUnwrapContainer(
       affectedNodeIds: [params.containerId, parentInfo.parent.id, ...childIds],
     },
     inverse: {
-      type: 'wrapInContainer',
+      type: 'element.wrap',
       params: {
         nodeIds: childIds,
-        containerTag: containerTag,
-        containerStyles: containerStyles,
+        containerTag,
+        containerStyles,
       },
     },
   };
 }
 
-// ===== reorderElement =====
+// ===== element.reorder =====
 
-export function executeReorderElement(
-  project: DesignProject,
-  params: ReorderElementOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeReorderElement(project: DesignProject, params: ElementReorderOp['params']): Result {
   const newProject = deepClone(project);
 
   let parent: ComponentNode | undefined;
@@ -661,7 +617,6 @@ export function executeReorderElement(
     };
   }
 
-  // Remove from current position and insert at new position
   const [node] = parent.children.splice(currentIndex, 1);
   const clampedIndex = Math.min(params.newIndex, parent.children.length);
   parent.children.splice(clampedIndex, 0, node);
@@ -676,7 +631,7 @@ export function executeReorderElement(
       affectedNodeIds: [params.nodeId, params.parentId],
     },
     inverse: {
-      type: 'reorderElement',
+      type: 'element.reorder',
       params: {
         nodeId: params.nodeId,
         parentId: params.parentId,
@@ -686,19 +641,12 @@ export function executeReorderElement(
   };
 }
 
-// ===== changeElementType =====
+// ===== element.changeType =====
 
-export function executeChangeElementType(
-  project: DesignProject,
-  params: ChangeElementTypeOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeChangeElementType(project: DesignProject, params: ElementChangeTypeOp['params']): Result {
   const newProject = deepClone(project);
 
-  let node: ComponentNode | undefined;
-  for (const screen of newProject.screens) {
-    node = findNodeById(screen.rootNode, params.nodeId);
-    if (node) break;
-  }
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
 
   if (!node) {
     return {
@@ -721,28 +669,17 @@ export function executeChangeElementType(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'changeElementType',
-      params: {
-        nodeId: params.nodeId,
-        newType: oldType,
-      },
+      type: 'element.changeType',
+      params: { nodeId: params.nodeId, newType: oldType },
     },
   };
 }
 
-// ===== setNodeVisibilityWhen =====
+// ===== element.setLocked / element.setVisible / element.setRole =====
 
-export function executeSetNodeVisibilityWhen(
-  project: DesignProject,
-  params: SetNodeVisibilityWhenOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeSetNodeLocked(project: DesignProject, params: ElementSetLockedOp['params']): Result {
   const newProject = deepClone(project);
-  let node: ComponentNode | undefined;
-  for (const screen of newProject.screens) {
-    node = findNodeById(screen.rootNode, params.nodeId);
-    if (node) break;
-  }
-
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
   if (!node) {
     return {
       project,
@@ -750,60 +687,9 @@ export function executeSetNodeVisibilityWhen(
       inverse: { type: 'noop', params: {} },
     };
   }
-
-  const previous =
-    node.visibilityWhen === undefined ? null : { ...node.visibilityWhen };
-
-  if (params.visibilityWhen === null) {
-    delete node.visibilityWhen;
-  } else {
-    node.visibilityWhen = { ...params.visibilityWhen };
-  }
-
-  newProject.updatedAt = new Date().toISOString();
-
-  return {
-    project: newProject,
-    result: {
-      success: true,
-      description: `Updated visibility rule on ${params.nodeId}`,
-      affectedNodeIds: [params.nodeId],
-    },
-    inverse: {
-      type: 'setNodeVisibilityWhen',
-      params: {
-        nodeId: params.nodeId,
-        visibilityWhen: previous,
-      },
-    },
-  };
-}
-
-// ===== setNodeLocked / setNodeVisible (W7-023) =====
-
-export function executeSetNodeLocked(
-  project: DesignProject,
-  params: SetNodeLockedOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
-  const newProject = deepClone(project);
-  let node: ComponentNode | undefined;
-  for (const screen of newProject.screens) {
-    node = findNodeById(screen.rootNode, params.nodeId);
-    if (node) break;
-  }
-
-  if (!node) {
-    return {
-      project,
-      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
-      inverse: { type: 'noop', params: {} },
-    };
-  }
-
   const previous = node.locked;
   node.locked = params.locked;
   newProject.updatedAt = new Date().toISOString();
-
   return {
     project: newProject,
     result: {
@@ -812,29 +698,15 @@ export function executeSetNodeLocked(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'setNodeLocked',
+      type: 'element.setLocked',
       params: { nodeId: params.nodeId, locked: previous },
     },
   };
 }
 
-/**
- * 设置节点的"编辑期角色（editor role）"——仅服务编辑画布的视觉锚定，**不影响渲染**。
- *
- * 写入位置：`node.editorMetadata.role`（编辑期 metadata 命名空间）。
- * 详见 `design_docs/02-product/editor/01-canvas/frame-viewport-canvas-redesign.md` §10。
- */
-export function executeSetNodeRole(
-  project: DesignProject,
-  params: SetNodeRoleOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeSetNodeRole(project: DesignProject, params: ElementSetRoleOp['params']): Result {
   const newProject = deepClone(project);
-  let node: ComponentNode | undefined;
-  for (const screen of newProject.screens) {
-    node = findNodeById(screen.rootNode, params.nodeId);
-    if (node) break;
-  }
-
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
   if (!node) {
     return {
       project,
@@ -842,12 +714,10 @@ export function executeSetNodeRole(
       inverse: { type: 'noop', params: {} },
     };
   }
-
   const previous = node.editorMetadata?.role ?? null;
   if (params.role === null) {
     if (node.editorMetadata) {
       delete node.editorMetadata.role;
-      // 清空命名空间，避免遗留空对象
       if (Object.keys(node.editorMetadata).length === 0) {
         delete node.editorMetadata;
       }
@@ -857,7 +727,6 @@ export function executeSetNodeRole(
     node.editorMetadata.role = params.role;
   }
   newProject.updatedAt = new Date().toISOString();
-
   return {
     project: newProject,
     result: {
@@ -866,23 +735,15 @@ export function executeSetNodeRole(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'setNodeRole',
+      type: 'element.setRole',
       params: { nodeId: params.nodeId, role: previous },
     },
   };
 }
 
-export function executeSetNodeVisible(
-  project: DesignProject,
-  params: SetNodeVisibleOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeSetNodeVisible(project: DesignProject, params: ElementSetVisibleOp['params']): Result {
   const newProject = deepClone(project);
-  let node: ComponentNode | undefined;
-  for (const screen of newProject.screens) {
-    node = findNodeById(screen.rootNode, params.nodeId);
-    if (node) break;
-  }
-
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
   if (!node) {
     return {
       project,
@@ -890,11 +751,9 @@ export function executeSetNodeVisible(
       inverse: { type: 'noop', params: {} },
     };
   }
-
   const previous = node.visible;
   node.visible = params.visible;
   newProject.updatedAt = new Date().toISOString();
-
   return {
     project: newProject,
     result: {
@@ -903,8 +762,103 @@ export function executeSetNodeVisible(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'setNodeVisible',
+      type: 'element.setVisible',
       params: { nodeId: params.nodeId, visible: previous },
+    },
+  };
+}
+
+// ===== element.setVisibleWhen / setRepeat / setBind（v2 新增） =====
+
+export function executeSetNodeVisibleWhen(project: DesignProject, params: ElementSetVisibleWhenOp['params']): Result {
+  const newProject = deepClone(project);
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
+  if (!node) {
+    return {
+      project,
+      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+  const previous: Expression<boolean> | string | null = node.visibleWhen ?? null;
+  if (params.visibleWhen === null || params.visibleWhen === '') {
+    delete node.visibleWhen;
+  } else {
+    node.visibleWhen = params.visibleWhen as Expression<boolean>;
+  }
+  newProject.updatedAt = new Date().toISOString();
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Updated visibleWhen on ${params.nodeId}`,
+      affectedNodeIds: [params.nodeId],
+    },
+    inverse: {
+      type: 'element.setVisibleWhen',
+      params: { nodeId: params.nodeId, visibleWhen: previous },
+    },
+  };
+}
+
+export function executeSetNodeRepeat(project: DesignProject, params: ElementSetRepeatOp['params']): Result {
+  const newProject = deepClone(project);
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
+  if (!node) {
+    return {
+      project,
+      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+  const previous: Expression<unknown[]> | string | null = node.repeat ?? null;
+  if (params.repeat === null || params.repeat === '') {
+    delete node.repeat;
+  } else {
+    node.repeat = params.repeat as Expression<unknown[]>;
+  }
+  newProject.updatedAt = new Date().toISOString();
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Updated repeat on ${params.nodeId}`,
+      affectedNodeIds: [params.nodeId],
+    },
+    inverse: {
+      type: 'element.setRepeat',
+      params: { nodeId: params.nodeId, repeat: previous },
+    },
+  };
+}
+
+export function executeSetNodeBind(project: DesignProject, params: ElementSetBindOp['params']): Result {
+  const newProject = deepClone(project);
+  const node = findNodeAcrossScreens(newProject, params.nodeId);
+  if (!node) {
+    return {
+      project,
+      result: { success: false, description: `Node ${params.nodeId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+  const previous: { path: string } | null = node.bind ? { ...node.bind } : null;
+  if (params.bind === null) {
+    delete node.bind;
+  } else {
+    node.bind = { ...params.bind };
+  }
+  newProject.updatedAt = new Date().toISOString();
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Updated bind on ${params.nodeId}`,
+      affectedNodeIds: [params.nodeId],
+    },
+    inverse: {
+      type: 'element.setBind',
+      params: { nodeId: params.nodeId, bind: previous },
     },
   };
 }

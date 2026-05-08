@@ -1,16 +1,17 @@
-import type { DesignProject, ComponentEvent } from '@globallink/design-schema';
+import type { DesignProject, ComponentEvent, Action } from '@globallink/design-schema';
 import { deepClone, generateScreenId, generateNodeId } from '@globallink/design-schema';
 import type {
-  AddEventOp,
-  RemoveEventOp,
-  UpdateEventOp,
-  AddNavigationOp,
+  EventAddOp,
+  EventRemoveOp,
+  EventUpdateOp,
+  EventAddNavigationOp,
   OperationResult,
   InverseData,
 } from '../types';
 import { findNodeById } from '../utils/tree';
 
-/** Find a node across all screens */
+type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
+
 function findNodeInProject(project: DesignProject, nodeId: string) {
   for (const screen of project.screens) {
     const node = findNodeById(screen.rootNode, nodeId);
@@ -19,12 +20,9 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
   return undefined;
 }
 
-// ===== addEvent =====
+// ===== event.add =====
 
-export function executeAddEvent(
-  project: DesignProject,
-  params: AddEventOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeAddEvent(project: DesignProject, params: EventAddOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -36,9 +34,7 @@ export function executeAddEvent(
     };
   }
 
-  if (!node.events) {
-    node.events = [];
-  }
+  if (!node.events) node.events = [];
   node.events.push(params.event);
   const eventIndex = node.events.length - 1;
 
@@ -52,18 +48,15 @@ export function executeAddEvent(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'removeEvent',
+      type: 'event.remove',
       params: { nodeId: params.nodeId, eventIndex },
     },
   };
 }
 
-// ===== removeEvent =====
+// ===== event.remove =====
 
-export function executeRemoveEvent(
-  project: DesignProject,
-  params: RemoveEventOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeRemoveEvent(project: DesignProject, params: EventRemoveOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -95,18 +88,15 @@ export function executeRemoveEvent(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'addEvent',
+      type: 'event.add',
       params: { nodeId: params.nodeId, event: removedEvent },
     },
   };
 }
 
-// ===== updateEvent =====
+// ===== event.update =====
 
-export function executeUpdateEvent(
-  project: DesignProject,
-  params: UpdateEventOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -126,11 +116,14 @@ export function executeUpdateEvent(
     };
   }
 
-  const previousEvent = { ...node.events[params.eventIndex] };
+  const previousEvent: ComponentEvent = { ...node.events[params.eventIndex] };
   const evt = node.events[params.eventIndex];
   if (params.event.trigger !== undefined) evt.trigger = params.event.trigger;
   if (params.event.actions !== undefined) evt.actions = params.event.actions;
   if (params.event.condition !== undefined) evt.condition = params.event.condition;
+  if (params.event.description !== undefined) evt.description = params.event.description;
+  if (params.event.disabled !== undefined) evt.disabled = params.event.disabled;
+  if (params.event.scrollConfig !== undefined) evt.scrollConfig = params.event.scrollConfig;
 
   newProject.updatedAt = new Date().toISOString();
 
@@ -142,18 +135,21 @@ export function executeUpdateEvent(
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
-      type: 'updateEvent',
+      type: 'event.update',
       params: { nodeId: params.nodeId, eventIndex: params.eventIndex, event: previousEvent },
     },
   };
 }
 
-// ===== addNavigation =====
+// ===== event.addNavigation =====
 
-export function executeAddNavigation(
-  project: DesignProject,
-  params: AddNavigationOp['params'],
-): { project: DesignProject; result: OperationResult; inverse: InverseData } {
+/**
+ * 便捷操作：给节点加一条 trigger=click + 单 nav.go action 的事件。
+ *
+ * targetScreenId === 'new' 时自动建一个新空白屏；服务端 ensureDeterministicIds 可
+ * 通过 _generatedScreenId / _generatedRootNodeId 预填充 ID 保证重放幂等。
+ */
+export function executeAddNavigation(project: DesignProject, params: EventAddNavigationOp['params']): Result {
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -168,8 +164,6 @@ export function executeAddNavigation(
   let targetScreenId = params.targetScreenId;
   const affectedIds: string[] = [params.nodeId];
 
-  // If targetScreenId is "new", auto-create a new screen
-  // Service 层 ensureDeterministicIds() 可能通过 _generatedScreenId / _generatedRootNodeId 预填充了 ID
   if (targetScreenId === 'new') {
     const p = params as Record<string, unknown>;
     const screenId = (p._generatedScreenId as string) || generateScreenId();
@@ -195,21 +189,24 @@ export function executeAddNavigation(
         locked: false,
         visible: true,
       },
-      domainStates: [],
       dataSources: [],
     };
-    targetScreenId = newScreen.id;
-    affectedIds.push(newScreen.id);
+    newProject.screens.push(newScreen);
+    targetScreenId = screenId;
+    affectedIds.push(screenId);
   }
 
+  const navAction: Action = {
+    type: 'nav.go',
+    targetScreenId,
+  };
   const navEvent: ComponentEvent = {
-    trigger: params.trigger as ComponentEvent['trigger'],
-    actions: [{
-      type: 'navigate',
-      targetScreenId,
-    }],
+    trigger: params.trigger,
+    actions: [navAction],
+    description: params.description,
   };
 
+  if (!node.events) node.events = [];
   node.events.push(navEvent);
   const eventIndex = node.events.length - 1;
 

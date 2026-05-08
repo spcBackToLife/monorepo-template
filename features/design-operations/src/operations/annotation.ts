@@ -1,8 +1,8 @@
 import type { DesignProject, ComponentNode } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
-  AddAnnotationOp,
-  RemoveAnnotationOp,
+  AnnotationAddOp,
+  AnnotationRemoveOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -30,7 +30,7 @@ function findParentInProject(project: DesignProject, nodeId: string) {
 
 export function executeAddAnnotation(
   project: DesignProject,
-  params: AddAnnotationOp['params'],
+  params: AnnotationAddOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
@@ -79,7 +79,7 @@ export function executeAddAnnotation(
       affectedNodeIds: [annotationId, params.parentId],
     },
     inverse: {
-      type: 'removeElement',
+      type: 'element.remove',
       params: { elementId: annotationId },
     },
   };
@@ -89,7 +89,7 @@ export function executeAddAnnotation(
 
 export function executeRemoveAnnotation(
   project: DesignProject,
-  params: RemoveAnnotationOp['params'],
+  params: AnnotationRemoveOp['params'],
 ): { project: DesignProject; result: OperationResult; inverse: InverseData } {
   const newProject = deepClone(project);
 
