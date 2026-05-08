@@ -41,7 +41,7 @@
 | **C.2** design-api：迁移层 + 一次性 migration script | ✅ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | 2026-05-08 | `81698ca` |
 | **D.1** design_front：状态面板（state.view + state.data） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `04dec67` |
 | **D.2** design_front：事件/动作链面板按新动词 | ✅ | D 编辑器 | ✅ | C.2, D.1 | 2026-05-08 | `2ccdbb9` |
-| **D.3** design_front：数据源面板（endpoint+mock 共存） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
+| **D.3** design_front：数据源面板（endpoint+mock 共存） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `0b8b4e1` |
 | **D.4** design_front：表达式编辑器（自动补全 + 校验） | ⬜ | D 编辑器 | ✅ | A.2 | — | — |
 | **E.1** design-mcp：工具按新动词重写 | ⬜ | E MCP | ✅ | C.1, C.2 | — | — |
 | **E.2** design-mcp：build + 重新连接 IDE | ⬜ | E MCP | ✅ | E.1 | — | — |
@@ -62,10 +62,10 @@
 | 指标 | 值 |
 |------|---|
 | 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 11（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2, D.1, D.2） |
-| 进行中 | D.3（待开工） |
+| 已完成 | 12（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2, D.1, D.2, D.3） |
+| 进行中 | D.4（待开工） |
 | 阻塞中 | — |
-| 最新 commit | `2ccdbb9` refactor(editor): action chain editor uses v2 verbs |
+| 最新 commit | `0b8b4e1` refactor(editor): data source panel with endpoint+mock coexistence |
 
 ---
 
@@ -353,3 +353,4 @@
 | 2026-05-08 | C.2 完成 — `migrations/v1-to-v2-state-model.ts` 纯函数迁移层 + `run-migration.ts` 一次性脚本（含备份表 `design_snapshots_v1_backup`、幂等 + dry-run）；`projects.service.findOne` 接入迁移层并删 `materializeLegacyInstances`；`operations.service` ensureDeterministicIds 升级到 v2 op 名（`element.add` / `element.duplicate` / `asset.instantiateTemplate` / `screen.add` / `event.addNavigation`）；`datasources` 模块精简为 v2 形态（删除 scenarios/phase 路由）；DB 30 行快照中 17 行 v1→v2 迁移成功，第二次重跑 0 migrated（幂等）；design-api typecheck + build 通过；三大 feature 包仍 build 通 | AI 助手 |
 | 2026-05-08 | D.1 完成 — 新增 `views/editor/panels/StatePanel/`：view 变量编辑器（增删改 + 预览值切换，走 `screenState.addViewVariable` / `removeViewVariable` / `updateViewVariable` / `setViewPreview`）+ data 初始值编辑器（走 `screenState.setDataInit` / `removeDataInit`），表单含 JSON 解析 + 字段校验；挂在 RightPanel「高级」区块"页面状态"位置；StatePanel 自身 typecheck 干净（design_front 整包 typecheck 仍受其他 v1 残留阻塞，待 D.2/D.3） | AI 助手 |
 | 2026-05-08 | D.2 完成（commit `2ccdbb9`）— InteractionsTab 全面按 v2 动词重写，op 名升级到 `event.add/remove/update`，ACTION_TYPES 全部 dot-namespace（state.* / effect.* / nav.* / node.* / ui.* / custom），condition 统一为 `{ when: Expression<boolean> }`，TRIGGER_OPTIONS 新增 change/submit；按 AGENTS.md §四.4.2 拆为 8 个 ≤300 行子文件（constants/formCommon/StateForms/MiscForms/ActionBadge/ActionChainEditor/EventCard/AddEventForm/index）；effect.fetch 子链禁止再嵌 fetch；切动词保留共享字段；子目录自身 typecheck + lint 全干净，主干仍受 design-mcp v1 残留阻塞 | AI 助手 |
+| 2026-05-08 | D.3 完成（commit `0b8b4e1`）— DataTab 全面重写为 endpoint+mock 共存模型：每个数据源一张卡片，static → StaticEditor（仅 initial），api → ApiEditor（endpoint + autoFetchOnEnter + defaultParams + MockScenariosSection，场景 CRUD + 激活切换）；顶部 PreviewEnvSwitcher 写入 editorStore.previewEffectEnv，待 PreviewRenderer 接入 EffectExecutor 消费；新建表单 NewDataSourceForm 校验 name 合法性与唯一性；op 名全部升级为 v2 dot-namespace（dataSource.add/remove/update/setEndpoint/setDefaultParams/setStaticInitial/addMockScenario/updateMockScenario/removeMockScenario/switchMockScenario）；按 AGENTS.md §四.4.2 拆为 7 个 ≤300 行子文件（index 147 / helpers 143 / DataSourceCard 134 / StaticEditor 116 / ApiEditor 205 / MockScenarios 271 / NewDataSourceForm 138）；editorStore 新增 previewEffectEnv 状态 + setter；helpers.parseEndpointBody 用 expr() 把非对象输入包成 Expression 字符串；DataTab 子目录 typecheck + lint 全干净，主干仍受 design-mcp v1 残留阻塞 | AI 助手 |
