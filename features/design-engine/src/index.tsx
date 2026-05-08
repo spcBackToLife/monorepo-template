@@ -171,14 +171,35 @@ export {
 } from './overlay/interactions/draw';
 export type { DrawState, DrawBounds } from './overlay/interactions/draw';
 
+// ===== State / Action / Effect (v2) =====
+// Store + Reducer + Dispatcher + EffectExecutor；替代 v1 EventExecutionEngine / MockExecutor。
+export {
+  createStore,
+  createEmptyState,
+  reduceStateAction,
+  parsePath,
+  getByPath,
+  setByPath,
+  EffectExecutor,
+  MockDriver,
+  HttpDriver,
+  Dispatcher,
+} from './state';
+export type {
+  Store,
+  Listener,
+  Updater,
+  StateMutationAction,
+  EffectDriver,
+  Env,
+  HostAdapters,
+  DataSourceResolver,
+  DispatcherDeps,
+} from './state';
+
 // ===== Preview Mode =====
 export { PreviewRenderer } from './preview/PreviewRenderer';
 export type { PreviewRendererProps } from './preview/PreviewRenderer';
-
-export { EventExecutionEngine } from './preview/EventExecutionEngine';
-export type { PreviewContext, TransitionAnimation, MockResponse } from './preview/EventExecutionEngine';
-
-export { MockExecutor } from './preview/MockExecutor';
 
 export { ToastRenderer } from './preview/ToastRenderer';
 export type { ToastItem, ToastRendererProps } from './preview/ToastRenderer';
