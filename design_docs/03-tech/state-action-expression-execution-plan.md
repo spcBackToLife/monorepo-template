@@ -39,7 +39,7 @@
 | **B.2** design-engine：清理 v1 残留 | ✅ | B 渲染器 | ❌ | B.1 | 2026-05-08 | `7b5bf36` |
 | **C.1** design-operations：所有 op 重写 | ✅ | C 业务层 | ❌ | A.1 | 2026-05-08 | `b59bc00` |
 | **C.2** design-api：迁移层 + 一次性 migration script | ✅ | C 业务层 | ✅ 恢复 | A.1, B.1, B.2, C.1 | 2026-05-08 | `81698ca` |
-| **D.1** design_front：状态面板（state.view + state.data） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | （随本子项） |
+| **D.1** design_front：状态面板（state.view + state.data） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `04dec67` |
 | **D.2** design_front：事件/动作链面板按新动词 | ⬜ | D 编辑器 | ✅ | C.2, D.1 | — | — |
 | **D.3** design_front：数据源面板（endpoint+mock 共存） | ⬜ | D 编辑器 | ✅ | C.2 | — | — |
 | **D.4** design_front：表达式编辑器（自动补全 + 校验） | ⬜ | D 编辑器 | ✅ | A.2 | — | — |
@@ -65,7 +65,7 @@
 | 已完成 | 10（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2, D.1） |
 | 进行中 | D.2（待开工） |
 | 阻塞中 | — |
-| 最新 commit | D.1：待 commit（feat(editor): state panel — view variables + data init editor） |
+| 最新 commit | `04dec67` feat(editor): state panel — view variables + data init editor |
 
 ---
 
