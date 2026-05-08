@@ -15,7 +15,8 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --ext .ts,.tsx src"
+    "lint": "eslint --ext .ts,.tsx src",
+    "test": "bun test"
   },
   "sideEffects": false,
   "peerDependencies": {

@@ -33,16 +33,32 @@ export {
 } from './assets/rewriteLocalAssetRefs';
 export { StaticAssetOriginProvider, useStaticAssetOrigin } from './renderer/StaticAssetOriginContext';
 
-// ===== Data Binding & Context =====
+// ===== Expression Engine (v2) =====
+// 受限求值器：解析 `{{ ... }}` 表达式，在 { state, item, index, parent, $last, $ } 作用域下安全求值。
 export {
-  resolveExpression,
-  hasExpression,
-  resolvePropsExpressions,
-  mergeLoadedScreenData,
-  injectCarouselSlice,
-  buildScreenDataContext,
-} from './data/resolveExpression';
-export type { DataContext } from './data/resolveExpression';
+  evaluateExpression,
+  evaluateAst,
+  compileExpression,
+  extractDeps,
+  parseExpression,
+  parseSingleExpression,
+  parseTemplate,
+  ExpressionParseError,
+  ExpressionEvaluationError,
+  builtinFunctions,
+  FORBIDDEN_GLOBALS,
+} from './expression';
+export type {
+  Ast,
+  BinaryOp,
+  TemplateSegment,
+  EvalContext,
+  BuiltinFunctions,
+} from './expression';
+
+// ===== Data Binding & Context =====
+// v1 的 resolveExpression / buildScreenDataContext 等已删除；
+// 由 expression 引擎 + Store（A.3 交付）接管。渲染器层清理在 B.1 完成。
 export { DataContextProvider, useDataContext } from './data/DataContext';
 export { ListRenderer } from './data/ListRenderer';
 export type { ListRendererProps } from './data/ListRenderer';

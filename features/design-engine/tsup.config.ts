@@ -11,6 +11,8 @@ export default defineConfig({
   target: 'es2020',
   treeshake: true,
   external: ['react', 'react-dom'],
+  // 测试文件不进入 build；仅供 bun test 运行
+  ignoreWatch: ['**/__tests__/**'],
   esbuildOptions(options) {
     options.jsx = 'automatic';
   },
