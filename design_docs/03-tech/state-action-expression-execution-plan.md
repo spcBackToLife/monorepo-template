@@ -33,7 +33,7 @@
 | 子项 | 状态 | 阶段 | 主干 build | 依赖 | 完成日期 | commit |
 |------|:---:|------|:---:|------|----------|--------|
 | **A.1** design-schema：v2 类型反转 | ✅ | A 底层契约 | ❌ | — | 2026-05-08 | `8486948` |
-| **A.2** design-engine：表达式引擎 | ⬜ | A 底层契约 | ❌ | A.1 | — | — |
+| **A.2** design-engine：表达式引擎 | ✅ | A 底层契约 | ❌ | A.1 | 2026-05-08 | `1e188bc` |
 | **A.3** design-engine：State store + Action dispatcher + EffectExecutor | ⬜ | A 底层契约 | ❌ | A.1, A.2 | — | — |
 | **B.1** design-engine：渲染器接入新模型 | ⬜ | B 渲染器 | ❌ | A.1, A.2, A.3 | — | — |
 | **B.2** design-engine：清理 v1 残留 | ⬜ | B 渲染器 | ❌ | B.1 | — | — |
@@ -62,10 +62,10 @@
 | 指标 | 值 |
 |------|---|
 | 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 3（P.0, P.1, A.1） |
-| 进行中 | A.2（待开工） |
+| 已完成 | 4（P.0, P.1, A.1, A.2） |
+| 进行中 | A.3（待开工） |
 | 阻塞中 | — |
-| 最新 commit | `8486948` refactor(schema): v2 type system — replace v1 |
+| 最新 commit | `1e188bc` feat(engine): expression engine v2 with sandboxed evaluator |
 
 ---
 
@@ -345,3 +345,4 @@
 | 2026-05-08 | P.0 完成（commit `0464954`），P.1 一并完成 | AI 助手 |
 | 2026-05-08 | A.1 设计稿 [state-action-expression-A1-design.md](./state-action-expression-A1-design.md) 落档，待实施 | AI 助手 |
 | 2026-05-08 | A.1 完成（commit `8486948`）— design-schema v2 类型反转，typecheck + build 通过，下游包按预期全断 | AI 助手 |
+| 2026-05-08 | A.2 完成（commit `1e188bc`）— expression 引擎落地：自实现 Parser/Evaluator/BuiltinFunctions，40 条 bun:test 全绿，含安全沙箱（禁 globalThis/Function/原型链/任意方法调用） | AI 助手 |
