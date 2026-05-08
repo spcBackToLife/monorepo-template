@@ -1,6 +1,8 @@
 import type { ComponentNode } from '../types/node';
 import type { Screen } from '../types/screen';
 import type { DesignProject } from '../types/project';
+import type { Action, ComponentEvent } from '../types/action';
+import { normalizeExpression } from '../types/expression';
 
 /**
  * Deep clone a value.
@@ -12,10 +14,52 @@ export function deepClone<T>(value: T): T {
 }
 
 /**
+ * 规范化 Action 链中"按 schema 必须是 Expression"的字段（裸字符串补 `{{ }}`）。
+ *
+ * 注意：仅处理强 Expression 字段（如 StateRemoveAction.predicate）。
+ *   `value` / `params.*` / `message` / `url` 等 `Expression | unknown` 字段不动 ——
+ *   它们允许字面量（"hello" / 42 / true）。
+ *
+ * 递归处理 effect.fetch.onSuccess / onError 子链。
+ */
+function normalizeActionChain(actions: Action[] | undefined): void {
+  if (!Array.isArray(actions)) return;
+  for (const a of actions) {
+    if (a.type === 'state.remove' && typeof a.predicate === 'string') {
+      a.predicate = normalizeExpression(a.predicate);
+    } else if (a.type === 'effect.fetch') {
+      normalizeActionChain(a.onSuccess);
+      normalizeActionChain(a.onError);
+    }
+  }
+}
+
+/** 规范化 ComponentEvent.condition.when（必须是 Expression<boolean>） */
+function normalizeEvents(events: ComponentEvent[] | undefined): void {
+  if (!Array.isArray(events)) return;
+  for (const ev of events) {
+    if (ev.condition && typeof ev.condition.when === 'string') {
+      ev.condition.when = normalizeExpression(ev.condition.when);
+    }
+    normalizeActionChain(ev.actions);
+  }
+}
+
+/**
  * Ensure all required fields on a ComponentNode have sensible defaults.
  * Walks the tree recursively so every descendant is also normalized.
  * This guards against incomplete data from older schema versions, manual
  * JSON edits, or API responses that omit empty arrays/objects.
+ *
+ * 同时把"按 schema 必须是 Expression<X>"的字段统一规范化（裸字符串自动补 `{{ }}`）：
+ *   - node.visibleWhen
+ *   - node.repeat
+ *   - events[].condition.when
+ *   - actions[].predicate（state.remove）
+ *
+ * 这样所有写入路径（前端 initProject、后端 migrateV1toV2、screen/template 反序列化）
+ * 都能在落地前自动得到合法的表达式形态，避免 ListRenderer / Evaluator 把裸字符串
+ * 误判为字面量、导致 `repeat: "state.data.messages"` 这类静默失败。
  */
 export function normalizeNode(node: ComponentNode): ComponentNode {
   if (!node.styles) node.styles = {};
@@ -25,6 +69,15 @@ export function normalizeNode(node: ComponentNode): ComponentNode {
   if (node.activeState === undefined) node.activeState = 'default';
   if (node.locked === undefined) node.locked = false;
   if (node.visible === undefined) node.visible = true;
+
+  // ---- v2 强 Expression 字段规范化 ----
+  if (typeof node.visibleWhen === 'string') {
+    node.visibleWhen = normalizeExpression(node.visibleWhen);
+  }
+  if (typeof node.repeat === 'string') {
+    node.repeat = normalizeExpression(node.repeat);
+  }
+  normalizeEvents(node.events);
 
   if (node.children) {
     for (const child of node.children) {

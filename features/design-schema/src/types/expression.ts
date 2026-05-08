@@ -30,3 +30,31 @@ export function expr<T = unknown>(s: string): Expression<T> {
 export function isExpression(value: unknown): value is Expression {
   return typeof value === 'string' && /\{\{[^}]+\}\}/.test(value);
 }
+
+/**
+ * 把"必须是表达式"的字段值规范化为 `{{ ... }}` 形态。
+ *
+ * 适用场景：`ComponentNode.visibleWhen` / `ComponentNode.repeat` /
+ *   `EventCondition.when` / `StateRemoveAction.predicate`
+ * 这类按 schema 类型必须是 `Expression<X>` 的字段。
+ *
+ * **不适用**于"字面量也合法"的 `Expression | unknown` 字段（如 Action.value /
+ *   styles[K] / props[K] / UiShowToastAction.message / UiOpenUrlAction.url）：
+ * 那些字段允许 `42` / `"hello"` / `true` 等纯字面量，不能盲目包 `{{ }}`。
+ *
+ * 行为：
+ *   - 已含 `{{ ... }}` 段（包括混合模板）→ 原样返回
+ *   - null / undefined / 空字符串 → 原样返回（语义：清空）
+ *   - 非字符串 → 原样返回（不是本函数职责）
+ *   - 裸字符串 → 包成 `{{ <trimmed> }}`
+ */
+export function normalizeExpression<T extends string | null | undefined>(
+  input: T,
+): T;
+export function normalizeExpression(input: unknown): unknown;
+export function normalizeExpression(input: unknown): unknown {
+  if (typeof input !== 'string') return input;
+  if (input === '') return input;
+  if (/\{\{[\s\S]+?\}\}/.test(input)) return input;
+  return `{{ ${input.trim()} }}`;
+}

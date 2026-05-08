@@ -84,7 +84,7 @@ export type {
 } from './types';
 
 // Expression 运行期工具（既是类型也是 runtime）
-export { expr, isExpression } from './types';
+export { expr, isExpression, normalizeExpression } from './types';
 
 // ===== Viewport Presets =====
 export {

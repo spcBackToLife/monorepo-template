@@ -7,7 +7,7 @@ export type {
   Expression,
   ExpressionMeta,
 } from './expression';
-export { expr, isExpression } from './expression';
+export { expr, isExpression, normalizeExpression } from './expression';
 
 export type {
   EffectStatus,

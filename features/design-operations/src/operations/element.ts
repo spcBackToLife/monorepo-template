@@ -11,6 +11,7 @@ import {
   deepClone,
   getDefaultStyles,
   isPrimitiveType,
+  normalizeExpression,
 } from '@globallink/design-schema';
 import type {
   ElementAddOp,
