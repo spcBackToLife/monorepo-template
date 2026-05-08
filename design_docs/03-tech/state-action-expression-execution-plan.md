@@ -75,19 +75,15 @@
 
 #### A.1 design-schema：v2 类型反转
 
-**工作内容**
+> **详细设计稿**：[state-action-expression-A1-design.md](./state-action-expression-A1-design.md)
+> 实施时直接照设计稿走即可，不需重新推导。
 
-- 删除 `features/design-schema/src/types/` 全部 v1 类型文件（`event.ts` / `domainState.ts` / `environment.ts` / `dataSource.ts` / `node.ts` / `screen.ts` / `state.ts`）
-- 新写：
-  - `types/expression.ts` — `Expression` 字符串品牌类型 + 编辑期注解结构
-  - `types/state.ts` — `ScreenState`（data/view/effects）+ `EffectStatus`
-  - `types/action.ts` — 新动词联合：`state.set` / `state.append` / `state.remove` / `state.merge` / `state.toggle` / `effect.fetch` / `effect.cancel` / `nav.go` / `nav.back` / `node.setVisualState` / `ui.showToast` / `ui.openUrl` / `ui.delay` / `custom`
-  - `types/dataSource.ts` — v2 DataSource：`type: 'static' | 'api'`，`endpoint` + `mock` 共存
-  - `types/node.ts` — v2 ComponentNode：去 `domainStateBindings` / `environmentBindings` / `visibilityWhen`，新增 `visibleWhen?: Expression` / `bind?: { path: Expression }`
-  - `types/screen.ts` — v2 Screen：`stateInit?: Partial<ScreenState>`、`dataSources` 用 v2 类型；`domainStates` / `environmentStates` **删除**
-  - `types/event.ts` — `ComponentEvent` 用新动词
-  - `types/project.ts` — DesignProject：去 `environmentStates`，加 `globalStateInit`
-- 同步更新 `src/index.ts` export 面、`src/zod-schemas/`、`src/utils/`、`src/constants/`
+**工作内容（摘要）**
+
+- 删除 v1 类型文件
+- 新建：`expression.ts` / `state.ts`(v2) / `visualState.ts` / `action.ts` / `dataSource.ts`(v2)
+- 重写：`node.ts` / `screen.ts` / `project.ts` / `types/index.ts` / `validators/*` / `src/index.ts`
+- 详细字段定义、实施顺序、验收清单见设计稿
 
 **验收**
 
@@ -347,3 +343,4 @@
 | 2026-05-08 | 创建本文档 | AI 助手 |
 | 2026-05-08 | 改为表格化呈现，新增 P.0/P.1 外部子项 | AI 助手 |
 | 2026-05-08 | P.0 完成（commit `0464954`），P.1 一并完成 | AI 助手 |
+| 2026-05-08 | A.1 设计稿 [state-action-expression-A1-design.md](./state-action-expression-A1-design.md) 落档，待实施 | AI 助手 |
