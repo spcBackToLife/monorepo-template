@@ -62,10 +62,10 @@
 | 指标 | 值 |
 |------|---|
 | 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 6（P.0, P.1, A.1, A.2, A.3, B.1） |
-| 进行中 | B.2（待开工） |
+| 已完成 | 8（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1） |
+| 进行中 | C.2（待开工） |
 | 阻塞中 | — |
-| 最新 commit | `f3d62f6` refactor(engine): renderers consume v2 schema with state/expression |
+| 最新 commit | `b59bc00` refactor(operations): rewrite all ops for v2 schema |
 
 ---
 
