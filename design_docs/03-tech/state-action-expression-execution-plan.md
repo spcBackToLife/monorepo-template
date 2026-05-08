@@ -32,7 +32,7 @@
 
 | 子项 | 状态 | 阶段 | 主干 build | 依赖 | 完成日期 | commit |
 |------|:---:|------|:---:|------|----------|--------|
-| **A.1** design-schema：v2 类型反转 | ⬜ | A 底层契约 | ❌ | — | — | — |
+| **A.1** design-schema：v2 类型反转 | ✅ | A 底层契约 | ❌ | — | 2026-05-08 | `8486948` |
 | **A.2** design-engine：表达式引擎 | ⬜ | A 底层契约 | ❌ | A.1 | — | — |
 | **A.3** design-engine：State store + Action dispatcher + EffectExecutor | ⬜ | A 底层契约 | ❌ | A.1, A.2 | — | — |
 | **B.1** design-engine：渲染器接入新模型 | ⬜ | B 渲染器 | ❌ | A.1, A.2, A.3 | — | — |
@@ -62,10 +62,10 @@
 | 指标 | 值 |
 |------|---|
 | 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 2（P.0, P.1） |
-| 进行中 | A.1（即将开始） |
+| 已完成 | 3（P.0, P.1, A.1） |
+| 进行中 | A.2（待开工） |
 | 阻塞中 | — |
-| 最新 commit | `0464954` chore(lint): fix 33 pre-existing eslint errors |
+| 最新 commit | `8486948` refactor(schema): v2 type system — replace v1 |
 
 ---
 
@@ -344,3 +344,4 @@
 | 2026-05-08 | 改为表格化呈现，新增 P.0/P.1 外部子项 | AI 助手 |
 | 2026-05-08 | P.0 完成（commit `0464954`），P.1 一并完成 | AI 助手 |
 | 2026-05-08 | A.1 设计稿 [state-action-expression-A1-design.md](./state-action-expression-A1-design.md) 落档，待实施 | AI 助手 |
+| 2026-05-08 | A.1 完成（commit `8486948`）— design-schema v2 类型反转，typecheck + build 通过，下游包按预期全断 | AI 助手 |
