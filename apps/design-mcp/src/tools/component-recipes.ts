@@ -27,14 +27,15 @@ const PRIMARY_DEFAULT_STYLES = {
 const STATE_TRANSITION = { duration: 200, easing: 'ease', properties: ['background-color', 'box-shadow', 'transform'] };
 
 /**
- * 高阶组件配方：一次 batch 插入主按钮 + hover / pressed / focus 状态 + 预览用事件（与引擎约定状态名一致）。
+ * 高阶组件配方：一次 batch 插入主按钮 + hover / pressed / focus 视觉态 + 预览用事件
+ * （使用 v2 op 名 element.add / visualState.add / event.add，actions 使用 v2 动词 node.setVisualState）。
  */
 export function registerComponentRecipeTools(server: McpServer): void {
   server.registerTool(
     'create_primary_button',
     {
       description:
-        '⚠️ 仅用于【从零创建】新的纯色主按钮。如果目标按钮已经存在（如已有素材按钮需要加状态），请用 visual_state 工具的 add/update/reset_style 操作。\n\n在指定父节点下创建「主按钮」: 默认/hover/pressed/focus 视觉状态（配色对齐编辑器 #1677ff 体系，纯色填充），并绑定 hover·focus·blur 的 setState 便于画布预览。',
+        '⚠️ 仅用于【从零创建】新的纯色主按钮。如果目标按钮已经存在（如已有素材按钮需要加状态），请用 visual_state 工具的 add/update/reset_style 操作。\n\n在指定父节点下创建「主按钮」: 默认/hover/pressed/focus 视觉状态（配色对齐编辑器 #1677ff 体系，纯色填充），并绑定 hover·focus·blur 的 node.setVisualState 便于画布预览。',
       inputSchema: {
         projectId: z.string().describe('项目 ID'),
         parentId: z.string().describe('父节点 ID（如 screen.rootNode）'),
@@ -85,32 +86,32 @@ export function registerComponentRecipeTools(server: McpServer): void {
         const hoverIn: ComponentEvent = {
           trigger: 'hover',
           description: '悬停 → hover 态（mouseleave 由预览引擎还原为 default）',
-          actions: [{ type: 'setState', targetId: btnId, state: 'hover' }],
+          actions: [{ type: 'node.setVisualState', nodeId: btnId, state: 'hover' }],
         };
         const focusIn: ComponentEvent = {
           trigger: 'focus',
           description: '聚焦 → focus 态',
-          actions: [{ type: 'setState', targetId: btnId, state: 'focus' }],
+          actions: [{ type: 'node.setVisualState', nodeId: btnId, state: 'focus' }],
         };
         const blurOut: ComponentEvent = {
           trigger: 'blur',
           description: '失焦 → default',
-          actions: [{ type: 'setState', targetId: btnId, state: 'default' }],
+          actions: [{ type: 'node.setVisualState', nodeId: btnId, state: 'default' }],
         };
 
         const operations: Operation[] = [
           {
-            type: 'addElement',
+            type: 'element.add',
             params: {
               parentId,
               tag: 'button',
               elementId: btnId,
-              props: { text },
+              props: { textContent: text },
               styles: base,
             },
           },
           {
-            type: 'addState',
+            type: 'visualState.add',
             params: {
               nodeId: btnId,
               stateName: 'hover',
@@ -119,7 +120,7 @@ export function registerComponentRecipeTools(server: McpServer): void {
             },
           },
           {
-            type: 'addState',
+            type: 'visualState.add',
             params: {
               nodeId: btnId,
               stateName: 'pressed',
@@ -128,7 +129,7 @@ export function registerComponentRecipeTools(server: McpServer): void {
             },
           },
           {
-            type: 'addState',
+            type: 'visualState.add',
             params: {
               nodeId: btnId,
               stateName: 'focus',
@@ -136,9 +137,9 @@ export function registerComponentRecipeTools(server: McpServer): void {
               transition: STATE_TRANSITION,
             },
           },
-          { type: 'addEvent', params: { nodeId: btnId, event: hoverIn } },
-          { type: 'addEvent', params: { nodeId: btnId, event: focusIn } },
-          { type: 'addEvent', params: { nodeId: btnId, event: blurOut } },
+          { type: 'event.add', params: { nodeId: btnId, event: hoverIn } },
+          { type: 'event.add', params: { nodeId: btnId, event: focusIn } },
+          { type: 'event.add', params: { nodeId: btnId, event: blurOut } },
         ];
 
         const result = await api.executeBatch(projectId, operations);
@@ -149,7 +150,7 @@ export function registerComponentRecipeTools(server: McpServer): void {
               text: JSON.stringify(
                 {
                   nodeId: btnId,
-                  message: '主按钮已创建：含 hover / pressed(CSS :active) / focus 状态与预览事件',
+                  message: '主按钮已创建：含 hover / pressed(CSS :active) / focus 视觉态与预览事件',
                   batchResult: result,
                 },
                 null,

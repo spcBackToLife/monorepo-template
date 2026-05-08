@@ -14,6 +14,7 @@ import {
   expandRootRectToContainer,
   buildSchemaLayoutMap,
   buildScreenDataContext,
+  buildEditorPreviewState,
   hitTest,
   getEditorCoordinateRoot,
   getPlacementParentRect,
@@ -24,7 +25,7 @@ import {
   type NodeRect,
   type OverlayToolMode,
 } from '@globallink/design-engine';
-import type { TransitionAnimation, PrimitiveNodeType } from '@globallink/design-schema';
+import type { NavTransitionAnimation, PrimitiveNodeType } from '@globallink/design-schema';
 import {
   findNodeInScreens,
   collectEffectivelyLockedNodeIds,
@@ -87,31 +88,64 @@ export const Canvas = observer(function Canvas() {
 
   const screen = editorStore.activeScreen;
   const viewport = editorStore.currentViewport;
-  const activeDsForLayout = (() => {
-    if (!screen) return undefined;
+  /**
+   * v2 layout fingerprint：把 schemaLayoutMap 依赖的"当前激活的数据源数据"序列化为字符串，
+   * 数据源数据变化时强制 useMemo 重算。
+   * - static 取 initial
+   * - api 取激活 mock 场景的 responseBody（仅成功且非超时）
+   */
+  const layoutDatasetFingerprint = useMemo(() => {
+    if (!screen) return '';
+    const merged: Record<string, unknown> = {};
     for (const ds of screen.dataSources ?? []) {
-      if (ds.activePhase !== 'loaded') continue;
-      const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
-      if (sc) return sc;
+      if (ds.type === 'static') {
+        merged[ds.id] = ds.initial;
+      } else {
+        const mock = ds.mock;
+        if (!mock) continue;
+        const sc = mock.scenarios.find((s) => s.id === mock.activeScenarioId)
+          ?? mock.scenarios[0];
+        if (!sc || sc.isTimeout) continue;
+        if (sc.statusCode < 200 || sc.statusCode >= 300) continue;
+        merged[ds.id] = sc.responseBody;
+      }
     }
-    return undefined;
-  })();
-  const layoutDatasetFingerprint = JSON.stringify(activeDsForLayout?.data ?? {});
+    return JSON.stringify(merged);
+  }, [screen]);
 
   /** W7-022：视口内节点包围盒是否超出设备框（与 buildCoordinateMap 同源） */
   const projectUpdatedAt = editorStore.project?.updatedAt;
+
+  /**
+   * v2 编辑期 SchemaRenderer 用的 dataContext：
+   *   - state.data 来自 static.initial + api 激活 mock 场景 responseBody
+   *   - state.view 来自 editorStore.currentGlobalStates 编辑期预览覆盖
+   *   - state.effects 暂为空（运行时副作用由 PreviewRenderer 内的 store 管理）
+   */
+  const editorDataContext = useMemo(() => {
+    if (!screen) return null;
+    const previewState = buildEditorPreviewState(screen);
+    const view: Record<string, unknown> = { ...previewState.view };
+    for (const [k, v] of Object.entries(editorStore.currentGlobalStates)) {
+      view[k] = v;
+    }
+    return buildScreenDataContext(screen, {
+      data: previewState.data,
+      view,
+      effects: previewState.effects,
+    });
+  }, [screen, editorStore.currentGlobalStates, layoutDatasetFingerprint]);
 
   /** W7-025：与 DOM 合并的 Schema 布局图（虚拟化开启时与 SchemaRenderer / Overlay 同源） */
   const schemaLayoutMap = useMemo(() => {
     if (!screen || !viewport) return null;
     if (!editorStore.canvasVirtualizeOutsideDeviceFrame) return null;
-    const dataContext = buildScreenDataContext(screen, editorStore.currentGlobalStates);
+    if (!editorDataContext) return null;
     return buildSchemaLayoutMap(screen, {
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
-      globalStates: editorStore.currentGlobalStates,
       assets: editorStore.project?.componentAssets ?? [],
-      dataContext,
+      dataContext: editorDataContext,
       interactionPreview:
         editorStore.selectedNodeIds.length === 1 &&
         editorStore.previewInteractionState &&
@@ -214,11 +248,19 @@ export const Canvas = observer(function Canvas() {
     const node = findNodeInScreens(editorStore.screens, nodeId);
     const clickEvt = node?.events?.find((ev) => ev.trigger === 'click' && !ev.disabled);
     const acts = clickEvt?.actions ?? [];
-    if (acts.length > 0 && acts.every((a) => a.type === 'setDomainState')) {
+    // v2：若节点 click 事件链全部是 state.set 且 path 形如 "view.xxx"，
+    // 编辑期把这些写入 currentGlobalStates 以预览效果（不影响真实运行时 store）。
+    if (
+      acts.length > 0 &&
+      acts.every((a) => a.type === 'state.set' && typeof a.path === 'string' && a.path.startsWith('view.'))
+    ) {
       runInAction(() => {
         for (const a of acts) {
-          if (a.type === 'setDomainState') {
-            editorStore.setCurrentGlobalState(a.variableName, a.value);
+          if (a.type === 'state.set' && typeof a.path === 'string' && a.path.startsWith('view.')) {
+            const name = a.path.slice('view.'.length);
+            const v = a.value;
+            const stringValue = typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v);
+            editorStore.setCurrentGlobalState(name, stringValue);
           }
         }
       });
@@ -234,20 +276,14 @@ export const Canvas = observer(function Canvas() {
     editorStore.selectMultiple(nodeIds);
   }, []);
 
-  const handlePreviewNavigate = useCallback((screenId: string, animation?: TransitionAnimation) => {
+  const handlePreviewNavigate = useCallback((screenId: string, animation?: NavTransitionAnimation) => {
     const name =
       animation == null || animation.type === 'none' ? 'fade' : animation.type;
     editorStore.previewNavigateTo(screenId, name);
   }, []);
 
-  const handlePreviewSwitchDataSourcePhase = useCallback((dataSourceId: string, phase: string) => {
-    const screen = editorStore.activeScreen;
-    if (!screen) return;
-    runInAction(() => {
-      const ds = screen.dataSources?.find((d) => d.id === dataSourceId);
-      if (ds) ds.activePhase = phase;
-    });
-  }, []);
+  // v2：v1 的 onSwitchDataSourcePhase callback 已删除（phase 概念消除）。
+  // 数据源 mock 场景切换走 dataSource.switchMockScenario op，由 CanvasContextBar / Toolbar 触发。
 
   useEffect(() => {
     if (editorStore.previewMode) setTextEditNodeId(null);
@@ -284,7 +320,7 @@ export const Canvas = observer(function Canvas() {
       const parentNode = findNodeInScreens(editorStore.screens, parentId);
       if (parentNode && (!parentNode.styles.position || parentNode.styles.position === 'static')) {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId: parentId, styles: { position: 'relative' } },
         });
       }
@@ -297,7 +333,7 @@ export const Canvas = observer(function Canvas() {
             : 'div';
       const isTextTool = editorStore.activeTool === 'text';
       const result = editorStore.execute({
-        type: 'addElement',
+        type: 'element.add',
         params: {
           parentId,
           tag: tag as PrimitiveNodeType,
@@ -351,13 +387,13 @@ export const Canvas = observer(function Canvas() {
       const parentNode = findNodeInScreens(editorStore.screens, args.parentId);
       if (parentNode && (!parentNode.styles.position || parentNode.styles.position === 'static')) {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId: args.parentId, styles: { position: 'relative' } },
         });
       }
 
       const result = editorStore.execute({
-        type: 'addAnnotation',
+        type: 'annotation.add',
         params: {
           parentId: args.parentId,
           content: '新注释',
@@ -447,13 +483,13 @@ export const Canvas = observer(function Canvas() {
 
       if (!parentNode.styles.position || parentNode.styles.position === 'static') {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId: parentId, styles: { position: 'relative' } },
         });
       }
 
       const result = editorStore.execute({
-        type: 'instantiateTemplate',
+        type: 'asset.instantiateTemplate',
         params: { templateId, parentId },
       });
       if (!result.success) {
@@ -479,7 +515,7 @@ export const Canvas = observer(function Canvas() {
           Math.max(0, parentRect.height - 40),
         );
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: {
             nodeId: newId,
             styles: {
@@ -554,13 +590,13 @@ export const Canvas = observer(function Canvas() {
 
       if (!parentNode.styles.position || parentNode.styles.position === 'static') {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId: parentId, styles: { position: 'relative' } },
         });
       }
 
       const result = editorStore.execute({
-        type: 'addElement',
+        type: 'element.add',
         params: { parentId, tag: tag as PrimitiveNodeType, elementId: generateNodeId(), styles: droppedStyles },
       });
       if (result.success) {
@@ -623,13 +659,11 @@ export const Canvas = observer(function Canvas() {
                   <PreviewRenderer
                     screen={screen}
                     assets={editorStore.project?.componentAssets ?? []}
-                    globalStates={editorStore.currentGlobalStates}
-                    currentDataSet={undefined}
                     onNavigate={handlePreviewNavigate}
-                    onSwitchDataSourcePhase={handlePreviewSwitchDataSourcePhase}
                     onNavigateBackRef={editorStore.previewNavigateBackRef}
                     embedded
                     staticAssetOrigin={getEditorStaticAssetOrigin()}
+                    env={editorStore.previewEffectEnv}
                   />
                 </TransitionAnimator>
               ) : (
@@ -637,7 +671,7 @@ export const Canvas = observer(function Canvas() {
                   <SchemaRenderer
                     screen={screen}
                     assets={editorStore.project?.componentAssets}
-                    globalStates={editorStore.currentGlobalStates}
+                    dataContext={editorDataContext ?? undefined}
                     staticAssetOrigin={getEditorStaticAssetOrigin()}
                     virtualizeOutsideDeviceFrame={editorStore.canvasVirtualizeOutsideDeviceFrame}
                     virtualizeViewportWidth={viewport.width}

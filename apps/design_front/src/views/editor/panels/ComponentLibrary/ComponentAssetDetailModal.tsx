@@ -114,7 +114,7 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
       return;
     }
     const r = editorStore.execute({
-      type: 'updateTemplate',
+      type: 'template.update',
       params: {
         templateId,
         patch: patch as {
@@ -137,7 +137,7 @@ export const ComponentAssetDetailModal = observer(function ComponentAssetDetailM
   const handleDuplicate = () => {
     if (!templateId || !template) return;
     const r = editorStore.execute({
-      type: 'duplicateTemplate',
+      type: 'template.duplicate',
       params: { sourceTemplateId: templateId, newName: `${template.name} (Copy)` },
     });
     if (r.success) {

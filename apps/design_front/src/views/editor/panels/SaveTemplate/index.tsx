@@ -91,7 +91,7 @@ function SaveAsTemplateWizardModal({
       // Generate template ID upfront to ensure consistency between client and server
       const templateId = generateTemplateId();
       const result = editorStore.execute({
-        type: 'saveAsTemplate',
+        type: 'asset.saveAsTemplate',
         params: {
           nodeId,
           templateId,  // Include pre-generated ID for deterministic template references

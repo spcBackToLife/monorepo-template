@@ -53,12 +53,12 @@ export const PropsTab = observer(function PropsTab() {
   const handlePropChange = (key: string, value: unknown) => {
     if (effectiveState === 'default') {
       editorStore.execute({
-        type: 'updateComponentProps',
+        type: 'componentProps.update',
         params: { nodeId, props: { [key]: value } },
       });
     } else {
       editorStore.execute({
-        type: 'updateState',
+        type: 'visualState.update',
         params: { nodeId, stateName: effectiveState, styles: {}, props: { [key]: value } },
       });
     }
@@ -125,21 +125,33 @@ export const PropsTab = observer(function PropsTab() {
 // 重复与列表
 //
 // 设计原则（第一性原理）：
-// - __listData 的含义是「重复此节点 N 次」，与节点类型无关
+// - node.repeat 的含义是「重复此节点 N 次」，与节点类型无关
 //   span/button/img/div 都可以重复
 // - 唯一的约束是层级：已经在列表内的节点不应再设列表绑定
 //   因为它的上下文已经是单个 item，应该用 {{item.xxx}} 引用字段
-// - 所以判断规则是：有祖先节点带 __listData → 隐藏此区域
-//   没有祖先带 __listData → 显示，允许绑定
+// - 所以判断规则是：有祖先节点带 node.repeat → 隐藏此区域
+//   没有祖先带 node.repeat → 显示，允许绑定
 // ===================================================================
 
-/** 从数据源合并出当前页面的顶层数据对象 */
+/** 从数据源合并出当前页面的顶层数据对象（v2：static→initial、api→激活 mock 场景的 responseBody） */
 function getMergedScreenData(screen: { dataSources?: import('@globallink/design-schema').DataSource[] }): DataPayload {
   const merged: DataPayload = {};
   for (const ds of screen.dataSources ?? []) {
-    if (ds.activePhase !== 'loaded') continue;
-    const sc = (ds.scenarios ?? []).find((s) => s.id === ds.activeScenarioId);
-    if (sc?.data && typeof sc.data === 'object') Object.assign(merged, sc.data);
+    let payload: unknown;
+    if (ds.type === 'static') {
+      payload = ds.initial;
+    } else {
+      const mock = ds.mock;
+      if (!mock) continue;
+      const scenario = mock.scenarios.find((s) => s.id === mock.activeScenarioId)
+        ?? mock.scenarios[0];
+      if (!scenario || scenario.isTimeout) continue;
+      if (scenario.statusCode < 200 || scenario.statusCode >= 300) continue;
+      payload = scenario.responseBody;
+    }
+    if (payload && typeof payload === 'object') {
+      Object.assign(merged, payload as DataPayload);
+    }
   }
   return merged;
 }
@@ -170,15 +182,16 @@ function extractItemFields(arr: unknown[]): string[] {
 const ListBindingSection = observer(function ListBindingSection({ nodeId }: { nodeId: string }) {
   const [open, setOpen] = useState(true);
   const node = findNodeInScreens(editorStore.screens, nodeId);
-  const raw = node?.props?.__listData;
+  // v2: 列表绑定字段从 props.__listData 迁移到 node.repeat: Expression<unknown[]> | string
+  const raw = node?.repeat;
   const value = typeof raw === 'string' ? raw : '';
   const screen = editorStore.activeScreen;
 
-  // 检查是否在列表内（祖先有 __listData）
+  // 检查是否在列表内（祖先有 node.repeat）
   const isInsideList = useMemo(() => {
     if (!node) return false;
     for (const s of editorStore.screens) {
-      if (findAncestorWithListData(s.rootNode, nodeId)) return true;
+      if (findAncestorWithRepeat(s.rootNode, nodeId)) return true;
     }
     return false;
   }, [nodeId, node]);
@@ -189,8 +202,8 @@ const ListBindingSection = observer(function ListBindingSection({ nodeId }: { no
 
   const apply = (next: string) => {
     editorStore.execute({
-      type: 'updateComponentProps',
-      params: { nodeId, props: { __listData: next } },
+      type: 'element.setRepeat',
+      params: { nodeId, repeat: next.trim() === '' ? null : next },
     });
   };
 
@@ -260,25 +273,25 @@ const ListBindingSection = observer(function ListBindingSection({ nodeId }: { no
   );
 });
 
-/** 在节点树中查找 nodeId 的祖先中是否有节点带 __listData */
-function findAncestorWithListData(
+/** 在节点树中查找 nodeId 的祖先中是否有节点带 node.repeat（v2 列表绑定） */
+function findAncestorWithRepeat(
   root: import('@globallink/design-schema').ComponentNode,
   targetId: string,
 ): import('@globallink/design-schema').ComponentNode | null {
-  // 递归搜索：如果当前节点的子树中包含 target，且当前节点有 __listData，则返回
+  // 递归搜索：如果当前节点的子树中包含 target，且当前节点有 node.repeat，则返回
   if (root.id === targetId) return null; // 自身不算祖先
   for (const child of root.children ?? []) {
     if (child.id === targetId) {
       // target 是 root 的直接子节点
-      if (typeof root.props?.__listData === 'string' && root.props.__listData) return root;
+      if (typeof root.repeat === 'string' && root.repeat) return root;
       return null;
     }
     // target 在 child 的子树中
     if (subtreeContains(child, targetId)) {
-      // 先检查 root 自身是否有 __listData
-      if (typeof root.props?.__listData === 'string' && root.props.__listData) return root;
-      // 再递归看 child 及其后代中有没有更近的祖先带 __listData
-      const deeper = findAncestorWithListData(child, targetId);
+      // 先检查 root 自身是否有 node.repeat
+      if (typeof root.repeat === 'string' && root.repeat) return root;
+      // 再递归看 child 及其后代中有没有更近的祖先带 node.repeat
+      const deeper = findAncestorWithRepeat(child, targetId);
       return deeper;
     }
   }
@@ -318,7 +331,7 @@ function ElementTypeSection({
         value={currentType}
         onChange={(e) => {
           editorStore.execute({
-            type: 'changeElementType',
+            type: 'element.changeType',
             params: { nodeId, newType: e.target.value as PrimitiveNodeType },
           });
         }}
@@ -501,7 +514,7 @@ function TemplateRefActions({
         type="button"
         className="px-2 py-0.5 text-[10px] rounded border border-gray-300 bg-white hover:bg-gray-50"
         onClick={() => {
-          const r = editorStore.execute({ type: 'detachInstance', params: { nodeId } });
+          const r = editorStore.execute({ type: 'asset.detachInstance', params: { nodeId } });
           if (!r.success) return;
         }}
       >
@@ -511,7 +524,7 @@ function TemplateRefActions({
         type="button"
         className="px-2 py-0.5 text-[10px] rounded border border-blue-300 bg-white hover:bg-blue-50 text-blue-700"
         onClick={() => {
-          editorStore.execute({ type: 'syncInstance', params: { nodeId } });
+          editorStore.execute({ type: 'asset.syncInstance', params: { nodeId } });
         }}
       >
         从模板同步
@@ -591,9 +604,9 @@ function TextContentSection({ nodeType, nodeId, children }: TextContentSectionPr
   const parentListFields = useMemo(() => {
     if (!node) return [];
     for (const screen of editorStore.screens) {
-      const ancestor = findAncestorWithListData(screen.rootNode, nodeId);
+      const ancestor = findAncestorWithRepeat(screen.rootNode, nodeId);
       if (!ancestor) continue;
-      const listExpr = ancestor.props?.__listData;
+      const listExpr = ancestor.repeat;
       if (typeof listExpr !== 'string') continue;
       const merged = getMergedScreenData(screen);
       const resolved = resolveDataPath(merged, listExpr);
@@ -623,7 +636,7 @@ function TextContentSection({ nodeType, nodeId, children }: TextContentSectionPr
                   const expr = `{{item.${field}}}`;
                   setLocalText(expr);
                   editorStore.execute({
-                    type: 'updateComponentProps',
+                    type: 'componentProps.update',
                     params: { nodeId, props: { textContent: expr } },
                   });
                 }}
@@ -642,7 +655,7 @@ function TextContentSection({ nodeType, nodeId, children }: TextContentSectionPr
         onChange={(e) => {
           setLocalText(e.target.value);
           editorStore.execute({
-            type: 'updateComponentProps',
+            type: 'componentProps.update',
             params: {
               nodeId,
               props: { textContent: e.target.value },
@@ -780,9 +793,11 @@ function PropControl({
 
   const handleExpressionChange = (expression: string) => {
     if (!nodeId) return;
+    // v2：bindData op 已删除；直接把表达式字符串写入对应 prop 字段，
+    // SchemaRenderer 会在含 `{{ }}` 时走 expression 引擎求值。
     editorStore.execute({
-      type: 'bindData',
-      params: { nodeId, propKey, expression },
+      type: 'componentProps.update',
+      params: { nodeId, props: { [propKey]: expression } },
     });
   };
 
@@ -1007,7 +1022,7 @@ function CustomAttributesSection({
 
   const handleRemove = (key: string) => {
     editorStore.execute({
-      type: 'updateComponentProps',
+      type: 'componentProps.update',
       params: { nodeId, props: { [key]: undefined } },
     });
   };

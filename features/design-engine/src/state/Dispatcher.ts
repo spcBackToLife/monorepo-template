@@ -21,7 +21,6 @@
 import type {
   Action,
   DataSource,
-  ScreenState,
   EffectStatus,
   StateSetAction,
   StateAppendAction,

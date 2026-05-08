@@ -1,10 +1,11 @@
 import type { ComponentTemplate, Screen } from '@globallink/design-schema';
-import { SchemaRenderer, type InteractionPreview } from '@globallink/design-engine';
+import { SchemaRenderer, type InteractionPreview, type EvalContext } from '@globallink/design-engine';
 import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 
 interface PanoramaCellProps {
   screen: Screen;
   assets: ComponentTemplate[];
+  /** v2: 该 cell 用于覆盖 view 变量预览值（key = view 变量名） */
   globalStates: Record<string, string>;
   interactionPreview?: InteractionPreview | null;
   label: string;
@@ -37,6 +38,11 @@ export function PanoramaCell({
   active = false,
   onClick,
 }: PanoramaCellProps) {
+  // v2: 把 cell 级别的 view 变量预览映射注入 SchemaRenderer.dataContext.state.view
+  // （编辑期没有 store，data/effects 留空；列表绑定如需 data，参考 buildEditorPreviewState）。
+  const cellDataContext: EvalContext = {
+    state: { data: {}, view: { ...globalStates }, effects: {} },
+  };
   // Auto-size mode: render at natural size, no viewport scaling
   if (autoSize) {
     return (
@@ -77,7 +83,7 @@ export function PanoramaCell({
             <SchemaRenderer
               screen={screen}
               assets={assets}
-              globalStates={globalStates}
+              dataContext={cellDataContext}
               staticAssetOrigin={getEditorStaticAssetOrigin()}
               interactionPreview={interactionPreview}
               hideGhostNodes
@@ -160,7 +166,7 @@ export function PanoramaCell({
           <SchemaRenderer
             screen={screen}
             assets={assets}
-            globalStates={globalStates}
+            dataContext={cellDataContext}
             staticAssetOrigin={getEditorStaticAssetOrigin()}
             interactionPreview={interactionPreview}
             hideGhostNodes

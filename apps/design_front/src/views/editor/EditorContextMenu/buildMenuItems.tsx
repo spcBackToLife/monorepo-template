@@ -330,7 +330,18 @@ export function handleEditorContextMenuClick(
             return;
           }
           const node = findNodeInScreens(editorStore.screens, targetNodeId);
-          const nodeStyles: StyleOverrides = { ...(node?.styles ?? {}) };
+          // v2 node.styles 是 ExpressionStyles，可能含 {{ }} 表达式字符串；
+          // 这里仅用于素材槽位清理后的样式回写，过滤掉表达式值，保留字面量。
+          const sourceStyles = node?.styles ?? {};
+          const nodeStyles: StyleOverrides = {};
+          for (const [k, v] of Object.entries(sourceStyles)) {
+            if (typeof v === 'string') {
+              if (v.includes('{{')) continue;
+              (nodeStyles as Record<string, string | number>)[k] = v;
+            } else if (typeof v === 'number') {
+              (nodeStyles as Record<string, string | number>)[k] = v;
+            }
+          }
           const deleted = await materialSlotApi.remove(projectId, slotId);
 
           const { resetProperties, updateStyles } = getStyleCleanupAfterMaterialSlotRemove(
@@ -339,13 +350,13 @@ export function handleEditorContextMenuClick(
           );
           if (resetProperties.length > 0) {
             editorStore.execute({
-              type: 'resetStyle',
+              type: 'style.reset',
               params: { nodeId: targetNodeId, properties: resetProperties },
             });
           }
           if (updateStyles && Object.keys(updateStyles).length > 0) {
             editorStore.execute({
-              type: 'updateStyle',
+              type: 'style.update',
               params: { nodeId: targetNodeId, styles: updateStyles },
             });
           }
@@ -394,7 +405,7 @@ export function handleEditorContextMenuClick(
 
   if (key === 'dup') {
     if (isRoot) return;
-    const r = editorStore.execute({ type: 'duplicateElement', params: { elementId: targetNodeId } });
+    const r = editorStore.execute({ type: 'element.duplicate', params: { elementId: targetNodeId } });
     if (r.success && r.affectedNodeIds[1]) {
       editorStore.select(r.affectedNodeIds[1]);
     } else if (!r.success) {
@@ -405,7 +416,7 @@ export function handleEditorContextMenuClick(
 
   if (key === 'del') {
     if (isRoot) return;
-    editorStore.execute({ type: 'removeElement', params: { elementId: targetNodeId } });
+    editorStore.execute({ type: 'element.remove', params: { elementId: targetNodeId } });
     editorStore.select(null);
     return;
   }
@@ -413,7 +424,7 @@ export function handleEditorContextMenuClick(
   if (key === 'wrap') {
     if (isRoot) return;
     const r = editorStore.execute({
-      type: 'wrapInContainer',
+      type: 'element.wrap',
       params: {
         nodeIds: [targetNodeId],
         containerTag: 'div',

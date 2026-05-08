@@ -26,7 +26,7 @@ export const AddElementPanel = observer(function AddElementPanel() {
     // Add to root node of active screen
     const parentId = screen.rootNode.id;
     const result = editorStore.execute({
-      type: 'addElement',
+      type: 'element.add',
       params: { parentId, tag: tag as PrimitiveNodeType, elementId: generateNodeId() },
     });
     if (result.success) {
@@ -87,7 +87,7 @@ const ComponentAssetList = observer(function ComponentAssetList() {
     const screen = editorStore.activeScreen;
     if (!screen) return;
     const result = editorStore.execute({
-      type: 'instantiateTemplate',
+      type: 'asset.instantiateTemplate',
       params: { templateId, parentId: screen.rootNode.id },
     });
     if (result.success) {

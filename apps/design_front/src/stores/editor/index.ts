@@ -1,5 +1,12 @@
 import { makeAutoObservable, runInAction, toJS } from 'mobx';
-import type { ComponentNode, CSSProperties, DesignProject, DomainStateVariable, Screen, Viewport } from '@globallink/design-schema';
+import type {
+  ComponentNode,
+  CSSProperties,
+  DesignProject,
+  Screen,
+  Viewport,
+  ViewVariableDef,
+} from '@globallink/design-schema';
 import { generateNodeId, normalizeNode } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
 import { OperationExecutor, findNodeInScreens, findParent, findParentInScreens, walkTree } from '@globallink/design-operations';
@@ -80,15 +87,21 @@ function writeStoredCanvasView(projectId: string, scale: number, panX: number, p
   }
 }
 
-/** 会影响当前页领域态 Schema 的操作：执行后须重跑 initGlobalStatesForScreen */
-const DOMAIN_STATE_SCHEMA_OPS = new Set<string>([
-  'addDomainState',
-  'removeDomainState',
-  'updateDomainState',
-  'setDomainStatePreview',
-  'addDomainStateBinding',
-  'removeDomainStateBinding',
-  'updateDomainStateBinding',
+/**
+ * 会影响"页面级 view 变量"的 v2 op：执行后须重跑 initStatePreviewForScreen，
+ * 让 currentStatePreview 与 schema 同步（影响表达式作用域）。
+ */
+const STATE_PREVIEW_RESYNC_OPS = new Set<string>([
+  'screenState.addViewVariable',
+  'screenState.removeViewVariable',
+  'screenState.updateViewVariable',
+  'screenState.setViewPreview',
+  'screenState.setDataInit',
+  'screenState.removeDataInit',
+  'globalState.addViewVariable',
+  'globalState.removeViewVariable',
+  'globalState.updateViewVariable',
+  'globalState.setViewPreview',
 ]);
 
 export type ToolType = 'select' | 'hand' | 'container' | 'element' | 'text' | 'component' | 'annotation';
@@ -96,14 +109,12 @@ export type ToolType = 'select' | 'hand' | 'container' | 'element' | 'text' | 'c
 /** 右侧面板可滚动分区（用于「展开并定位」） */
 export type RightPanelSectionId = 'props' | 'styles' | 'states' | 'events' | 'data' | 'code' | 'children';
 
-/** Phase 3：编辑上下文（五层状态驱动） */
+/** Phase 3：编辑上下文（v2：移除 v1 lockedDomain，仅保留 visualState 维度的预览） */
 export interface EditorStateContext {
-  /** 交互态预览：default | hover | active | focus | disabled */
+  /** 交互态预览：default | hover | active | focus | disabled | <自定义> */
   interactionState: string;
-  /** 正在编辑 props/styles 覆盖的组件态；null = base/default */
+  /** 正在编辑 props/styles 覆盖的视觉态；null = base/default */
   componentStateEditing: string | null;
-  /** 领域态上下文锁定（子元素导航不丢预览） */
-  lockedDomain: { variableName: string } | null;
 }
 
 export type LeftPanelView = 'pages' | 'elements' | 'data' | 'materials';
@@ -158,7 +169,6 @@ export class EditorStore {
   stateContext: EditorStateContext = {
     interactionState: 'default',
     componentStateEditing: null,
-    lockedDomain: null,
   };
 
   /** 各折叠区块是否收起（key = section id） */
@@ -261,13 +271,13 @@ export class EditorStore {
 
   /** Critical operation types that should flush immediately to prevent data loss */
   private readonly criticalOperationTypes = new Set([
-    'saveAsTemplate',        // Creating component template
-    'deleteTemplate',        // Deleting component template
-    'duplicateTemplate',     // Duplicating component template
-    'createScreen',          // Creating new screen
-    'deleteScreen',          // Deleting screen (risky operation)
-    'createEnvironmentState', // Environment state management
-    'deleteEnvironmentState',
+    'asset.saveAsTemplate',     // Creating component template
+    'template.delete',           // Deleting component template
+    'template.duplicate',        // Duplicating component template
+    'screen.add',                // Creating new screen
+    'screen.remove',             // Deleting screen (risky operation)
+    'globalState.addViewVariable',    // Project-level state mgmt
+    'globalState.removeViewVariable',
   ]);
 
   /** Retry state for failed operations */
@@ -305,32 +315,30 @@ export class EditorStore {
   }
 
   /**
-   * 当前选中节点可继承的领域态变量：页面级 + 自选中节点向上到根的各容器上定义的 domainStates。
+   * 当前屏幕作用域内可见的 view 变量定义（v2）：
+   *   - 项目级 globalStateInit.view（所有屏幕共享）
+   *   - 当前屏幕 stateInit.view（屏幕私有，与 global 同名时屏幕覆盖）
+   *
+   * 仅供编辑器面板（变量列表 / 表达式补全）参考；运行时 evalContext 由渲染器组装。
    */
-  get resolvedInheritedDomainStates(): DomainStateVariable[] {
+  get resolvedViewVariables(): ViewVariableDef[] {
     const screen = this.activeScreen;
+    const project = this.project;
     if (!screen) return [];
     const seen = new Set<string>();
-    const out: DomainStateVariable[] = [];
-    const push = (list: DomainStateVariable[] | undefined) => {
-      for (const d of list ?? []) {
-        if (!seen.has(d.id)) {
-          seen.add(d.id);
-          out.push(d);
+    const out: ViewVariableDef[] = [];
+    const push = (defs: Record<string, ViewVariableDef> | undefined) => {
+      if (!defs) return;
+      for (const def of Object.values(defs)) {
+        if (!seen.has(def.name)) {
+          seen.add(def.name);
+          out.push(def);
         }
       }
     };
-    push(screen.domainStates);
-    const nodeId = this.selectedNodeIds[0];
-    if (!nodeId) return out;
-    let cur: string | null = nodeId;
-    while (cur) {
-      const fp = findParentInScreens(this.screens, cur);
-      if (!fp) break;
-      const parent = findNodeInScreens(this.screens, fp.parent.id);
-      push(parent?.domainStates);
-      cur = fp.parent.id;
-    }
+    // 屏幕级先（同名覆盖项目级）
+    push(screen.stateInit?.view);
+    push(project?.globalStateInit?.view);
     return out;
   }
 
@@ -412,7 +420,6 @@ export class EditorStore {
     this.stateContext = {
       interactionState: 'default',
       componentStateEditing: null,
-      lockedDomain: null,
     };
     this.collapsedSections = {};
     this.rightPanelScrollToSection = null;
@@ -465,8 +472,8 @@ export class EditorStore {
     runInAction(() => {
       this.projectState = this.executor!.getProject();
       this.selectedNodeIds = [...this.selectedNodeIds];
-      // setActiveScreen 在数据层是 no-op，但 UI 必须切换当前页（见 design-operations/screen.ts）
-      if (op.type === 'setActiveScreen' && result.success) {
+      // screen.setActive 在数据层是 no-op，但 UI 必须切换当前页（见 design-operations/screen.ts）
+      if (op.type === 'screen.setActive' && result.success) {
         this.activeScreenId = op.params.screenId;
         this.selectedNodeIds = [];
         this.hoveredNodeId = null;
@@ -474,9 +481,9 @@ export class EditorStore {
       } else if (
         result.success &&
         this.activeScreen &&
-        DOMAIN_STATE_SCHEMA_OPS.has(op.type)
+        STATE_PREVIEW_RESYNC_OPS.has(op.type)
       ) {
-        // 新增/删除领域态或改预览值后，画布 globalStates 需与 Schema 同步（否则分页等绑定不生效）
+        // view 变量增删改预览值后，画布 globalStates 需与 Schema 同步
         this.initGlobalStatesForScreen();
       }
     });
@@ -501,7 +508,7 @@ export class EditorStore {
     runInAction(() => {
       this.projectState = this.executor!.getProject();
       this.selectedNodeIds = [...this.selectedNodeIds];
-      if (op.type === 'setActiveScreen' && result.success) {
+      if (op.type === 'screen.setActive' && result.success) {
         this.activeScreenId = op.params.screenId;
         this.selectedNodeIds = [];
         this.hoveredNodeId = null;
@@ -509,7 +516,7 @@ export class EditorStore {
       } else if (
         result.success &&
         this.activeScreen &&
-        DOMAIN_STATE_SCHEMA_OPS.has(op.type)
+        STATE_PREVIEW_RESYNC_OPS.has(op.type)
       ) {
         this.initGlobalStatesForScreen();
       }
@@ -782,14 +789,6 @@ export class EditorStore {
     this.stateContext = { ...this.stateContext, componentStateEditing: name };
   }
 
-  lockDomainState(variableName: string): void {
-    this.stateContext = { ...this.stateContext, lockedDomain: { variableName } };
-  }
-
-  unlockDomainState(): void {
-    this.stateContext = { ...this.stateContext, lockedDomain: null };
-  }
-
   toggleSectionCollapsed(sectionId: string): void {
     this.collapsedSections = {
       ...this.collapsedSections,
@@ -890,7 +889,17 @@ export class EditorStore {
     if (!nodeId) return;
     const node = findNodeInScreens(this.screens, nodeId);
     if (!node) return;
-    const styles: Partial<CSSProperties> = node.styles ?? {};
+    // node.styles 在 v2 是 ExpressionStyles（每个值可为表达式或字面量）；
+    // 复制时仅复制字面量值，过滤掉表达式串（粘贴到其他节点时可能上下文不存在）。
+    const sourceStyles = node.styles ?? {};
+    const styles: Partial<CSSProperties> = {};
+    for (const [k, v] of Object.entries(sourceStyles)) {
+      if (typeof v === 'string' || typeof v === 'number') {
+        // 跳过 {{...}} 表达式（不能跨节点直接复用）
+        if (typeof v === 'string' && v.includes('{{')) continue;
+        (styles as Record<string, string | number>)[k] = v;
+      }
+    }
     runInAction(() => {
       this.styleClipboard = { ...styles };
     });
@@ -906,7 +915,7 @@ export class EditorStore {
         : [...this.selectedNodeIds];
     for (const nodeId of ids) {
       this.execute({
-        type: 'updateStyle',
+        type: 'style.update',
         params: { nodeId, styles: clip },
       });
     }
@@ -924,7 +933,7 @@ export class EditorStore {
       const properties = Object.keys(node.styles ?? {});
       if (properties.length === 0) continue;
       this.execute({
-        type: 'resetStyle',
+        type: 'style.reset',
         params: { nodeId, properties },
       });
     }
@@ -936,7 +945,7 @@ export class EditorStore {
     const id = this.selectedNodeIds[0];
     const rootId = this.activeScreen?.rootNode.id;
     if (!id || !rootId || id === rootId) return;
-    this.execute({ type: 'removeElement', params: { elementId: id } });
+    this.execute({ type: 'element.remove', params: { elementId: id } });
     this.select(null);
   }
 
@@ -989,7 +998,7 @@ export class EditorStore {
 
     walkTree(subtree, (n) => { n.id = generateNodeId(); });
     const r = this.execute({
-      type: 'insertSubtree',
+      type: 'element.insertSubtree',
       params: { parentId, subtree, position },
     });
     if (r.success && r.affectedNodeIds[0]) {
@@ -1020,18 +1029,35 @@ export class EditorStore {
     this.viewportOverflow = overflow;
   }
 
-  /** 初始化领域态 + 环境态预览值（写入 currentGlobalStates 供画布解析） */
+  /**
+   * 初始化当前屏幕的 view 变量预览值（v2）：
+   *   - 项目级 globalStateInit.view → defaultValue（先放）
+   *   - 屏幕级 stateInit.view       → previewValue ?? defaultValue（后放，同名覆盖）
+   *
+   * 写入 currentGlobalStates 供画布渲染器作为 state.view.* 表达式作用域使用。
+   * 注：v2 的 state.data.* 由 dataSource / effect.fetch 运行时驱动，本方法不预填。
+   */
   initGlobalStatesForScreen(): void {
     const screen = this.activeScreen;
     const project = this.project;
     if (!screen) return;
     const states: Record<string, string> = {};
-    for (const gs of screen.domainStates ?? []) {
-      states[gs.name] = gs.currentPreviewValue ?? gs.defaultValue;
-    }
-    for (const ev of project?.environmentStates ?? []) {
-      states[ev.name] = ev.currentPreviewValue ?? ev.defaultValue;
-    }
+    const fillFromDefs = (defs: Record<string, ViewVariableDef> | undefined, preferPreview: boolean) => {
+      if (!defs) return;
+      for (const def of Object.values(defs)) {
+        const value = preferPreview && def.previewValue !== undefined ? def.previewValue : def.defaultValue;
+        // currentGlobalStates 仍是 string-stringly map（兼容旧消费者：CanvasContextBar / Toolbar 等读 string）；
+        // 非字符串值序列化以避免 [object Object]
+        states[def.name] =
+          typeof value === 'string'
+            ? value
+            : value === undefined || value === null
+              ? ''
+              : JSON.stringify(value);
+      }
+    };
+    fillFromDefs(project?.globalStateInit?.view, true);
+    fillFromDefs(screen.stateInit?.view, true);
     this.currentGlobalStates = states;
   }
 
@@ -1076,7 +1102,6 @@ export class EditorStore {
     this.stateContext = {
       interactionState: 'default',
       componentStateEditing: null,
-      lockedDomain: null,
     };
     this.collapsedSections = {};
     this.rightPanelScrollToSection = null;

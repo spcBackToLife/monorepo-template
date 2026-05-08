@@ -180,12 +180,12 @@ export const MaterialEditorPanel = observer(function MaterialEditorPanel() {
     const isImg = node?.type === 'img';
     if (isImg) {
       editorStore.execute({
-        type: 'updateComponentProps',
+        type: 'componentProps.update',
         params: { nodeId, props: { src: item.url } },
       });
     } else {
       editorStore.execute({
-        type: 'updateStyle',
+        type: 'style.update',
         params: {
           nodeId,
           styles: {

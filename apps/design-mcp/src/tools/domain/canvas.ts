@@ -904,7 +904,7 @@ export function registerCanvasTools(server: McpServer): void {
     apply_material_design: defineAction({
       description: '将素材编辑器的CSS属性集合应用到设计Schema的目标节点（素材编辑器↔设计编辑器的桥梁）',
       schema: z.object({ projectId:z.string(),nodeId:z.string(),styleUpdates:z.record(z.string(),z.union([z.string(),z.number()])) }),
-      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeOperation(p.projectId,{type:'applyMaterialDesign',params:{nodeId:p.nodeId,styleUpdates:p.styleUpdates}}),null,2)}] }),
+      handler: async (p)=>({ content:[{type:'text',text:JSON.stringify(await api.executeOperation(p.projectId,{type:'material.applyDesign',params:{nodeId:p.nodeId,styleUpdates:p.styleUpdates}}),null,2)}] }),
     }),
 
     // ── Server-side Export & Apply (MCP 独有能力) ──
@@ -1054,7 +1054,7 @@ export function registerCanvasTools(server: McpServer): void {
         }
 
         const applyResult = await api.executeOperation(projectId, {
-          type: 'applyMaterialDesign',
+          type: 'material.applyDesign',
           params:
             applyCssTarget === 'border-image'
               ? {

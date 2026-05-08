@@ -1,73 +1,268 @@
 /**
- * 数据源 — 合并原 7 个工具为 1 个
+ * 数据源（v2 endpoint+mock 共存模型）
+ *
+ * 与 design-operations 的 dataSource.* op 一一对应。
+ * 与 v1 区别：
+ *   - 不再有 phase / scenarios 顶层概念，mock 场景挂在 ApiDataSource.mock.scenarios 下
+ *   - endpoint 直接挂在 ApiDataSource 下，不分 design/develop/production
+ *   - StaticDataSource 用 initial 字段表示常量数据
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { generateId } from '@globallink/design-schema';
+import type {
+  ApiDataSource,
+  StaticDataSource,
+  ApiEndpoint,
+  MockScenario,
+  Expression,
+} from '@globallink/design-schema';
 import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.js';
 import { apiClient } from '../../api-client.js';
-import type { DataPayload } from '../../types/canvas.js';
+
+const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
+
+const EndpointSchema = z.object({
+  method: HttpMethodSchema,
+  path: z.string().describe('如 "/api/chat/list" 或 "{{state.view.host}}/foo"'),
+  headers: z.record(z.string(), z.string()).optional(),
+  query: z.record(z.string(), z.unknown()).optional(),
+  body: z.record(z.string(), z.unknown()).optional().describe('对象或表达式字符串；GET 不填'),
+  responseSchema: z.record(z.string(), z.unknown()).optional(),
+});
+
+const MockScenarioSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  statusCode: z.number().int().describe('HTTP 状态码，如 200/404/500'),
+  delay: z.number().int().nonnegative().describe('模拟网络延迟 ms'),
+  isTimeout: z.boolean().optional(),
+  responseBody: z.unknown(),
+});
 
 export function registerDataSourceTools(server: McpServer): void {
-  registerDomainTool(server, 'data_source', '数据源的 CRUD、生命周期阶段切换、场景管理与数据绑定', {
+  registerDomainTool(server, 'data_source', '数据源（static / api endpoint+mock 共存）的 CRUD、Mock 场景管理与配置', {
     list: defineAction({
-      description: '列出指定屏幕的所有数据源（含生命周期阶段与场景）',
+      description: '列出指定屏幕的所有数据源（含 endpoint 与 mock.scenarios，活动 mock 场景由 mock.activeScenarioId 标识）',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),
       handler: async (p) => {
         const result = await apiClient.listDataSources(p.projectId, p.screenId);
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
+
     add: defineAction({
-      description: '创建数据源（API 或 static 类型）',
-      schema: z.object({ projectId: z.string(), screenId: z.string(), id: z.string(), name: z.string(), lifecycle: z.enum(['api','static']), description: z.string().optional() }),
+      description:
+        '创建数据源。type=static → 提供 initial（常量数据）。type=api → 同时提供 endpoint（真实接口配置）与至少一个 mock 场景（编辑期可用）。' +
+        'autoFetchOnEnter 控制是否在 screenEnter 时自动 fetch（默认 false）。',
+      schema: z.object({
+        projectId: z.string(),
+        screenId: z.string(),
+        id: z.string().describe('数据源 ID（屏幕内唯一），表达式中以 state.effects.<id>.* 引用'),
+        name: z.string(),
+        type: z.enum(['static', 'api']),
+        description: z.string().optional(),
+        // static
+        initial: z.unknown().optional().describe('static 类型必填'),
+        // api
+        endpoint: EndpointSchema.optional().describe('api 类型必填'),
+        autoFetchOnEnter: z.boolean().optional(),
+        defaultParams: z.record(z.string(), z.unknown()).optional(),
+        mockScenarios: z.array(MockScenarioSchema).optional().describe('api 类型至少 1 条；首条作为初始 active'),
+        activeMockScenarioId: z.string().optional(),
+      }),
       handler: async (p) => {
-        const sid = generateId();
-        const result = await apiClient.executeOperation(p.projectId, { type: 'addDataSource', params: { screenId:p.screenId, dataSource:{ id:p.id, name:p.name, lifecycle:p.lifecycle, description:p.description, scenarios:[{id:sid,name:'默认',data:{},isDefault:true}], activeScenarioId:sid }} });
+        let dataSource: StaticDataSource | ApiDataSource;
+        if (p.type === 'static') {
+          dataSource = {
+            id: p.id,
+            name: p.name,
+            type: 'static',
+            description: p.description,
+            initial: p.initial ?? null,
+          };
+        } else {
+          if (!p.endpoint) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'api type requires endpoint' }) }] };
+          }
+          // p.endpoint 来自 zod，body 是 Record<string, unknown> 与 ApiEndpoint.body 兼容
+          const endpoint = p.endpoint as unknown as ApiEndpoint;
+          const scenarios: MockScenario[] = (p.mockScenarios ?? []) as unknown as MockScenario[];
+          const activeId = p.activeMockScenarioId ?? scenarios[0]?.id ?? '';
+          const apiDs: ApiDataSource = {
+            id: p.id,
+            name: p.name,
+            type: 'api',
+            description: p.description,
+            endpoint,
+            autoFetchOnEnter: p.autoFetchOnEnter ?? false,
+          };
+          if (p.defaultParams) {
+            apiDs.defaultParams = p.defaultParams as Record<string, Expression | unknown>;
+          }
+          if (scenarios.length > 0) {
+            apiDs.mock = { scenarios, activeScenarioId: activeId };
+          }
+          dataSource = apiDs;
+        }
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.add',
+          params: { screenId: p.screenId, dataSource },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
-    switch_phase: defineAction({
-      description: '切换 API 数据源生命周期阶段',
-      schema: z.object({ projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), phase: z.string() }),
+
+    remove: defineAction({
+      description: '删除数据源',
+      schema: z.object({ projectId: z.string(), screenId: z.string(), dataSourceId: z.string() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'switchDataSourcePhase', params: { screenId:p.screenId, dataSourceId:p.dataSourceId, phase:p.phase } });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.remove',
+          params: { screenId: p.screenId, dataSourceId: p.dataSourceId },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
-    add_scenario: defineAction({
-      description: '向数据源添加数据场景',
-      schema: z.object({ projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), id: z.string(), name: z.string(), data: z.record(z.string(),z.unknown()), description: z.string().optional(), isDefault: z.boolean().optional() }),
+
+    update: defineAction({
+      description: '更新数据源元信息（name / description / autoFetchOnEnter）',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        autoFetchOnEnter: z.boolean().optional().describe('仅 api 类型生效'),
+      }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'addDataScenario', params: { screenId:p.screenId, dataSourceId:p.dataSourceId, scenario:{ id:p.id, name:p.name, data:p.data, description:p.description, isDefault:p.isDefault }} });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.update',
+          params: {
+            screenId: p.screenId,
+            dataSourceId: p.dataSourceId,
+            name: p.name,
+            description: p.description,
+            autoFetchOnEnter: p.autoFetchOnEnter,
+          },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
-    update_scenario: defineAction({
-      description: '更新数据场景',
-      schema: z.object({ projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), scenarioId: z.string(), data: z.record(z.string(),z.unknown()).optional(), name: z.string().optional(), description: z.string().optional() }),
+
+    set_endpoint: defineAction({
+      description: '设置/替换 api 数据源的 endpoint（method/path/headers/query/body/responseSchema）',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
+        endpoint: EndpointSchema,
+      }),
       handler: async (p) => {
-        const baseParams: DataPayload = { screenId:p.screenId, dataSourceId:p.dataSourceId, scenarioId:p.scenarioId };
-        if (p.data !== undefined) baseParams.data = p.data;
-        if (p.name !== undefined) baseParams.name = p.name;
-        if (p.description !== undefined) baseParams.description = p.description;
-        const result = await apiClient.executeOperation(p.projectId, { type: 'updateDataScenario', params: baseParams });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.setEndpoint',
+          params: { screenId: p.screenId, dataSourceId: p.dataSourceId, endpoint: p.endpoint as unknown as ApiEndpoint },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
-    switch_scenario: defineAction({
-      description: '切换数据源当前活动场景',
-      schema: z.object({ projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), scenarioId: z.string() }),
+
+    set_default_params: defineAction({
+      description: '设置 api 数据源的默认 params（effect.fetch 不传 params 时使用）；传 null 清空',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
+        defaultParams: z.record(z.string(), z.unknown()).nullable(),
+      }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'switchDataScenario', params: { screenId:p.screenId, dataSourceId:p.dataSourceId, scenarioId:p.scenarioId } });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.setDefaultParams',
+          params: {
+            screenId: p.screenId,
+            dataSourceId: p.dataSourceId,
+            defaultParams: p.defaultParams as Record<string, Expression | unknown> | null,
+          },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
-    bind_data: defineAction({
-      description: '将数据表达式绑定到节点属性（如 {{data.user.name}}）',
-      schema: z.object({ projectId: z.string(), nodeId: z.string(), propKey: z.string(), expression: z.string() }),
+
+    set_static_initial: defineAction({
+      description: '更新 static 数据源的 initial 常量数据',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
+        initial: z.unknown(),
+      }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'bindData', params: { nodeId:p.nodeId, propKey:p.propKey, expression:p.expression } });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.setStaticInitial',
+          params: { screenId: p.screenId, dataSourceId: p.dataSourceId, initial: p.initial },
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
+
+    add_mock_scenario: defineAction({
+      description: '为 api 数据源添加一个 Mock 场景（statusCode / delay / responseBody / 可选 isTimeout）',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
+        scenario: MockScenarioSchema,
+      }),
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.addMockScenario',
+          params: { screenId: p.screenId, dataSourceId: p.dataSourceId, scenario: p.scenario as unknown as MockScenario },
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
+
+    update_mock_scenario: defineAction({
+      description: '局部更新 Mock 场景（仅传需要改的字段）',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), scenarioId: z.string(),
+        changes: z.object({
+          name: z.string().optional(),
+          description: z.string().optional(),
+          statusCode: z.number().int().optional(),
+          delay: z.number().int().nonnegative().optional().describe('网络延迟 ms'),
+          isTimeout: z.boolean().optional(),
+          responseBody: z.unknown().optional(),
+        }),
+      }),
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.updateMockScenario',
+          params: {
+            screenId: p.screenId,
+            dataSourceId: p.dataSourceId,
+            scenarioId: p.scenarioId,
+            changes: p.changes as Partial<MockScenario>,
+          },
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
+
+    remove_mock_scenario: defineAction({
+      description: '删除某个 Mock 场景（如果删的是 active，会自动切到剩余首个）',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), scenarioId: z.string(),
+      }),
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.removeMockScenario',
+          params: { screenId: p.screenId, dataSourceId: p.dataSourceId, scenarioId: p.scenarioId },
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
+
+    switch_mock_scenario: defineAction({
+      description: '切换 api 数据源当前激活的 Mock 场景（编辑期 / 预览 mock 模式生效）',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(), scenarioId: z.string(),
+      }),
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.switchMockScenario',
+          params: { screenId: p.screenId, dataSourceId: p.dataSourceId, scenarioId: p.scenarioId },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

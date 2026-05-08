@@ -181,7 +181,6 @@ function PreviewInteractiveShell({
   const previewDataContext: DataContext = useMemo(
     () => buildScreenDataContext(screen, storeRef.current.getState()),
     // 依赖 forceTick 让 subscribe 后重新计算
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [screen, storeRef.current.getState()],
   );
 

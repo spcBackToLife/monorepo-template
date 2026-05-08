@@ -17,7 +17,7 @@
  * 使用：在 RightPanel 的"高级"或"页面"入口挂载即可。
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import type {

@@ -112,7 +112,7 @@ export function FilterEditor({ currentFilter, onApply }: FilterEditorProps) {
 
     const value = cssValue || 'none';
     editorStore.execute({
-      type: 'updateStyle',
+      type: 'style.update',
       params: { nodeId, styles: { filter: value } },
     });
 

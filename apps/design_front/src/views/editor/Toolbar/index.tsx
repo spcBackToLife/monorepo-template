@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Select, Button, Typography, Segmented, Dropdown, Switch, Tooltip, App as AntdApp } from 'antd';
-import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined, FileTextOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,7 +34,7 @@ export const Toolbar = observer(function Toolbar() {
   const handleViewportChange = (key: string) => {
     const vp = viewportOptions.find((item) => item.key === key)?.viewport;
     if (vp) {
-      editorStore.execute({ type: 'switchViewport', params: { viewport: vp } });
+      editorStore.execute({ type: 'viewport.switch', params: { viewport: vp } });
     }
   };
 
@@ -44,18 +44,32 @@ export const Toolbar = observer(function Toolbar() {
 
   const activeScreen = editorStore.activeScreen;
   const dataSources = activeScreen?.dataSources ?? [];
-  const screenGlobalStates = activeScreen?.domainStates ?? [];
 
-  const handleDataSourceScenarioSwitch = (dataSourceId: string, scenarioId: string) => {
+  /**
+   * v2 替代 v1 屏幕级 domainStates 的 toolbar 切换器：
+   * 只列出有 enum（编辑器知道可选值）的 view 变量，方便 toolbar 一键切预览。
+   */
+  const enumViewVariables = (() => {
+    const screenViewDefs = activeScreen?.stateInit?.view ?? {};
+    return Object.values(screenViewDefs).filter((v) => Array.isArray(v.enum) && v.enum.length > 0);
+  })();
+
+  /** v2：切换 api 数据源激活的 mock 场景（替代 v1 switchDataScenario） */
+  const handleMockScenarioSwitch = (dataSourceId: string, scenarioId: string) => {
     if (!activeScreen) return;
     editorStore.execute({
-      type: 'switchDataScenario',
+      type: 'dataSource.switchMockScenario',
       params: { screenId: activeScreen.id, dataSourceId, scenarioId },
     });
   };
 
-  const handleGlobalStateChange = (variableName: string, value: string) => {
-    editorStore.setCurrentGlobalState(variableName, value);
+  /** v2：切换 view 变量预览值（不写运行时 state，仅写编辑期 schema preview） */
+  const handleViewPreviewSwitch = (variableName: string, value: unknown) => {
+    if (!activeScreen) return;
+    editorStore.execute({
+      type: 'screenState.setViewPreview',
+      params: { screenId: activeScreen.id, name: variableName, previewValue: value },
+    });
   };
 
   return (
@@ -76,7 +90,7 @@ export const Toolbar = observer(function Toolbar() {
               ? ALL_VIEWPORTS.find((x) => x.platform === 'pc')
               : ALL_VIEWPORTS.find((x) => x.platform !== 'pc');
             if (fallback) {
-              editorStore.execute({ type: 'switchViewport', params: { viewport: fallback } });
+              editorStore.execute({ type: 'viewport.switch', params: { viewport: fallback } });
             }
           }}
           options={[
@@ -101,39 +115,61 @@ export const Toolbar = observer(function Toolbar() {
           style={{ width: 140 }}
           options={screens.map((s) => ({ label: s.name, value: s.id }))}
         />
-        {dataSources.length > 0 && activeScreen && (
-          <Tooltip title="当前页数据源（{{data.*}} 解析来源）">
-            <Select
-              size="small"
-              value={dataSources[0]?.activeScenarioId}
-              onChange={(scenarioId) => {
-                const ds = dataSources.find(d => d.scenarios.some(s => s.id === scenarioId));
-                if (ds) handleDataSourceScenarioSwitch(ds.id, scenarioId);
-              }}
-              style={{ width: 128 }}
-              options={dataSources.flatMap((ds) =>
-                ds.scenarios.map((sc) => ({ label: `${ds.name} / ${sc.name}`, value: sc.id }))
-              )}
-            />
-          </Tooltip>
-        )}
-        {screenGlobalStates.length > 0 && activeScreen && (
-          <Tooltip title="当前页全局变量（状态绑定与表达式；与预览顶栏一致）">
+        {dataSources.length > 0 && activeScreen && (() => {
+          // v2：仅 api 类型且配了 mock 场景的数据源能在 toolbar 切场景
+          const apiWithMock = dataSources.filter(
+            (ds): ds is Extract<typeof ds, { type: 'api' }> =>
+              ds.type === 'api' && (ds.mock?.scenarios?.length ?? 0) > 0,
+          );
+          if (apiWithMock.length === 0) return null;
+          const first = apiWithMock[0];
+          const activeScenarioId = first.mock?.activeScenarioId;
+          const allOptions = apiWithMock.flatMap((ds) =>
+            (ds.mock?.scenarios ?? []).map((sc) => ({
+              label: `${ds.name} / ${sc.name}`,
+              value: sc.id,
+              dataSourceId: ds.id,
+            })),
+          );
+          return (
+            <Tooltip title="当前页 api 数据源激活的 Mock 场景（编辑期/预览-mock 模式生效）">
+              <Select
+                size="small"
+                value={activeScenarioId || undefined}
+                onChange={(scenarioId) => {
+                  const opt = allOptions.find((o) => o.value === scenarioId);
+                  if (opt) handleMockScenarioSwitch(opt.dataSourceId, scenarioId);
+                }}
+                style={{ width: 160 }}
+                options={allOptions.map(({ label, value }) => ({ label, value }))}
+              />
+            </Tooltip>
+          );
+        })()}
+        {enumViewVariables.length > 0 && activeScreen && (
+          <Tooltip title="当前页 view 变量预览值（仅显示带 enum 的；改值会写入 schema previewValue，画布表达式跟随）">
             <span className="toolbar-global-states flex items-center gap-1 flex-wrap">
-              {screenGlobalStates.map((gs) => (
-                <span key={gs.name} className="flex items-center gap-0.5">
-                  <span className="text-[10px] text-gray-500 max-w-[56px] truncate" title={gs.name}>
-                    {gs.name}
+              {enumViewVariables.map((vv) => {
+                const currentValue =
+                  vv.previewValue !== undefined ? vv.previewValue : vv.defaultValue;
+                return (
+                  <span key={vv.name} className="flex items-center gap-0.5">
+                    <span className="text-[10px] text-gray-500 max-w-[56px] truncate" title={vv.label ?? vv.name}>
+                      {vv.label ?? vv.name}
+                    </span>
+                    <Select
+                      size="small"
+                      value={currentValue as string | number | boolean}
+                      onChange={(v) => handleViewPreviewSwitch(vv.name, v)}
+                      style={{ width: 88 }}
+                      options={(vv.enum ?? []).map((opt) => ({
+                        label: opt.label,
+                        value: opt.value as string | number | boolean,
+                      }))}
+                    />
                   </span>
-                  <Select
-                    size="small"
-                    value={editorStore.currentGlobalStates[gs.name] ?? gs.defaultValue}
-                    onChange={(v) => handleGlobalStateChange(gs.name, String(v))}
-                    style={{ width: 88 }}
-                    options={gs.values.map((v) => ({ label: v.label, value: v.value }))}
-                  />
-                </span>
-              ))}
+                );
+              })}
             </span>
           </Tooltip>
         )}
@@ -243,7 +279,7 @@ export const Toolbar = observer(function Toolbar() {
             />
           </span>
         </Tooltip>
-        <Tooltip title="在画布上方显示数据源/领域态/环境态上下文条">
+        <Tooltip title="在画布上方显示数据源 / view 变量预览的上下文条">
           <span className="toolbar-inline-switch">
             <span className="toolbar-inline-switch__label">上下文</span>
             <Switch
@@ -287,13 +323,7 @@ export const Toolbar = observer(function Toolbar() {
           }}
           title="全景视图（查看所有状态）"
         />
-        <Tooltip title="产品全景 PRD + 交互链路图">
-          <Button
-            type="text"
-            icon={<FileTextOutlined />}
-            onClick={() => navigate('blueprint')}
-          />
-        </Tooltip>
+        {/* 「产品全景 PRD」按钮已随 v1 Blueprint 模块一并移除，待 D.6 按 v2 schema 重写后恢复 */}
         <Button
           type="text"
           icon={<UndoOutlined />}

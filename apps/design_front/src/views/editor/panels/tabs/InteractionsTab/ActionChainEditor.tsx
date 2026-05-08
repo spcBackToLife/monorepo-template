@@ -12,6 +12,8 @@ import { useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import type { ActionType } from '@globallink/design-schema';
+import { ExpressionEditor } from '@/views/editor/components/ExpressionEditor';
+import { useExpressionScope } from '@/views/editor/components/ExpressionEditor/useExpressionScope';
 import {
   ACTION_TYPES,
   ACTION_TYPES_NO_EFFECT_FETCH,
@@ -225,7 +227,21 @@ function EffectFetchForm({
   const dsId = typeof action.dataSourceId === 'string' ? action.dataSourceId : '';
   const paramsJson = typeof action.params === 'object' && action.params !== null
     ? JSON.stringify(action.params, null, 0)
-    : '';
+    : typeof action.params === 'string' ? action.params : '';
+  const scope = useExpressionScope({ allowItem: true });
+
+  const commitParams = (txt: string) => {
+    if (!txt) {
+      update('params', undefined);
+      return;
+    }
+    try {
+      update('params', JSON.parse(txt));
+    } catch {
+      // 容错：暂存原文（可能含 `{{...}}` 未 parse），保存事件时上层再处理
+      update('params', txt);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-1 pl-4">
@@ -249,26 +265,14 @@ function EffectFetchForm({
           暂无 api 数据源，请先在「数据」面板创建。
         </div>
       )}
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">params:</span>
-        <input
-          type="text"
-          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none font-mono"
-          placeholder='{"text":"{{ state.view.inputDraft }}"} 可选'
+      <div className="flex items-start gap-1">
+        <span className="text-[10px] text-gray-500 w-12 flex-shrink-0 pt-1">params:</span>
+        <ExpressionEditor
           value={paramsJson}
-          onChange={(e) => {
-            const txt = e.target.value;
-            if (!txt) {
-              update('params', undefined);
-              return;
-            }
-            try {
-              update('params', JSON.parse(txt));
-            } catch {
-              // 容错：暂存原文，让用户继续编辑；保存事件时会再次 parse
-              update('params', txt);
-            }
-          }}
+          onChange={commitParams}
+          scope={scope}
+          mode="template"
+          placeholder='{"text":"{{ state.view.inputDraft }}"} 可选'
         />
       </div>
       <ActionChainEditor

@@ -305,7 +305,7 @@ export function GradientEditor({
     }
 
     editorStore.execute({
-      type: 'updateStyle',
+      type: 'style.update',
       params: {
         nodeId,
         styles: { background: cssValue },

@@ -14,7 +14,8 @@ import { LeftPanel } from './panels/LeftPanel';
 import { RightPanel } from './panels/RightPanel';
 import { PanelResizer } from './panels/PanelResizer';
 import { BottomToolbar } from './BottomToolbar';
-import { PreviewBar } from './PreviewBar';
+// v1 PreviewBar 已随 D.5 删除（按 phase/scenario/domainState 顶栏切换条），
+// 预览状态切换待 D.6 按 v2 模型（env mock/http + view 预览）重写后恢复。
 import { AiOperationToast } from './AiOperationToast';
 import { MaterialEditorModal } from './panels/MaterialEditor/MaterialEditorModal';
 import './editor.css';
@@ -34,7 +35,6 @@ export const EditorWorkspace = observer(function EditorWorkspace() {
   return (
     <div className="editor-layout">
       <Toolbar />
-      {editorStore.previewMode && <PreviewBar />}
       <div className="editor-body">
         {!editorStore.leftPanelCollapsed ? (
           <>

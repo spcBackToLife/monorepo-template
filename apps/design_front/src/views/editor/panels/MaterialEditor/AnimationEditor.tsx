@@ -262,7 +262,7 @@ export function AnimationEditor() {
 
     // 应用 animation 到选中节点的 styles
     editorStore.execute({
-      type: 'updateStyle',
+      type: 'style.update',
       params: {
         nodeId,
         styles: {

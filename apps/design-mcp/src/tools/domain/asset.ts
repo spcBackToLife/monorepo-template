@@ -13,7 +13,7 @@ export function registerAssetTools(server: McpServer): void {
       description: '从组件资产库实例化一个组件到指定位置',
       schema: z.object({ projectId: z.string(), templateId: z.string(), parentId: z.string(), position: z.number().optional() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'instantiateTemplate', params: { templateId: p.templateId, parentId: p.parentId, position: p.position } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'asset.instantiateTemplate', params: { templateId: p.templateId, parentId: p.parentId, position: p.position } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -24,7 +24,7 @@ export function registerAssetTools(server: McpServer): void {
         tags: z.array(z.string()).optional(), description: z.string().optional(),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'saveAsTemplate', params: { nodeId: p.nodeId, name: p.name, category: p.category, tags: p.tags, description: p.description, templateId: generateTemplateId() } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'asset.saveAsTemplate', params: { nodeId: p.nodeId, name: p.name, category: p.category, tags: p.tags, description: p.description, templateId: generateTemplateId() } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -40,7 +40,7 @@ export function registerAssetTools(server: McpServer): void {
       description: '将组件实例设为脱离模板（不再随模板更新同步）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'detachInstance', params: { nodeId: p.nodeId } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'asset.detachInstance', params: { nodeId: p.nodeId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -48,7 +48,7 @@ export function registerAssetTools(server: McpServer): void {
       description: '从关联模板重新同步实例结构（需仍为引用模式）',
       schema: z.object({ projectId: z.string(), nodeId: z.string() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'syncInstance', params: { nodeId: p.nodeId } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'asset.syncInstance', params: { nodeId: p.nodeId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -56,7 +56,7 @@ export function registerAssetTools(server: McpServer): void {
       description: '更新组件模板属性（名称/分类/描述）',
       schema: z.object({ projectId: z.string(), templateId: z.string(), patch: z.record(z.string(), z.unknown()) }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'updateTemplate', params: { templateId: p.templateId, patch: p.patch } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'template.update', params: { templateId: p.templateId, patch: p.patch } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -64,7 +64,7 @@ export function registerAssetTools(server: McpServer): void {
       description: '删除组件模板',
       schema: z.object({ projectId: z.string(), templateId: z.string() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'deleteTemplate', params: { templateId: p.templateId } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'template.delete', params: { templateId: p.templateId } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -72,7 +72,7 @@ export function registerAssetTools(server: McpServer): void {
       description: '复制组件模板',
       schema: z.object({ projectId: z.string(), sourceTemplateId: z.string(), newName: z.string().optional() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'duplicateTemplate', params: { sourceTemplateId: p.sourceTemplateId, newName: p.newName } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'template.duplicate', params: { sourceTemplateId: p.sourceTemplateId, newName: p.newName } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

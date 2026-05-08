@@ -18,7 +18,6 @@ interface StatePreviewStripProps {
   nodeId: string;
   screen: Screen;
   assets: ComponentTemplate[];
-  globalStates: Record<string, string>;
   /** All states defined on the node (from node.states) */
   allNodeStates: Array<{ name: string }>;
   /** Currently active state name */
@@ -38,7 +37,6 @@ export const StatePreviewStrip = observer(function StatePreviewStrip({
   nodeId,
   screen,
   assets,
-  globalStates,
   allNodeStates,
   currentState,
   onStateSelect,
@@ -97,7 +95,6 @@ export const StatePreviewStrip = observer(function StatePreviewStrip({
               nodeId={nodeId}
               stateName={state.value}
               label={state.label}
-              globalStates={globalStates}
               isActive={currentState === state.value}
               onClick={() => onStateSelect(state.value)}
             />

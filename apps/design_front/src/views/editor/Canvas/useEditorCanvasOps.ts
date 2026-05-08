@@ -110,12 +110,12 @@ export function useEditorCanvasOperations(
 
         if (activeState === 'default') {
           editorStore.execute({
-            type: 'updateStyle',
+            type: 'style.update',
             params: { nodeId: id, styles: patch },
           });
         } else {
           editorStore.execute({
-            type: 'updateState',
+            type: 'visualState.update',
             params: { nodeId: id, stateName: activeState, styles: patch },
           });
         }
@@ -169,7 +169,7 @@ export function useEditorCanvasOperations(
     lastFlexReorderRef.current = key;
 
     editorStore.execute({
-      type: 'reorderElement',
+      type: 'element.reorder',
       params: { nodeId, parentId: parent.id, newIndex: bestIndex > currentIndex ? bestIndex - 1 : bestIndex },
     });
   }
@@ -218,12 +218,12 @@ export function useEditorCanvasOperations(
 
       if (activeState === 'default') {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId, styles },
         });
       } else {
         editorStore.execute({
-          type: 'updateState',
+          type: 'visualState.update',
           params: { nodeId, stateName: activeState, styles },
         });
       }

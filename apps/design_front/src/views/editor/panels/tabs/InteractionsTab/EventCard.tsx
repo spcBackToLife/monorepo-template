@@ -9,6 +9,8 @@ import { observer } from 'mobx-react-lite';
 import { editorStore } from '@/stores/editor';
 import type { ComponentEvent } from '@globallink/design-schema';
 import { expr } from '@globallink/design-schema';
+import { ExpressionEditor } from '@/views/editor/components/ExpressionEditor';
+import { useExpressionScope } from '@/views/editor/components/ExpressionEditor/useExpressionScope';
 import { TRIGGER_OPTIONS, type LooseAction, type TriggerType } from './constants';
 import { ActionBadge } from './ActionBadge';
 import { ActionChainEditor } from './ActionChainEditor';
@@ -32,6 +34,7 @@ export const EventCard = observer(function EventCard({ event, eventIndex, nodeId
   const [editTrigger, setEditTrigger] = useState<TriggerType>(event.trigger as TriggerType);
   const [editActions, setEditActions] = useState<LooseAction[]>(() => [...event.actions]);
   const [editConditionExpr, setEditConditionExpr] = useState<string>(event.condition?.when ?? '');
+  const conditionScope = useExpressionScope({ allowItem: true });
 
   const handleDelete = useCallback(() => {
     editorStore.execute({
@@ -95,12 +98,12 @@ export const EventCard = observer(function EventCard({ event, eventIndex, nodeId
 
         <div className="flex items-center gap-1 mt-1">
           <span className="text-[10px] text-gray-500 w-12 flex-shrink-0">条件:</span>
-          <input
-            type="text"
-            className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-xs outline-none font-mono"
-            placeholder='{{ state.view.isEnabled }} 不填则总是执行'
+          <ExpressionEditor
             value={editConditionExpr}
-            onChange={(e) => setEditConditionExpr(e.target.value)}
+            onChange={setEditConditionExpr}
+            scope={conditionScope}
+            mode="expression"
+            placeholder='{{ state.view.isEnabled }} 不填则总是执行'
           />
         </div>
 

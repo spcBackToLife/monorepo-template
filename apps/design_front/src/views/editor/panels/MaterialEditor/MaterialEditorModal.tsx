@@ -104,7 +104,9 @@ function useTargetNodeStyles(nodeId: string | null) {
 
   return useMemo(() => {
     if (!node) return null;
-    const styles: StyleOverrides = node.styles ?? {};
+    // v2 node.styles 是 ExpressionStyles；这里只用作"读最终态"展示，假定表达式字符串
+    // 已是合法 CSS 值或被消费方做了 String() 包装；强转为 StyleOverrides 仅作展示用途。
+    const styles = (node.styles ?? {}) as StyleOverrides;
     const w = styles.width;
     const h = styles.height;
     return {

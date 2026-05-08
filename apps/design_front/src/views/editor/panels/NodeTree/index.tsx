@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } fr
 import { App as AntdApp, Input, Empty } from 'antd';
 import { observer } from 'mobx-react-lite';
 import type { ComponentNode } from '@globallink/design-schema';
-import { hasExpression } from '@globallink/design-engine';
 import { findNodeById, isNodeOrAncestorLocked } from '@globallink/design-operations';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { editorStore } from '@/stores/editor';
@@ -13,6 +12,13 @@ import {
   preloadMaterialSlots,
 } from '../../EditorContextMenu';
 import './nodeTreePanel.css';
+
+/** v2 列表绑定标记：`node.repeat` 是非空字符串或非空对象 */
+function hasListRepeat(node: ComponentNode): boolean {
+  const r = node.repeat;
+  if (typeof r === 'string') return r.trim() !== '';
+  return r != null;
+}
 
 /** W7-021：虚拟行高（与 py-0.5 + text-xs 行大致一致） */
 const ROW_HEIGHT = 28;
@@ -232,8 +238,8 @@ const TreeRow = observer(function TreeRow({
           <span className="flex-1 truncate">{name}</span>
         )}
 
-        {hasExpression(node.props?.__listData as string) && (
-          <span className="flex-shrink-0 text-[10px] text-cyan-600 font-mono px-0.5" title="列表绑定 (__listData)">
+        {hasListRepeat(node) && (
+          <span className="flex-shrink-0 text-[10px] text-cyan-600 font-mono px-0.5" title="列表绑定 (node.repeat)">
             ≡
           </span>
         )}
@@ -385,7 +391,7 @@ export const NewNodeTree = observer(function NewNodeTree() {
     setEditingId(null);
     if (!next || next === (node.name ?? '')) return;
     const result = editorStore.execute({
-      type: 'renameNode',
+      type: 'element.rename',
       params: { nodeId: node.id, name: next },
     });
     if (!result.success) message.error(result.description);
@@ -393,7 +399,7 @@ export const NewNodeTree = observer(function NewNodeTree() {
 
   const toggleLock = useCallback((node: ComponentNode) => {
     const result = editorStore.execute({
-      type: 'setNodeLocked',
+      type: 'element.setLocked',
       params: { nodeId: node.id, locked: !node.locked },
     });
     if (!result.success) message.error(result.description);
@@ -401,7 +407,7 @@ export const NewNodeTree = observer(function NewNodeTree() {
 
   const toggleHidden = useCallback((node: ComponentNode) => {
     const result = editorStore.execute({
-      type: 'setNodeVisible',
+      type: 'element.setVisible',
       params: { nodeId: node.id, visible: !node.visible },
     });
     if (!result.success) message.error(result.description);
@@ -494,7 +500,7 @@ export const NewNodeTree = observer(function NewNodeTree() {
 
     if (pos === 'inside') {
       const result = editorStore.execute({
-        type: 'moveElement',
+        type: 'element.move',
         params: { elementId: sourceId, newParentId: targetId, position: 0 },
       });
       if (!result.success) message.error(result.description);
@@ -508,7 +514,7 @@ export const NewNodeTree = observer(function NewNodeTree() {
       let idx = siblings.findIndex((c) => c.id === targetId);
       if (pos === 'after') idx += 1;
       const result = editorStore.execute({
-        type: 'moveElement',
+        type: 'element.move',
         params: { elementId: sourceId, newParentId: parentId, position: Math.max(0, idx) },
       });
       if (!result.success) message.error(result.description);

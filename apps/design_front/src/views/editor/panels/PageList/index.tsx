@@ -70,7 +70,6 @@ const PageThumbnail = observer(function PageThumbnail({ screen }: { screen: Scre
         <SchemaRenderer
           screen={screen}
           assets={project?.componentAssets ?? []}
-          globalStates={editorStore.currentGlobalStates}
           staticAssetOrigin={getEditorStaticAssetOrigin()}
           hideGhostNodes
           editorCanvasOptimize={false}
@@ -105,18 +104,18 @@ export const NewPageList = observer(function NewPageList() {
   }, []);
 
   const handleSelect = useCallback((screenId: string) => {
-    editorStore.execute({ type: 'setActiveScreen', params: { screenId } });
+    editorStore.execute({ type: 'screen.setActive', params: { screenId } });
   }, []);
 
   const handleAdd = useCallback(() => {
     const name = `页面 ${screens.length + 1}`;
-    editorStore.execute({ type: 'addScreen', params: { name } });
+    editorStore.execute({ type: 'screen.add', params: { name } });
   }, [screens.length]);
 
   const handleDelete = useCallback(
     (screenId: string) => {
       if (screens.length <= 1) return;
-      editorStore.execute({ type: 'removeScreen', params: { screenId } });
+      editorStore.execute({ type: 'screen.remove', params: { screenId } });
     },
     [screens.length],
   );
@@ -130,7 +129,7 @@ export const NewPageList = observer(function NewPageList() {
     (screenId: string) => {
       if (editValue.trim()) {
         editorStore.execute({
-          type: 'renameScreen',
+          type: 'screen.rename',
           params: { screenId, name: editValue.trim() },
         });
       }
@@ -223,7 +222,7 @@ export const NewPageList = observer(function NewPageList() {
                 if (!sourceId) return;
                 const newIndex = computeReorderNewIndex(screens, sourceId, targetId, placement);
                 editorStore.execute({
-                  type: 'reorderScreen',
+                  type: 'screen.reorder',
                   params: { screenId: sourceId, newIndex },
                 });
               }}

@@ -188,7 +188,7 @@ function CanvasToolbar() {
             if (response.ok) {
               const uploaded: MaterialExportUploadResponse = await response.json();
               editorStore.execute({
-                type: 'updateStyle',
+                type: 'style.update',
                 params: {
                   nodeId,
                   styles: {

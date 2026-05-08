@@ -6,7 +6,6 @@ import { HomePage } from '@/views/home';
 import { EditorShell } from '@/views/editor/EditorShell';
 import { EditorWorkspace } from '@/views/editor';
 import { PanoramaPage } from '@/views/editor/Panorama/PanoramaPage';
-import { BlueprintPage } from '@/views/editor/Blueprint/BlueprintPage';
 import { App as AntdApp, ConfigProvider, Spin, theme } from 'antd';
 import { observer } from 'mobx-react-lite';
 import { useEffect } from 'react';
@@ -123,7 +122,6 @@ export const App = observer(function App() {
         >
           <Route index element={<EditorWorkspace />} />
           <Route path="panorama" element={<PanoramaPage />} />
-          <Route path="blueprint" element={<BlueprintPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

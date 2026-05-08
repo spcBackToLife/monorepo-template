@@ -130,7 +130,7 @@ export function getAvailableOperations(): OperationDescription[] {
     },
     {
       type: 'element.setVisibleWhen',
-      description: "Set an expression-driven visibility (node.visibleWhen). Evaluates to a boolean against { state, item, index, parent, \$last, \$ }.",
+      description: "Set an expression-driven visibility (node.visibleWhen). Evaluates to a boolean against { state, item, index, parent, $last, $ }.",
       category: 'element',
       params: [
         { name: 'nodeId', type: 'string', required: true, description: 'Node ID' },

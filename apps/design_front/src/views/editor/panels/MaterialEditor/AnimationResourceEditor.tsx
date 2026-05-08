@@ -433,7 +433,7 @@ export function AnimationResourceEditor() {
 
     // 将 data-animation 属性写入选中节点
     editorStore.execute({
-      type: 'updateComponentProps',
+      type: 'componentProps.update',
       params: {
         nodeId,
         props: schemaProps,
@@ -444,7 +444,7 @@ export function AnimationResourceEditor() {
     if (fileInfo.type === 'gif') {
       const currentConfig = manager.getConfig();
       editorStore.execute({
-        type: 'updateComponentProps',
+        type: 'componentProps.update',
         params: {
           nodeId,
           props: { src: currentConfig.src },

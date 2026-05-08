@@ -162,13 +162,13 @@ export const TextInlineEditor = observer(function TextInlineEditor({
   const save = useCallback(() => {
     if (!node || skipSaveRef.current) return;
     editorStore.execute({
-      type: 'updateComponentProps',
+      type: 'componentProps.update',
       params: { nodeId, props: { text } },
     });
     /** 编辑时用整高 line-height 居中，落库后须 column flex，否则只选中时又回到贴顶 */
     if (captionFlexNeedsPatch(node)) {
       editorStore.execute({
-        type: 'updateStyle',
+        type: 'style.update',
         params: {
           nodeId,
           styles: {

@@ -1,13 +1,16 @@
 /**
  * State / Effect.cancel 类动词参数表单（v2）。
- * 全部纯字段编辑器；effect.fetch（含子链）放在 ActionChainEditor.tsx 内。
+ * 表达式字段统一用 ExpressionEditor（D.4）。
  */
 
-import { type FormProps, type FormCtx, str, num, labelCls, inputCls, selectCls, rowCls } from './formCommon';
+import { ExpressionEditor } from '@/views/editor/components/ExpressionEditor';
+import { useExpressionScope } from '@/views/editor/components/ExpressionEditor/useExpressionScope';
+import { type FormProps, type FormCtx, str, num, labelCls, selectCls, rowCls, inputCls } from './formCommon';
 
 // ===== state.set / state.append / state.merge 共用模板 =====
 
 function StatePathValueForm({ action, update, placeholder }: FormProps & { placeholder: string }) {
+  const scope = useExpressionScope({ allowItem: true });
   return (
     <div className="flex flex-col gap-1 pl-4">
       <div className={rowCls}>
@@ -22,12 +25,12 @@ function StatePathValueForm({ action, update, placeholder }: FormProps & { place
       </div>
       <div className={rowCls}>
         <span className={labelCls}>值:</span>
-        <input
-          type="text"
-          className={`${inputCls} font-mono`}
-          placeholder={placeholder}
+        <ExpressionEditor
           value={str(action, 'value')}
-          onChange={(e) => update('value', e.target.value)}
+          onChange={(next) => update('value', next)}
+          scope={scope}
+          mode="expression"
+          placeholder={placeholder}
         />
       </div>
     </div>
@@ -35,7 +38,7 @@ function StatePathValueForm({ action, update, placeholder }: FormProps & { place
 }
 
 export function StateSetForm(p: FormProps) {
-  return <StatePathValueForm {...p} placeholder="字面量或 {{ state.x + 1 }}" />;
+  return <StatePathValueForm {...p} placeholder='字面量或 {{ state.x + 1 }}' />;
 }
 export function StateAppendForm(p: FormProps) {
   return <StatePathValueForm {...p} placeholder="单个数组项（对象/字面量/表达式）" />;
@@ -47,6 +50,7 @@ export function StateMergeForm(p: FormProps) {
 // ===== state.remove =====
 
 export function StateRemoveForm({ action, update }: FormProps) {
+  const scope = useExpressionScope({ allowItem: true });
   const hasPredicate = typeof action.predicate === 'string' && (action.predicate as string).length > 0;
   return (
     <div className="flex flex-col gap-1 pl-4">
@@ -76,12 +80,12 @@ export function StateRemoveForm({ action, update }: FormProps) {
       )}
       <div className={rowCls}>
         <span className={labelCls}>谓词:</span>
-        <input
-          type="text"
-          className={`${inputCls} font-mono`}
-          placeholder='{{ item.id === state.view.activeId }}（含表达式则忽略 index）'
+        <ExpressionEditor
           value={str(action, 'predicate')}
-          onChange={(e) => update('predicate', e.target.value || undefined)}
+          onChange={(next) => update('predicate', next || undefined)}
+          scope={scope}
+          mode="expression"
+          placeholder='{{ item.id === state.view.activeId }}（含表达式则忽略 index）'
         />
       </div>
     </div>

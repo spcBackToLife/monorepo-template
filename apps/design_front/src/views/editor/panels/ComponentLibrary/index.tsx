@@ -102,7 +102,7 @@ export const ComponentLibrary = observer(function ComponentLibrary({
         return;
       }
       editorStore.execute({
-        type: 'instantiateTemplate',
+        type: 'asset.instantiateTemplate',
         params: { templateId, parentId: rootId },
       });
       onClose();
@@ -110,7 +110,7 @@ export const ComponentLibrary = observer(function ComponentLibrary({
     }
 
     const result = editorStore.execute({
-      type: 'instantiateTemplate',
+      type: 'asset.instantiateTemplate',
       params: { templateId, parentId },
     });
 

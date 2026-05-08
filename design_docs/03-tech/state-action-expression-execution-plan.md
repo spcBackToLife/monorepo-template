@@ -42,9 +42,11 @@
 | **D.1** design_front：状态面板（state.view + state.data） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `04dec67` |
 | **D.2** design_front：事件/动作链面板按新动词 | ✅ | D 编辑器 | ✅ | C.2, D.1 | 2026-05-08 | `2ccdbb9` |
 | **D.3** design_front：数据源面板（endpoint+mock 共存） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | `0b8b4e1` |
-| **D.4** design_front：表达式编辑器（自动补全 + 校验） | ⬜ | D 编辑器 | ✅ | A.2 | — | — |
-| **E.1** design-mcp：工具按新动词重写 | ⬜ | E MCP | ✅ | C.1, C.2 | — | — |
-| **E.2** design-mcp：build + 重新连接 IDE | ⬜ | E MCP | ✅ | E.1 | — | — |
+| **D.4** design_front：表达式编辑器（自动补全 + 校验） | ✅ | D 编辑器 | ✅ | A.2 | 2026-05-08 | （随本次提交） |
+| **D.5** design_front：v1 残留全量清除（typecheck 归零） | ✅ | D 编辑器 | ✅ | C.2 | 2026-05-08 | （随本次提交） |
+| **D.6** design_front：删除的 v1 概念面板按 v2 重写恢复（Blueprint / StatesTab / PreviewBar） | ⬜ | D 编辑器 | ✅ | D.5 | — | — |
+| **E.1** design-mcp：工具按新动词重写 | ✅ | E MCP | ✅ | C.1, C.2 | 2026-05-08 | （随本次提交） |
+| **E.2** design-mcp：build + 重新连接 IDE | 🟡 | E MCP | ✅ | E.1 | — | — |
 | **F.1** 用 MCP 重做 Chat 页面 | ⬜ | F 业务验收 | ✅ | E.2 | — | — |
 | **F.2** 收尾：删迁移层 + 更新 RFC + AGENTS.md | ⬜ | F 业务验收 | ✅ | F.1 | — | — |
 
@@ -61,11 +63,11 @@
 
 | 指标 | 值 |
 |------|---|
-| 总子项 | 15（重构）+ 2（外部） |
-| 已完成 | 12（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2, D.1, D.2, D.3） |
-| 进行中 | D.4（待开工） |
+| 总子项 | 17（重构）+ 2（外部） |
+| 已完成 | 15（P.0, P.1, A.1, A.2, A.3, B.1, B.2, C.1, C.2, D.1, D.2, D.3, D.4, D.5, E.1） |
+| 进行中 | E.2（build + IDE 重连，待用户操作）/ D.6（v1 概念面板按 v2 重建，可与业务并行推进） |
 | 阻塞中 | — |
-| 最新 commit | `0b8b4e1` refactor(editor): data source panel with endpoint+mock coexistence |
+| 最新 commit | E.1 + D.5（design_front typecheck 312→0，monorepo lint 0 errors） |
 
 ---
 
@@ -264,12 +266,150 @@
 
 **工作内容**
 
-- 新增 `components/ExpressionEditor/`：基于 codemirror
-- 自动补全 `state.x.y` / `item.x` / `$.length`
-- 实时调用 expression `validate()` 显示错误
-- 替换面板里所有手写 input 编辑表达式的位置
+- 新增 `components/ExpressionEditor/`：
+  - `index.tsx` — 主组件：受控 input / textarea + 轻量补全浮层 + 下方单行错误提示
+  - `suggestions.ts` — 前缀匹配：state / state.view.* / state.data.* / state.effects.<id>.* / $.length ... / $last.* / item / index / parent
+  - `useExpressionScope.ts` — 从 `editorStore.activeScreen.stateInit` + `dataSources` 派生作用域
+  - `validate.ts` — 调 design-engine 的 `parseExpression` / `parseTemplate` / `parseSingleExpression` 做实时解析校验
+- 替换面板里所有手写 input 编辑表达式的位置：
+  - InteractionsTab: StateForms（state.set/append/merge/remove 的 value、predicate）
+  - InteractionsTab: MiscForms（ui.showToast.message、ui.openUrl.url）
+  - InteractionsTab: ActionChainEditor（effect.fetch.params — multiline）
+  - InteractionsTab: EventCard（condition.when）
+  - DataTab: ApiEditor（endpoint.path、endpoint.body — multiline）
+- 两种模式：`mode='expression'`（裸表达式或单段 `{{...}}`）vs `mode='template'`（允许文本混合多个 `{{...}}`）
+
+**为什么不用 codemirror（RFC §7 原计划）**
+
+codemirror v6 需要引入 `@codemirror/state/view/language/autocomplete/lint` 等 6+ 包、~200KB 产物；
+此处需求较轻（前缀补全 + parse 错误），用原生 input + 浮层即可覆盖 90% 场景。
+若后续需要语法高亮 / 括号匹配，再做增量升级，不阻塞 D.4 收官。
 
 **commit message**: `feat(editor): expression editor with autocomplete + validation`
+
+---
+
+#### D.5 design_front：v1 残留全量清除（typecheck 归零）
+
+**背景**
+
+D.1～D.4 期间为快速推进，把 design_front 中"非本次面板范围内的 v1 残留"
+（如 stores/editor、Toolbar、PreviewBar、RightPanel、Blueprint、MaterialEditor、Canvas
+等约 50 个文件、312 处 typecheck 错误）暂时绕过，使主干 typecheck 红着进入 E。
+进入 E 阶段后必须先把这些清干净，否则 pre-commit hook 卡住，且这些文件里继续藏着
+v1 名词，违反 AGENTS.md §九「无双版本」红线。
+
+**工作内容**
+
+按文件批次（每批 1～3 个文件）走"读 → 改 → typecheck → 下一批"循环，
+全部按 RFC §4 的 v1→v2 字段映射修，禁止"加 if 兼容旧格式"或 `as any` 绕过。
+
+主要修复模式：
+
+1. **op 名升级**（dot-namespace）：
+   - `addElement / removeElement / moveElement / duplicateElement` → `element.add / .remove / .move / .duplicate`
+   - `updateStyle / resetStyle / batchUpdateStyle` → `style.update / .reset / .batchUpdate`
+   - `addState / removeState / updateState / setActiveState / resetStateStyle / setChildVisibility` → `visualState.*`
+   - `addEvent / removeEvent / updateEvent / addNavigation` → `event.*`
+   - `addScreen / removeScreen / setActiveScreen / renameScreen / reorderScreen` → `screen.*`
+   - `addDataSource / removeDataSource / addDataScenario / switchDataScenario / switchDataSourcePhase` → `dataSource.*`（含场景挪到 mock）
+   - `setNodeLocked / setNodeVisible / setNodeVisibilityWhen / changeElementType / renameNode / wrapInContainer / unwrapContainer / reorderElement / insertSubtree` → `element.*`
+   - `applyMaterialDesign` → `material.applyDesign`
+   - `updateComponentProps / addPropDefinition / removePropDefinition` → `componentProps.*`
+   - `instantiateTemplate / saveAsTemplate / detachInstance / syncInstance / updateTemplate / deleteTemplate / duplicateTemplate` → `asset.* / template.*`
+   - `switchViewport / addViewportPreset` → `viewport.*`
+   - `addAnnotation / removeAnnotation` → `annotation.*`
+   - `addDomainState* / setDomainStatePreview / addDomainStateBinding / updateDomainStateBinding / removeDomainStateBinding` → `screenState.* / globalState.*`（无 binding 概念，删该面板/UI）
+   - `addEnvironmentState / setEnvironmentPreview / addEnvironmentBinding` → `globalState.*`
+
+2. **schema 字段升级**：
+   - `Screen.domainStates` → `Screen.stateInit.view`
+   - `node.domainStates` → 删（节点级运行态由全屏 state.data 表达）
+   - `node.domainStateBindings / environmentBindings` → 删（用 styles/props/visibleWhen 表达式取代）
+   - `node.visibilityWhen` → `node.visibleWhen`（Expression<boolean> 字符串）
+   - `node.__listData` → `node.repeat`（Expression<unknown[]>）
+   - `DesignProject.environmentStates` → `DesignProject.globalStateInit.view`
+   - `DataSource.scenarios / activeScenarioId / activePhase / phases` → `ApiDataSource.mock.{scenarios, activeScenarioId}` + `endpoint`（StaticDataSource 无 mock）
+
+3. **API 升级**：
+   - `hasExpression(...)` → `parseExpression(...)`（design-engine 已重命名）
+   - `materializeLegacyInstances` 清理（已在 C.2 删过，前端入口残留同步删）
+
+4. **删除整段死代码**：
+   - `DomainStateResponseSection` / `NodeVisibilityCondition`（v1 binding UI）：直接删除文件，不再渲染
+   - `ChildrenStateBindings` 改名/重写为 `ChildrenVisualStateMapping`（visualState 子映射，非 binding）
+   - editorStore 中 `_legacyInstanceIndex` / 旧 selector 全量删
+
+**禁用做法（红线）**
+
+- ❌ 任何 `as any` / `// @ts-expect-error` / `// @ts-ignore`（除非有 issue 链接 + 删除时间表）
+- ❌ 任何 `if (oldFmt) { /* 兼容 v1 */ }` 分支
+- ❌ 把 `domainStates` 改成 `(node as any).domainStates` 这种"骗过 ts"的写法
+
+**验收**
+
+- `pnpm --filter @globallink/design_front typecheck` 错误数 = 0
+- `pnpm --filter @globallink/design_front lint` 0 个 `no-explicit-any` 报错
+- grep `domainState\|environmentState\|visibilityWhen\|__listData\|globalStateBinding\|environmentBindings` 在 apps/design_front/src 下零匹配
+- pre-commit hook 通过
+
+**commit message**: `refactor(editor): drop all v1 residue from design_front (typecheck → 0)`
+
+---
+
+#### D.6 design_front：删除的 v1 概念面板按 v2 重写恢复
+
+**背景**
+
+D.5 为快速归零，把以下"完全 v1 概念"的面板/视图整段删除，等独立子项按 v2
+模型重新设计：
+
+1. **Blueprint 模块**（`apps/design_front/src/views/editor/Blueprint/`）：
+   原"产品全景 PRD + 流图"分析器，按 v1 schema（domainStates / environmentStates /
+   apiEndpoints）写。v2 应基于 stateInit + dataSources（endpoint+mock）重新
+   分析。Toolbar 的「产品全景 PRD」按钮一并撤掉。
+
+2. **PreviewBar**（`apps/design_front/src/views/editor/PreviewBar/`）：
+   原预览模式顶栏，提供 phase / scenario / domainState / environmentState
+   切换。v2 应改为：环境切换（mock/http）+ view 变量预览 + mock 场景切换；
+   且大部分能力已被 PreviewRenderer 内 Store + EffectExecutor 接管，预览顶栏的
+   职责需要重新定义。
+
+3. **StatesTab**（`apps/design_front/src/views/editor/panels/tabs/StatesTab/`）：
+   原"状态绑定矩阵 + 组合预览"面板。v2 已无 binding 模型；视觉态由
+   StylesTab + StateContextBar 承担，view 变量由 StatePanel + ExpressionEditor 承担，
+   组合预览交给 Panorama 矩阵全景。原 StatesTab 的"产品状态描述"价值需要
+   通过新设计回收。
+
+4. **RightPanel 三个 v1 子组件**（已删，不需要恢复）：
+   - DomainStateResponseSection（按 domainState 值的样式 binding）
+   - NodeVisibilityCondition（按 domainState 值判可见）
+   - ChildrenStateBindings（子元素状态绑定）
+
+   它们的功能在 v2 通过表达式 + InteractionsTab + visualState.setChildVisibility
+   已自然覆盖，不需要单独面板。
+
+**工作内容**
+
+- 重写 Blueprint：v2 SchemaAnalyzer 按 stateInit / dataSources / events.actions
+  重新生成 PRD 数据；FlowView 按 nav.go / state.set 等 v2 动词构图；导出 markdown
+  同步。Toolbar 按钮恢复。
+- 重写 PreviewBar：极简顶栏，含
+  「mock / http 环境切换」+「mock 场景切换（多 api 数据源时）」+ 「view 变量
+  enum 预览切换」三组件。
+- 重写 StatesTab（或决定不恢复）：评估"按 view 变量值矩阵 × 节点视觉态"组合
+  预览是否仍有价值；若有，新设计走 stateInit + visualState 模型。
+
+**禁止做法**：直接复活 D.5 删除的代码（违反 §九「无双版本」）。新版本在
+重新规划 schema 后用新文件名写。
+
+**验收**
+
+- typecheck / lint 全过
+- 主流程功能（数据源 mock 切换、view 变量预览）等价于 D.5 前
+- 新模块全部使用 v2 schema 字段（grep `domainState\|environmentState` 在新代码中零匹配）
+
+**commit message**: `feat(editor): rebuild blueprint / preview-bar / states-panel on v2 schema`
 
 ---
 
@@ -354,3 +494,6 @@
 | 2026-05-08 | D.1 完成 — 新增 `views/editor/panels/StatePanel/`：view 变量编辑器（增删改 + 预览值切换，走 `screenState.addViewVariable` / `removeViewVariable` / `updateViewVariable` / `setViewPreview`）+ data 初始值编辑器（走 `screenState.setDataInit` / `removeDataInit`），表单含 JSON 解析 + 字段校验；挂在 RightPanel「高级」区块"页面状态"位置；StatePanel 自身 typecheck 干净（design_front 整包 typecheck 仍受其他 v1 残留阻塞，待 D.2/D.3） | AI 助手 |
 | 2026-05-08 | D.2 完成（commit `2ccdbb9`）— InteractionsTab 全面按 v2 动词重写，op 名升级到 `event.add/remove/update`，ACTION_TYPES 全部 dot-namespace（state.* / effect.* / nav.* / node.* / ui.* / custom），condition 统一为 `{ when: Expression<boolean> }`，TRIGGER_OPTIONS 新增 change/submit；按 AGENTS.md §四.4.2 拆为 8 个 ≤300 行子文件（constants/formCommon/StateForms/MiscForms/ActionBadge/ActionChainEditor/EventCard/AddEventForm/index）；effect.fetch 子链禁止再嵌 fetch；切动词保留共享字段；子目录自身 typecheck + lint 全干净，主干仍受 design-mcp v1 残留阻塞 | AI 助手 |
 | 2026-05-08 | D.3 完成（commit `0b8b4e1`）— DataTab 全面重写为 endpoint+mock 共存模型：每个数据源一张卡片，static → StaticEditor（仅 initial），api → ApiEditor（endpoint + autoFetchOnEnter + defaultParams + MockScenariosSection，场景 CRUD + 激活切换）；顶部 PreviewEnvSwitcher 写入 editorStore.previewEffectEnv，待 PreviewRenderer 接入 EffectExecutor 消费；新建表单 NewDataSourceForm 校验 name 合法性与唯一性；op 名全部升级为 v2 dot-namespace（dataSource.add/remove/update/setEndpoint/setDefaultParams/setStaticInitial/addMockScenario/updateMockScenario/removeMockScenario/switchMockScenario）；按 AGENTS.md §四.4.2 拆为 7 个 ≤300 行子文件（index 147 / helpers 143 / DataSourceCard 134 / StaticEditor 116 / ApiEditor 205 / MockScenarios 271 / NewDataSourceForm 138）；editorStore 新增 previewEffectEnv 状态 + setter；helpers.parseEndpointBody 用 expr() 把非对象输入包成 Expression 字符串；DataTab 子目录 typecheck + lint 全干净，主干仍受 design-mcp v1 残留阻塞 | AI 助手 |
+| 2026-05-08 | D.4 完成 — 新增 `components/ExpressionEditor/`（index 250 / suggestions 201 / useExpressionScope 58 / validate 64，全部 ≤300 行）：原生 input+textarea 受控实现，前缀补全（state.view/data/effects.<id>.status|data|error / $ builtins / $last / item/index/parent / true/false/null/undefined），↑↓ 选候、Enter/Tab 插入、Esc 关闭；mode 分 template（允许混合文本）/ expression（裸表达式或单段 `{{...}}`）；实时调用 design-engine 的 `parseExpression` / `parseTemplate` / `parseSingleExpression` 做解析校验，错误下方单行展示；替换 InteractionsTab（StateForms.value/predicate、MiscForms.message/url、ActionChainEditor.params、EventCard.condition.when）与 DataTab（ApiEditor.path/body）的手写 input；决策放弃 codemirror v6 依赖（~200KB / 6+ 包），原生实现覆盖 90% 场景；相关子目录 typecheck + lint 全干净，主干 typecheck 错误全部是 D.4 前就存在的 editorStore v1 残留 | AI 助手 |
+| 2026-05-08 | E.1 完成 — design-mcp 全套工具按 v2 op 名 + 新动词重写：① 删除 `tools/domain/domain-state.ts`、`tools/domain/environment-state.ts`、`resources/domain-state-resources.ts`、`resources/environment-state-resources.ts`（v1 概念消除）；② 新增 `tools/domain/state.ts`（10 个 action：list / view_add/remove/update/set_preview / data_set_init/remove_init / global_view_add/remove/update/set_preview，分别走 `screenState.*` 与 `globalState.*` op）和 `resources/state-resources.ts`（state://screen + state://project，对齐项目级 globalStateInit + 屏幕级 stateInit）；③ 重写 `tools/domain/data-source.ts` 为 endpoint+mock 共存模型（list / add / remove / update / set_endpoint / set_default_params / set_static_initial / add_mock_scenario / update_mock_scenario / remove_mock_scenario / switch_mock_scenario，type 枚举 static / api，MockScenario 字段对齐 schema：statusCode / delay / responseBody / isTimeout）；④ element/style/asset/component-prop/canvas/misc-grouped/component-recipes 全文升级到 v2 op 名（`element.*` / `style.*` / `asset.*` / `template.*` / `componentProps.*` / `material.applyDesign` / `visualState.*` / `event.*` / `screen.*` / `viewport.*` / `annotation.*`），并补 element 工具新 action：set_visible_when（表达式 string，替代 v1 visibilityWhen）/ set_repeat（列表绑定）/ set_bind（受控双向绑定）/ set_role；⑤ component-recipes 的主按钮配方动作链改为 v2 动词 `node.setVisualState` + 操作改为 `element.add` / `visualState.add` / `event.add` 组合；⑥ 主入口 `index.ts` 注册改造（version 0.2.0 → 0.3.0），删除 v1 的 `registerDomainStateTools` / `registerEnvironmentTools` 与对应 resources，新增 `registerStateTools` + `registerStateResources`；⑦ design-mcp typecheck + build（dist/index.js 163KB）+ lint 全过；grep `addElement|removeState|updateStyle|...` 等 v1 op 名零匹配 | AI 助手 |
+| 2026-05-08 | D.5 完成 — design_front v1 残留全量清除（typecheck 312→0）：① editorStore 重写（`DomainStateVariable` 引用删除、`resolvedInheritedDomainStates` getter 改为 `resolvedViewVariables`、`DOMAIN_STATE_SCHEMA_OPS` set 改为 `STATE_PREVIEW_RESYNC_OPS` 含 v2 `screenState.*` / `globalState.*` op、`initGlobalStatesForScreen` 按 `screen.stateInit.view` + `project.globalStateInit.view` 派生预览值、execute 中 `setActiveScreen` op 名升级、`criticalOperationTypes` 改 v2、`copyStyles` 过滤 ExpressionStyles 中的表达式串、`stateContext.lockedDomain` 字段连同 lock/unlockDomainState 删除）；② 删除 v1 概念组件 `RightPanel/DomainStateResponseSection.tsx` / `NodeVisibilityCondition.tsx` / `ChildrenStateBindings.tsx`，从 RightPanel/index.tsx 摘除（v2 由表达式 + InteractionsTab + visualState.setChildVisibility 承担）；③ 删除 v1 `Blueprint/` 整目录（37+11+3+3+1+2 个错误，按 v1 schema 写的 PRD 分析器，待 D.6 重写）+ 删 Toolbar 「产品全景 PRD」按钮 + app/index.tsx 路由；④ 删除 v1 `PreviewBar/`（390 行，按 phase/scenario/domainState/environmentState 顶栏切换条，v2 待 D.6 重写）+ editor/index.tsx 摘除引用；⑤ 删除 v1 `panels/tabs/StatesTab/`（含 StateCombinationPreview，整段按 v1 binding 矩阵写）；⑥ Panorama/useCombinations.ts 重写：page 模式按"屏幕级 view 变量带 enum 的"做笛卡尔积取代 v1 domainStates 矩阵；⑦ Panorama/PanoramaCell.tsx：用 `EvalContext` 构造 dataContext 注入 SchemaRenderer，替代 v1 globalStates props；⑧ 在 design-engine `index.tsx` 公开 `buildScreenDataContext` / `buildEditorPreviewState` / `hasExpression` / `resolveExpressionValue` / `resolvePropsExpressions` + DataContext 类型，supplant v1 `hasExpression` 引用；⑨ 一次性脚本 `/tmp/rename-ops.mjs` 把 90 处 v1 op 名 (`type: 'addElement'` 等 56 个动词)按 dot-namespace 升级到 v2，覆盖 29 个文件；⑩ 删除遗留 `RightPanel/index.tsx.orig` 备份文件（违反 §九）；⑪ NodeTree / collectNodeIdsWithListBinding / PropsTab.ListBindingSection：v1 `props.__listData` 全量改为 v2 `node.repeat` + `element.setRepeat` op，PropsTab 中 `findAncestorWithListData` 改名 `findAncestorWithRepeat`；⑫ ExpressionInput / PropsTab.getMergedScreenData：v1 `ds.activePhase / scenarios` 改为 v2 `static.initial` / `api.mock.activeScenarioId` 取数；⑬ ExpressionStyles 类型：StyleEditor / EditorContextMenu / MaterialEditorModal 三处 styles 转 StyleOverrides 时增加表达式过滤（typeof v === 'string' && v.includes('{{') 跳过）；⑭ Toolbar / CanvasContextBar 全量重写为 v2：mock 场景切换 + 屏幕/项目级 view 变量 enum 预览切换；⑮ Canvas/index.tsx：handleSelect 把 v1 `setDomainState` actions 等价为 v2 `state.set path: 'view.xxx'`，删除 `handlePreviewSwitchDataSourcePhase` callback 与 PreviewRenderer 的 `globalStates / currentDataSet / onSwitchDataSourcePhase` props（v2 PreviewRenderer 内部 store 接管），SchemaRenderer globalStates → dataContext，新增 `editorDataContext` useMemo 复用，`TransitionAnimation` 类型 → `NavTransitionAnimation`；⑯ ChildrenVisibilitySection：`ComponentState` 类型 → `VisualState`；⑰ 顺手修 `design-operations/executor/description.ts` 的 `\$` 不必要转义、`design-engine/preview/PreviewRenderer.tsx` 与 `state/Dispatcher.ts` 的 lint 残留、`StatePanel/index.tsx` 与 `useExpressionScope.ts` 的 D.4/D.1 lint 残留；⑱ 全 monorepo typecheck + lint + build 通过，pre-commit hook 解锁；最终 grep `domainState\|environmentState\|visibilityWhen\|__listData\|globalStateBinding\|environmentBindings` 在 apps/design_front/src 下零代码匹配（仅余 4 处迁移说明注释） | AI 助手 |

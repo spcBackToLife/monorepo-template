@@ -94,8 +94,12 @@ export function usePanoramaCombinations(
     }
 
     // ===== Page Panorama =====
-    const domainStates = screen.domainStates ?? [];
-    if (domainStates.length === 0) {
+    // v2：按"屏幕级 view 变量中带 enum 的"做笛卡尔积。
+    // 无 enum 变量则退化为单格当前态预览。
+    const enumViewDefs = Object.values(screen.stateInit?.view ?? {}).filter(
+      (v) => Array.isArray(v.enum) && v.enum.length > 0,
+    );
+    if (enumViewDefs.length === 0) {
       return [
         {
           id: 'page-default',
@@ -106,16 +110,22 @@ export function usePanoramaCombinations(
       ];
     }
 
-    // Full cartesian product of all domain state variables
-    const valueArrays = domainStates.map((ds) =>
-      ds.values.map((v) => ({
-        varName: ds.name,
-        value: v.value,
-        label: v.label || v.value,
+    interface ComboItem {
+      varName: string;
+      value: unknown;
+      label: string;
+    }
+
+    // Full cartesian product of all enum view variables
+    const valueArrays: ComboItem[][] = enumViewDefs.map((vv) =>
+      (vv.enum ?? []).map((opt) => ({
+        varName: vv.name,
+        value: opt.value,
+        label: opt.label || String(opt.value),
       })),
     );
 
-    const allCombinations = cartesianProduct(valueArrays);
+    const allCombinations = cartesianProduct<ComboItem>(valueArrays);
 
     // Cap at MAX_COMBINATIONS
     const capped = allCombinations.slice(0, MAX_COMBINATIONS);
@@ -126,7 +136,12 @@ export function usePanoramaCombinations(
       category: 'custom' as const,
       globalStates: {
         ...currentGlobalStates,
-        ...Object.fromEntries(combo.map((c) => [c.varName, c.value])),
+        ...Object.fromEntries(
+          combo.map((c) => [
+            c.varName,
+            typeof c.value === 'string' ? c.value : JSON.stringify(c.value),
+          ]),
+        ),
       },
     }));
   }, [screen, targetNodeId, currentGlobalStates]);

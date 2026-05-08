@@ -81,13 +81,13 @@ export function useCanvasInteractions(containerRef: React.RefObject<HTMLElement 
         // Ensure parent has position
         if (!parentNode.styles.position || parentNode.styles.position === 'static') {
           editorStore.execute({
-            type: 'updateStyle',
+            type: 'style.update',
             params: { nodeId: parentId, styles: { position: 'relative' } },
           });
         }
 
         const result = editorStore.execute({
-          type: 'addElement',
+          type: 'element.add',
           params: { parentId, tag: tagMap[tool] as PrimitiveNodeType, elementId: generateNodeId(), styles: droppedStyles },
         });
 

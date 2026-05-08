@@ -54,11 +54,11 @@ export const StateContextBar = observer(function StateContextBar() {
     if (value !== 'default' && node && nodeId) {
       const exists = allStates.some((s) => s.name === value);
       if (!exists) {
-        editorStore.execute({ type: 'addState', params: { nodeId, stateName: value } });
+        editorStore.execute({ type: 'visualState.add', params: { nodeId, stateName: value } });
       }
-      editorStore.execute({ type: 'setActiveState', params: { nodeId, stateName: value } });
+      editorStore.execute({ type: 'visualState.setActive', params: { nodeId, stateName: value } });
     } else if (value === 'default' && nodeId) {
-      editorStore.execute({ type: 'setActiveState', params: { nodeId, stateName: 'default' } });
+      editorStore.execute({ type: 'visualState.setActive', params: { nodeId, stateName: 'default' } });
     }
   };
 
@@ -66,7 +66,7 @@ export const StateContextBar = observer(function StateContextBar() {
     editorStore.setStateContextComponentState(stateName);
     if (nodeId) {
       editorStore.execute({
-        type: 'setActiveState',
+        type: 'visualState.setActive',
         params: { nodeId, stateName: stateName ?? 'default' },
       });
     }
@@ -79,7 +79,7 @@ export const StateContextBar = observer(function StateContextBar() {
     const trimmed = newName.trim();
     if (!trimmed || !nodeId) return;
     if (allStates.some((s) => s.name === trimmed)) return;
-    editorStore.execute({ type: 'addState', params: { nodeId, stateName: trimmed } });
+    editorStore.execute({ type: 'visualState.add', params: { nodeId, stateName: trimmed } });
     handleCustomSelect(trimmed);
     setNewName('');
     setAdding(false);
@@ -90,13 +90,13 @@ export const StateContextBar = observer(function StateContextBar() {
     if (currentCustom === stateName) {
       handleCustomSelect(null);
     }
-    editorStore.execute({ type: 'removeState', params: { nodeId, stateName } });
+    editorStore.execute({ type: 'visualState.remove', params: { nodeId, stateName } });
   };
 
   const handleQuickAdd = (name: string) => {
     if (!nodeId) return;
     if (allStates.some((s) => s.name === name)) return;
-    editorStore.execute({ type: 'addState', params: { nodeId, stateName: name } });
+    editorStore.execute({ type: 'visualState.add', params: { nodeId, stateName: name } });
     handleCustomSelect(name);
     setAdding(false);
     setNewName('');
@@ -270,7 +270,6 @@ export const StateContextBar = observer(function StateContextBar() {
           nodeId={nodeId}
           screen={editorStore.activeScreen}
           assets={editorStore.project?.componentAssets ?? []}
-          globalStates={editorStore.currentGlobalStates}
           allNodeStates={allStates}
           currentState={currentCustom ?? currentInteraction}
           onStateSelect={(stateName) => {

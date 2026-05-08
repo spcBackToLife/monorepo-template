@@ -44,7 +44,7 @@ export const BottomToolbar = observer(function BottomToolbar() {
       const parentId = selectedParentId;
       const isText = TEXT_TYPES.has(tag);
       const result = editorStore.execute({
-        type: 'addElement',
+        type: 'element.add',
         params: {
           parentId,
           tag: tag as PrimitiveNodeType,

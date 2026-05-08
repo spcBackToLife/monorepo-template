@@ -184,7 +184,7 @@ export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, 
           const blob = await dataUrlToBlob(dataUrl);
           const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.png');
           editorStore.execute({
-            type: 'applyMaterialDesign',
+            type: 'material.applyDesign',
             params: {
               nodeId: targetNodeId,
               propUpdates: { [propKey]: result.url },
@@ -193,7 +193,7 @@ export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, 
           });
         } else {
           editorStore.execute({
-            type: 'updateComponentProps',
+            type: 'componentProps.update',
             params: { nodeId: targetNodeId, props: { [propKey]: dataUrl } },
           });
         }
@@ -212,7 +212,7 @@ export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, 
           const blob = new Blob([svgString], { type: 'image/svg+xml' });
           const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.svg');
           editorStore.execute({
-            type: 'applyMaterialDesign',
+            type: 'material.applyDesign',
             params: {
               nodeId: targetNodeId,
               // Cast needed: TS cannot infer Record type from computed template-literal keys
@@ -225,7 +225,7 @@ export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, 
         } else {
           const encodedSvg = `url("data:image/svg+xml,${encodeURIComponent(svgString)}")`;
           editorStore.execute({
-            type: 'updateStyle',
+            type: 'style.update',
             params: {
               nodeId: targetNodeId,
               // Cast needed: TS cannot infer Record type from computed template-literal keys
@@ -281,7 +281,7 @@ export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, 
           const result = await materialProjectApi.uploadExport(projectId, materialProjectId, blob, 'material-export.svg');
           const urlValue = `url("${result.url}")`;
           editorStore.execute({
-            type: 'applyMaterialDesign',
+            type: 'material.applyDesign',
             params: {
               nodeId: targetNodeId,
               ...(clearStyleKeys ? { clearStyleKeys: [...clearStyleKeys] } : {}),
@@ -307,7 +307,7 @@ export function ExportBar({ targetNodeId, onClose: _onClose, materialProjectId, 
             const uploaded: MaterialExportUploadResponse = await response.json();
             const urlValue = `url("${uploaded.url}")`;
             editorStore.execute({
-              type: 'updateStyle',
+              type: 'style.update',
               params: {
                 nodeId: targetNodeId,
                 styles: {

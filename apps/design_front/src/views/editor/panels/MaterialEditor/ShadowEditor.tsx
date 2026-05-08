@@ -123,7 +123,7 @@ export function ShadowEditor({ currentBoxShadow, currentTextShadow, onApply }: S
     if (cssOutput.textShadow) styles.textShadow = cssOutput.textShadow;
 
     editorStore.execute({
-      type: 'updateStyle',
+      type: 'style.update',
       params: { nodeId, styles },
     });
 

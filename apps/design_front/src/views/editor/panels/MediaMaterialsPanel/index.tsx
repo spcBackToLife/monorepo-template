@@ -109,12 +109,12 @@ export const MediaMaterialsPanel = observer(function MediaMaterialsPanel() {
       if (!node) return;
       if (node.type === 'img') {
         editorStore.execute({
-          type: 'updateComponentProps',
+          type: 'componentProps.update',
           params: { nodeId, props: { src: imageUrl } },
         });
       } else {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId, styles: { backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover' } },
         });
       }

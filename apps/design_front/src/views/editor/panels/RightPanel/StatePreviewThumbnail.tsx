@@ -14,7 +14,6 @@ interface StatePreviewThumbnailProps {
   nodeId: string;
   stateName: string;
   label: string;
-  globalStates: Record<string, string>;
   isActive: boolean;
   onClick: () => void;
 }
@@ -41,7 +40,6 @@ export const StatePreviewThumbnail = React.memo(function StatePreviewThumbnail({
   nodeId,
   stateName,
   label,
-  globalStates,
   isActive,
   onClick,
 }: StatePreviewThumbnailProps) {
@@ -93,7 +91,6 @@ export const StatePreviewThumbnail = React.memo(function StatePreviewThumbnail({
             <SchemaRenderer
               screen={renderScreen}
               assets={assets}
-              globalStates={globalStates}
               staticAssetOrigin={getEditorStaticAssetOrigin()}
               interactionPreview={{ nodeId, state: stateName }}
               hideGhostNodes
@@ -137,7 +134,6 @@ export const StatePreviewThumbnail = React.memo(function StatePreviewThumbnail({
           <SchemaRenderer
             screen={renderScreen}
             assets={assets}
-            globalStates={globalStates}
             staticAssetOrigin={getEditorStaticAssetOrigin()}
             interactionPreview={{ nodeId, state: stateName }}
             hideGhostNodes

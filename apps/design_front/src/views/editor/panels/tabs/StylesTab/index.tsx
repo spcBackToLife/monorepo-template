@@ -108,12 +108,12 @@ export const StylesTab = observer(function StylesTab() {
     for (const nid of ids) {
       if (effectiveState === 'default') {
         editorStore.execute({
-          type: 'updateStyle',
+          type: 'style.update',
           params: { nodeId: nid, styles: { [key]: v } },
         });
       } else {
         editorStore.execute({
-          type: 'updateState',
+          type: 'visualState.update',
           params: { nodeId: nid, stateName: effectiveState, styles: { [key]: v } },
         });
       }

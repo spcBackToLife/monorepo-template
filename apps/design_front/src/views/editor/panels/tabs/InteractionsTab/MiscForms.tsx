@@ -1,7 +1,10 @@
 /**
  * Nav / Node / UI / Custom 类动词参数表单（v2）。
+ * 表达式字段用 ExpressionEditor（D.4）。
  */
 
+import { ExpressionEditor } from '@/views/editor/components/ExpressionEditor';
+import { useExpressionScope } from '@/views/editor/components/ExpressionEditor/useExpressionScope';
 import { type FormProps, type FormCtx, str, num, labelCls, inputCls, selectCls, rowCls } from './formCommon';
 
 // ===== nav.go =====
@@ -113,6 +116,7 @@ export function NodeSetVisualStateForm({ action, update, updateMany, allNodes }:
 // ===== ui.showToast =====
 
 export function UiShowToastForm({ action, update }: FormProps) {
+  const scope = useExpressionScope();
   return (
     <div className="flex flex-col gap-1 pl-4">
       <div className={rowCls}>
@@ -130,12 +134,12 @@ export function UiShowToastForm({ action, update }: FormProps) {
       </div>
       <div className={rowCls}>
         <span className={labelCls}>内容:</span>
-        <input
-          type="text"
-          className={inputCls}
-          placeholder="支持 {{ state.view.errMsg }}"
+        <ExpressionEditor
           value={str(action, 'message')}
-          onChange={(e) => update('message', e.target.value)}
+          onChange={(next) => update('message', next)}
+          scope={scope}
+          mode="template"
+          placeholder="支持 {{ state.view.errMsg }}"
         />
       </div>
       <div className={rowCls}>
@@ -171,16 +175,17 @@ export function UiShowToastForm({ action, update }: FormProps) {
 // ===== ui.openUrl =====
 
 export function UiOpenUrlForm({ action, update }: FormProps) {
+  const scope = useExpressionScope();
   return (
     <div className="flex flex-col gap-1 pl-4">
       <div className={rowCls}>
         <span className={labelCls}>URL:</span>
-        <input
-          type="text"
-          className={inputCls}
-          placeholder="https://... 或 {{ state.view.url }}"
+        <ExpressionEditor
           value={str(action, 'url')}
-          onChange={(e) => update('url', e.target.value)}
+          onChange={(next) => update('url', next)}
+          scope={scope}
+          mode="template"
+          placeholder="https://... 或 {{ state.view.url }}"
         />
       </div>
       <label className="flex items-center gap-1 text-[10px] text-gray-500">

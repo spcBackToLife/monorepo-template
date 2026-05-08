@@ -19,6 +19,8 @@ import type {
   HttpMethod,
 } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
+import { ExpressionEditor } from '@/views/editor/components/ExpressionEditor';
+import { useExpressionScope } from '@/views/editor/components/ExpressionEditor/useExpressionScope';
 import {
   HTTP_METHODS,
   METHOD_COLORS,
@@ -58,6 +60,7 @@ const EndpointSection = observer(function EndpointSection({
     ep.body !== undefined ? formatJsonBlock(ep.body) : '',
   );
   const [dirty, setDirty] = useState(false);
+  const scope = useExpressionScope();
 
   const commit = () => {
     const next: ApiEndpoint = {
@@ -88,12 +91,12 @@ const EndpointSection = observer(function EndpointSection({
         >
           {HTTP_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
-        <input
-          type="text"
-          className="flex-1 h-6 px-1.5 border border-gray-200 rounded text-[11px] outline-none focus:border-blue-400 font-mono"
-          placeholder="/api/users/{{ state.view.userId }}"
+        <ExpressionEditor
           value={path}
-          onChange={(e) => { setPath(e.target.value); setDirty(true); }}
+          onChange={(next) => { setPath(next); setDirty(true); }}
+          scope={scope}
+          mode="template"
+          placeholder="/api/users/{{ state.view.userId }}"
         />
       </div>
 
@@ -102,10 +105,13 @@ const EndpointSection = observer(function EndpointSection({
           <span className="text-[10px] text-gray-500">
             请求体 (JSON，支持 <code className="font-mono text-purple-600">{'{{ state.x }}'}</code>)
           </span>
-          <textarea
-            className="w-full h-20 px-1.5 py-1 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400 font-mono resize-y bg-gray-50"
+          <ExpressionEditor
             value={bodyText}
-            onChange={(e) => { setBodyText(e.target.value); setDirty(true); }}
+            onChange={(next) => { setBodyText(next); setDirty(true); }}
+            scope={scope}
+            mode="template"
+            multiline
+            rows={4}
             placeholder={'{\n  "email": "{{ state.view.email }}"\n}'}
           />
         </div>

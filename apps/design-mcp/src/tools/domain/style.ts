@@ -16,7 +16,7 @@ export function registerStyleTools(server: McpServer): void {
         styles: z.record(z.string(), z.union([z.string(), z.number()])).describe('CSS 属性键值对'),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'updateStyle', params: { nodeId: p.nodeId, styles: p.styles } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'style.update', params: { nodeId: p.nodeId, styles: p.styles } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -24,7 +24,7 @@ export function registerStyleTools(server: McpServer): void {
       description: '重置（删除）某些 CSS 属性，恢复默认值',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), properties: z.array(z.string()) }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'resetStyle', params: { nodeId: p.nodeId, properties: p.properties } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'style.reset', params: { nodeId: p.nodeId, properties: p.properties } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -37,7 +37,7 @@ export function registerStyleTools(server: McpServer): void {
         })),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'batchUpdateStyle', params: { updates: p.updates } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'style.batchUpdate', params: { updates: p.updates } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

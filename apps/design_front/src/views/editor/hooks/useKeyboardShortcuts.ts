@@ -97,7 +97,7 @@ export function useKeyboardShortcuts() {
           const id = editorStore.selectedNodeIds[0];
           const rootId = editorStore.activeScreen?.rootNode.id;
           if (!id || !rootId || id === rootId) return;
-          const r = editorStore.execute({ type: 'duplicateElement', params: { elementId: id } });
+          const r = editorStore.execute({ type: 'element.duplicate', params: { elementId: id } });
           if (r.success && r.affectedNodeIds[1]) {
             editorStore.select(r.affectedNodeIds[1]);
           }
@@ -161,7 +161,7 @@ export function useKeyboardShortcuts() {
         const newIdx = e.key === 'ArrowUp' ? idx - 1 : idx + 1;
         if (newIdx < 0 || newIdx >= siblings.length) return;
         editorStore.execute({
-          type: 'reorderElement',
+          type: 'element.reorder',
           params: { nodeId: id, parentId: parent.id, newIndex: newIdx },
         });
         return;
@@ -172,7 +172,7 @@ export function useKeyboardShortcuts() {
         e.preventDefault();
         const ids = [...editorStore.selectedNodeIds];
         for (const id of ids) {
-          editorStore.execute({ type: 'removeElement', params: { elementId: id } });
+          editorStore.execute({ type: 'element.remove', params: { elementId: id } });
         }
         editorStore.select(null);
         return;

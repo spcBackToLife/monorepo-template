@@ -29,15 +29,27 @@ export const ExpressionInput = observer(function ExpressionInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Get active dataset keys for autocompletion
+  // v2: 数据源补全候选合并（static→initial；api→激活 mock 场景的 responseBody）
   const screen = editorStore.activeScreen;
   const activeDataSet = useMemo(() => {
     if (!screen) return null;
     const merged: DataPayload = {};
     for (const ds of screen.dataSources ?? []) {
-      if (ds.activePhase !== 'loaded') continue;
-      const sc = ds.scenarios.find(s => s.id === ds.activeScenarioId);
-      if (sc) Object.assign(merged, sc.data);
+      let payload: unknown;
+      if (ds.type === 'static') {
+        payload = ds.initial;
+      } else {
+        const mock = ds.mock;
+        if (!mock) continue;
+        const sc = mock.scenarios.find((s) => s.id === mock.activeScenarioId)
+          ?? mock.scenarios[0];
+        if (!sc || sc.isTimeout) continue;
+        if (sc.statusCode < 200 || sc.statusCode >= 300) continue;
+        payload = sc.responseBody;
+      }
+      if (payload && typeof payload === 'object') {
+        Object.assign(merged, payload as DataPayload);
+      }
     }
     return Object.keys(merged).length > 0 ? { data: merged } : null;
   }, [screen?.dataSources]);

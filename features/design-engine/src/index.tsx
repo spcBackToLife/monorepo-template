@@ -57,9 +57,20 @@ export type {
 } from './expression';
 
 // ===== Data Binding & Context =====
-// v1 的 resolveExpression / buildScreenDataContext 等已删除；
-// 由 expression 引擎 + Store（A.3 交付）接管。渲染器层清理在 B.1 完成。
+// v1 的 resolveExpression 已删除；编辑期需要 DataContext 拼装时使用以下两个公开 helper：
+//   - buildEditorPreviewState(screen): 把 screen.dataSources 中 static.initial 与 api 激活 mock
+//     场景 responseBody 注入为最小 ScreenState。
+//   - buildScreenDataContext(screen, state): 把 ScreenState 包成渲染期 DataContext。
+// 运行时（PreviewRenderer / 真实运行时）由 Store 维护 ScreenState，渲染器直接消费。
 export { DataContextProvider, useDataContext } from './data/DataContextProvider';
+export {
+  buildScreenDataContext,
+  buildEditorPreviewState,
+  hasExpression,
+  resolveExpression as resolveExpressionValue,
+  resolvePropsExpressions,
+} from './data/dataContext';
+export type { DataContext } from './data/dataContext';
 export { ListRenderer } from './data/ListRenderer';
 export type { ListRendererProps } from './data/ListRenderer';
 

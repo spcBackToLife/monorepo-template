@@ -34,7 +34,7 @@ export function registerComponentPropsTools(server: McpServer): void {
       description: '更新指定节点的组件属性值，可一次更新多个',
       schema: z.object({ projectId: z.string(), nodeId: z.string(), props: z.record(z.string(), z.unknown()) }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'updateComponentProps', params: { nodeId:p.nodeId, props:p.props } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'componentProps.update', params: { nodeId:p.nodeId, props:p.props } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -51,7 +51,7 @@ export function registerComponentPropsTools(server: McpServer): void {
       description: '为组件模板添加属性定义',
       schema: z.object({ projectId: z.string(), templateId: z.string(), definition: z.record(z.string(), z.unknown()) }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'addPropDefinition', params: { templateId: p.templateId, definition: p.definition } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'componentProps.addDefinition', params: { templateId: p.templateId, definition: p.definition } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -59,7 +59,7 @@ export function registerComponentPropsTools(server: McpServer): void {
       description: '删除组件模板上的属性定义',
       schema: z.object({ projectId: z.string(), templateId: z.string(), propKey: z.string() }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'removePropDefinition', params: { templateId: p.templateId, propKey: p.propKey } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'componentProps.removeDefinition', params: { templateId: p.templateId, propKey: p.propKey } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

@@ -66,7 +66,7 @@ export const PropBindingsEditorModal = observer(function PropBindingsEditorModal
       }
     }
     const result = editorStore.execute({
-      type: 'updateTemplate',
+      type: 'template.update',
       params: { templateId, patch: { propBindings: rows } },
     });
     if (result.success) {

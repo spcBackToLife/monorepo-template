@@ -11,12 +11,9 @@ import { StatePanel } from '../StatePanel';
 import { StateContextBar } from './StateContextBar';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ChildrenVisibilitySection } from './ChildrenVisibilitySection';
-import { NodeVisibilityCondition } from './NodeVisibilityCondition';
-import { DomainStateResponseSection } from './DomainStateResponseSection';
-import { ChildrenStateBindings } from './ChildrenStateBindings';
 
 /**
- * 右侧面板 — 按产品设计重写。
+ * 右侧面板 — v2 重构版。
  *
  * 结构：
  *   A. 元素头部（固定） — 类型 + 名称 + 锁定/可见
@@ -25,8 +22,13 @@ import { ChildrenStateBindings } from './ChildrenStateBindings';
  *      1. 内容 — 文本、元素属性、组件 Props
  *      2. 外观 — CSS 八组样式编辑器
  *      3. 子元素 — 子元素可见性（容器独有）
- *      4. 行为 — 事件列表
- *      5. 高级 — 状态响应 + 代码预览
+ *      4. 行为 — 事件列表（actions 使用 v2 动词）
+ *      5. 高级 — 页面 state（view + data）+ 数据源 + 代码预览
+ *
+ * v1 已移除：
+ *   - NodeVisibilityCondition（按 domainState 值判断可见 → v2 用 node.visibleWhen 表达式，由行为面板管理）
+ *   - ChildrenStateBindings（子元素状态绑定 → v2 用 visualState.setChildVisibility，能力并入"子元素"分区）
+ *   - DomainStateResponseSection（领域态响应 binding → v2 无 binding 概念，表达式直接写在 styles/props）
  */
 export const RightPanel = observer(function RightPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -87,25 +89,11 @@ export const RightPanel = observer(function RightPanel() {
           </span>
         </CollapsibleSection>
 
-        {/* 2.5 可见性 — 选中节点的可见性条件 */}
-        {node && (
-          <NodeVisibilityCondition node={node} />
-        )}
-
         {/* 3. 子元素（仅容器） */}
         {hasChildren && (
           <CollapsibleSection id="sec-children" title="子元素">
             <span data-right-section="children" className="block">
               <ChildrenVisibilitySection node={node} />
-            </span>
-          </CollapsibleSection>
-        )}
-
-        {/* 3.5 子元素状态绑定（仅容器） */}
-        {hasChildren && (
-          <CollapsibleSection id="sec-children-states" title="子元素状态绑定" defaultOpen={false}>
-            <span data-right-section="children-states" className="block">
-              <ChildrenStateBindings node={node} />
             </span>
           </CollapsibleSection>
         )}
@@ -129,20 +117,13 @@ export const RightPanel = observer(function RightPanel() {
             <StatePanel />
           </div>
 
-          {/* 5b. Domain state response (low-frequency) */}
-          {node && (
-            <div data-right-section="states" className="mb-2">
-              <DomainStateResponseSection nodeId={node.id} />
-            </div>
-          )}
-
-          {/* 5c. Data (kept inline for now) */}
+          {/* 5b. Data (kept inline for now) */}
           <div data-right-section="data" className="mb-2">
             <div className="text-[10px] text-gray-500 font-medium mb-1 px-2">数据</div>
             <DataTab />
           </div>
 
-          {/* 5d. Code preview */}
+          {/* 5c. Code preview */}
           <div data-right-section="code">
             <div className="text-[10px] text-gray-500 font-medium mb-1 px-2">代码预览</div>
             <CodeTab />
@@ -173,7 +154,7 @@ const ElementHeader = observer(function ElementHeader({
         className={`p-0.5 transition-colors ${node.locked ? 'text-amber-500' : 'text-gray-300 hover:text-gray-500'}`}
         title={node.locked ? '解锁' : '锁定'}
         onClick={() =>
-          editorStore.execute({ type: 'setNodeLocked', params: { nodeId: node.id, locked: !node.locked } })
+          editorStore.execute({ type: 'element.setLocked', params: { nodeId: node.id, locked: !node.locked } })
         }
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -195,7 +176,7 @@ const ElementHeader = observer(function ElementHeader({
         title={node.visible === false ? '显示' : '隐藏'}
         onClick={() =>
           editorStore.execute({
-            type: 'setNodeVisible',
+            type: 'element.setVisible',
             params: { nodeId: node.id, visible: node.visible === false },
           })
         }

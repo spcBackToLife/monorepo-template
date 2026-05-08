@@ -21,18 +21,18 @@ export const StateEditorPanel = observer(function StateEditorPanel() {
   }
 
   const handleActivate = (stateName: string) => {
-    editorStore.execute({ type: 'setActiveState', params: { nodeId, stateName } });
+    editorStore.execute({ type: 'visualState.setActive', params: { nodeId, stateName } });
   };
 
   const handleRemove = (stateName: string) => {
-    const result = editorStore.execute({ type: 'removeState', params: { nodeId, stateName } });
+    const result = editorStore.execute({ type: 'visualState.remove', params: { nodeId, stateName } });
     if (result.success) message.success(`已删除状态 "${stateName}"`);
   };
 
   const handleAdd = () => {
     if (!newName.trim()) return;
     const result = editorStore.execute({
-      type: 'addState',
+      type: 'visualState.add',
       params: { nodeId, stateName: newName.trim() },
     });
     if (result.success) {

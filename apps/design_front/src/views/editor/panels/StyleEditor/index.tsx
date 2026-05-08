@@ -55,12 +55,14 @@ export const StyleEditorPanel = observer(function StyleEditorPanel() {
     return <Empty description="节点未找到" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
-  const styles: StyleOverrides = node.styles;
+  // node.styles 在 v2 是 ExpressionStyles（每值可为字符串字面 / 表达式 / 数字）。
+  // 样式面板只处理字面输入；表达式值由 InteractionsTab / ExpressionEditor 管理。
+  const styles: StyleOverrides = (node.styles ?? {}) as StyleOverrides;
 
   const handleChange = (key: string, value: string) => {
     const normalized = normalizeStyleInput(key, value);
     editorStore.execute({
-      type: 'updateStyle',
+      type: 'style.update',
       params: { nodeId, styles: { [key]: normalized || undefined } },
     });
   };

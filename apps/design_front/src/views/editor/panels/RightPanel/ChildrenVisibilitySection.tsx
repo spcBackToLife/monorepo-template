@@ -70,8 +70,8 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
   parentNode: ComponentNode;
   currentEditState: string;
   isEditingDefault: boolean;
-  defaultStateDef: import('@globallink/design-schema').ComponentState | undefined;
-  activeStateDef: import('@globallink/design-schema').ComponentState | undefined;
+  defaultStateDef: import('@globallink/design-schema').VisualState | undefined;
+  activeStateDef: import('@globallink/design-schema').VisualState | undefined;
   hasCustomStates: boolean;
 }) {
   // Compute effective visibility
@@ -85,7 +85,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
   const handleToggle = (checked: boolean) => {
     if (isEditingDefault) {
       editorStore.execute({
-        type: 'setChildVisibility',
+        type: 'visualState.setChildVisibility',
         params: {
           parentNodeId: parentNode.id,
           childNodeId: child.id,
@@ -95,7 +95,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
       });
     } else {
       editorStore.execute({
-        type: 'setChildVisibility',
+        type: 'visualState.setChildVisibility',
         params: {
           parentNodeId: parentNode.id,
           childNodeId: child.id,
@@ -109,7 +109,7 @@ const ChildVisibilityRow = observer(function ChildVisibilityRow({
   const handleResetToDefault = () => {
     if (isEditingDefault) return;
     editorStore.execute({
-      type: 'setChildVisibility',
+      type: 'visualState.setChildVisibility',
       params: {
         parentNodeId: parentNode.id,
         childNodeId: child.id,
