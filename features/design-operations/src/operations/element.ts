@@ -33,24 +33,69 @@ import type {
   ElementSetBindOp,
   OperationResult,
   InverseData,
+  LayoutHint,
 } from '../types';
 import { findNodeById, findParent, isNodeOrAncestorLocked, walkTree } from '../utils/tree';
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
 /**
- * Intelligently infer default styles based on tag type and parent layout
+ * Intelligently infer default styles based on tag type, parent layout, and layout hint
  * 
- * Rules:
- * - text/button/input elements: use registry defaults, no size defaults
- * - flex children in flex parent: can use flex: 1 to fill space
- * - block elements: use registry defaults
- * - only apply sizing defaults when semantically appropriate
+ * Layout hints:
+ * - 'scroll-child': child in scrollable container → flex: 1 or height: auto
+ * - 'auto-size': size based on content → no flex defaults
+ * - 'fixed-height': fixed height, full width → height auto, width: 100%
+ * - 'fill-parent': fill available space → flex: 1
+ * - 'sticky-header': sticky positioned header → position: sticky, height: auto
+ * - 'sticky-footer': sticky positioned footer → position: sticky, height: auto
  */
 function inferPracticalDefaults(
   tag: PrimitiveNodeType,
   parentStyles?: CSSProperties | ExpressionStyles,
+  layoutHint?: LayoutHint,
 ): CSSProperties {
+  // Apply layout hint if provided
+  if (layoutHint) {
+    switch (layoutHint) {
+      case 'scroll-child':
+        // Child in scrollable container: use flex: 1 if parent is flex
+        return parentStyles?.display === 'flex' ? { flex: 1, flexShrink: 0 } : {};
+      
+      case 'auto-size':
+        // Size based on content: no sizing defaults
+        return {};
+      
+      case 'fixed-height':
+        // Fixed height, full width
+        return { width: '100%', height: 'auto' };
+      
+      case 'fill-parent':
+        // Fill available space
+        return { flex: 1 };
+      
+      case 'sticky-header':
+        // Sticky positioned header
+        return {
+          position: 'sticky',
+          top: 0,
+          height: 'auto',
+          width: '100%',
+          zIndex: 10,
+        };
+      
+      case 'sticky-footer':
+        // Sticky positioned footer
+        return {
+          position: 'sticky',
+          bottom: 0,
+          height: 'auto',
+          width: '100%',
+          zIndex: 10,
+        };
+    }
+  }
+
   // Get parent display type
   const parentDisplay = parentStyles?.display as string | undefined;
 
@@ -97,9 +142,10 @@ function createNode(
   props?: Record<string, unknown>,
   explicitId?: string,
   parent?: ComponentNode,
+  layoutHint?: LayoutHint,
 ): ComponentNode {
   const defaultStyles = isPrimitiveType(tag) ? getDefaultStyles(tag) : {};
-  const practicalDefaults = inferPracticalDefaults(tag, parent?.styles);
+  const practicalDefaults = inferPracticalDefaults(tag, parent?.styles, layoutHint);
 
   return {
     id: explicitId ?? generateNodeId(),
@@ -175,7 +221,7 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
     }
   }
 
-  const newNode = createNode(params.tag, params.styles, params.props, params.elementId, parent);
+  const newNode = createNode(params.tag, params.styles, params.props, params.elementId, parent, params.layoutHint);
   const position = params.position ?? parent.children.length;
   parent.children.splice(position, 0, newNode);
 

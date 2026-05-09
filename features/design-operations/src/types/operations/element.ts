@@ -14,6 +14,17 @@ import type {
   RepeatBinding,
 } from '@globallink/design-schema';
 
+/**
+ * Layout hint for intelligent default styling.
+ * - 'scroll-child': child in scrollable container (flex: 1, flex-shrink: 0 or auto-height)
+ * - 'auto-size': size based on content (no flex defaults)
+ * - 'fixed-height': fixed height, full width (height: auto or specific px)
+ * - 'fill-parent': fill available space (flex: 1)
+ * - 'sticky-header': sticky positioned header (height: auto, position: sticky)
+ * - 'sticky-footer': sticky positioned footer (height: auto, position: sticky)
+ */
+export type LayoutHint = 'scroll-child' | 'auto-size' | 'fixed-height' | 'fill-parent' | 'sticky-header' | 'sticky-footer';
+
 export interface ElementAddOp {
   type: 'element.add';
   params: {
@@ -23,6 +34,8 @@ export interface ElementAddOp {
     styles?: ExpressionStyles | CSSProperties;
     props?: Record<string, unknown>;
     position?: number;
+    /** Layout hint for intelligent default styling */
+    layoutHint?: LayoutHint;
   };
 }
 

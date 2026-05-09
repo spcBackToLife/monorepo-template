@@ -15,12 +15,13 @@ import type { ComponentNode, PrimitiveNodeType } from '@globallink/design-schema
 import { apiClient } from '../../api-client.js';
 
 export function registerElementTools(server: McpServer): void {
-  registerDomainTool(server, 'element', '元素增删改查、移动复制、包裹解包、重命名、可见性/锁定/列表绑定/受控 bind/编辑期 role 等', {
+  registerDomainTool(server, 'element', '元素增删改查、移动复制、包裹解包、重命名、可见性/锁定/列表绑定/受控 bind/编辑期 role/布局提示(layoutHint) 等', {
     add: defineAction({
       description:
         '在指定父节点下添加一个 HTML 原子元素（div/button/img/input 等），可设置初始样式和属性。' +
         '叶子文案请用 props.textContent（推荐）或 props.children 字符串（含 {{state.data.*}} 等表达式）；' +
-        '勿把可见文字只写在树 children 却留空 props——与画布/渲染器约定一致。',
+        '勿把可见文字只写在树 children 却留空 props——与画布/渲染器约定一致。' +
+        '可选 layoutHint 提示元素的布局意图（scroll-child/auto-size/fixed-height/fill-parent/sticky-header/sticky-footer）。',
       schema: z.object({
         projectId: z.string(), parentId: z.string(),
         tag: z.string().describe('div/span/p/h1-h3/button/input/textarea/select/img/a/ul/ol/li/nav/header/footer/section/main'),
@@ -30,9 +31,10 @@ export function registerElementTools(server: McpServer): void {
           .optional()
           .describe('例: { textContent: "标题" } 或 { children: "{{state.data.x}}" }；p/h/span/button 等会渲染上述字段'),
         position: z.number().optional(),
+        layoutHint: z.enum(['scroll-child', 'auto-size', 'fixed-height', 'fill-parent', 'sticky-header', 'sticky-footer']).optional().describe('布局提示：scroll-child(滚动容器内的子元素)、auto-size(内容自适应)、fixed-height(固定高度、满宽)、fill-parent(填充父容器)、sticky-header(粘性顶部)、sticky-footer(粘性底部)'),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, elementId: generateNodeId(), styles: p.styles, props: p.props, position: p.position } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, elementId: generateNodeId(), styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
