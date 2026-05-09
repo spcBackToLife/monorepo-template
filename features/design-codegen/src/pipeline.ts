@@ -10,8 +10,10 @@
 
 import { existsSync, mkdirSync, readdirSync, statSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
 import { join, relative, dirname } from 'path';
+import * as ejs from 'ejs';
 import type { DesignProject, Screen } from '@globallink/design-schema';
 import type { FrameworkConfig, SplitPlan, PageIR } from './core/types';
+import type { ActionStepIR } from './core/types';
 import type { FrameworkAdapter } from './adapter/interface';
 import type { GenerateInput, GenerateOutput, ResolvedTemplate } from './config/types';
 import { loadTemplate, listAvailableTemplates } from './config/loader';
@@ -71,6 +73,9 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
   for (const screen of schema.screens) {
     // 5a. Parse: Schema → IR
     const pageIR = parseScreen(screen);
+
+    // 5a-post: Resolve screenIds to paths in navigate actions
+    resolveNavigationPaths(pageIR, screenPathMap);
 
     // 5b. Split: IR → SplitPlan
     const plan = splitPage(pageIR, config.splitting);
@@ -208,7 +213,7 @@ function emitScreen(
   for (const hook of plan.hooks) {
     const hookPath = pathResolver.resolveHookEntry(pageName, hook.hookName, org);
     const hookContent = renderPattern(template.patternsDir, 'hook.ts.ejs', {
-      imports: adapter.getFrameworkImports({ hasState: true, hasEffect: hook.reason === 'data-fetching', hasNavigation: false }).map(i => `import ${i};`).join('\n'),
+      imports: adapter.getFrameworkImports({ hasState: true, hasEffect: hook.reason === 'data-fetching', hasNavigation: false }).join('\n'),
       hookName: hook.hookName,
       stateDeclarations: hook.stateVars.map(v => adapter.emitStateDeclaration({ name: v, pascalName: toPascalCase(v), type: 'unknown', defaultValue: 'undefined' })).join('\n'),
       effects: hook.dataSource
@@ -309,6 +314,46 @@ function emitRouter(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Navigation Path Resolution
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Post-process a PageIR to replace raw screenIds in navigate steps
+ * with actual URL paths from the screenPathMap.
+ */
+function resolveNavigationPaths(pageIR: PageIR, screenPathMap: Map<string, string>): void {
+  // Process all handlers
+  for (const handler of pageIR.handlers) {
+    resolveStepsNavigation(handler.steps, screenPathMap);
+  }
+
+  // Process onMount handler
+  if (pageIR.onMount) {
+    resolveStepsNavigation(pageIR.onMount.steps, screenPathMap);
+  }
+}
+
+function resolveStepsNavigation(steps: ActionStepIR[], screenPathMap: Map<string, string>): void {
+  for (const step of steps) {
+    if (step.kind === 'navigate') {
+      // Replace screenId with actual path
+      const resolvedPath = screenPathMap.get(step.path);
+      if (resolvedPath) {
+        step.path = resolvedPath;
+      }
+    } else if (step.kind === 'fetch') {
+      // Recurse into onSuccess/onError chains
+      if (step.onSuccess) {
+        resolveStepsNavigation(step.onSuccess, screenPathMap);
+      }
+      if (step.onError) {
+        resolveStepsNavigation(step.onError, screenPathMap);
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
@@ -340,7 +385,7 @@ function buildPageImports(
     hasNavigation: pageIR.handlers.some(h => h.steps.some(s => s.kind === 'navigate' || s.kind === 'navigate-back')),
   };
   const fwImports = adapter.getFrameworkImports(needs);
-  lines.push(...fwImports.map(i => `import ${i};`));
+  lines.push(...fwImports);
 
   // Service imports
   for (const svc of plan.services) {
@@ -391,20 +436,7 @@ function renderPattern(patternsDir: string, patternFile: string, data: Record<st
 }
 
 function renderEjs(template: string, data: Record<string, unknown>): string {
-  // Simple EJS-like renderer for our patterns
-  // Supports: <%= expr %> (escaped), <%- expr %> (unescaped), <% code %>, <%# comment %>
-  try {
-    const ejs = require('ejs');
-    return ejs.render(template, data, { rmWhitespace: false });
-  } catch (e: unknown) {
-    // Fallback: simple variable replacement if ejs not installed
-    let result = template;
-    for (const [key, value] of Object.entries(data)) {
-      const regex = new RegExp(`<%[=-]\\s*${key}\\s*%>`, 'g');
-      result = result.replace(regex, String(value ?? ''));
-    }
-    return result;
-  }
+  return ejs.render(template, data, { rmWhitespace: false });
 }
 
 function replaceVars(content: string, vars: Record<string, string>): string {

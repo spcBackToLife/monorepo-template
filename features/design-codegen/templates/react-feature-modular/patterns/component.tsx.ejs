@@ -1,9 +1,9 @@
 <%- imports %>
 <% if (propsInterface) { %>
-<%= propsInterface %>
+<%- propsInterface %>
 <% } %>
 
-export function <%= componentName %>(<%= propsSignature %>) {
+export function <%- componentName %>(<%- propsSignature %>) {
 <%- body %>
 
   return (

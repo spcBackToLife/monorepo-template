@@ -395,6 +395,11 @@ const MaterialTab = observer(function MaterialTab() {
 
 const ApiTab = observer(function ApiTab() {
   const screens = editorStore.screens;
+  const [filterScreenId, setFilterScreenId] = useState<string | null>(null);
+
+  const screenOptions = useMemo(() => {
+    return screens.map((s) => ({ value: s.id, label: s.name }));
+  }, [screens]);
 
   const apiSources = useMemo(() => {
     const list: Array<{
@@ -434,6 +439,11 @@ const ApiTab = observer(function ApiTab() {
     return list;
   }, [screens]);
 
+  const filtered = useMemo(() => {
+    if (!filterScreenId) return apiSources;
+    return apiSources.filter((a) => a.screenId === filterScreenId);
+  }, [apiSources, filterScreenId]);
+
   if (apiSources.length === 0) {
     return (
       <Empty
@@ -445,39 +455,54 @@ const ApiTab = observer(function ApiTab() {
   }
 
   return (
-    <div className="overview-api-list">
-      {apiSources.map((api) => (
-        <div key={`${api.screenId}-${api.id}`} className="overview-api-card">
-          <div className="overview-api-card__header">
-            <span className={`overview-api-card__method overview-api-card__method--${api.method.toLowerCase()}`}>
-              {api.method}
-            </span>
-            <span className="overview-api-card__name">{api.name}</span>
-            {api.autoFetchOnEnter && (
-              <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', margin: 0 }}>
-                自动请求
-              </Tag>
-            )}
-          </div>
-          <div className="overview-api-card__path">{api.path || '(未配置路径)'}</div>
-          {api.scenarios.length > 0 && (
-            <div className="overview-api-card__scenarios">
-              {api.scenarios.map((sc) => (
-                <span
-                  key={sc.id}
-                  className={`overview-api-card__scenario ${sc.isActive ? 'overview-api-card__scenario--active' : ''}`}
-                >
-                  {sc.name} ({sc.statusCode})
-                </span>
-              ))}
+    <div>
+      <div className="overview-filter-bar">
+        <span className="overview-filter-bar__label">筛选页面:</span>
+        <Select
+          allowClear
+          placeholder="全部页面"
+          style={{ width: 200 }}
+          size="small"
+          value={filterScreenId}
+          onChange={(v) => setFilterScreenId(v ?? null)}
+          options={screenOptions}
+        />
+        <span className="overview-topbar__badge">{filtered.length} 个接口</span>
+      </div>
+      <div className="overview-api-list">
+        {filtered.map((api) => (
+          <div key={`${api.screenId}-${api.id}`} className="overview-api-card">
+            <div className="overview-api-card__header">
+              <span className={`overview-api-card__method overview-api-card__method--${api.method.toLowerCase()}`}>
+                {api.method}
+              </span>
+              <span className="overview-api-card__name">{api.name}</span>
+              {api.autoFetchOnEnter && (
+                <Tag color="blue" style={{ fontSize: 10, lineHeight: '16px', margin: 0 }}>
+                  自动请求
+                </Tag>
+              )}
             </div>
-          )}
-          <div className="overview-api-card__screen">
-            <CloudServerOutlined style={{ marginRight: 4 }} />
-            页面: {api.screenName}
+            <div className="overview-api-card__path">{api.path || '(未配置路径)'}</div>
+            {api.scenarios.length > 0 && (
+              <div className="overview-api-card__scenarios">
+                {api.scenarios.map((sc) => (
+                  <span
+                    key={sc.id}
+                    className={`overview-api-card__scenario ${sc.isActive ? 'overview-api-card__scenario--active' : ''}`}
+                  >
+                    {sc.name} ({sc.statusCode})
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="overview-api-card__screen">
+              <CloudServerOutlined style={{ marginRight: 4 }} />
+              页面: {api.screenName}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 });
@@ -487,6 +512,11 @@ const ApiTab = observer(function ApiTab() {
 const StateTab = observer(function StateTab() {
   const screens = editorStore.screens;
   const project = editorStore.project;
+  const [filterScreenId, setFilterScreenId] = useState<string | null>(null);
+
+  const screenOptions = useMemo(() => {
+    return screens.map((s) => ({ value: s.id, label: s.name }));
+  }, [screens]);
 
   const globalViewVars = useMemo(() => {
     const viewDefs = project?.globalStateInit?.view ?? {};
@@ -523,6 +553,11 @@ const StateTab = observer(function StateTab() {
     });
   }, [screens]);
 
+  const filteredStates = useMemo(() => {
+    if (!filterScreenId) return screenStates;
+    return screenStates.filter((s) => s.screenId === filterScreenId);
+  }, [screenStates, filterScreenId]);
+
   const hasAnyContent = globalViewVars.length > 0 || screenStates.some(
     (s) => s.viewVars.length > 0 || s.dataInits.length > 0 || s.staticSources.length > 0,
   );
@@ -539,8 +574,21 @@ const StateTab = observer(function StateTab() {
 
   return (
     <div>
-      {/* Global view variables */}
-      {globalViewVars.length > 0 && (
+      <div className="overview-filter-bar">
+        <span className="overview-filter-bar__label">筛选页面:</span>
+        <Select
+          allowClear
+          placeholder="全部页面"
+          style={{ width: 200 }}
+          size="small"
+          value={filterScreenId}
+          onChange={(v) => setFilterScreenId(v ?? null)}
+          options={screenOptions}
+        />
+      </div>
+
+      {/* Global view variables (always show unless filtering) */}
+      {!filterScreenId && globalViewVars.length > 0 && (
         <div className="overview-state-section">
           <div className="overview-state-section__title">
             <PartitionOutlined /> 全局 View 变量
@@ -575,7 +623,7 @@ const StateTab = observer(function StateTab() {
       )}
 
       {/* Per-screen states */}
-      {screenStates.map((ss) => {
+      {filteredStates.map((ss) => {
         if (ss.viewVars.length === 0 && ss.dataInits.length === 0 && ss.staticSources.length === 0) {
           return null;
         }
@@ -669,6 +717,11 @@ const StateTab = observer(function StateTab() {
 
 const NavigationTab = observer(function NavigationTab() {
   const screens = editorStore.screens;
+  const [filterScreenId, setFilterScreenId] = useState<string | null>(null);
+
+  const screenOptions = useMemo(() => {
+    return screens.map((s) => ({ value: s.id, label: s.name }));
+  }, [screens]);
 
   const navData = useMemo(() => {
     return screens.map((screen) => {
@@ -683,6 +736,11 @@ const NavigationTab = observer(function NavigationTab() {
     });
   }, [screens]);
 
+  const filtered = useMemo(() => {
+    if (!filterScreenId) return navData;
+    return navData.filter((d) => d.screenId === filterScreenId);
+  }, [navData, filterScreenId]);
+
   const hasAny = navData.some((d) => d.allEvents.length > 0);
 
   if (!hasAny) {
@@ -696,8 +754,24 @@ const NavigationTab = observer(function NavigationTab() {
   }
 
   return (
-    <div className="overview-nav-flow">
-      {navData.map((sd) => {
+    <div>
+      <div className="overview-filter-bar">
+        <span className="overview-filter-bar__label">筛选页面:</span>
+        <Select
+          allowClear
+          placeholder="全部页面"
+          style={{ width: 200 }}
+          size="small"
+          value={filterScreenId}
+          onChange={(v) => setFilterScreenId(v ?? null)}
+          options={screenOptions}
+        />
+        <span className="overview-topbar__badge">
+          {filtered.reduce((sum, d) => sum + d.allEvents.length, 0)} 个事件
+        </span>
+      </div>
+      <div className="overview-nav-flow">
+        {filtered.map((sd) => {
         if (sd.allEvents.length === 0) return null;
         return (
           <div key={sd.screenId} className="overview-nav-card">
@@ -751,6 +825,7 @@ const NavigationTab = observer(function NavigationTab() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 });

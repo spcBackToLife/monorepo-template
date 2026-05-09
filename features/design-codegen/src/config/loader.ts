@@ -4,8 +4,10 @@
  * Loads framework.yaml from template directory + merges user overrides.
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { resolve, join } from 'path';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { resolve, join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { parse as parseYaml } from 'yaml';
 import type { FrameworkConfig } from '../core/types';
 import type { ResolvedTemplate, CodegenUserConfig } from './types';
 
@@ -14,8 +16,13 @@ import type { ResolvedTemplate, CodegenUserConfig } from './types';
  * Templates live at: <package-root>/templates/
  */
 function getTemplatesBaseDir(): string {
-  // __dirname will be in dist/ or src/ — templates are at package root
-  return resolve(__dirname, '../../templates');
+  // ESM compatible: compute __dirname equivalent
+  const currentFile = typeof __filename !== 'undefined'
+    ? __filename
+    : fileURLToPath(import.meta.url);
+  const currentDir = dirname(currentFile);
+  // currentDir is src/config/ or dist/config/ — go up to package root
+  return resolve(currentDir, '../../templates');
 }
 
 /**
@@ -82,8 +89,7 @@ export function listAvailableTemplates(): string[] {
   const baseDir = getTemplatesBaseDir();
   if (!existsSync(baseDir)) return [];
 
-  const { readdirSync, statSync } = require('fs');
-  const entries: string[] = readdirSync(baseDir);
+  const entries = readdirSync(baseDir);
   return entries.filter((name: string) => {
     const fullPath = join(baseDir, name);
     return statSync(fullPath).isDirectory() && existsSync(join(fullPath, 'framework.yaml'));
@@ -92,37 +98,11 @@ export function listAvailableTemplates(): string[] {
 
 /**
  * Parse framework.yaml into FrameworkConfig.
- * Uses a simple YAML parser (the `yaml` package).
  */
 function parseFrameworkYaml(yamlPath: string): FrameworkConfig {
-  // Dynamic import to avoid hard dependency if yaml isn't installed yet
-  let parseYaml: (s: string) => unknown;
-  try {
-    parseYaml = require('yaml').parse;
-  } catch {
-    // Fallback: simple YAML parsing for our known structure
-    parseYaml = simpleYamlParse;
-  }
-
   const content = readFileSync(yamlPath, 'utf-8');
   const raw = parseYaml(content) as Record<string, unknown>;
-
   return raw as unknown as FrameworkConfig;
-}
-
-/**
- * Simple YAML parser fallback for basic key-value YAML
- * (only used if `yaml` package isn't available)
- */
-function simpleYamlParse(content: string): Record<string, unknown> {
-  // For production, we rely on the `yaml` package.
-  // This is a safety fallback that handles basic cases.
-  try {
-    const yaml = require('yaml');
-    return yaml.parse(content);
-  } catch {
-    throw new Error('Please install the "yaml" package: npm install yaml');
-  }
 }
 
 /**
@@ -155,13 +135,6 @@ function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial
 export function loadUserConfig(configPath?: string): CodegenUserConfig | null {
   const path = configPath || resolve(process.cwd(), 'codegen.config.yaml');
   if (!existsSync(path)) return null;
-
-  let parseYaml: (s: string) => unknown;
-  try {
-    parseYaml = require('yaml').parse;
-  } catch {
-    throw new Error('Please install the "yaml" package: npm install yaml');
-  }
 
   const content = readFileSync(path, 'utf-8');
   return parseYaml(content) as CodegenUserConfig;

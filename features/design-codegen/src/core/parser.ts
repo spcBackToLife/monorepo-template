@@ -600,8 +600,8 @@ function translateEffectFetch(
   // Compile params
   const params = compileParams(action.params);
 
-  // Generate a result variable name
-  const resultVar = ds ? `${ds.functionName}Result` : 'result';
+  // Generate a result variable name — must match expression compiler's $last → result mapping
+  const resultVar = 'result';
 
   // Translate onSuccess chain (in on-success scope)
   const onSuccess = action.onSuccess

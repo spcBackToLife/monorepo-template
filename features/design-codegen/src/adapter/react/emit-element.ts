@@ -1,37 +1,25 @@
-import type { NodeIR, DynamicStyleIR } from '../../core/types';
+import type { NodeIR } from '../../core/types';
 import type { ReactAdapter } from './index';
 
 /**
  * Build the attribute string for a JSX element.
  *
  * Handles: className, static props, dynamic styles, events, two-way binding.
+ *
+ * Static styles are extracted to .less files and referenced via className (CSS Modules).
+ * Only dynamic styles (containing expressions) are emitted as inline style={{}}.
  */
 export function buildAttributes(node: NodeIR, adapter: ReactAdapter): string {
   const parts: string[] = [];
 
-  // className (via CSS Modules)
+  // className (via CSS Modules) — covers static styles extracted to .less file
   if (node.name) {
     parts.push(adapter.emitClassName(toCssClassName(node.name)));
   }
 
-  // Static styles as inline style object (only when staticStyles has entries)
-  if (node.staticStyles && Object.keys(node.staticStyles).length > 0) {
-    const inlineStyle = buildInlineStyle(node.staticStyles);
-    parts.push(`style={${inlineStyle}}`);
-  }
-
-  // Dynamic styles override/extend inline style
+  // Dynamic styles as inline style object (only dynamic expressions)
   if (node.dynamicStyles.length > 0) {
-    // If we already have static styles, merge them — otherwise emit standalone
-    if (node.staticStyles && Object.keys(node.staticStyles).length > 0) {
-      // The static style is already added; we'll append dynamic via spread
-      // Remove the last static style entry and merge
-      parts.pop();
-      const merged = buildMergedStyle(node.staticStyles, node.dynamicStyles);
-      parts.push(`style={${merged}}`);
-    } else {
-      parts.push(adapter.emitDynamicStyle(node.dynamicStyles));
-    }
+    parts.push(adapter.emitDynamicStyle(node.dynamicStyles));
   }
 
   // Event bindings
@@ -62,43 +50,3 @@ function toCssClassName(name: string): string {
     .replace(/^[A-Z]/, c => c.toLowerCase());
 }
 
-/**
- * Build a static inline style object string.
- * Input: { 'background-color': '#fff', 'font-size': '14px' }
- * Output: { backgroundColor: '#fff', fontSize: '14px' }
- */
-function buildInlineStyle(styles: Record<string, string>): string {
-  const entries = Object.entries(styles)
-    .map(([prop, value]) => {
-      const camelProp = toCamelCase(prop);
-      return `${camelProp}: '${value}'`;
-    })
-    .join(', ');
-
-  return `{ ${entries} }`;
-}
-
-/**
- * Build merged static + dynamic inline style.
- */
-function buildMergedStyle(
-  staticStyles: Record<string, string>,
-  dynamicStyles: DynamicStyleIR[],
-): string {
-  const staticEntries = Object.entries(staticStyles)
-    .map(([prop, value]) => `${toCamelCase(prop)}: '${value}'`);
-
-  const dynamicEntries = dynamicStyles
-    .map(s => `${s.property}: ${s.expression.compiled}`);
-
-  const all = [...staticEntries, ...dynamicEntries].join(', ');
-  return `{ ${all} }`;
-}
-
-/**
- * Convert kebab-case CSS property to camelCase.
- * "background-color" → "backgroundColor"
- */
-function toCamelCase(str: string): string {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
