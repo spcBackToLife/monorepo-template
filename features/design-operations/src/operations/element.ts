@@ -38,15 +38,69 @@ import { findNodeById, findParent, isNodeOrAncestorLocked, walkTree } from '../u
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
+/**
+ * Intelligently infer default styles based on tag type and parent layout
+ * 
+ * Rules:
+ * - text/button/input elements: use registry defaults, no size defaults
+ * - flex children in flex parent: can use flex: 1 to fill space
+ * - block elements: use registry defaults
+ * - only apply sizing defaults when semantically appropriate
+ */
+function inferPracticalDefaults(
+  tag: PrimitiveNodeType,
+  parentStyles?: CSSProperties | ExpressionStyles,
+): CSSProperties {
+  // Get parent display type
+  const parentDisplay = parentStyles?.display as string | undefined;
+
+  // Interactive elements and text elements get no sizing defaults
+  // They rely on their content and registry defaults
+  if (
+    tag === 'button' ||
+    tag === 'input' ||
+    tag === 'textarea' ||
+    tag === 'select' ||
+    tag === 'p' ||
+    tag === 'h1' ||
+    tag === 'h2' ||
+    tag === 'h3' ||
+    tag === 'span' ||
+    tag === 'a'
+  ) {
+    return {};
+  }
+
+  // For layout containers in flex parent: add flex: 1 to fill available space
+  // This provides better layout behavior without hardcoded dimensions
+  if (parentDisplay === 'flex') {
+    if (
+      tag === 'div' ||
+      tag === 'section' ||
+      tag === 'main' ||
+      tag === 'header' ||
+      tag === 'footer' ||
+      tag === 'nav'
+    ) {
+      return { flex: 1 };
+    }
+  }
+
+  // No arbitrary sizing defaults for other cases
+  return {};
+}
+
 /** Create a new ComponentNode with defaults */
 function createNode(
   tag: PrimitiveNodeType,
   styles?: ExpressionStyles | CSSProperties,
   props?: Record<string, unknown>,
   explicitId?: string,
+  parent?: ComponentNode,
 ): ComponentNode {
   const defaultStyles = isPrimitiveType(tag) ? getDefaultStyles(tag) : {};
-  const practicalDefaults: CSSProperties = tag === 'div' ? { width: '200px', height: '50px' } : {};
+  const practicalDefaults = inferPracticalDefaults(tag, parent?.styles);
+
   return {
     id: explicitId ?? generateNodeId(),
     type: tag as ComponentNode['type'],
@@ -60,6 +114,8 @@ function createNode(
     visible: true,
   };
 }
+
+
 
 /** Find the screen index containing a given nodeId */
 function findScreenContaining(project: DesignProject, nodeId: string): number {
@@ -119,7 +175,7 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
     }
   }
 
-  const newNode = createNode(params.tag, params.styles, params.props, params.elementId);
+  const newNode = createNode(params.tag, params.styles, params.props, params.elementId, parent);
   const position = params.position ?? parent.children.length;
   parent.children.splice(position, 0, newNode);
 
@@ -480,7 +536,7 @@ export function executeWrapInContainer(project: DesignProject, params: ElementWr
   indices.sort((a, b) => a - b);
 
   const containerTag = params.containerTag ?? 'div';
-  const container = createNode(containerTag, params.containerStyles);
+  const container = createNode(containerTag, params.containerStyles, undefined, undefined, parent);
 
   const nodesToWrap: ComponentNode[] = [];
   for (let i = indices.length - 1; i >= 0; i--) {
