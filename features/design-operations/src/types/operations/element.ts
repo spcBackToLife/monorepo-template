@@ -11,6 +11,7 @@ import type {
   ExpressionStyles,
   PrimitiveNodeType,
   Expression,
+  RepeatBinding,
 } from '@globallink/design-schema';
 
 export interface ElementAddOp {
@@ -140,13 +141,31 @@ export interface ElementSetVisibleWhenOp {
   };
 }
 
-/** 设置 `node.repeat` 列表绑定表达式（求值得数组） */
+/**
+ * 设置 `node.repeat` 列表绑定（v2.1 `{ expression, template }` 三层模型）。
+ *
+ * - repeat = null → 清除绑定
+ * - repeat = { expression, template } → 设置/替换
+ * - repeat = { expression } （省略 template） → 仅更新表达式，保留现有 template；
+ *   若节点当前无 repeat，执行器会以"当前节点的第一个子节点"作为默认 template 并把它从 children 中移出
+ * - repeat = string（**一次性迁移窗口**） → 等价于 `{ expression }`；
+ *   历史 undo/redo op 记录 / 老客户端调用兼容用，迁移完成后应移除
+ */
 export interface ElementSetRepeatOp {
   type: 'element.setRepeat';
   params: {
     nodeId: string;
-    /** 传 null 清空 */
-    repeat: Expression<unknown[]> | string | null;
+    /**
+     * - `null` 清空绑定
+     * - `RepeatBinding` 完整绑定
+     * - `{ expression }` 仅更新表达式（保留原 template）
+     * - `string`（历史兼容，一次性窗口）
+     */
+    repeat:
+      | RepeatBinding
+      | { expression: Expression<unknown[]> | string }
+      | string
+      | null;
   };
 }
 

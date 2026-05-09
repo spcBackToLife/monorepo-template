@@ -1,5 +1,5 @@
 import type { DesignProject, ComponentEvent, Action } from '@globallink/design-schema';
-import { deepClone, generateScreenId, generateNodeId } from '@globallink/design-schema';
+import { deepClone, generateScreenId, generateNodeId, normalizeExpression } from '@globallink/design-schema';
 import type {
   EventAddOp,
   EventRemoveOp,
@@ -20,6 +20,30 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
   return undefined;
 }
 
+/**
+ * 规范化 Action 链中的强 Expression 字段（state.remove.predicate / 子链 onSuccess|onError）。
+ * value / params / message / url 等"字面量也合法"的字段保持原样。
+ */
+function normalizeActionChain(actions: Action[] | undefined): void {
+  if (!Array.isArray(actions)) return;
+  for (const a of actions) {
+    if (a.type === 'state.remove' && typeof a.predicate === 'string') {
+      a.predicate = normalizeExpression(a.predicate);
+    } else if (a.type === 'effect.fetch') {
+      normalizeActionChain(a.onSuccess);
+      normalizeActionChain(a.onError);
+    }
+  }
+}
+
+/** 规范化整个事件配置：condition.when + actions 链 */
+function normalizeEvent(event: ComponentEvent): void {
+  if (event.condition && typeof event.condition.when === 'string') {
+    event.condition.when = normalizeExpression(event.condition.when);
+  }
+  normalizeActionChain(event.actions);
+}
+
 // ===== event.add =====
 
 export function executeAddEvent(project: DesignProject, params: EventAddOp['params']): Result {
@@ -35,6 +59,7 @@ export function executeAddEvent(project: DesignProject, params: EventAddOp['para
   }
 
   if (!node.events) node.events = [];
+  normalizeEvent(params.event);
   node.events.push(params.event);
   const eventIndex = node.events.length - 1;
 
@@ -124,6 +149,9 @@ export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp
   if (params.event.description !== undefined) evt.description = params.event.description;
   if (params.event.disabled !== undefined) evt.disabled = params.event.disabled;
   if (params.event.scrollConfig !== undefined) evt.scrollConfig = params.event.scrollConfig;
+
+  // patch 写入后再统一规范化（覆盖原 condition / 新 actions 中的强 Expression 字段）
+  normalizeEvent(evt);
 
   newProject.updatedAt = new Date().toISOString();
 

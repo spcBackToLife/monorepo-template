@@ -76,6 +76,7 @@ export type {
   EditorRole,
   NodeEditorMetadata,
   ExpressionStyles,
+  RepeatBinding,
 } from './node';
 export type { Screen } from './screen';
 export type { DesignProject } from './project';

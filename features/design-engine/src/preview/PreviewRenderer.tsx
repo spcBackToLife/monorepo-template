@@ -347,16 +347,6 @@ interface PreviewNodeRendererProps {
   isListItem?: boolean;
 }
 
-function applyListContainerStyleOverrides(styles: React.CSSProperties): React.CSSProperties {
-  return {
-    ...styles,
-    display: 'flex',
-    flexDirection: 'column',
-    height: undefined,
-    minHeight: styles.height ?? styles.minHeight,
-  };
-}
-
 function applyListItemStyleOverrides(styles: React.CSSProperties): React.CSSProperties {
   if (styles.position !== 'absolute') return styles;
   return {
@@ -414,7 +404,6 @@ function PreviewNodeRenderer({
         }
       : baseStyles;
 
-  if (isListContainer) reactStyles = applyListContainerStyleOverrides(reactStyles);
   if (isListItem) reactStyles = applyListItemStyleOverrides(reactStyles);
 
   if (staticOrigin) {
@@ -488,16 +477,36 @@ function PreviewNodeRenderer({
     propsForRender = { ...propsForRender, src: rewriteMediaSrc(propsForRender.src, staticOrigin) ?? propsForRender.src };
   }
 
-  // children 渲染
-  let children: React.ReactNode;
-  if (isListContainer) {
-    children = (
+  // children 渲染 — v2.1：容器节点自己正常渲染，静态 children 先出，list 情况下再追加 N 份 template
+  const activeStateDef = effectiveNode.states?.find((s) => s.name === (effectiveNode.activeState ?? 'default'));
+  const cvMap = activeStateDef?.childrenVisibility;
+  const implicitDefaultCvMap = !activeStateDef && (effectiveNode.activeState ?? 'default') === 'default'
+    ? buildImplicitDefaultVisibility(effectiveNode)
+    : undefined;
+  const effectiveCvMap = cvMap ?? implicitDefaultCvMap;
+
+  const staticChildren = effectiveNode.children
+    ?.filter((child) => !(effectiveCvMap && effectiveCvMap[child.id] === false))
+    .map((child) => (
+      <PreviewNodeRenderer
+        key={child.id}
+        node={child}
+        rootNodeId={rootNodeId}
+        assets={assets}
+        dispatcher={dispatcher}
+        runtimeNodeStates={runtimeNodeStates}
+      />
+    ));
+
+  const children: React.ReactNode = isListContainer ? (
+    <>
+      {staticChildren}
       <ListRenderer
         node={effectiveNode}
-        renderChild={(child, listIndex) => (
+        renderTemplate={(template, listIndex) => (
           <PreviewNodeRenderer
-            key={`${child.id}-${listIndex}`}
-            node={child}
+            key={`${template.id}-${listIndex}`}
+            node={template}
             rootNodeId={rootNodeId}
             assets={assets}
             dispatcher={dispatcher}
@@ -506,28 +515,10 @@ function PreviewNodeRenderer({
           />
         )}
       />
-    );
-  } else {
-    const activeStateDef = effectiveNode.states?.find((s) => s.name === (effectiveNode.activeState ?? 'default'));
-    const cvMap = activeStateDef?.childrenVisibility;
-    const implicitDefaultCvMap = !activeStateDef && (effectiveNode.activeState ?? 'default') === 'default'
-      ? buildImplicitDefaultVisibility(effectiveNode)
-      : undefined;
-    const effectiveCvMap = cvMap ?? implicitDefaultCvMap;
-
-    children = effectiveNode.children
-      ?.filter((child) => !(effectiveCvMap && effectiveCvMap[child.id] === false))
-      .map((child) => (
-        <PreviewNodeRenderer
-          key={child.id}
-          node={child}
-          rootNodeId={rootNodeId}
-          assets={assets}
-          dispatcher={dispatcher}
-          runtimeNodeStates={runtimeNodeStates}
-        />
-      ));
-  }
+    </>
+  ) : (
+    staticChildren
+  );
 
   return (
     <PrimitiveRenderer

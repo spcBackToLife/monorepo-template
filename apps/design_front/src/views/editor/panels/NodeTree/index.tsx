@@ -13,11 +13,11 @@ import {
 } from '../../EditorContextMenu';
 import './nodeTreePanel.css';
 
-/** v2 列表绑定标记：`node.repeat` 是非空字符串或非空对象 */
+/** v2.1 列表绑定标记：`node.repeat` 是 { expression, template } 对象 */
 function hasListRepeat(node: ComponentNode): boolean {
   const r = node.repeat;
-  if (typeof r === 'string') return r.trim() !== '';
-  return r != null;
+  if (!r || typeof r !== 'object') return false;
+  return typeof r.expression === 'string' && r.expression.trim() !== '';
 }
 
 /** W7-021：虚拟行高（与 py-0.5 + text-xs 行大致一致） */
@@ -46,15 +46,22 @@ function flattenVisibleRows(
 ): FlatRow[] {
   const term = searchTerm.trim();
   const out: FlatRow[] = [];
+  // v2.1：节点的逻辑子节点 = children ∪ repeat.template
+  const logicalChildren = (n: ComponentNode): ComponentNode[] => {
+    const arr: ComponentNode[] = [];
+    if (n.children) arr.push(...n.children);
+    if (n.repeat?.template) arr.push(n.repeat.template);
+    return arr;
+  };
   function walk(node: ComponentNode, depth: number) {
     if (term && !subtreeMatchesSearch(node, term)) return;
     if (filterType && node.type !== filterType && depth > 0) {
-      for (const c of node.children ?? []) walk(c, depth + 1);
+      for (const c of logicalChildren(node)) walk(c, depth + 1);
       return;
     }
     out.push({ node, depth });
     if (collapsed.has(node.id)) return;
-    for (const c of node.children ?? []) walk(c, depth + 1);
+    for (const c of logicalChildren(node)) walk(c, depth + 1);
   }
   walk(root, 0);
   return out;

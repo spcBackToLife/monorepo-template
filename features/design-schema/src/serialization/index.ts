@@ -53,13 +53,13 @@ function normalizeEvents(events: ComponentEvent[] | undefined): void {
  *
  * 同时把"按 schema 必须是 Expression<X>"的字段统一规范化（裸字符串自动补 `{{ }}`）：
  *   - node.visibleWhen
- *   - node.repeat
+ *   - node.repeat.expression
  *   - events[].condition.when
  *   - actions[].predicate（state.remove）
  *
  * 这样所有写入路径（前端 initProject、后端 migrateV1toV2、screen/template 反序列化）
  * 都能在落地前自动得到合法的表达式形态，避免 ListRenderer / Evaluator 把裸字符串
- * 误判为字面量、导致 `repeat: "state.data.messages"` 这类静默失败。
+ * 误判为字面量、导致 `repeat.expression: "state.data.messages"` 这类静默失败。
  */
 export function normalizeNode(node: ComponentNode): ComponentNode {
   if (!node.styles) node.styles = {};
@@ -74,8 +74,41 @@ export function normalizeNode(node: ComponentNode): ComponentNode {
   if (typeof node.visibleWhen === 'string') {
     node.visibleWhen = normalizeExpression(node.visibleWhen);
   }
+  // v2.1: repeat 规范形态是 { expression, template }。
+  // 【一次性迁移窗口】读入旧 `repeat: string` 数据时自愈为新结构：
+  //   - children[0] 升格为 template；children 剩余保留为静态装饰
+  //   - 没 children 时直接丢弃 repeat（保守，避免破坏节点树）
+  // 预期使用一次性脚本 `apps/design-mcp/scripts/migrate-repeat-to-v2.1.mjs` 把所有项目回填到新结构后，
+  // 应该删除本 if 分支（遵循 AGENTS.md §9.2）。迁移完成前保留自愈打 warn，便于定位残留数据。
   if (typeof node.repeat === 'string') {
-    node.repeat = normalizeExpression(node.repeat);
+    const expr = node.repeat;
+    const kids = node.children ?? [];
+    if (kids.length > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[design-schema] node ${node.id}: legacy repeat:string detected ("${expr}"); ` +
+          `auto-upgraded to { expression, template: children[0] }. Run migrate-repeat-to-v2.1 script to persist.`,
+      );
+      node.repeat = {
+        expression: normalizeExpression(expr),
+        template: kids[0],
+      };
+      node.children = kids.slice(1);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[design-schema] node ${node.id}: legacy repeat:string "${expr}" with no children; ` +
+          `dropping repeat to keep tree valid.`,
+      );
+      delete (node as { repeat?: unknown }).repeat;
+    }
+  } else if (node.repeat && typeof node.repeat === 'object') {
+    if (typeof node.repeat.expression === 'string') {
+      node.repeat.expression = normalizeExpression(node.repeat.expression);
+    }
+    if (node.repeat.template) {
+      normalizeNode(node.repeat.template);
+    }
   }
   normalizeEvents(node.events);
 

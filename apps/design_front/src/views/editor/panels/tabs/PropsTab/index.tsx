@@ -182,9 +182,9 @@ function extractItemFields(arr: unknown[]): string[] {
 const ListBindingSection = observer(function ListBindingSection({ nodeId }: { nodeId: string }) {
   const [open, setOpen] = useState(true);
   const node = findNodeInScreens(editorStore.screens, nodeId);
-  // v2: 列表绑定字段从 props.__listData 迁移到 node.repeat: Expression<unknown[]> | string
+  // v2.1: node.repeat = { expression, template }
   const raw = node?.repeat;
-  const value = typeof raw === 'string' ? raw : '';
+  const value = raw && typeof raw === 'object' ? (raw.expression ?? '') : '';
   const screen = editorStore.activeScreen;
 
   // 检查是否在列表内（祖先有 node.repeat）
@@ -201,9 +201,14 @@ const ListBindingSection = observer(function ListBindingSection({ nodeId }: { no
   if (isInsideList) return null;
 
   const apply = (next: string) => {
+    const trimmed = next.trim();
     editorStore.execute({
       type: 'element.setRepeat',
-      params: { nodeId, repeat: next.trim() === '' ? null : next },
+      params: {
+        nodeId,
+        // 只更新 expression；若节点还没绑定过，executor 会自动把 children[0] 升格为默认 template
+        repeat: trimmed === '' ? null : { expression: trimmed },
+      },
     });
   };
 
@@ -273,32 +278,46 @@ const ListBindingSection = observer(function ListBindingSection({ nodeId }: { no
   );
 });
 
-/** 在节点树中查找 nodeId 的祖先中是否有节点带 node.repeat（v2 列表绑定） */
+/**
+ * 在节点树中查找 nodeId 的祖先中是否有节点带 node.repeat（v2.1 列表绑定）。
+ * 注意：nodeId 既可能在 `children` 里，也可能在某个 `repeat.template` 子树里 —— 都算"在列表内"。
+ */
 function findAncestorWithRepeat(
   root: import('@globallink/design-schema').ComponentNode,
   targetId: string,
 ): import('@globallink/design-schema').ComponentNode | null {
-  // 递归搜索：如果当前节点的子树中包含 target，且当前节点有 node.repeat，则返回
-  if (root.id === targetId) return null; // 自身不算祖先
+  const rootHasRepeat =
+    !!root.repeat && typeof root.repeat === 'object' && !!root.repeat.expression;
+
+  // root 自身就是 target：无祖先
+  if (root.id === targetId) return null;
+
+  // 查找 target 在 root 的常规 children 下
   for (const child of root.children ?? []) {
     if (child.id === targetId) {
-      // target 是 root 的直接子节点
-      if (typeof root.repeat === 'string' && root.repeat) return root;
-      return null;
+      return rootHasRepeat ? root : null;
     }
-    // target 在 child 的子树中
     if (subtreeContains(child, targetId)) {
-      // 先检查 root 自身是否有 node.repeat
-      if (typeof root.repeat === 'string' && root.repeat) return root;
-      // 再递归看 child 及其后代中有没有更近的祖先带 node.repeat
-      const deeper = findAncestorWithRepeat(child, targetId);
-      return deeper;
+      if (rootHasRepeat) return root;
+      return findAncestorWithRepeat(child, targetId);
     }
   }
+
+  // 查找 target 在 root.repeat.template 子树里：
+  // 一旦命中 template 子树，则 root 自身就是最近一个列表祖先
+  const tpl = root.repeat?.template;
+  if (tpl) {
+    if (tpl.id === targetId) return root;
+    if (subtreeContains(tpl, targetId)) {
+      // 沿 template 子树继续往深处找更近的 repeat 祖先；找不到则 root 就是最近的
+      return findAncestorWithRepeat(tpl, targetId) ?? root;
+    }
+  }
+
   return null;
 }
 
-/** 检查子树中是否包含指定 nodeId */
+/** 检查子树中是否包含指定 nodeId（同时查 children 和 repeat.template） */
 function subtreeContains(
   node: import('@globallink/design-schema').ComponentNode,
   targetId: string,
@@ -307,6 +326,7 @@ function subtreeContains(
   for (const child of node.children ?? []) {
     if (subtreeContains(child, targetId)) return true;
   }
+  if (node.repeat?.template && subtreeContains(node.repeat.template, targetId)) return true;
   return false;
 }
 
@@ -606,7 +626,7 @@ function TextContentSection({ nodeType, nodeId, children }: TextContentSectionPr
     for (const screen of editorStore.screens) {
       const ancestor = findAncestorWithRepeat(screen.rootNode, nodeId);
       if (!ancestor) continue;
-      const listExpr = ancestor.repeat;
+      const listExpr = ancestor.repeat?.expression;
       if (typeof listExpr !== 'string') continue;
       const merged = getMergedScreenData(screen);
       const resolved = resolveDataPath(merged, listExpr);

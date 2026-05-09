@@ -1,6 +1,24 @@
 import type { ComponentNode } from '@globallink/design-schema';
 
 /**
+ * v2.1 节点树遍历约定：
+ *   一个节点的"逻辑子节点" = 常规 `children` ∪ `repeat.template`（如果有）。
+ *
+ * 任何工具函数都应同时考察这两个子结构，否则：
+ *   - MCP `style/update` 无法定位 template 子树里的节点
+ *   - 画布 hitTest / 锁定 / 注释扫描无法覆盖列表项
+ *   - Undo/Redo 无法找到被迁移到 template 下的节点
+ *
+ * 内部抽出 `iterateChildren(n)` 表达这个语义，所有 walk/find 走同一条路。
+ */
+function iterateChildren(n: ComponentNode): ComponentNode[] {
+  const out: ComponentNode[] = [];
+  if (n.children) out.push(...n.children);
+  if (n.repeat?.template) out.push(n.repeat.template);
+  return out;
+}
+
+/**
  * Find a node by ID in a ComponentNode tree.
  * Returns undefined if not found.
  */
@@ -9,18 +27,20 @@ export function findNodeById(
   nodeId: string,
 ): ComponentNode | undefined {
   if (root.id === nodeId) return root;
-  if (root.children) {
-    for (const child of root.children) {
-      const found = findNodeById(child, nodeId);
-      if (found) return found;
-    }
+  for (const child of iterateChildren(root)) {
+    const found = findNodeById(child, nodeId);
+    if (found) return found;
   }
   return undefined;
 }
 
 /**
  * Find the parent node of a given nodeId.
- * Returns { parent, index } where index is the child position, or undefined.
+ * Returns { parent, index } where index is the child position.
+ *
+ * v2.1 约定：当子节点位于 `repeat.template` 位置时，`index === -1`。
+ * 调用方（move / remove / reorder / wrap / unwrap 等）需要识别 `-1` 并走 template 分支：
+ *   - 直接改 `parent.repeat.template` 而非 `parent.children[index]`
  */
 export function findParent(
   root: ComponentNode,
@@ -35,12 +55,22 @@ export function findParent(
       if (found) return found;
     }
   }
+  if (root.repeat?.template) {
+    const tpl = root.repeat.template;
+    if (tpl.id === nodeId) {
+      return { parent: root, index: -1 };
+    }
+    const found = findParent(tpl, nodeId);
+    if (found) return found;
+  }
   return undefined;
 }
 
 /**
  * Walk a ComponentNode tree depth-first, calling visitor on each node.
- * If visitor returns false, stop traversal.
+ * If visitor returns false, stop descending into that node's subtree.
+ *
+ * 遍历范围覆盖 `children` 与 `repeat.template`。
  */
 export function walkTree(
   node: ComponentNode,
@@ -48,10 +78,8 @@ export function walkTree(
 ): void {
   const result = visitor(node);
   if (result === false) return;
-  if (node.children) {
-    for (const child of node.children) {
-      walkTree(child, visitor);
-    }
+  for (const child of iterateChildren(node)) {
+    walkTree(child, visitor);
   }
 }
 
@@ -95,7 +123,7 @@ export function isNodeOrAncestorLocked(root: ComponentNode, nodeId: string): boo
   function walk(n: ComponentNode, ancestorLocked: boolean): boolean | null {
     const L = ancestorLocked || n.locked;
     if (n.id === nodeId) return L;
-    for (const c of n.children ?? []) {
+    for (const c of iterateChildren(n)) {
       const r = walk(c, L);
       if (r !== null) return r;
     }
@@ -111,9 +139,9 @@ export function collectEffectivelyLockedNodeIds(root: ComponentNode): Set<string
     const L = ancestorLocked || n.locked;
     if (L) {
       out.add(n.id);
-      for (const c of n.children ?? []) walk(c, true);
+      for (const c of iterateChildren(n)) walk(c, true);
     } else {
-      for (const c of n.children ?? []) walk(c, false);
+      for (const c of iterateChildren(n)) walk(c, false);
     }
   }
   walk(root, false);
@@ -125,7 +153,7 @@ export function collectAnnotationNodeIds(root: ComponentNode): Set<string> {
   const out = new Set<string>();
   function walk(n: ComponentNode) {
     if (n.type === 'annotation') out.add(n.id);
-    for (const c of n.children ?? []) walk(c);
+    for (const c of iterateChildren(n)) walk(c);
   }
   walk(root);
   return out;

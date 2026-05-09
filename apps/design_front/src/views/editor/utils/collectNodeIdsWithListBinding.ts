@@ -1,19 +1,21 @@
 import type { ComponentNode } from '@globallink/design-schema';
 
 /**
- * 收集子树中启用了列表绑定（v2 node.repeat）的节点 id，用于画布角标。
+ * 收集子树中启用了列表绑定（v2.1 `node.repeat = { expression, template }`）的节点 id，用于画布 ≡ 角标。
  *
- * v2 把 v1 的 props.__listData 迁移到 node.repeat: Expression<unknown[]> | string。
- * 只要存在非空的 repeat，就认为是列表容器。
+ * 需要同时考察两个子结构：
+ *   1. 常规 `children`（静态装饰）
+ *   2. `repeat.template` 子树（每 item 模板也可能嵌套列表）
  */
 export function collectNodeIdsWithListBinding(root: ComponentNode): string[] {
   const out: string[] = [];
   const walk = (n: ComponentNode) => {
-    const repeat = n.repeat;
-    if (typeof repeat === 'string' ? repeat.trim() !== '' : repeat != null) {
+    const r = n.repeat;
+    if (r && typeof r === 'object' && typeof r.expression === 'string' && r.expression.trim() !== '') {
       out.push(n.id);
     }
     n.children?.forEach(walk);
+    if (r?.template) walk(r.template);
   };
   walk(root);
   return out;

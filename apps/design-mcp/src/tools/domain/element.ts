@@ -120,13 +120,50 @@ export function registerElementTools(server: McpServer): void {
       },
     }),
     set_repeat: defineAction({
-      description: '设置节点的列表绑定表达式（求值得数组；本节点会按数组项重复渲染，子树可访问 item/index）',
+      description:
+        '设置节点的列表绑定（v2.1 三层模型 { expression, template }）。\n' +
+        '- expression：求值得数组的表达式，如 "{{ state.data.messages }}"\n' +
+        '- template：每 item 的根节点子树（完整 ComponentNode）；其 styles/props/events 可读 item/index/parent\n' +
+        '容器节点自身正常渲染，其 children 作为"静态装饰"（EmptyState 等）与 template 共存。\n' +
+        '便利形式：只传 expression 时，若节点已有 repeat 则仅更新表达式；若节点没有 repeat，会自动把 children[0] 提升为默认 template（并从 children 中移出）。\n' +
+        '传 null 清空整个绑定。',
       schema: z.object({
-        projectId: z.string(), nodeId: z.string(),
-        repeat: z.string().nullable().describe('表达式字符串，如 "state.data.messages"；传 null 清空'),
+        projectId: z.string(),
+        nodeId: z.string(),
+        repeat: z
+          .union([
+            // 完整：{ expression, template }
+            z.object({
+              expression: z.string().min(1),
+              template: z.record(z.string(), z.unknown()),
+            }),
+            // 便利：只更新表达式 { expression }
+            z.object({
+              expression: z.string().min(1),
+            }),
+            z.null(),
+          ])
+          .describe(
+            '完整：{ expression: "{{state.data.messages}}", template: <ComponentNode> }；' +
+              '仅表达式：{ expression: "..." }；清空：null',
+          ),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'element.setRepeat', params: { nodeId: p.nodeId, repeat: p.repeat } });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'element.setRepeat',
+          params: {
+            nodeId: p.nodeId,
+            repeat:
+              p.repeat === null
+                ? null
+                : 'template' in p.repeat
+                  ? {
+                      expression: p.repeat.expression,
+                      template: p.repeat.template as unknown as ComponentNode,
+                    }
+                  : { expression: p.repeat.expression },
+          },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

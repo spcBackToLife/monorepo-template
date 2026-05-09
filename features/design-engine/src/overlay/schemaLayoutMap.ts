@@ -104,15 +104,6 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
 
     const interactionForNode = resolveInteractionForNode(resolved.id, options.interactionPreview ?? null);
 
-    // v2 列表容器：node.repeat 表达式存在时，children 由 ListRenderer 在每个 item 下渲染，
-    // 估算阶段把直接子项当作各自参与 offsetParent 计算（保留 v1 行为）。
-    if (resolved.repeat !== undefined) {
-      for (const child of resolved.children ?? []) {
-        walk(child, offsetParentRect, false);
-      }
-      return;
-    }
-
     const { visible } = resolveNodeProps(resolved, options.dataContext, interactionForNode);
     if (visible === false) return;
 
@@ -123,12 +114,24 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
     );
     const pos = ((styles.position as string | undefined) ?? 'static') as string;
 
+    /**
+     * v2.1 列表容器：`node.repeat = { expression, template }`。
+     * 容器自身按常规布局参与计算；此外把 template 作为"典型子项"估算一次
+     * （与渲染期"在每个 item 下渲染 template"保持形状一致；不按 item 数量重复走 walk）。
+     */
+    const walkRepeatTemplate = (containerRect: { x: number; y: number; width: number; height: number }) => {
+      if (resolved.repeat?.template) {
+        walk(resolved.repeat.template, containerRect, false);
+      }
+    };
+
     if (isRoot) {
       const box: NodeRect = { x: 0, y: 0, width: vp.width, height: vp.height };
       out.set(resolved.id, { nodeId: resolved.id, rect: box });
       for (const child of resolved.children ?? []) {
         walk(child, box, false);
       }
+      walkRepeatTemplate(box);
       return;
     }
 
@@ -149,6 +152,7 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
       for (const child of resolved.children ?? []) {
         walk(child, box, false);
       }
+      walkRepeatTemplate(box);
       return;
     }
 
@@ -169,12 +173,14 @@ export function buildSchemaLayoutMap(screen: Screen, options: BuildSchemaLayoutM
       for (const child of resolved.children ?? []) {
         walk(child, box, false);
       }
+      walkRepeatTemplate(box);
       return;
     }
 
     for (const child of resolved.children ?? []) {
       walk(child, offsetParentRect, false);
     }
+    walkRepeatTemplate(offsetParentRect);
   }
 
   walk(screen.rootNode, vp, true);

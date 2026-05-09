@@ -10,35 +10,31 @@ import { ListInstanceContext, useListInstancePath } from '../renderer/ListInstan
 const MAX_LIST_ITEMS = 50;
 
 export interface ListRendererProps {
-  /** 列表容器节点（其 `repeat` 字段为表达式） */
+  /** 列表容器节点（其 `repeat.expression` + `repeat.template`） */
   node: ComponentNode;
-  /** Render a single child node within a list-item data context */
-  renderChild: (
-    child: ComponentNode,
-    listIndex: number,
-  ) => React.ReactNode;
+  /** Render the `template` subtree under a given item/index scope */
+  renderTemplate: (template: ComponentNode, listIndex: number) => React.ReactNode;
 }
 
 /**
- * ListRenderer：基于 `node.repeat` 表达式求值得数组，把 children 重复渲染。
+ * ListRenderer — v2.1 三层模型：
+ *   1. 容器节点自身由调用方（NodeRenderer / PreviewNodeRenderer）渲染；
+ *   2. 容器的静态 `children`（EmptyState / LoadingSkeleton 等）同样由调用方渲染；
+ *   3. 本组件只负责："对 expression 求值得数组，对每个 item 把 template 渲染一次"，
+ *      并在每个 item 的 scope 下注入 `item` / `index` / `parent` 到 DataContext。
  *
- * - 在 children 内可访问 `{{ item.x }}` / `{{ index }}`
- * - 容器节点本身不由 ListRenderer 渲染 —— 调用方负责包外层
+ * 返回内容挂在容器的静态 children **之后**，由调用方决定二者的 DOM 顺序。
  */
-export function ListRenderer({
-  node,
-  renderChild,
-}: ListRendererProps) {
+export function ListRenderer({ node, renderTemplate }: ListRendererProps) {
   const parentContext = useDataContext();
   const parentVirtualize = useSchemaVirtualize();
   const parentListPath = useListInstancePath();
 
-  const repeatExpr = node.repeat;
-  const resolvedData = repeatExpr !== undefined
-    ? resolveExpression(repeatExpr, parentContext)
-    : undefined;
-  const items = Array.isArray(resolvedData) ? resolvedData : [];
+  const binding = node.repeat;
+  if (!binding) return null;
 
+  const resolvedData = resolveExpression(binding.expression, parentContext);
+  const items = Array.isArray(resolvedData) ? resolvedData : [];
   const visibleItems = items.slice(0, MAX_LIST_ITEMS);
 
   const listVirtualizeValue = {
@@ -46,18 +42,7 @@ export function ListRenderer({
     cullDisabledForSubtree: true,
   };
 
-  const nodeChildren = node.children ?? [];
-
-  if (visibleItems.length === 0) {
-    // 没有数据时：用父 ctx 渲一遍占位（不暴露 item / index）
-    return (
-      <SchemaVirtualizeContext.Provider value={listVirtualizeValue}>
-        <ListInstanceContext.Provider value={parentListPath}>
-          {nodeChildren.map((child) => renderChild(child, 0))}
-        </ListInstanceContext.Provider>
-      </SchemaVirtualizeContext.Provider>
-    );
-  }
+  if (visibleItems.length === 0) return null;
 
   return (
     <>
@@ -79,7 +64,7 @@ export function ListRenderer({
           >
             <ListInstanceContext.Provider value={rowPath}>
               <DataContextProvider value={childContext}>
-                {nodeChildren.map((child) => renderChild(child, index))}
+                {renderTemplate(binding.template, index)}
               </DataContextProvider>
             </ListInstanceContext.Provider>
           </SchemaVirtualizeContext.Provider>

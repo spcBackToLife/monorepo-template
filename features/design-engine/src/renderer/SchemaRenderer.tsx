@@ -180,23 +180,8 @@ export function SchemaRenderer({
 const TEXT_PRIMITIVE_TYPES = new Set<string>(['p', 'span', 'h1', 'h2', 'h3', 'a']);
 
 /**
- * 列表容器样式覆盖：当节点声明了 repeat，强制 flex column 布局，
- * 使重复渲染的子项能自动纵向排列。
- */
-function applyListContainerStyleOverrides(
-  styles: React.CSSProperties,
-): React.CSSProperties {
-  return {
-    ...styles,
-    display: 'flex',
-    flexDirection: 'column',
-    height: undefined,
-    minHeight: styles.height ?? styles.minHeight,
-  };
-}
-
-/**
- * 列表子项样式覆盖：absolute → relative，让其参与父容器 flex 流。
+ * 列表子项样式覆盖：absolute → relative，让 template 根节点参与父容器的 flex/grid 流
+ * （绝对定位在列表场景下几乎总是错的；保留为 relative 让设计师用容器的 display 决定排布）。
  */
 function applyListItemStyleOverrides(
   styles: React.CSSProperties,
@@ -293,9 +278,7 @@ function NodeRenderer({
         }
       : baseStyles;
 
-  if (isListContainer) {
-    reactStyles = applyListContainerStyleOverrides(reactStyles);
-  }
+  // v2.1：列表容器自身正常渲染，不再强制 flex column。设计师自由决定排布（row/column/grid/...）。
   if (isListItem) {
     reactStyles = applyListItemStyleOverrides(reactStyles);
   }
@@ -342,16 +325,99 @@ function NodeRenderer({
     [node.id, node.type, onNodeDoubleClick],
   );
 
-  // Step 5: Render children — node.repeat 时让 ListRenderer 重复 children
-  let children: React.ReactNode;
-  if (isListContainer) {
-    children = (
+  // Step 5: Render children — 统一"静态 children 先渲染"，再在 list container 情况下追加 N 份 template
+  // 默认 + delta 合并 visualState 的 childrenVisibility / childrenStates
+  const rawPreviewState = interactionPreview?.nodeId === node.id
+    ? interactionPreview.state
+    : null;
+
+  const defaultStateDef = node.states?.find((s) => s.name === 'default');
+
+  let cvMap: Record<string, boolean> | undefined;
+  let csMap: Record<string, string> | undefined;
+
+  if (rawPreviewState) {
+    if (rawPreviewState === 'default' || rawPreviewState === 'normal') {
+      cvMap = defaultStateDef?.childrenVisibility;
+      csMap = defaultStateDef?.childrenStates;
+    } else {
+      const previewStateDef = node.states?.find((s) => s.name === rawPreviewState);
+      cvMap = mergeStateMaps(
+        defaultStateDef?.childrenVisibility,
+        previewStateDef?.childrenVisibility,
+      );
+      csMap = mergeStateMaps(
+        defaultStateDef?.childrenStates,
+        previewStateDef?.childrenStates,
+      );
+    }
+  } else {
+    const effectiveActiveState = node.activeState ?? 'default';
+    if (effectiveActiveState === 'default') {
+      cvMap = defaultStateDef?.childrenVisibility;
+      csMap = defaultStateDef?.childrenStates;
+    } else {
+      const activeStateDef = node.states?.find((s) => s.name === effectiveActiveState);
+      cvMap = mergeStateMaps(
+        defaultStateDef?.childrenVisibility,
+        activeStateDef?.childrenVisibility,
+      );
+      csMap = mergeStateMaps(
+        defaultStateDef?.childrenStates,
+        activeStateDef?.childrenStates,
+      );
+    }
+  }
+
+  const staticChildren = node.children?.map((child) => {
+    const hiddenInState = cvMap ? cvMap[child.id] === false : false;
+    const childStateOverride = csMap?.[child.id] ?? null;
+    if (hiddenInState) {
+      if (hideGhostNodes) {
+        return null;
+      }
+      return (
+        <GhostWrapper key={child.id} node={child} visibleStates={getVisibleStateNames(node, child.id)}>
+          <NodeRenderer
+            key={child.id}
+            node={child}
+            rootNodeId={rootNodeId}
+            assets={assets}
+            interactionPreview={interactionPreview}
+            hideGhostNodes={hideGhostNodes}
+            parentStateOverride={childStateOverride}
+            onNodeClick={onNodeClick}
+            onNodeHover={onNodeHover}
+            onNodeDoubleClick={onNodeDoubleClick}
+          />
+        </GhostWrapper>
+      );
+    }
+    return (
+      <NodeRenderer
+        key={child.id}
+        node={child}
+        rootNodeId={rootNodeId}
+        assets={assets}
+        interactionPreview={interactionPreview}
+        hideGhostNodes={hideGhostNodes}
+        parentStateOverride={childStateOverride}
+        onNodeClick={onNodeClick}
+        onNodeHover={onNodeHover}
+        onNodeDoubleClick={onNodeDoubleClick}
+      />
+    );
+  });
+
+  const children: React.ReactNode = isListContainer ? (
+    <>
+      {staticChildren}
       <ListRenderer
         node={node}
-        renderChild={(child, listIndex) => (
+        renderTemplate={(template, listIndex) => (
           <NodeRenderer
-            key={`${child.id}-${listIndex}`}
-            node={child}
+            key={`${template.id}-${listIndex}`}
+            node={template}
             rootNodeId={rootNodeId}
             assets={assets}
             interactionPreview={interactionPreview}
@@ -363,91 +429,10 @@ function NodeRenderer({
           />
         )}
       />
-    );
-  } else {
-    // 默认 + delta 合并 visualState 的 childrenVisibility / childrenStates
-    const rawPreviewState = interactionPreview?.nodeId === node.id
-      ? interactionPreview.state
-      : null;
-
-    const defaultStateDef = node.states?.find((s) => s.name === 'default');
-
-    let cvMap: Record<string, boolean> | undefined;
-    let csMap: Record<string, string> | undefined;
-
-    if (rawPreviewState) {
-      if (rawPreviewState === 'default' || rawPreviewState === 'normal') {
-        cvMap = defaultStateDef?.childrenVisibility;
-        csMap = defaultStateDef?.childrenStates;
-      } else {
-        const previewStateDef = node.states?.find((s) => s.name === rawPreviewState);
-        cvMap = mergeStateMaps(
-          defaultStateDef?.childrenVisibility,
-          previewStateDef?.childrenVisibility,
-        );
-        csMap = mergeStateMaps(
-          defaultStateDef?.childrenStates,
-          previewStateDef?.childrenStates,
-        );
-      }
-    } else {
-      const effectiveActiveState = node.activeState ?? 'default';
-      if (effectiveActiveState === 'default') {
-        cvMap = defaultStateDef?.childrenVisibility;
-        csMap = defaultStateDef?.childrenStates;
-      } else {
-        const activeStateDef = node.states?.find((s) => s.name === effectiveActiveState);
-        cvMap = mergeStateMaps(
-          defaultStateDef?.childrenVisibility,
-          activeStateDef?.childrenVisibility,
-        );
-        csMap = mergeStateMaps(
-          defaultStateDef?.childrenStates,
-          activeStateDef?.childrenStates,
-        );
-      }
-    }
-
-    children = node.children?.map((child) => {
-      const hiddenInState = cvMap ? cvMap[child.id] === false : false;
-      const childStateOverride = csMap?.[child.id] ?? null;
-      if (hiddenInState) {
-        if (hideGhostNodes) {
-          return null;
-        }
-        return (
-          <GhostWrapper key={child.id} node={child} visibleStates={getVisibleStateNames(node, child.id)}>
-            <NodeRenderer
-              key={child.id}
-              node={child}
-              rootNodeId={rootNodeId}
-              assets={assets}
-              interactionPreview={interactionPreview}
-              hideGhostNodes={hideGhostNodes}
-              parentStateOverride={childStateOverride}
-              onNodeClick={onNodeClick}
-              onNodeHover={onNodeHover}
-              onNodeDoubleClick={onNodeDoubleClick}
-            />
-          </GhostWrapper>
-        );
-      }
-      return (
-        <NodeRenderer
-          key={child.id}
-          node={child}
-          rootNodeId={rootNodeId}
-          assets={assets}
-          interactionPreview={interactionPreview}
-          hideGhostNodes={hideGhostNodes}
-          parentStateOverride={childStateOverride}
-          onNodeClick={onNodeClick}
-          onNodeHover={onNodeHover}
-          onNodeDoubleClick={onNodeDoubleClick}
-        />
-      );
-    });
-  }
+    </>
+  ) : (
+    staticChildren
+  );
 
   const propsForRender =
     staticOrigin && node.type === 'img' && typeof resolvedProps.src === 'string'

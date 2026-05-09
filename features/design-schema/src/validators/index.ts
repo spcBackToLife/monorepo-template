@@ -78,7 +78,8 @@ const BaseComponentNodeSchema = z.object({
   visible: z.boolean().default(true),
   // v2 新字段
   visibleWhen: z.string().optional(),
-  repeat: z.string().optional(),
+  // v2.1 列表绑定 —— { expression, template }
+  // repeat 的 template 同样是 ComponentNode；递归引用通过下面 z.lazy(ComponentNodeSchema) 兜底。
   bind: z.object({ path: z.string().min(1) }).optional(),
   // 编辑器 metadata
   editorMetadata: z
@@ -93,10 +94,24 @@ const BaseComponentNodeSchema = z.object({
 
 type ComponentNodeInput = z.input<typeof BaseComponentNodeSchema> & {
   children?: ComponentNodeInput[];
+  repeat?: { expression: string; template: ComponentNodeInput } | string;
 };
 
 export const ComponentNodeSchema: z.ZodType<ComponentNodeInput> = BaseComponentNodeSchema.extend({
   children: z.lazy(() => z.array(ComponentNodeSchema)).optional(),
+  // 读入期接受两种形态：
+  //   - v2.1 规范形态 `{ expression, template }`
+  //   - v2.0 遗留字符串（serialization.normalizeNode 会再自愈）
+  // 迁移完所有项目数据后，请删除 `z.string()` 分支（AGENTS.md §9.2 一次性迁移窗口）。
+  repeat: z.lazy(() =>
+    z.union([
+      z.object({
+        expression: z.string().min(1),
+        template: ComponentNodeSchema,
+      }),
+      z.string(),
+    ]),
+  ).optional(),
 });
 
 // ===== Screen Schema =====

@@ -292,12 +292,19 @@ function migrateNode(raw: unknown): ComponentNode {
     ? (n.children as unknown[])
     : undefined;
 
-  // props.__listData → node.repeat
-  let repeat: Expression<unknown[]> | undefined;
+  // v1 props.__listData / v2.0 node.repeat(string) → v2.1 node.repeat({ expression, template })
+  let repeatExpression: string | undefined;
   if (typeof propsV1.__listData === 'string') {
-    repeat = propsV1.__listData as Expression<unknown[]>;
+    repeatExpression = propsV1.__listData;
   } else if (typeof n.repeat === 'string') {
-    repeat = n.repeat as Expression<unknown[]>;
+    repeatExpression = n.repeat;
+  } else if (
+    n.repeat &&
+    typeof n.repeat === 'object' &&
+    typeof (n.repeat as Record<string, unknown>).expression === 'string'
+  ) {
+    // 已是 v2.1 结构，直接保留
+    repeatExpression = (n.repeat as Record<string, unknown>).expression as string;
   }
   const propsV2: Record<string, Expression | unknown> = {};
   for (const [k, v] of Object.entries(propsV1)) {
@@ -321,12 +328,36 @@ function migrateNode(raw: unknown): ComponentNode {
 
   const events: ComponentEvent[] = eventsV1.map(migrateEvent).filter(Boolean) as ComponentEvent[];
 
+  // v2.1 RepeatBinding：template = children[0]（并从 children 中移出）；无 children 则不设 repeat
+  const migratedChildren = childrenV1 ? childrenV1.map(migrateNode) : undefined;
+  let repeatBinding: ComponentNode['repeat'];
+  let finalChildren = migratedChildren;
+  if (repeatExpression) {
+    // 如果原本已有 v2.1 对象 repeat 且带 template，则直接用
+    const existing = n.repeat as Record<string, unknown> | undefined;
+    if (existing && typeof existing === 'object' && existing.template) {
+      repeatBinding = {
+        expression: repeatExpression as Expression<unknown[]>,
+        template: migrateNode(existing.template),
+      };
+    } else if (migratedChildren && migratedChildren.length > 0) {
+      repeatBinding = {
+        expression: repeatExpression as Expression<unknown[]>,
+        template: migratedChildren[0],
+      };
+      finalChildren = migratedChildren.slice(1);
+    } else {
+      // 没有 children 可作为 template —— 保守起见不设 repeat，避免破坏节点树
+      // （可打日志，但迁移脚本无标准 logger；静默跳过）
+    }
+  }
+
   return {
     id,
     type,
     name: typeof n.name === 'string' ? n.name : undefined,
     styles: stylesV1 as ComponentNode['styles'],
-    children: childrenV1 ? childrenV1.map(migrateNode) : undefined,
+    children: finalChildren,
     props: propsV2,
     states: Array.isArray(n.states) ? (n.states as ComponentNode['states']) : [],
     activeState: typeof n.activeState === 'string' ? n.activeState : 'default',
@@ -336,7 +367,7 @@ function migrateNode(raw: unknown): ComponentNode {
     locked: Boolean(n.locked),
     visible: n.visible === undefined ? true : Boolean(n.visible),
     visibleWhen,
-    repeat,
+    repeat: repeatBinding,
     bind,
     animation: n.animation as ComponentNode['animation'],
     materialProjectId:

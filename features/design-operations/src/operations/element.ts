@@ -5,6 +5,7 @@ import type {
   ExpressionStyles,
   PrimitiveNodeType,
   Expression,
+  RepeatBinding,
 } from '@globallink/design-schema';
 import {
   generateNodeId,
@@ -785,7 +786,8 @@ export function executeSetNodeVisibleWhen(project: DesignProject, params: Elemen
   if (params.visibleWhen === null || params.visibleWhen === '') {
     delete node.visibleWhen;
   } else {
-    node.visibleWhen = params.visibleWhen as Expression<boolean>;
+    // 强 Expression 字段：裸字符串自动补 `{{ }}`，避免引擎把它当字面量
+    node.visibleWhen = normalizeExpression(params.visibleWhen) as Expression<boolean>;
   }
   newProject.updatedAt = new Date().toISOString();
   return {
@@ -812,12 +814,58 @@ export function executeSetNodeRepeat(project: DesignProject, params: ElementSetR
       inverse: { type: 'noop', params: {} },
     };
   }
-  const previous: Expression<unknown[]> | string | null = node.repeat ?? null;
-  if (params.repeat === null || params.repeat === '') {
-    delete node.repeat;
+  const previous: RepeatBinding | null = node.repeat ? deepClone(node.repeat) : null;
+
+  // 兼容读入：历史 op 记录 / 旧客户端可能仍然把 params.repeat 传成字符串（v2.0 形态）。
+  // 这里一次性归一化成联合类型的 { expression } 便利形式，复用下方 "只传 expression" 分支。
+  // 【一次性迁移窗口】迁移完所有历史记录后请删除此分支（AGENTS.md §9.2）。
+  let normalizedRepeat: ElementSetRepeatOp['params']['repeat'];
+  if (typeof params.repeat === 'string') {
+    const s = (params.repeat as string).trim();
+    normalizedRepeat = s === '' ? null : { expression: s };
   } else {
-    node.repeat = params.repeat as Expression<unknown[]>;
+    normalizedRepeat = params.repeat;
   }
+
+  if (normalizedRepeat === null) {
+    delete node.repeat;
+  } else if ('template' in normalizedRepeat && normalizedRepeat.template) {
+    // 完整 RepeatBinding：直接设置；表达式裸字符串补 {{ }}
+    const expr = normalizeExpression(normalizedRepeat.expression as string) as Expression<unknown[]>;
+    node.repeat = {
+      expression: expr,
+      template: deepClone(normalizedRepeat.template),
+    };
+  } else {
+    // 只传 expression：
+    //   - 节点已有 repeat → 只替换表达式，保留原 template
+    //   - 节点没有 repeat → 用 children[0] 作为 template（并从 children 中移出），对齐"把此节点变成列表"的意图
+    const expr = normalizeExpression(
+      (normalizedRepeat as { expression: string }).expression,
+    ) as Expression<unknown[]>;
+    if (node.repeat) {
+      node.repeat = { expression: expr, template: node.repeat.template };
+    } else {
+      const firstChild = node.children?.[0];
+      if (!firstChild) {
+        return {
+          project,
+          result: {
+            success: false,
+            description:
+              `Cannot bind repeat on ${params.nodeId}: node has no children to use as template. ` +
+              `Pass { expression, template } explicitly.`,
+            affectedNodeIds: [],
+          },
+          inverse: { type: 'noop', params: {} },
+        };
+      }
+      const template = deepClone(firstChild);
+      node.children = (node.children ?? []).slice(1);
+      node.repeat = { expression: expr, template };
+    }
+  }
+
   newProject.updatedAt = new Date().toISOString();
   return {
     project: newProject,

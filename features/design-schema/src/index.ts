@@ -70,6 +70,7 @@ export type {
   EditorRole,
   NodeEditorMetadata,
   ExpressionStyles,
+  RepeatBinding,
   Screen,
   DesignProject,
   // Template / Props

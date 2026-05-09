@@ -139,11 +139,22 @@ export function getAvailableOperations(): OperationDescription[] {
     },
     {
       type: 'element.setRepeat',
-      description: "Set list repeat expression (node.repeat). Evaluates to an array; children are repeated with item/index in context.",
+      description:
+        "Set list binding (node.repeat) using three-tier model { expression, template }. " +
+        "Container node renders normally; static children + N copies of template are both emitted; " +
+        "template root node itself runs in item scope (item/index/parent).",
       category: 'element',
       params: [
         { name: 'nodeId', type: 'string', required: true, description: 'Node ID' },
-        { name: 'repeat', type: "string | null", required: true, description: "Expression like `{{ state.data.messages }}`, or null to clear" },
+        {
+          name: 'repeat',
+          type: "{ expression, template } | { expression } | null",
+          required: true,
+          description:
+            "Full: { expression: '{{state.data.messages}}', template: <ComponentNode subtree> }. " +
+            "Partial: { expression: '...' } to change expression only (keeps existing template, " +
+            "or if node has no repeat yet, first child is promoted as default template). Null to clear.",
+        },
       ],
     },
     {
