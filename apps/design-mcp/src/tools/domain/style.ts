@@ -8,9 +8,9 @@ import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.
 import { apiClient } from '../../api-client.js';
 
 export function registerStyleTools(server: McpServer): void {
-  registerDomainTool(server, 'style', 'CSS 样式修改与批量操作', {
+  registerDomainTool(server, 'style', 'CSS 样式修改与批量操作。【常用模式】构建"上下固定+中间滚动"布局：容器 display:flex/flex-direction:column/height:100%；头部 position:sticky/top:0；底部 position:sticky/bottom:0；中间 flex:1/overflow:auto。', {
     update: defineAction({
-      description: '修改指定元素的 CSS 样式（backgroundColor/fontSize/padding/display/flexDirection 等）',
+      description: '修改指定元素的 CSS 样式（backgroundColor/fontSize/padding/display/flexDirection 等）。设置布局容器时常配合 flex/flex-direction/height/overflow；粘性定位需要 position:sticky + top/bottom。',
       schema: z.object({
         projectId: z.string(), nodeId: z.string(),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).describe('CSS 属性键值对'),

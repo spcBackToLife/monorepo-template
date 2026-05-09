@@ -21,7 +21,10 @@ export function registerElementTools(server: McpServer): void {
         '在指定父节点下添加一个 HTML 原子元素（div/button/img/input 等），可设置初始样式和属性。' +
         '叶子文案请用 props.textContent（推荐）或 props.children 字符串（含 {{state.data.*}} 等表达式）；' +
         '勿把可见文字只写在树 children 却留空 props——与画布/渲染器约定一致。' +
-        '可选 layoutHint 提示元素的布局意图（scroll-child/auto-size/fixed-height/fill-parent/sticky-header/sticky-footer）。',
+        '可选 layoutHint 提示元素的布局意图（scroll-child/auto-size/fixed-height/fill-parent/sticky-header/sticky-footer）。' +
+        '【规范模式】"上下固定+中间滚动"：容器用 display:flex、flex-direction:column、height:100%；' +
+        '顶部用 sticky-header、底部用 sticky-footer、中间内容区用 layoutHint:scroll-child。' +
+        '【添加后清理】创建复杂布局后需检查是否遗漏必要的容器（flex parent）、宽高约束或溢出滚动配置。',
       schema: z.object({
         projectId: z.string(), parentId: z.string(),
         tag: z.string().describe('div/span/p/h1-h3/button/input/textarea/select/img/a/ul/ol/li/nav/header/footer/section/main'),
