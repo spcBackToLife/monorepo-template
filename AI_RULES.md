@@ -530,4 +530,76 @@ If you encounter any of these situations, ask the user:
 
 ---
 
+## Element Naming Conventions
+
+### Why Naming Matters
+
+节点命名直接影响代码生成质量。codegen 引擎用 `node.name` 作为组件名、CSS class 名、handler 函数名的来源。**没有 name 的节点会产生无意义的代码标识符**（如 `handle3af1ecClick`、`components/68486350Item/`）。
+
+### MUST: 创建容器节点后立即命名
+
+每次调用 `element.add` 创建有语义的容器节点后，**必须紧跟** `element.rename` 设置符合规范的名称。
+
+```
+// 正确流程
+element.add({ projectId, parentId, tag: 'div', ... })
+→ 返回 { affectedNodeIds: ['nd_abc123'] }
+
+element.rename({ projectId, nodeId: 'nd_abc123', name: 'ChatHeader' })
+```
+
+### 命名规范（MUST）
+
+| 规则 | 正确示例 | 错误示例 |
+|---|---|---|
+| **PascalCase**（推荐，与组件名一致） | `ChatHeader`, `MessageList`, `SendButton` | `chat-header`, `chat_header` |
+| **英文**，不用中文 | `UserAvatar` | `用户头像` |
+| **无空格** | `InputBar` | `Input Bar` |
+| **无特殊字符**（仅字母数字） | `FeatureGrid` | `feature-grid!`, `#header` |
+| **语义化**，描述这个节点"是什么" | `MessageBubble` | `Div1`, `Container2` |
+| **简洁**，2-4 个单词 | `NavBackButton` | `TheMainNavigationBackButtonContainer` |
+
+### 必须命名的节点类型
+
+| 场景 | 必须命名 | 可跳过 |
+|---|---|---|
+| 页面级容器（header/footer/content） | ✅ 必须 | |
+| 有交互事件的元素 | ✅ 必须 | |
+| repeat 列表容器 | ✅ 必须 | |
+| repeat template 根节点 | ✅ 必须 | |
+| 有 bind 的表单元素 | ✅ 必须 | |
+| 纯布局 wrapper（无语义） | | ✅ 可跳过 |
+| 叶子文本节点 | | ✅ 可跳过 |
+| 纯装饰性图标 | | ✅ 可跳过 |
+
+### 命名示例
+
+```
+Screen: "Chat - AI Conversation"
+├── ChatPage (rootNode)
+│   ├── ChatHeader
+│   │   ├── BackButton
+│   │   ├── PageTitle
+│   │   └── MoreButton
+│   ├── MessageList (repeat 容器)
+│   │   └── MessageItem (repeat template)
+│   │       ├── Avatar
+│   │       └── Bubble
+│   │           └── (p 文本节点 - 可不命名)
+│   └── InputBar
+│       ├── MessageInput (有 bind)
+│       ├── SendButton (有事件)
+│       ├── VoiceButton
+│       └── ImageButton
+```
+
+### 不命名会导致什么
+
+codegen 引擎在节点没有 name 时会用 node ID 的后几位作为标识符，产出：
+- `components/68486350Item/index.tsx` — 无法理解的文件名
+- `handleEe0ec9Click` — 无法理解的函数名
+- `styles.nd3af1ec` — 无法理解的 CSS class 名
+
+---
+
 Last Updated: 2026-05-09

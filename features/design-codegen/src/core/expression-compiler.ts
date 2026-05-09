@@ -21,11 +21,11 @@ export type ExpressionScope = 'component' | 'repeat-template' | 'on-success';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Regex matching a single `{{ ... }}` expression block */
-const EXPR_BLOCK_RE = /\{\{\s*(.*?)\s*\}\}/g;
+/** Regex matching a single `{{ ... }}` expression block (supports multiline) */
+const EXPR_BLOCK_RE = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
-/** Regex matching if a string contains at least one `{{ }}` expression */
-const HAS_EXPR_RE = /\{\{.*?\}\}/;
+/** Regex matching if a string contains at least one `{{ }}` expression (supports multiline) */
+const HAS_EXPR_RE = /\{\{[\s\S]*?\}\}/;
 
 /** State path prefixes to strip during compilation (ordered longest-first) */
 const STATE_PREFIXES = [

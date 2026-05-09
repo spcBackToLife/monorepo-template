@@ -225,4 +225,12 @@ export interface ComponentNode {
 
   // ----- 编辑器 metadata（不参与渲染） -----
   editorMetadata?: NodeEditorMetadata;
+
+  // ----- Codegen 辅助 -----
+
+  /**
+   * 组件边界标记。标记后 codegen 引擎会将此节点及其子树作为独立组件输出。
+   * 设计时由 AI 分析决策，也可由设计师手动标记。
+   */
+  componentBoundary?: boolean;
 }

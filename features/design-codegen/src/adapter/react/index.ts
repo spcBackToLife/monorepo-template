@@ -380,9 +380,12 @@ function isValidIdentifier(s: string): boolean {
 
 function renderTextContent(text: TextContentIR): string {
   if (!text.isExpression) {
-    return text.compiled;
+    // Escape newlines in plain text for JSX
+    return text.compiled.replace(/\n/g, '\\n');
   }
-  return `{${text.compiled}}`;
+  // Escape newlines inside expression strings for valid JS
+  const escaped = text.compiled.replace(/\n/g, '\\n');
+  return `{${escaped}}`;
 }
 
 /**

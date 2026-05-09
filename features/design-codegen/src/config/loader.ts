@@ -1,48 +1,80 @@
 /**
  * Config Loader
  *
- * Loads framework.yaml from template directory + merges user overrides.
+ * Loads framework.yaml from template packages + merges user overrides.
+ * Templates are now independent packages (e.g. @globallink/codegen-template-react).
+ *
+ * Discovery strategy:
+ * 1. Resolve template package directory via require.resolve (finds package.json)
+ * 2. Read framework.yaml from the package root
+ * 3. Use convention-based paths for scaffold/, patterns/, splitting/
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
-import { resolve, join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import { readFileSync, existsSync } from 'fs';
+import { resolve, dirname, join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import type { FrameworkConfig } from '../core/types';
 import type { ResolvedTemplate, CodegenUserConfig } from './types';
 
+// ═══════════════════════════════════════════════════════════════
+// Template Meta Interface
+// ═══════════════════════════════════════════════════════════════
+
+export interface TemplateMeta {
+  name: string;
+  description: string;
+  adapter: string;
+  frameworkYamlPath: string;
+  scaffoldDir: string;
+  patternsDir: string;
+  splittingDir: string;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Template name → package name mapping
+// ═══════════════════════════════════════════════════════════════
+
+const templatePackageMap: Record<string, string> = {
+  'react-feature-modular': '@globallink/codegen-template-react',
+  'react': '@globallink/codegen-template-react',
+};
+
 /**
- * Locate the templates directory.
- * Templates live at: <package-root>/templates/
+ * Resolve a template package directory from its package name.
+ * Uses require.resolve to find the package.json, then extracts the directory.
  */
-function getTemplatesBaseDir(): string {
-  // ESM compatible: compute __dirname equivalent
-  const currentFile = typeof __filename !== 'undefined'
-    ? __filename
-    : fileURLToPath(import.meta.url);
-  const currentDir = dirname(currentFile);
-  // currentDir is src/config/ or dist/config/ — go up to package root
-  return resolve(currentDir, '../../templates');
+function resolveTemplatePackageDir(packageName: string): string {
+  const req = createRequire(import.meta.url);
+  // Resolve the package.json to find the package root
+  const pkgJsonPath = req.resolve(`${packageName}/package.json`);
+  return dirname(pkgJsonPath);
 }
 
 /**
  * Load a template framework by name.
- * Reads framework.yaml, resolves scaffold/ and patterns/ paths.
+ * Resolves the template package directory and reads framework.yaml + paths.
  */
 export function loadTemplate(templateName: string, overrides?: CodegenUserConfig['overrides']): ResolvedTemplate {
-  const baseDir = getTemplatesBaseDir();
-  const templateDir = join(baseDir, templateName);
+  const packageName = templatePackageMap[templateName]
+    || `@globallink/codegen-template-${templateName}`;
 
-  if (!existsSync(templateDir)) {
+  let templateDir: string;
+  try {
+    templateDir = resolveTemplatePackageDir(packageName);
+  } catch (err: unknown) {
     const available = listAvailableTemplates();
+    const message = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `Template "${templateName}" not found at ${templateDir}.\nAvailable: ${available.join(', ')}`
+      `Template "${templateName}" not found (tried package "${packageName}").\n` +
+      `Error: ${message}\n` +
+      `Available templates: ${available.join(', ')}`
     );
   }
 
   const yamlPath = join(templateDir, 'framework.yaml');
   if (!existsSync(yamlPath)) {
-    throw new Error(`framework.yaml not found in template "${templateName}" at ${yamlPath}`);
+    throw new Error(`framework.yaml not found for template "${templateName}" at ${yamlPath}`);
   }
 
   const config = parseFrameworkYaml(yamlPath);
@@ -86,14 +118,7 @@ export function loadTemplate(templateName: string, overrides?: CodegenUserConfig
  * List all available template framework names.
  */
 export function listAvailableTemplates(): string[] {
-  const baseDir = getTemplatesBaseDir();
-  if (!existsSync(baseDir)) return [];
-
-  const entries = readdirSync(baseDir);
-  return entries.filter((name: string) => {
-    const fullPath = join(baseDir, name);
-    return statSync(fullPath).isDirectory() && existsSync(join(fullPath, 'framework.yaml'));
-  });
+  return Object.keys(templatePackageMap);
 }
 
 /**
@@ -139,3 +164,4 @@ export function loadUserConfig(configPath?: string): CodegenUserConfig | null {
   const content = readFileSync(path, 'utf-8');
   return parseYaml(content) as CodegenUserConfig;
 }
+

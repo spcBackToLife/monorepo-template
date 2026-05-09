@@ -15,6 +15,7 @@
 // ── Pipeline (主入口) ──
 export { generate, getAdapter, listAvailableTemplates, loadTemplate } from './pipeline';
 export type { GenerateInput, GenerateOutput, ResolvedTemplate, CodegenUserConfig } from './config/types';
+export type { TemplateMeta } from './config/loader';
 
 // ── Core Types (IR) ──
 export type {
@@ -36,6 +37,8 @@ export type {
   SplittingRules,
   CodeStyle,
   Conventions,
+  SplitStrategy,
+  SplitContext,
 } from './core/types';
 
 // ── Adapter Interface ──

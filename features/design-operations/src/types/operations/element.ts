@@ -36,6 +36,10 @@ export interface ElementAddOp {
     position?: number;
     /** Layout hint for intelligent default styling */
     layoutHint?: LayoutHint;
+    /** Display name for the node (PascalCase). Required at MCP layer, optional for programmatic use. */
+    name?: string;
+    /** 组件边界标记。codegen 引擎会将标记节点及其子树作为独立组件输出。 */
+    componentBoundary?: boolean;
   };
 }
 

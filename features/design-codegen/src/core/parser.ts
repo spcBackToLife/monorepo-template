@@ -257,6 +257,9 @@ function parseNode(
     bind,
     repeat,
     visibleWhen,
+    componentBoundary: node.componentBoundary,
+    isComponentInstance: node.type.startsWith('component:'),
+    templateId: node.type.startsWith('component:') ? node.type.slice('component:'.length) : undefined,
   };
 }
 

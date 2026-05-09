@@ -70,6 +70,11 @@ export interface NodeIR {
   repeat?: RepeatIR;
   visibleWhen?: ExpressionIR;
 
+  // Component boundary / instance metadata (from schema)
+  componentBoundary?: boolean;
+  isComponentInstance?: boolean;
+  templateId?: string;
+
   // Splitter fills these:
   splitAs?: 'component';
   splitComponentName?: string;
@@ -213,6 +218,10 @@ export interface FileOrganization {
 }
 
 export interface SplittingRules {
+  respectExplicitBoundary?: boolean;
+  respectComponentAssets?: boolean;
+  params?: Record<string, unknown>;
+  enabledStrategies?: string[];
   component: {
     minDescendantsToSplit: number;
     splitRepeatTemplate: boolean;
@@ -240,4 +249,22 @@ export interface Conventions {
   hookNaming: 'useCamelCase';
   serviceNaming: 'camelCase';
   dirNaming: 'PascalCase' | 'kebab-case' | 'camelCase';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Splitting Strategy Types
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Splitting strategy interface — each strategy is a function */
+export interface SplitStrategy {
+  name: string;
+  description?: string;
+  evaluate(node: NodeIR, context: SplitContext): string | null;
+}
+
+export interface SplitContext {
+  depth: number;
+  parent?: NodeIR;
+  page: PageIR;
+  params: Record<string, unknown>;
 }

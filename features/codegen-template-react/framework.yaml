@@ -25,6 +25,17 @@ fileOrganization:
     scope: page-local
 
 splitting:
+  respectExplicitBoundary: true
+  respectComponentAssets: true
+  params:
+    maxDepth: 5
+    maxDirectChildren: 6
+    minDescendantsToSplit: 8
+  enabledStrategies:
+    - repeat-container
+    - deep-nesting
+    - many-children
+    - interactive-region
   component:
     minDescendantsToSplit: 6
     splitRepeatTemplate: true

@@ -222,6 +222,12 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
   }
 
   const newNode = createNode(params.tag, params.styles, params.props, params.elementId, parent, params.layoutHint);
+  if (params.name) {
+    newNode.name = params.name;
+  }
+  if (params.componentBoundary) {
+    newNode.componentBoundary = true;
+  }
   const position = params.position ?? parent.children.length;
   parent.children.splice(position, 0, newNode);
 

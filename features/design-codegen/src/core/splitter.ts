@@ -4,6 +4,12 @@
 // Takes a flat PageIR and applies SplittingRules to decide how to break it
 // into smaller pieces: child components, custom hooks, service files, and
 // inferred types.
+//
+// Three-level priority:
+//   1. componentBoundary === true → split (if respectExplicitBoundary !== false)
+//   2. isComponentInstance === true → split (if respectComponentAssets !== false)
+//   3. Run through strategies array in order, first match wins
+//   Fallback: old rule-based logic (SplittingRules.component.*)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import type {
@@ -21,6 +27,8 @@ import type {
   TypeSplit,
   TypeFieldIR,
   PropDefinition,
+  SplitStrategy,
+  SplitContext,
 } from './types';
 
 import {
@@ -33,10 +41,17 @@ import {
 /**
  * Take a PageIR and SplittingRules, produce a SplitPlan that describes
  * how the page should be decomposed into multiple files/components/hooks.
+ *
+ * If strategies are provided, they are used for level-3 evaluation.
+ * Otherwise, falls back to the old rule-based logic using rules.component.* fields.
  */
-export function splitPage(page: PageIR, rules: SplittingRules): SplitPlan {
+export function splitPage(
+  page: PageIR,
+  rules: SplittingRules,
+  strategies?: SplitStrategy[],
+): SplitPlan {
   // 1. Walk the NodeIR tree and mark nodes for splitting
-  const splitNodes = identifySplitNodes(page.rootNode, rules, true /* isRoot */);
+  const splitNodes = identifySplitNodes(page.rootNode, rules, true /* isRoot */, strategies, page);
 
   // 2. Build child component definitions
   const childComponents = buildChildComponents(splitNodes, page);
@@ -71,18 +86,22 @@ interface SplitCandidate {
 
 /**
  * Walk the node tree and identify nodes that should be split into
- * their own components based on the rules.
+ * their own components based on the rules and strategies.
  */
 function identifySplitNodes(
   node: NodeIR,
   rules: SplittingRules,
   isRoot: boolean,
+  strategies?: SplitStrategy[],
+  page?: PageIR,
+  depth = 0,
+  parent?: NodeIR,
 ): SplitCandidate[] {
   const candidates: SplitCandidate[] = [];
 
   // Don't split the root node itself
   if (!isRoot) {
-    const reason = shouldSplit(node, rules);
+    const reason = shouldSplit(node, rules, strategies, page, depth, parent);
     if (reason) {
       // Mark the node
       node.splitAs = 'component';
@@ -95,7 +114,7 @@ function identifySplitNodes(
 
   // Recurse into children
   for (const child of node.children) {
-    const childCandidates = identifySplitNodes(child, rules, false);
+    const childCandidates = identifySplitNodes(child, rules, false, strategies, page, depth + 1, node);
     candidates.push(...childCandidates);
   }
 
@@ -114,10 +133,81 @@ function identifySplitNodes(
 }
 
 /**
- * Determine if a node should be split based on rules.
- * Returns the reason or null if no split is needed.
+ * Determine if a node should be split based on the three-level priority:
+ *   1. Explicit componentBoundary
+ *   2. Component instance from asset library
+ *   3. Strategy evaluation (or fallback to old rules)
  */
 function shouldSplit(
+  node: NodeIR,
+  rules: SplittingRules,
+  strategies?: SplitStrategy[],
+  page?: PageIR,
+  depth = 0,
+  parent?: NodeIR,
+): ComponentSplit['reason'] | null {
+  // Level 1: Explicit component boundary
+  if (rules.respectExplicitBoundary !== false && node.componentBoundary) {
+    return 'named-container';
+  }
+
+  // Level 2: Component instance from asset library
+  if (rules.respectComponentAssets !== false && node.isComponentInstance) {
+    return 'named-container';
+  }
+
+  // Level 3: Strategy-based evaluation
+  if (strategies && strategies.length > 0 && page) {
+    // Filter strategies by enabledStrategies if specified
+    const enabledNames = rules.enabledStrategies;
+    const activeStrategies = enabledNames
+      ? strategies.filter(s => enabledNames.includes(s.name))
+      : strategies;
+
+    const ctx: SplitContext = {
+      depth,
+      parent,
+      page,
+      params: rules.params || {},
+    };
+
+    for (const strategy of activeStrategies) {
+      const result = strategy.evaluate(node, ctx);
+      if (result) {
+        // Map strategy result to a ComponentSplit reason
+        return mapStrategyResultToReason(result);
+      }
+    }
+
+    return null;
+  }
+
+  // Fallback: old rule-based logic
+  return shouldSplitLegacy(node, rules);
+}
+
+/**
+ * Map a strategy result string to a ComponentSplit reason.
+ */
+function mapStrategyResultToReason(result: string): ComponentSplit['reason'] {
+  switch (result) {
+    case 'repeat-template':
+      return 'repeat-template';
+    case 'interactive-region':
+      return 'interactive-region';
+    case 'depth-exceeded':
+    case 'children-exceeded':
+      return 'complex-container';
+    default:
+      return 'complex-container';
+  }
+}
+
+/**
+ * Legacy rule-based splitting logic (backward compatibility).
+ * Used when no strategies are loaded.
+ */
+function shouldSplitLegacy(
   node: NodeIR,
   rules: SplittingRules,
 ): ComponentSplit['reason'] | null {

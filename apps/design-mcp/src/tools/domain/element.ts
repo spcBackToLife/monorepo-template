@@ -27,6 +27,7 @@ export function registerElementTools(server: McpServer): void {
         '【添加后清理】创建复杂布局后需检查是否遗漏必要的容器（flex parent）、宽高约束或溢出滚动配置。',
       schema: z.object({
         projectId: z.string(), parentId: z.string(),
+        name: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/, 'Must be PascalCase: start with uppercase letter, followed by alphanumeric characters, no spaces or special chars (e.g. "HeaderContainer", "LoginButton", "UserAvatar")').describe('Required node name in PascalCase (e.g. "MainContainer", "SubmitButton", "ProfileImage"). Must start with an uppercase letter and contain only English alphanumeric characters.'),
         tag: z.string().describe('div/span/p/h1-h3/button/input/textarea/select/img/a/ul/ol/li/nav/header/footer/section/main'),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
         props: z
@@ -35,9 +36,11 @@ export function registerElementTools(server: McpServer): void {
           .describe('例: { textContent: "标题" } 或 { children: "{{state.data.x}}" }；p/h/span/button 等会渲染上述字段'),
         position: z.number().optional(),
         layoutHint: z.enum(['scroll-child', 'auto-size', 'fixed-height', 'fill-parent', 'sticky-header', 'sticky-footer']).optional().describe('布局提示：scroll-child(滚动容器内的子元素)、auto-size(内容自适应)、fixed-height(固定高度、满宽)、fill-parent(填充父容器)、sticky-header(粘性顶部)、sticky-footer(粘性底部)'),
+        componentBoundary: z.boolean().optional()
+          .describe('标记此节点为组件边界。codegen 会将其拆为独立组件。对 Header/Footer/Card/Modal/Form 等语义容器建议标记为 true'),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, elementId: generateNodeId(), styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, elementId: generateNodeId(), styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint, name: p.name, componentBoundary: p.componentBoundary } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

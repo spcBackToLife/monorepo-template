@@ -12,8 +12,7 @@ import { existsSync, mkdirSync, readdirSync, statSync, readFileSync, writeFileSy
 import { join, relative, dirname } from 'path';
 import * as ejs from 'ejs';
 import type { DesignProject, Screen } from '@globallink/design-schema';
-import type { FrameworkConfig, SplitPlan, PageIR } from './core/types';
-import type { ActionStepIR } from './core/types';
+import type { FrameworkConfig, SplitPlan, PageIR, ActionStepIR, SplitStrategy } from './core/types';
 import type { FrameworkAdapter } from './adapter/interface';
 import type { GenerateInput, GenerateOutput, ResolvedTemplate } from './config/types';
 import { loadTemplate, listAvailableTemplates } from './config/loader';
@@ -68,6 +67,19 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
   const { parseScreen } = await import('./core/parser');
   const { splitPage } = await import('./core/splitter');
 
+  // Load splitting strategies from template directory (if available)
+  let strategies: SplitStrategy[] | undefined;
+  const splittingDir = join(template.templateDir, 'splitting');
+  if (existsSync(join(splittingDir, 'index.ts')) || existsSync(join(splittingDir, 'index.js'))) {
+    try {
+      const mod = await import(splittingDir);
+      strategies = mod.strategies;
+    } catch {
+      // If loading fails, fall back to legacy rule-based splitting
+      strategies = undefined;
+    }
+  }
+
   const screenPathMap = buildScreenPathMap(schema.screens);
 
   for (const screen of schema.screens) {
@@ -78,7 +90,7 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
     resolveNavigationPaths(pageIR, screenPathMap);
 
     // 5b. Split: IR → SplitPlan
-    const plan = splitPage(pageIR, config.splitting);
+    const plan = splitPage(pageIR, config.splitting, strategies);
 
     // 5c. Emit: Generate files for this screen
     const files = emitScreen(pageIR, plan, adapter, template, outputDir, screenPathMap);

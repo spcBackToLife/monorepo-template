@@ -28,6 +28,12 @@ export class ProjectsController {
     return this.projects.findOne(id);
   }
 
+  /** 导出完整 DesignProject JSON（含所有 Screen 完整 schema），供 codegen CLI 使用 */
+  @Get(':id/export')
+  export(@Param('id') id: string) {
+    return this.projects.findOne(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.projects.remove(id);
