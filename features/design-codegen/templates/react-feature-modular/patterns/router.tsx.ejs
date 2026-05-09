@@ -1,0 +1,10 @@
+import { createBrowserRouter } from 'react-router-dom';
+<% for (const route of routes) { %>
+import { <%= route.componentName %> } from '<%= route.importPath %>';
+<% } %>
+
+export const router = createBrowserRouter([
+<% for (const route of routes) { %>
+  { path: '<%= route.path %>', element: <<%= route.componentName %> /> },
+<% } %>
+]);

@@ -1,0 +1,9 @@
+<%- imports %>
+
+export function <%= hookName %>() {
+<%- stateDeclarations %>
+<%- effects %>
+<%- logic %>
+
+  return { <%- returnFields %> };
+}

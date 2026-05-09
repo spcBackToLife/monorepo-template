@@ -1,34 +1,47 @@
 {
   "name": "@globallink/design-codegen",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "design-codegen": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist",
+    "templates"
+  ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --ext .ts src"
+    "lint": "eslint --ext .ts src",
+    "generate": "tsx src/cli.ts generate"
   },
   "sideEffects": false,
   "dependencies": {
-    "@globallink/design-schema": "workspace:*"
+    "@globallink/design-schema": "workspace:*",
+    "ejs": "^3.1.10",
+    "yaml": "^2.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.37.0",
+    "@types/ejs": "^3.1.5",
+    "@types/node": "^20.14.0",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
     "eslint": "^9.37.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^15.11.0",
     "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.3"
   }
 }

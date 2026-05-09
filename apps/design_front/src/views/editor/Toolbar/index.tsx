@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Select, Button, Typography, Segmented, Dropdown, Switch, Tooltip, App as AntdApp } from 'antd';
-import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, UndoOutlined, RedoOutlined, PlayCircleOutlined, ExportOutlined, CodeOutlined, AppstoreOutlined, FundProjectionScreenOutlined } from '@ant-design/icons';
 import { observer } from 'mobx-react-lite';
 import { useNavigate } from 'react-router-dom';
 
@@ -322,6 +322,12 @@ export const Toolbar = observer(function Toolbar() {
             navigate(path);
           }}
           title="全景视图（查看所有状态）"
+        />
+        <Button
+          type="text"
+          icon={<FundProjectionScreenOutlined />}
+          onClick={() => navigate('overview')}
+          title="项目资源总览"
         />
         {/* 「产品全景 PRD」按钮已随 v1 Blueprint 模块一并移除，待 D.6 按 v2 schema 重写后恢复 */}
         <Button

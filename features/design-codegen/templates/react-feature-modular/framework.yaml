@@ -1,0 +1,64 @@
+name: react-feature-modular
+description: "React 功能模块化，Folder/index.tsx + index.less 组织方式"
+adapter: react
+
+fileOrganization:
+  page:
+    baseDir: src/pages
+    dirNaming: PascalCase
+    entryFile: index.tsx
+    styleFile: index.less
+  component:
+    dir: components
+    filePattern: folder
+    entryFile: index.tsx
+    styleFile: index.less
+  hook:
+    dir: hooks
+    fileNaming: camelCase
+  service:
+    dir: src/services
+    groupBy: domain
+  types:
+    dir: types
+    entryFile: index.ts
+    scope: page-local
+
+splitting:
+  component:
+    minDescendantsToSplit: 6
+    splitRepeatTemplate: true
+    splitInteractiveRegions: true
+    splitNamedContainers: true
+  hook:
+    minActionsToSplit: 3
+    splitDataFetching: true
+
+codeStyle:
+  component:
+    declaration: function
+    export: named
+    propsStyle: destructured
+  state:
+    pattern: useState
+  logic:
+    async: async-await
+    handlerNaming: handleXxx
+    guardStyle: early-return
+  style:
+    preprocessor: less
+    modules: true
+    dynamicStrategy: inline-merge
+  router:
+    lib: react-router-v6
+    lazyLoading: false
+  service:
+    httpClient: axios
+    typing: interface
+
+conventions:
+  fileNaming: PascalCase
+  componentNaming: PascalCase
+  hookNaming: useCamelCase
+  serviceNaming: camelCase
+  dirNaming: PascalCase

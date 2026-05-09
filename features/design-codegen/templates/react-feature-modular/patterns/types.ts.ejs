@@ -1,0 +1,8 @@
+<% for (const t of types) { %>
+export interface <%= t.name %> {
+<% for (const field of t.fields) { %>
+  <%= field.name %><%= field.optional ? '?' : '' %>: <%= field.type %>;
+<% } %>
+}
+
+<% } %>

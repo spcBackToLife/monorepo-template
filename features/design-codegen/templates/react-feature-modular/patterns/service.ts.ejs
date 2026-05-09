@@ -1,0 +1,16 @@
+import { request } from '@/utils/request';
+<% if (typeImports) { %>
+<%- typeImports %>
+<% } %>
+<% for (const fn of functions) { %>
+
+<% if (fn.description) { %>/** <%= fn.description %> */<% } %>
+export async function <%= fn.name %>(<%= fn.params %>): Promise<<%= fn.returnType %>> {
+  return request({
+    method: '<%= fn.method %>',
+    url: '<%= fn.path %>',
+<% if (fn.hasData) { %>    data: <%= fn.dataMapping %>,
+<% } %>
+  });
+}
+<% } %>

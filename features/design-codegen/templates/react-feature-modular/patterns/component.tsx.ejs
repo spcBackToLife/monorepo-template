@@ -1,0 +1,12 @@
+<%- imports %>
+<% if (propsInterface) { %>
+<%= propsInterface %>
+<% } %>
+
+export function <%= componentName %>(<%= propsSignature %>) {
+<%- body %>
+
+  return (
+<%- jsx %>
+  );
+}

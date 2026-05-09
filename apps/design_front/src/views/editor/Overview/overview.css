@@ -1,0 +1,471 @@
+.overview-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f8f9fb;
+  overflow: hidden;
+}
+
+.overview-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.overview-topbar__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-topbar__icon {
+  color: #6366f1;
+  font-size: 16px;
+}
+
+.overview-topbar__text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.overview-topbar__badge {
+  font-size: 12px;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.overview-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+}
+
+.overview-tabs {
+  margin-bottom: 24px;
+}
+
+/* Material cards grid */
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.overview-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.overview-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+}
+
+.overview-card__thumbnail {
+  width: 100%;
+  height: 140px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.overview-card__thumbnail img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.overview-card__thumbnail--empty {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.overview-card__zoom-hint {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.overview-card:hover .overview-card__zoom-hint {
+  opacity: 1;
+}
+
+.overview-card__body {
+  padding: 12px 14px;
+}
+
+.overview-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-card__meta {
+  font-size: 11px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.overview-card__tag {
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.overview-card__tag--active {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+/* API list */
+.overview-api-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.overview-api-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 16px 20px;
+  transition: border-color 0.2s;
+}
+
+.overview-api-card:hover {
+  border-color: #c7d2fe;
+}
+
+.overview-api-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.overview-api-card__method {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.overview-api-card__method--get {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.overview-api-card__method--post {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.overview-api-card__method--put {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.overview-api-card__method--delete {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.overview-api-card__method--patch {
+  background: #e9d5ff;
+  color: #7c3aed;
+}
+
+.overview-api-card__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.overview-api-card__path {
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #64748b;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.overview-api-card__scenarios {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.overview-api-card__scenario {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.overview-api-card__scenario--active {
+  background: #ede9fe;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.overview-api-card__screen {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+/* State/data section */
+.overview-state-section {
+  margin-bottom: 24px;
+}
+
+.overview-state-section__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-state-table {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  background: #fff;
+}
+
+.overview-state-table th {
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.overview-state-table td {
+  font-size: 12px;
+  color: #334155;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.overview-state-table tr:last-child td {
+  border-bottom: none;
+}
+
+.overview-state-table__value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: #6366f1;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Navigation/Event flow */
+.overview-nav-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overview-nav-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  padding: 16px 20px;
+}
+
+.overview-nav-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-nav-card__events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overview-nav-card__event {
+  font-size: 12px;
+  color: #475569;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-nav-card__trigger {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6366f1;
+  background: #eef2ff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.overview-nav-card__action {
+  font-size: 11px;
+  color: #64748b;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.overview-nav-card__arrow {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* Empty state */
+.overview-empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 60px 20px;
+  font-size: 13px;
+}
+
+/* Filter bar */
+.overview-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.overview-filter-bar__label {
+  font-size: 12px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+/* Detail Modal */
+.overview-detail-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-detail-modal__image-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  min-height: 420px;
+  max-height: 520px;
+  overflow: hidden;
+}
+
+.overview-detail-modal__img {
+  max-width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+}
+
+.overview-detail-modal__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+}
+
+.overview-detail-modal__footer {
+  padding: 16px 24px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+}
+
+.overview-detail-modal__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.overview-detail-modal__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.overview-detail-modal__tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.overview-detail-modal__tag--purple {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.overview-detail-modal__tag--blue {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.overview-detail-modal__time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.overview-detail-modal__info {
+  margin-top: 0;
+}

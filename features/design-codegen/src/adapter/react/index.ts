@@ -1,0 +1,394 @@
+import type {
+  NodeIR,
+  HandlerIR,
+  ExpressionIR,
+  ViewStateIR,
+  DataStateIR,
+  DataSourceIR,
+  RepeatIR,
+  BindIR,
+  DynamicStyleIR,
+  TextContentIR,
+} from '../../core/types';
+import type { FrameworkAdapter, FrameworkImportNeeds } from '../interface';
+import { emitHandlerBody } from './emit-handler';
+import { buildAttributes } from './emit-element';
+
+/**
+ * Map design event triggers to React event attributes.
+ */
+const TRIGGER_TO_REACT_ATTR: Record<string, string> = {
+  click: 'onClick',
+  doubleClick: 'onDoubleClick',
+  hover: 'onMouseEnter',
+  focus: 'onFocus',
+  blur: 'onBlur',
+  change: 'onChange',
+  submit: 'onSubmit',
+  keyDown: 'onKeyDown',
+  keyUp: 'onKeyUp',
+  keyPress: 'onKeyPress',
+  scroll: 'onScroll',
+  longPress: 'onMouseDown', // approximation
+};
+
+/** Tags that are self-closing in JSX */
+const SELF_CLOSING_TAGS = new Set([
+  'img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base',
+  'col', 'embed', 'source', 'track', 'wbr',
+]);
+
+/**
+ * ReactAdapter — generates idiomatic React + TypeScript code.
+ *
+ * Outputs JSX with hooks (useState, useEffect, useNavigate).
+ */
+export class ReactAdapter implements FrameworkAdapter {
+  readonly name = 'react';
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Element rendering
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  renderElement(node: NodeIR, indent: number): string {
+    return this.renderNodeShallow(node, indent);
+  }
+
+  renderTree(node: NodeIR, indent: number): string {
+    // Conditional rendering wraps the element
+    if (node.visibleWhen) {
+      const content = this.renderNodeDeep(node, indent + 1);
+      return this.emitConditional(node.visibleWhen, content);
+    }
+
+    // Repeat rendering
+    if (node.repeat) {
+      return this.emitRepeat(node.repeat, indent);
+    }
+
+    return this.renderNodeDeep(node, indent);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // State
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitStateDeclaration(state: ViewStateIR | DataStateIR): string {
+    const { name, pascalName, type, defaultValue } = state;
+    const setter = `set${pascalName}`;
+    if (type && type !== 'any') {
+      return `const [${name}, ${setter}] = useState<${type}>(${defaultValue});`;
+    }
+    return `const [${name}, ${setter}] = useState(${defaultValue});`;
+  }
+
+  emitStateSet(_variable: string, setter: string, value: string): string {
+    return `${setter}(${value});`;
+  }
+
+  emitStateAppend(_variable: string, setter: string, value: string): string {
+    return `${setter}(prev => [...prev, ${value}]);`;
+  }
+
+  emitStateToggle(_variable: string, setter: string): string {
+    return `${setter}(prev => !prev);`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Events
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitEventAttribute(trigger: string, handlerName: string): string {
+    const reactAttr = TRIGGER_TO_REACT_ATTR[trigger] || `on${capitalize(trigger)}`;
+    return `${reactAttr}={${handlerName}}`;
+  }
+
+  emitHandler(handler: HandlerIR): string {
+    const { name, isAsync, steps, guard } = handler;
+    const asyncPrefix = isAsync ? 'async ' : '';
+    const lines: string[] = [];
+
+    lines.push(`const ${name} = ${asyncPrefix}() => {`);
+
+    if (guard) {
+      lines.push(`  if (!(${guard.compiled})) return;`);
+    }
+
+    lines.push(...emitHandlerBody(steps, 1));
+
+    lines.push(`};`);
+
+    return lines.join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // List rendering
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitRepeat(repeat: RepeatIR, indent: number): string {
+    const pad = makeIndent(indent);
+    const { dataExpression, itemName, indexName, template } = repeat;
+    const templateStr = this.renderNodeDeep(template, indent + 2);
+
+    // Determine key expression: use item.id if exists, fallback to index
+    const keyAttr = ` key={${itemName}.id ?? ${indexName}}`;
+
+    const lines = [
+      `${pad}{${dataExpression.compiled}.map((${itemName}, ${indexName}) => (`,
+      injectKeyToFirstTag(templateStr, keyAttr),
+      `${pad}))}`,
+    ];
+
+    return lines.join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Conditional rendering
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitConditional(condition: ExpressionIR, content: string): string {
+    return `{${condition.compiled} && (\n${content}\n)}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Binding
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitBind(bind: BindIR, tag: string): string {
+    const { variable, setter } = bind;
+    const valuePart = `value={${variable}}`;
+
+    if (tag === 'input' || tag === 'textarea') {
+      return `${valuePart} onChange={e => ${setter}(e.target.value)}`;
+    }
+    if (tag === 'select') {
+      return `${valuePart} onChange={e => ${setter}(e.target.value)}`;
+    }
+    // Checkbox-like
+    return `checked={${variable}} onChange={e => ${setter}(e.target.checked)}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Lifecycle
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitOnMount(handler: HandlerIR): string {
+    const { isAsync, steps } = handler;
+    const lines: string[] = [];
+
+    if (isAsync) {
+      lines.push(`useEffect(() => {`);
+      lines.push(`  const init = async () => {`);
+      lines.push(...emitHandlerBody(steps, 2));
+      lines.push(`  };`);
+      lines.push(`  init();`);
+      lines.push(`}, []);`);
+    } else {
+      lines.push(`useEffect(() => {`);
+      lines.push(...emitHandlerBody(steps, 1));
+      lines.push(`}, []);`);
+    }
+
+    return lines.join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Navigation
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitNavigationSetup(): string {
+    return `const navigate = useNavigate();`;
+  }
+
+  emitNavigate(path: string): string {
+    return `navigate('${path}');`;
+  }
+
+  emitNavigateBack(): string {
+    return `navigate(-1);`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Styles
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitStyleImport(relativePath: string): string {
+    return `import styles from '${relativePath}';`;
+  }
+
+  emitClassName(name: string): string {
+    if (isValidIdentifier(name)) {
+      return `className={styles.${name}}`;
+    }
+    return `className={styles['${name}']}`;
+  }
+
+  emitDynamicStyle(dynamicStyles: DynamicStyleIR[]): string {
+    if (dynamicStyles.length === 0) return '';
+
+    const entries = dynamicStyles
+      .map(s => `${s.property}: ${s.expression.compiled}`)
+      .join(', ');
+
+    return `style={{ ${entries} }}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Data Source / Service
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  emitServiceFunction(ds: DataSourceIR): string {
+    const { functionName, method, path, params, responseType } = ds;
+    const returnType = responseType || 'any';
+    const lines: string[] = [];
+
+    if (params && params.length > 0) {
+      const paramsList = params.map(p => `${p.name}: ${p.type}`).join(', ');
+      lines.push(`export async function ${functionName}(params: { ${paramsList} }): Promise<${returnType}> {`);
+    } else {
+      lines.push(`export async function ${functionName}(): Promise<${returnType}> {`);
+    }
+
+    if (method === 'GET') {
+      lines.push(`  const response = await request.get('${path}');`);
+    } else {
+      lines.push(`  const response = await request.${method.toLowerCase()}('${path}', params);`);
+    }
+
+    lines.push(`  return response.data;`);
+    lines.push(`}`);
+
+    return lines.join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Imports
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  getFrameworkImports(needs: FrameworkImportNeeds): string[] {
+    const imports: string[] = [];
+
+    // React hooks
+    const reactHooks: string[] = [];
+    if (needs.hasState) reactHooks.push('useState');
+    if (needs.hasEffect) reactHooks.push('useEffect');
+    if (needs.hasMemo) reactHooks.push('useMemo');
+    if (needs.hasCallback) reactHooks.push('useCallback');
+
+    if (reactHooks.length > 0) {
+      imports.push(`import { ${reactHooks.join(', ')} } from 'react';`);
+    }
+
+    // React Router
+    if (needs.hasNavigation) {
+      imports.push(`import { useNavigate } from 'react-router-dom';`);
+    }
+
+    return imports;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Private: node rendering
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Render a single node without recursing into children (for renderElement).
+   */
+  private renderNodeShallow(node: NodeIR, indent: number): string {
+    const pad = makeIndent(indent);
+    const tag = node.tag;
+    const attrs = buildAttributes(node, this);
+    const isSelfClosing = SELF_CLOSING_TAGS.has(tag);
+
+    if (isSelfClosing) {
+      return `${pad}<${tag}${attrs} />`;
+    }
+
+    if (node.textContent) {
+      const text = renderTextContent(node.textContent);
+      return `${pad}<${tag}${attrs}>${text}</${tag}>`;
+    }
+
+    if (node.children.length === 0) {
+      return `${pad}<${tag}${attrs} />`;
+    }
+
+    // Shallow: show children as placeholder
+    return `${pad}<${tag}${attrs}>...</${tag}>`;
+  }
+
+  /**
+   * Render a node and all its children recursively.
+   */
+  private renderNodeDeep(node: NodeIR, indent: number): string {
+    const pad = makeIndent(indent);
+    const tag = node.tag;
+    const attrs = buildAttributes(node, this);
+    const isSelfClosing = SELF_CLOSING_TAGS.has(tag);
+
+    if (isSelfClosing) {
+      return `${pad}<${tag}${attrs} />`;
+    }
+
+    // Text content only (no nested children)
+    if (node.textContent && node.children.length === 0) {
+      const text = renderTextContent(node.textContent);
+      return `${pad}<${tag}${attrs}>${text}</${tag}>`;
+    }
+
+    // No children and no text
+    if (node.children.length === 0 && !node.textContent) {
+      return `${pad}<${tag}${attrs} />`;
+    }
+
+    // Recursive children
+    const childrenLines: string[] = [];
+
+    // If there's text content alongside children, emit text first
+    if (node.textContent) {
+      const text = renderTextContent(node.textContent);
+      childrenLines.push(`${makeIndent(indent + 1)}${text}`);
+    }
+
+    for (const child of node.children) {
+      childrenLines.push(this.renderTree(child, indent + 1));
+    }
+
+    return [
+      `${pad}<${tag}${attrs}>`,
+      ...childrenLines,
+      `${pad}</${tag}>`,
+    ].join('\n');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Module-level utility functions
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function makeIndent(level: number): string {
+  return '  '.repeat(level);
+}
+
+export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function isValidIdentifier(s: string): boolean {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(s);
+}
+
+function renderTextContent(text: TextContentIR): string {
+  if (!text.isExpression) {
+    return text.compiled;
+  }
+  return `{${text.compiled}}`;
+}
+
+/**
+ * Inject a key attribute into the first opening tag of a rendered template string.
+ */
+function injectKeyToFirstTag(rendered: string, keyAttr: string): string {
+  if (!keyAttr) return rendered;
+  return rendered.replace(/(<\w+)/, `$1${keyAttr}`);
+}

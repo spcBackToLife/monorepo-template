@@ -1,0 +1,12 @@
+<%- imports %>
+
+export function <%= pageName %>() {
+<%- stateDeclarations %>
+<%- navigationSetup %>
+<%- onMountEffect %>
+<%- handlers %>
+
+  return (
+<%- jsx %>
+  );
+}
