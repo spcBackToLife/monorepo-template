@@ -1,19 +1,25 @@
 
-export interface  {
+export interface Message {
 
-  data: Record<string, unknown>[];
+  id: string;
 
-}
+  role: string;
 
-
-export interface  {
-
-  data: Record<string, unknown>;
+  text: string;
 
 }
 
 
-export interface  {
+export interface ChatSendResponse {
+
+  userMessage: Message;
+
+  aiReply: Message;
+
+}
+
+
+export interface ChatSendParams {
 
   text: string;
 

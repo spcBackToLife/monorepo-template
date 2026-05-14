@@ -23,6 +23,7 @@ export type {
   GlobalStateInit,
   ExpressionContext,
   BuiltinFunctions,
+  DataTypeAnnotation,
   // v2 visualState
   VisualState,
   // v2 action
@@ -56,6 +57,8 @@ export type {
   StaticDataSource,
   ApiDataSource,
   DataSource,
+  TypeField,
+  DataSourceTypeDef,
   // Node / Screen / Project
   PrimitiveNodeType,
   ComponentInstanceType,

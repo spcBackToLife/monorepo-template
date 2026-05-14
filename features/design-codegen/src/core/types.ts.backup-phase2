@@ -42,13 +42,6 @@ export interface DataStateIR {
   defaultValue: string;            // "[]"
 }
 
-export interface HookStateDef {
-  name: string;
-  pascalName: string;
-  type: string;          // ✓ Preserve type
-  defaultValue: string;
-}
-
 // ─── Data Source IR ──────────────────────────────────────────────────────────
 
 export interface DataSourceIR {
@@ -190,14 +183,13 @@ export interface HookSplit {
   reason: 'data-fetching' | 'complex-handler';
   dataSource?: DataSourceIR;
   handler?: HandlerIR;
-  stateVars: HookStateDef[];       // variables this hook manages (BUG #2 fix)
+  stateVars: string[];             // variables this hook manages
   returnFields: string[];          // what it returns
 }
 
 export interface ServiceSplit {
   domain: string;                  // "chat" → services/chat.ts
   functions: DataSourceIR[];
-  relatedTypes: string[];  // Type names used by these functions (BUG #7 fix)
 }
 
 export interface TypeSplit {
@@ -209,24 +201,6 @@ export interface TypeFieldIR {
   name: string;
   type: string;
   optional?: boolean;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Emit Plan Types
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/** A complete emit plan for one screen — all files, their paths, and full render data */
-export interface ScreenEmitPlan {
-  files: FileEmitPlan[];
-}
-
-export interface FileEmitPlan {
-  /** Relative output path (e.g., "src/pages/Chat/index.tsx") */
-  outputPath: string;
-  /** EJS pattern template name, or null for raw content output */
-  pattern: string | null;
-  /** Complete data for template rendering (includes full import lists) */
-  templateData: Record<string, unknown>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

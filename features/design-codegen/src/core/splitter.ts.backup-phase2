@@ -23,7 +23,6 @@ import type {
   PageSplit,
   ComponentSplit,
   HookSplit,
-  HookStateDef,
   ServiceSplit,
   TypeSplit,
   TypeFieldIR,
@@ -462,107 +461,51 @@ function hasNonEmptyStyles(node: NodeIR): boolean {
 function analyzeHooks(page: PageIR, rules: SplittingRules): HookSplit[] {
   const hooks: HookSplit[] = [];
 
-  // ── Data-fetching hooks ────────────────────────────────────────────────────
-  // ONLY create data-fetching hooks for data sources used in onMount/screenEnter.
-  // A POST endpoint triggered by user click is NOT a "data-fetching" pattern —
-  // it's a mutation that belongs in a handler hook or stays in the page.
-  if (rules.hook.splitDataFetching && page.onMount) {
-    // Find which data sources are fetched on mount
-    const onMountServiceNames = collectFetchServiceNamesFromSteps(page.onMount.steps);
-
+  // Data fetching hooks
+  if (rules.hook.splitDataFetching) {
     for (const ds of page.dataSources) {
-      // Only create data-fetching hook if this DS is auto-fetched on mount
-      if (!onMountServiceNames.has(ds.functionName)) continue;
-
       const hookName = `use${toPascalCase(ds.name)}`;
 
-      // Find state variables populated by this fetch (from onMount's onSuccess)
+      // Find related state variables (data that this fetch populates)
       const relatedStateVars = findRelatedStateVars(ds, page);
-      const relatedStateVarSet = new Set(relatedStateVars);
 
-      // Find handlers that also mutate the same state (e.g., a send handler that appends to messages)
-      // These should be co-located in this hook to have access to setters
-      const relatedHandler = page.handlers.find(h => {
-        if (h.trigger === 'screenEnter') return false;
-        const handlerVars = extractHandlerStateVars(h);
-        return handlerVars.some(v => relatedStateVarSet.has(v));
-      });
-
-      // If a related handler also manages additional state vars, include them
-      let allStateVars = [...relatedStateVars];
-      if (relatedHandler) {
-        const handlerVars = extractHandlerStateVars(relatedHandler);
-        for (const v of handlerVars) {
-          if (!allStateVars.includes(v)) {
-            allStateVars.push(v);
-          }
-        }
-      }
+      // Find handlers that use this data source
+      const relatedHandler = page.handlers.find((h) =>
+        h.steps.some(
+          (s) => s.kind === 'fetch' && s.serviceName === ds.functionName,
+        ),
+      );
 
       hooks.push({
         hookName,
         reason: 'data-fetching',
         dataSource: ds,
         handler: relatedHandler,
-        stateVars: allStateVars.map(varName => {
-          const viewVar = page.viewState.find(v => v.name === varName);
-          const dataVar = page.dataState.find(d => d.name === varName);
-          const baseVar = viewVar || dataVar;
-          return {
-            name: varName,
-            pascalName: baseVar?.pascalName || toPascalCase(varName),
-            type: baseVar?.type || 'unknown',
-            defaultValue: baseVar?.defaultValue || 'undefined',
-          };
-        }),
-        returnFields: buildHookReturnFields(ds, allStateVars, relatedHandler),
+        stateVars: relatedStateVars,
+        returnFields: buildHookReturnFields(ds, relatedStateVars, relatedHandler),
       });
     }
   }
 
-  // ── Complex handler hooks ──────────────────────────────────────────────────
-  // Handlers with many actions get extracted into their own hook.
-  // They bring their state variables (the ones they set) with them.
+  // Complex handler hooks
   if (rules.hook.minActionsToSplit > 0) {
-    // Don't re-extract handlers that are already covered by onMount
-    const onMountHandlerName = page.onMount?.name;
+    const alreadyInHook = new Set(
+      hooks.filter((h) => h.handler).map((h) => h.handler!.name),
+    );
 
     for (const handler of page.handlers) {
-      // Skip the screenEnter handler (it's covered by data-fetching hooks)
-      if (handler.trigger === 'screenEnter') continue;
-      if (handler.name === onMountHandlerName) continue;
-
+      if (alreadyInHook.has(handler.name)) continue;
       if (handler.steps.length >= rules.hook.minActionsToSplit) {
         const hookName = `use${toPascalCase(handler.name.replace(/^handle/, ''))}`;
 
         // Find state vars this handler manages
-        const handlerVarNames = extractHandlerStateVars(handler);
-
-        // Don't steal state variables already managed by a data-fetching hook
-        const hookManagedVars = new Set<string>();
-        for (const h of hooks) {
-          for (const sv of h.stateVars) {
-            hookManagedVars.add(sv.name);
-          }
-        }
-
-        const stateVars = handlerVarNames.filter(v => !hookManagedVars.has(v));
+        const stateVars = extractHandlerStateVars(handler);
 
         hooks.push({
           hookName,
           reason: 'complex-handler',
           handler,
-          stateVars: stateVars.map(varName => {
-            const viewVar = page.viewState.find(v => v.name === varName);
-            const dataVar = page.dataState.find(d => d.name === varName);
-            const baseVar = viewVar || dataVar;
-            return {
-              name: varName,
-              pascalName: baseVar?.pascalName || toPascalCase(varName),
-              type: baseVar?.type || 'unknown',
-              defaultValue: baseVar?.defaultValue || 'undefined',
-            };
-          }),
+          stateVars,
           returnFields: [...stateVars, handler.name],
         });
       }
@@ -570,19 +513,6 @@ function analyzeHooks(page: PageIR, rules: SplittingRules): HookSplit[] {
   }
 
   return hooks;
-}
-
-/**
- * Collect all service function names from fetch steps (non-recursive into success/error).
- */
-function collectFetchServiceNamesFromSteps(steps: ActionStepIR[]): Set<string> {
-  const names = new Set<string>();
-  for (const step of steps) {
-    if (step.kind === 'fetch') {
-      names.add(step.serviceName);
-    }
-  }
-  return names;
 }
 
 /**
@@ -664,11 +594,6 @@ function buildHookReturnFields(
 ): string[] {
   const fields: string[] = [...stateVars];
 
-  // Add setters for state vars (needed when JSX binds to these vars)
-  for (const varName of stateVars) {
-    fields.push(`set${toPascalCase(varName)}`);
-  }
-
   // Add loading state
   fields.push(`is${toPascalCase(ds.name)}Loading`);
 
@@ -696,23 +621,10 @@ function groupServices(dataSources: DataSourceIR[]): ServiceSplit[] {
     domainMap.get(domain)!.push(ds);
   }
 
-  return Array.from(domainMap.entries()).map(([domain, functions]) => {
-    // Extract related types from response types of functions in this domain
-    const relatedTypes = new Set<string>();
-    for (const fn of functions) {
-      if (fn.responseType && fn.responseType !== 'unknown' && fn.responseType !== 'any') {
-        // Remove array suffix (e.g., "Message[]" → "Message")
-        const baseType = fn.responseType.replace(/\[\]$/, '');
-        relatedTypes.add(baseType);
-      }
-    }
-
-    return {
-      domain,
-      functions,
-      relatedTypes: Array.from(relatedTypes),
-    };
-  });
+  return Array.from(domainMap.entries()).map(([domain, functions]) => ({
+    domain,
+    functions,
+  }));
 }
 
 // ─── Type Inference ─────────────────────────────────────────────────────────

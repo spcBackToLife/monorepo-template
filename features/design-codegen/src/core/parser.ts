@@ -38,6 +38,7 @@ import type {
   HandlerIR,
   ActionStepIR,
   ParamIR,
+  InferredTypeIR,
 } from './types';
 
 import {
@@ -84,6 +85,9 @@ export function parseScreen(screen: Screen): PageIR {
     (h) => h.trigger !== 'screenEnter' && h.trigger !== 'screenExit',
   );
 
+  // 7. Infer TypeScript interfaces from data shapes
+  const inferredTypes = inferTypesFromSchema(screen);
+
   return {
     name: componentName,
     slug,
@@ -94,6 +98,7 @@ export function parseScreen(screen: Screen): PageIR {
     rootNode,
     handlers,
     onMount,
+    inferredTypes,
   };
 }
 
@@ -120,12 +125,25 @@ function extractDataState(screen: Screen): DataStateIR[] {
   const dataInit = screen.stateInit?.data;
   if (!dataInit) return [];
 
+  const dataTypes = (screen.stateInit as Record<string, unknown>)?.dataTypes as Record<string, { typeName: string; isArray: boolean }> | undefined;
+
   return Object.entries(dataInit).map(([key, value]) => {
+    let type: string;
+
+    // 只从显式 dataTypes 注解读取，不推断
+    const annotation = dataTypes?.[key];
+    if (annotation) {
+      type = annotation.isArray ? `${annotation.typeName}[]` : annotation.typeName;
+    } else {
+      // 没有类型注解 → 标记为 TODO，后续由 AI 补全
+      type = 'unknown';
+    }
+
     return {
       name: key,
       pascalName: toPascalCase(key),
-      type: inferTypeFromValue(value),
-      defaultValue: serializeDefaultValue(value),
+      type,
+      defaultValue: '[]',
     };
   });
 }
@@ -192,23 +210,13 @@ function extractParamsFromEndpoint(ds: ApiDataSource): ParamIR[] {
 }
 
 function inferResponseType(ds: ApiDataSource): string | undefined {
-  // Try to infer from mock response body
-  if (ds.mock?.scenarios?.length) {
-    const activeScenario = ds.mock.scenarios.find(
-      (s) => s.id === ds.mock!.activeScenarioId,
-    ) || ds.mock.scenarios[0];
-
-    if (activeScenario?.responseBody) {
-      return inferComplexType(activeScenario.responseBody);
-    }
+  // 只从显式 typeDef 读取，不推断
+  if (ds.typeDef) {
+    const { responseName, responseShape } = ds.typeDef;
+    return responseShape === 'array' ? `${responseName}[]` : responseName;
   }
-
-  // Try from responseSchema
-  if (ds.endpoint.responseSchema) {
-    return 'unknown';
-  }
-
-  return undefined;
+  // 没有 typeDef → 返回 unknown，后续由 AI 补全
+  return 'unknown';
 }
 
 // ─── Node Tree Parsing ──────────────────────────────────────────────────────
@@ -754,10 +762,15 @@ function inferTypeFromValue(value: unknown): string {
   if (typeof value === 'boolean') return 'boolean';
   if (Array.isArray(value)) {
     if (value.length === 0) return 'unknown[]';
-    const itemType = inferTypeFromValue(value[0]);
+    const first = value[0];
+    if (typeof first === 'object' && first !== null && !Array.isArray(first)) {
+      // Array of objects → use interface name (will be resolved by type inference pass)
+      return '__INFER_ITEM__[]';
+    }
+    const itemType = inferTypeFromValue(first);
     return `${itemType}[]`;
   }
-  if (typeof value === 'object') return 'Record<string, unknown>';
+  if (typeof value === 'object') return '__INFER_OBJ__';
   return 'unknown';
 }
 
@@ -765,15 +778,14 @@ function inferComplexType(value: unknown): string {
   if (value === null || value === undefined) return 'unknown';
   if (Array.isArray(value)) {
     if (value.length === 0) return 'unknown[]';
-    // Infer from first element
     const first = value[0];
     if (typeof first === 'object' && first !== null) {
-      return 'Record<string, unknown>[]';
+      return '__INFER_ITEM__[]';
     }
     return `${inferTypeFromValue(first)}[]`;
   }
   if (typeof value === 'object') {
-    return 'Record<string, unknown>';
+    return '__INFER_OBJ__';
   }
   return inferTypeFromValue(value);
 }
@@ -783,5 +795,101 @@ function serializeDefaultValue(value: unknown): string {
   if (value === null) return 'null';
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  // For arrays and objects, just use [] or {} as initial (real data comes from API)
+  if (Array.isArray(value)) return '[]';
+  if (typeof value === 'object') return JSON.stringify(value);
   return JSON.stringify(value);
+}
+
+// ─── Type Inference from Schema Data ────────────────────────────────────────
+
+/**
+ * Infer TypeScript interfaces by examining:
+ * 1. dataSource.typeDef (explicit type definitions — highest priority)
+ * 2. stateInit.data values (initial data shapes)
+ * 3. dataSource mock responseBody shapes (fallback)
+ *
+ * Produces named interfaces like "Message", "ChatSendResponse" etc.
+ */
+function inferTypesFromSchema(screen: Screen): InferredTypeIR[] {
+  const types: InferredTypeIR[] = [];
+  const seen = new Set<string>();
+
+  // 只从显式 typeDef 读取，不做任何推断
+  for (const ds of screen.dataSources) {
+    if (ds.type !== 'api') continue;
+    const apiDs = ds as ApiDataSource;
+    if (!apiDs.typeDef) continue;
+
+    const { responseName, responseFields, paramsName, paramsFields } = apiDs.typeDef;
+
+    if (!seen.has(responseName)) {
+      seen.add(responseName);
+      types.push({
+        name: responseName,
+        fields: responseFields.map((f) => ({
+          name: f.name,
+          type: f.type,
+          optional: f.optional,
+          description: f.description,
+        })),
+      });
+    }
+
+    if (paramsName && paramsFields && !seen.has(paramsName)) {
+      seen.add(paramsName);
+      types.push({
+        name: paramsName,
+        fields: paramsFields.map((f) => ({
+          name: f.name,
+          type: f.type,
+          optional: f.optional,
+          description: f.description,
+        })),
+      });
+    }
+  }
+
+  return types;
+}
+
+/**
+ * Infer TypeScript fields from an object's shape.
+ * { id: "1", role: "user", text: "hello" } → [{name:"id",type:"string"}, {name:"role",type:"string"}, {name:"text",type:"string"}]
+ */
+function inferFieldsFromObject(obj: Record<string, unknown>): InferredTypeIR['fields'] {
+  return Object.entries(obj).map(([key, value]) => {
+    let type: string;
+    if (value === null || value === undefined) {
+      type = 'unknown';
+    } else if (typeof value === 'string') {
+      // Check if it looks like an enum-like field
+      type = 'string';
+    } else if (typeof value === 'number') {
+      type = 'number';
+    } else if (typeof value === 'boolean') {
+      type = 'boolean';
+    } else if (Array.isArray(value)) {
+      type = value.length > 0 ? `${inferTypeFromValue(value[0])}[]` : 'unknown[]';
+    } else if (typeof value === 'object') {
+      type = 'Record<string, unknown>';
+    } else {
+      type = 'unknown';
+    }
+    return { name: key, type };
+  });
+}
+
+/**
+ * Derive a type name from a state key or data source name.
+ * 不做复数→单数变换（不靠谱），用稳定的命名规则：
+ * - 数组类型的 state key: "messages" → "MessagesItem"
+ * - dataSource name: "chat-list" → "ChatListItem" (数组响应), "chat-send" → "ChatSendResponse" (对象响应)
+ */
+function deriveItemTypeName(key: string): string {
+  return toPascalCase(key) + 'Item';
+}
+
+function deriveResponseTypeName(dsName: string): string {
+  return toPascalCase(dsName) + 'Response';
 }

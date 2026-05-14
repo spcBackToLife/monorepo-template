@@ -2,7 +2,8 @@
 
 export function <%- hookName %>() {
 <%- stateDeclarations %>
-<%- effects %>
+<%- navigationSetup %>
+<%- fetchEffect %>
 <%- logic %>
 
   return { <%- returnFields %> };

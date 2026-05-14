@@ -132,11 +132,20 @@ export function registerStateTools(server: McpServer): void {
           projectId: z.string(), screenId: z.string(),
           key: z.string().describe('data 下的顶层 key，如 "messages"'),
           value: z.unknown(),
+          typeAnnotation: z.object({
+            typeName: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/),
+            isArray: z.boolean(),
+          }).optional().describe('类型注解，如 { typeName: "Message", isArray: true }'),
         }),
         handler: async (p) => {
           const result = await apiClient.executeOperation(p.projectId, {
             type: 'screenState.setDataInit',
-            params: { screenId: p.screenId, key: p.key, value: p.value },
+            params: {
+              screenId: p.screenId,
+              key: p.key,
+              value: p.value,
+              typeAnnotation: p.typeAnnotation,
+            },
           });
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         },

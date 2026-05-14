@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styles from './index.less';
 import { HeroCircle } from './components/HeroCircle';
 import { CreateTile } from './components/CreateTile';
 import { RemixTile } from './components/RemixTile';
 import { CollabTile } from './components/CollabTile';
 import { ExploreTile } from './components/ExploreTile';
 import { BottomTabBar } from './components/BottomTabBar';
+import styles from './index.less';
 
 export function HomeMusicAIHub() {
-  const [hero, setHero] = useState<Record<string, unknown>>({"cta":"Tap to talk","greeting":"Hi, Dimas 👋"});
-  const [user, setUser] = useState<Record<string, unknown>>({"avatarUrl":"https://api.dicebear.com/7.x/avataaars/svg?seed=home12","displayName":"Dimas Slebew"});
-  const [featureTiles, setFeatureTiles] = useState<Record<string, unknown>[]>([{"title":"Beat new craft","subtitle":"Shape drums & grooves"},{"title":"Lyric composer","subtitle":"From line to chorus"},{"title":"Stem splitter","subtitle":"Isolate vocals & beds"},{"title":"Mix assistant","subtitle":"Glue the master bus"}]);
-  const [popularPrompts, setPopularPrompts] = useState<Record<string, unknown>[]>([{"emoji":"🌍","title":"The most musical idea explorations made this week!"},{"emoji":"🎧","title":"Lo-fi Sunday mood pack"}]);
+  const [hero, setHero] = useState<unknown>([]);
+  const [user, setUser] = useState<unknown>([]);
+  const [featureTiles, setFeatureTiles] = useState<unknown>([]);
+  const [popularPrompts, setPopularPrompts] = useState<unknown>([]);
+
   const navigate = useNavigate();
 
 

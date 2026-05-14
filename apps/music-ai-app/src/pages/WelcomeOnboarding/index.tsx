@@ -4,7 +4,8 @@ import styles from './index.less';
 
 export function WelcomeOnboarding() {
   const [welcomePagerIndex, setWelcomePagerIndex] = useState<string>("0");
-  const [slide, setSlide] = useState<Record<string, unknown>>({"title":"Your Music, Your Imagination\nAI Makes It Real.","eyebrow":"Welcome to","description":"Create your own music with the help of AI. Choose a genre, set a mood, and let AI create your song!","emptyBanner":""});
+  const [slide, setSlide] = useState<unknown>([]);
+
   const navigate = useNavigate();
 
 

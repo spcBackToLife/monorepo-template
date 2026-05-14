@@ -1,5 +1,5 @@
 <% for (const t of types) { %>
-export interface <%- t.name %> {
+export interface <%- t.typeName %> {
 <% for (const field of t.fields) { %>
   <%- field.name %><%- field.optional ? '?' : '' %>: <%- field.type %>;
 <% } %>

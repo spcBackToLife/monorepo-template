@@ -7,7 +7,7 @@
  * 写入到 Screen.stateInit.view[name] / Screen.stateInit.data[key]。
  */
 
-import type { ViewVariableDef } from '@globallink/design-schema';
+import type { ViewVariableDef, DataTypeAnnotation } from '@globallink/design-schema';
 
 export interface ScreenStateAddViewVariableOp {
   type: 'screenState.addViewVariable';
@@ -56,6 +56,8 @@ export interface ScreenStateSetDataInitOp {
     screenId: string;
     key: string;
     value: unknown;
+    /** 类型注解，写入 stateInit.dataTypes[key] */
+    typeAnnotation?: DataTypeAnnotation;
   };
 }
 

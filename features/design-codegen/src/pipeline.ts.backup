@@ -9,16 +9,16 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, statSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, relative, dirname } from 'path';
 import * as ejs from 'ejs';
 import type { DesignProject, Screen } from '@globallink/design-schema';
-import type { SplitPlan, PageIR, ActionStepIR, SplitStrategy } from './core/types';
+import type { FrameworkConfig, SplitPlan, PageIR, ActionStepIR, SplitStrategy } from './core/types';
 import type { FrameworkAdapter } from './adapter/interface';
 import type { GenerateInput, GenerateOutput, ResolvedTemplate } from './config/types';
 import { loadTemplate, listAvailableTemplates } from './config/loader';
 import { ReactAdapter } from './adapter/react';
 import * as pathResolver from './utils/path-resolver';
-import { toPascalCase, toKebabCase } from './utils/naming';
+import { toPascalCase, toKebabCase, toCamelCase } from './utils/naming';
 
 // ═══════════════════════════════════════════════════════════════
 // Adapter Registry
@@ -172,10 +172,8 @@ async function loadSchema(input: GenerateInput): Promise<DesignProject> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Step 5c: Emit Screen Files (via EmitPlan)
+// Step 5c: Emit Screen Files
 // ═══════════════════════════════════════════════════════════════
-
-import { planScreenEmit } from './emit/plan';
 
 function emitScreen(
   pageIR: PageIR,
@@ -183,25 +181,119 @@ function emitScreen(
   adapter: FrameworkAdapter,
   template: ResolvedTemplate,
   outputDir: string,
-  _screenPathMap: Map<string, string>,
+  screenPathMap: Map<string, string>,
 ): string[] {
   const config = template.config;
   const org = config.fileOrganization;
   const files: string[] = [];
 
-  // 1. Plan — compute all file paths, imports, and template data at once
-  const emitPlan = planScreenEmit(pageIR, plan, org, adapter);
+  const pageName = pageIR.name;
 
-  // 2. Render each file from the plan
-  for (const file of emitPlan.files) {
-    if (file.pattern) {
-      const content = renderPattern(template.patternsDir, file.pattern, file.templateData);
-      writeFileSafe(join(outputDir, file.outputPath), content);
-    } else {
-      // Raw content output (e.g., .less style files)
-      writeFileSafe(join(outputDir, file.outputPath), file.templateData.content as string);
+  // 5c-1: Types
+  if (plan.types.length > 0) {
+    const typesPath = pathResolver.resolveTypesEntry(pageName, org);
+    const typesContent = renderPattern(template.patternsDir, 'types.ts.ejs', {
+      types: plan.types,
+    });
+    writeFileSafe(join(outputDir, typesPath), typesContent);
+    files.push(typesPath);
+  }
+
+  // 5c-2: Services (grouped by domain)
+  for (const svc of plan.services) {
+    const servicePath = pathResolver.resolveServiceEntry(svc.domain, org);
+    const serviceContent = renderPattern(template.patternsDir, 'service.ts.ejs', {
+      functions: svc.functions.map(fn => ({
+        name: fn.functionName,
+        description: fn.description || '',
+        method: fn.method,
+        path: fn.path,
+        params: fn.params && fn.params.length > 0
+          ? `params: { ${fn.params.map(p => `${p.name}: ${p.type}`).join('; ')} }`
+          : '',
+        returnType: fn.responseType || 'unknown',
+        hasData: fn.method !== 'GET' && fn.params && fn.params.length > 0,
+        dataMapping: fn.params ? `{ ${fn.params.map(p => `${p.name}: params.${p.name}`).join(', ')} }` : '{}',
+      })),
+      typeImports: '',
+    });
+    writeFileSafe(join(outputDir, servicePath), serviceContent);
+    files.push(servicePath);
+  }
+
+  // 5c-3: Hooks
+  for (const hook of plan.hooks) {
+    const hookPath = pathResolver.resolveHookEntry(pageName, hook.hookName, org);
+    const hookContent = renderPattern(template.patternsDir, 'hook.ts.ejs', {
+      imports: adapter.getFrameworkImports({ hasState: true, hasEffect: hook.reason === 'data-fetching', hasNavigation: false }).join('\n'),
+      hookName: hook.hookName,
+      stateDeclarations: hook.stateVars.map(v => adapter.emitStateDeclaration({ name: v, pascalName: toPascalCase(v), type: 'unknown', defaultValue: 'undefined' })).join('\n'),
+      effects: hook.dataSource
+        ? `  useEffect(() => {\n    ${hook.dataSource.functionName}().then(res => set${toPascalCase(hook.stateVars[0] || 'data')}(res));\n  }, []);`
+        : '',
+      logic: hook.handler ? adapter.emitHandler(hook.handler) : '',
+      returnFields: hook.returnFields.join(', '),
+    });
+    writeFileSafe(join(outputDir, hookPath), hookContent);
+    files.push(hookPath);
+  }
+
+  // 5c-4: Child Components
+  for (const comp of plan.childComponents) {
+    const compEntryPath = pathResolver.resolveComponentEntry(pageName, comp.componentName, org);
+    const compStylePath = pathResolver.resolveComponentStyle(pageName, comp.componentName, org);
+
+    // Component code
+    const styleRelative = `./${org.component.styleFile}`;
+    const compContent = renderPattern(template.patternsDir, 'component.tsx.ejs', {
+      imports: adapter.emitStyleImport(styleRelative),
+      componentName: comp.componentName,
+      propsInterface: comp.props.length > 0
+        ? `interface ${comp.componentName}Props {\n${comp.props.map(p => `  ${p.name}${p.required ? '' : '?'}: ${p.type};`).join('\n')}\n}`
+        : '',
+      propsSignature: comp.props.length > 0
+        ? `{ ${comp.props.map(p => p.name).join(', ')} }: ${comp.componentName}Props`
+        : '',
+      body: '',
+      jsx: adapter.renderTree(comp.node, 4),
+    });
+    writeFileSafe(join(outputDir, compEntryPath), compContent);
+    files.push(compEntryPath);
+
+    // Component style
+    if (comp.hasStyle) {
+      const styleContent = generateLessFile(comp.node);
+      writeFileSafe(join(outputDir, compStylePath), styleContent);
+      files.push(compStylePath);
     }
-    files.push(file.outputPath);
+  }
+
+  // 5c-5: Page component
+  const pageEntryPath = pathResolver.resolvePageEntry(pageName, org);
+  const pageStylePath = pathResolver.resolvePageStyle(pageName, org);
+
+  const pageContent = renderPattern(template.patternsDir, 'page.tsx.ejs', {
+    imports: buildPageImports(pageIR, plan, adapter, template, screenPathMap),
+    pageName,
+    stateDeclarations: buildStateDeclarations(pageIR, adapter),
+    navigationSetup: pageIR.handlers.some(h => h.steps.some(s => s.kind === 'navigate' || s.kind === 'navigate-back'))
+      ? `  ${adapter.emitNavigationSetup()}\n`
+      : '',
+    onMountEffect: pageIR.onMount ? `  ${adapter.emitOnMount(pageIR.onMount)}\n` : '',
+    handlers: pageIR.handlers
+      .filter(h => h.trigger !== 'screenEnter')
+      .map(h => `  ${adapter.emitHandler(h)}`)
+      .join('\n\n'),
+    jsx: adapter.renderTree(plan.page.node, 4),
+  });
+  writeFileSafe(join(outputDir, pageEntryPath), pageContent);
+  files.push(pageEntryPath);
+
+  // Page style
+  const pageStyleContent = generateLessFile(pageIR.rootNode);
+  if (pageStyleContent.trim()) {
+    writeFileSafe(join(outputDir, pageStylePath), pageStyleContent);
+    files.push(pageStylePath);
   }
 
   return files;
@@ -288,6 +380,58 @@ function buildScreenPathMap(screens: Screen[]): Map<string, string> {
   return map;
 }
 
+function buildPageImports(
+  pageIR: PageIR,
+  plan: SplitPlan,
+  adapter: FrameworkAdapter,
+  template: ResolvedTemplate,
+  screenPathMap: Map<string, string>,
+): string {
+  const lines: string[] = [];
+  const org = template.config.fileOrganization;
+
+  // Framework imports
+  const needs = {
+    hasState: pageIR.viewState.length > 0 || pageIR.dataState.length > 0,
+    hasEffect: !!pageIR.onMount,
+    hasNavigation: pageIR.handlers.some(h => h.steps.some(s => s.kind === 'navigate' || s.kind === 'navigate-back')),
+  };
+  const fwImports = adapter.getFrameworkImports(needs);
+  lines.push(...fwImports);
+
+  // Service imports
+  for (const svc of plan.services) {
+    const fns = svc.functions.map(f => f.functionName).join(', ');
+    lines.push(`import { ${fns} } from '@/services/${svc.domain}';`);
+  }
+
+  // Style import
+  lines.push(adapter.emitStyleImport(`./${org.page.styleFile}`));
+
+  // Child component imports
+  for (const comp of plan.childComponents) {
+    const dir = `./${org.component.dir}/${comp.componentName}`;
+    lines.push(`import { ${comp.componentName} } from '${dir}';`);
+  }
+
+  // Hook imports
+  for (const hook of plan.hooks) {
+    lines.push(`import { ${hook.hookName} } from './${org.hook.dir}/${hook.hookName}';`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildStateDeclarations(pageIR: PageIR, adapter: FrameworkAdapter): string {
+  const lines: string[] = [];
+  for (const vs of pageIR.viewState) {
+    lines.push(`  ${adapter.emitStateDeclaration(vs)}`);
+  }
+  for (const ds of pageIR.dataState) {
+    lines.push(`  ${adapter.emitStateDeclaration(ds)}`);
+  }
+  return lines.join('\n');
+}
 
 // ═══════════════════════════════════════════════════════════════
 // Template Rendering
@@ -329,6 +473,38 @@ function ensureDir(dir: string): void {
 function writeFileSafe(filePath: string, content: string): void {
   ensureDir(dirname(filePath));
   writeFileSync(filePath, content, 'utf-8');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Style File Generation
+// ═══════════════════════════════════════════════════════════════
+
+import type { NodeIR } from './core/types';
+
+function generateLessFile(rootNode: NodeIR): string {
+  const entries: string[] = [];
+  collectStyles(rootNode, entries);
+  return entries.join('\n');
+}
+
+function collectStyles(node: NodeIR, out: string[]): void {
+  const statics = node.staticStyles;
+  if (Object.keys(statics).length > 0) {
+    const className = toCamelCase(node.name || `node${node.id.slice(-6)}`);
+    out.push(`.${className} {`);
+    for (const [prop, value] of Object.entries(statics)) {
+      const kebabProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+      out.push(`  ${kebabProp}: ${value};`);
+    }
+    out.push('}');
+    out.push('');
+  }
+  for (const child of node.children) {
+    collectStyles(child, out);
+  }
+  if (node.repeat) {
+    collectStyles(node.repeat.template, out);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -11,6 +11,7 @@ import type {
   ApiEndpoint,
   MockScenario,
   Expression,
+  DataSourceTypeDef,
 } from '@globallink/design-schema';
 
 /**
@@ -44,6 +45,8 @@ export interface DataSourceUpdateOp {
     description?: string;
     /** api 数据源专属：是否在 screenEnter 时自动 fetch */
     autoFetchOnEnter?: boolean;
+    /** api 数据源专属：类型定义元数据 */
+    typeDef?: DataSourceTypeDef;
   };
 }
 

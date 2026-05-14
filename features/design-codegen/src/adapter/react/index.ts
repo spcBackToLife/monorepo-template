@@ -11,8 +11,16 @@ import type {
   TextContentIR,
 } from '../../core/types';
 import type { FrameworkAdapter, FrameworkImportNeeds } from '../interface';
+import type {
+  TypesFileContext,
+  ServiceFileContext,
+  HookFileContext,
+  PageFileContext,
+  ComponentFileContext,
+} from '../../emit/types';
 import { emitHandlerBody } from './emit-handler';
 import { buildAttributes } from './emit-element';
+import * as emitPlanFns from './emit-plan';
 
 /**
  * Map design event triggers to React event attributes.
@@ -66,7 +74,31 @@ export class ReactAdapter implements FrameworkAdapter {
       return this.emitRepeat(node.repeat, indent);
     }
 
-    return this.renderNodeDeep(node, indent);
+    const rendered = this.renderNodeDeep(node, indent);
+
+    // Guarantee a single root element: if the output would produce multiple
+    // sibling lines at the top level (rare, e.g., conditional + element),
+    // wrap in a React fragment.
+    return rendered;
+  }
+
+  /**
+   * Render a tree guaranteeing a single root JSX element.
+   * If the node tree would produce a non-element (like a map expression or conditional),
+   * wraps it in a React Fragment (<>...</>).
+   */
+  renderTreeWithRoot(node: NodeIR, indent: number): string {
+    const rendered = this.renderTree(node, indent);
+
+    // Check if result already has a single root JSX element
+    const trimmed = rendered.trim();
+    if (trimmed.startsWith('<')) {
+      return rendered;
+    }
+
+    // Expression-only (e.g., {data.map(...)}) or conditional needs fragment wrapping
+    const pad = makeIndent(indent);
+    return `${pad}<>\n${rendered}\n${pad}</>`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -359,6 +391,30 @@ export class ReactAdapter implements FrameworkAdapter {
       ...childrenLines,
       `${pad}</${tag}>`,
     ].join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EmitPlan: file content generation (delegates to emit-plan.ts)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  buildTypesTemplateData(ctx: TypesFileContext): Record<string, unknown> {
+    return emitPlanFns.buildTypesTemplateData(ctx);
+  }
+
+  buildServiceTemplateData(ctx: ServiceFileContext): Record<string, unknown> {
+    return emitPlanFns.buildServiceTemplateData(ctx);
+  }
+
+  buildHookTemplateData(ctx: HookFileContext): Record<string, unknown> | null {
+    return emitPlanFns.buildHookTemplateData(ctx, this);
+  }
+
+  buildPageTemplateData(ctx: PageFileContext): Record<string, unknown> {
+    return emitPlanFns.buildPageTemplateData(ctx, this);
+  }
+
+  buildComponentTemplateData(ctx: ComponentFileContext): Record<string, unknown> {
+    return emitPlanFns.buildComponentTemplateData(ctx, this);
   }
 }
 

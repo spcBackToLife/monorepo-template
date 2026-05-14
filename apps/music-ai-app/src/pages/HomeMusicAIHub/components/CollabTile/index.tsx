@@ -1,7 +1,7 @@
 import styles from './index.less';
 
 interface CollabTileProps {
-  featureTiles: Record<string, unknown>[];
+  featureTiles: unknown;
   handleCollabTileClick: () => void;
 }
 

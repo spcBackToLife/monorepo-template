@@ -17,6 +17,7 @@ export type {
   GlobalStateInit,
   ExpressionContext,
   BuiltinFunctions,
+  DataTypeAnnotation,
 } from './state';
 
 // ===== Visual State (节点视觉态) =====
@@ -59,6 +60,8 @@ export type {
   StaticDataSource,
   ApiDataSource,
   DataSource,
+  TypeField,
+  DataSourceTypeDef,
 } from './dataSource';
 
 // ===== Node / Screen / Project =====

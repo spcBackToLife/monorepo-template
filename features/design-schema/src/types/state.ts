@@ -46,12 +46,28 @@ export interface ViewVariableDef {
   previewValue?: unknown;
 }
 
+/** Type annotation for a data state field */
+export interface DataTypeAnnotation {
+  /** Type name (PascalCase), e.g., "Message" */
+  typeName: string;
+  /** Whether the value is an array of this type */
+  isArray: boolean;
+}
+
 /** 屏幕的 stateInit：用于初始化 ScreenState（serialize 进 schema） */
 export interface ScreenStateInit {
   /** data 的初始值（通常被 dataSource 覆盖；可手动加常量） */
   data?: Record<string, unknown>;
   /** view 的变量定义集合（key = 变量名） */
   view?: Record<string, ViewVariableDef>;
+  /**
+   * data 字段的类型映射。
+   * key = stateInit.data 的 key，value = 类型信息
+   *
+   * 例：{ messages: { typeName: "Message", isArray: true } }
+   * 生成：const [messages, setMessages] = useState<Message[]>([])
+   */
+  dataTypes?: Record<string, DataTypeAnnotation>;
 }
 
 /** 项目级 globalStateInit（顶替 v1 EnvironmentVariable[]） */

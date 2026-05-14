@@ -15,6 +15,7 @@ import type {
   ApiEndpoint,
   MockScenario,
   Expression,
+  DataSourceTypeDef,
 } from '@globallink/design-schema';
 import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.js';
 import { apiClient } from '../../api-client.js';
@@ -38,6 +39,23 @@ const MockScenarioSchema = z.object({
   delay: z.number().int().nonnegative().describe('模拟网络延迟 ms'),
   isTimeout: z.boolean().optional(),
   responseBody: z.unknown(),
+});
+
+const TypeFieldSchema = z.object({
+  name: z.string(),
+  type: z.string().describe('TypeScript 类型，如 "string", "number", "\'user\' | \'assistant\'", "Message[]"'),
+  optional: z.boolean().optional(),
+  description: z.string().optional(),
+});
+
+const TypeDefSchema = z.object({
+  responseName: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/)
+    .describe('响应类型名，PascalCase。如 "Message", "UserProfile", "ChatSendResponse"'),
+  responseShape: z.enum(['array', 'object']),
+  responseFields: z.array(TypeFieldSchema),
+  paramsName: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/).optional()
+    .describe('请求参数类型名（POST/PUT 时有 body 的情况），如 "ChatSendParams"'),
+  paramsFields: z.array(TypeFieldSchema).optional(),
 });
 
 export function registerDataSourceTools(server: McpServer): void {
@@ -70,6 +88,7 @@ export function registerDataSourceTools(server: McpServer): void {
         defaultParams: z.record(z.string(), z.unknown()).optional(),
         mockScenarios: z.array(MockScenarioSchema).optional().describe('api 类型至少 1 条；首条作为初始 active'),
         activeMockScenarioId: z.string().optional(),
+        typeDef: TypeDefSchema.optional().describe('类型定义。api 类型必填，AI 必须根据接口设计提供完整的 TypeScript 类型信息'),
       }),
       handler: async (p) => {
         let dataSource: StaticDataSource | ApiDataSource;
@@ -103,6 +122,9 @@ export function registerDataSourceTools(server: McpServer): void {
           if (scenarios.length > 0) {
             apiDs.mock = { scenarios, activeScenarioId: activeId };
           }
+          if (p.typeDef) {
+            apiDs.typeDef = p.typeDef as unknown as DataSourceTypeDef;
+          }
           dataSource = apiDs;
         }
         const result = await apiClient.executeOperation(p.projectId, {
@@ -126,12 +148,13 @@ export function registerDataSourceTools(server: McpServer): void {
     }),
 
     update: defineAction({
-      description: '更新数据源元信息（name / description / autoFetchOnEnter）',
+      description: '更新数据源元信息（name / description / autoFetchOnEnter / typeDef）',
       schema: z.object({
         projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
         name: z.string().optional(),
         description: z.string().optional(),
         autoFetchOnEnter: z.boolean().optional().describe('仅 api 类型生效'),
+        typeDef: TypeDefSchema.optional().describe('类型定义（仅 api 类型生效）'),
       }),
       handler: async (p) => {
         const result = await apiClient.executeOperation(p.projectId, {
@@ -142,6 +165,7 @@ export function registerDataSourceTools(server: McpServer): void {
             name: p.name,
             description: p.description,
             autoFetchOnEnter: p.autoFetchOnEnter,
+            typeDef: p.typeDef as unknown as DataSourceTypeDef | undefined,
           },
         });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };

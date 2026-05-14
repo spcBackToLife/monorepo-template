@@ -1,7 +1,7 @@
 import styles from './index.less';
 
 interface HeroCircleProps {
-  hero: Record<string, unknown>;
+  hero: unknown;
   handleHeroCircleClick: () => void;
 }
 

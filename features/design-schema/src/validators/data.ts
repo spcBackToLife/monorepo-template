@@ -41,6 +41,23 @@ export const StaticDataSourceSchema = z.object({
   initial: z.unknown(),
 });
 
+// Type field definition for codegen
+export const TypeFieldSchema = z.object({
+  name: z.string().min(1),
+  type: z.string().min(1),
+  optional: z.boolean().optional(),
+  description: z.string().optional(),
+});
+
+// Type definition metadata for a DataSource
+export const DataSourceTypeDefSchema = z.object({
+  responseName: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/),
+  responseShape: z.enum(['array', 'object']),
+  responseFields: z.array(TypeFieldSchema),
+  paramsName: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/).optional(),
+  paramsFields: z.array(TypeFieldSchema).optional(),
+});
+
 // Api 数据源
 export const ApiDataSourceSchema = z.object({
   id: z.string().min(1),
@@ -51,6 +68,7 @@ export const ApiDataSourceSchema = z.object({
   mock: MockConfigSchema.optional(),
   autoFetchOnEnter: z.boolean().optional(),
   defaultParams: z.record(z.string(), z.unknown()).optional(),
+  typeDef: DataSourceTypeDefSchema.optional(),
 });
 
 // 联合

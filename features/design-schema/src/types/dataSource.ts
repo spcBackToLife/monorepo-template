@@ -1,5 +1,33 @@
 import type { Expression } from './expression';
 
+// ===== Type metadata for codegen =====
+
+/** Type field definition for codegen */
+export interface TypeField {
+  /** Field name */
+  name: string;
+  /** TypeScript type (e.g., "string", "number", "'user' | 'assistant'", "Message[]") */
+  type: string;
+  /** Whether the field is optional */
+  optional?: boolean;
+  /** Field description (for JSDoc) */
+  description?: string;
+}
+
+/** Type definition metadata for a DataSource */
+export interface DataSourceTypeDef {
+  /** Response type name (PascalCase), e.g., "Message", "ChatSendResponse" */
+  responseName: string;
+  /** Whether response is array or object */
+  responseShape: 'array' | 'object';
+  /** Fields of the response type (if array, describes single item) */
+  responseFields: TypeField[];
+  /** Request params type name (for POST/PUT) */
+  paramsName?: string;
+  /** Request params fields */
+  paramsFields?: TypeField[];
+}
+
 /** HTTP 请求方法 */
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -65,4 +93,9 @@ export interface ApiDataSource {
   autoFetchOnEnter?: boolean;
   /** 自动 fetch 时携带的默认参数 */
   defaultParams?: Record<string, Expression | unknown>;
+  /**
+   * 响应类型定义。
+   * codegen 直接使用这里的类型名和字段，不再靠 mock 推导。
+   */
+  typeDef?: DataSourceTypeDef;
 }

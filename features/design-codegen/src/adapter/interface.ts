@@ -9,6 +9,13 @@ import type {
   BindIR,
   DynamicStyleIR,
 } from '../core/types';
+import type {
+  TypesFileContext,
+  ServiceFileContext,
+  HookFileContext,
+  PageFileContext,
+  ComponentFileContext,
+} from '../emit/types';
 
 /**
  * FrameworkAdapter — one implementation per target language/framework.
@@ -30,6 +37,9 @@ export interface FrameworkAdapter {
 
   /** Render a full node tree recursively */
   renderTree(node: NodeIR, indent: number): string;
+
+  /** Render a tree guaranteeing a single root element (wraps in fragment if needed) */
+  renderTreeWithRoot(node: NodeIR, indent: number): string;
 
   // ═══ State ═══
 
@@ -98,6 +108,26 @@ export interface FrameworkAdapter {
 
   /** Get framework-specific imports needed (React hooks, router, etc.) */
   getFrameworkImports(needs: FrameworkImportNeeds): string[];
+
+  // ═══ EmitPlan: file content generation ═══
+
+  /** Produce templateData for types file. TS → interface, Dart → class */
+  buildTypesTemplateData(ctx: TypesFileContext): Record<string, unknown>;
+
+  /** Produce templateData for a service file */
+  buildServiceTemplateData(ctx: ServiceFileContext): Record<string, unknown>;
+
+  /**
+   * Produce templateData for a hook/composable file.
+   * Return null if this framework doesn't produce hook files (e.g. Flutter).
+   */
+  buildHookTemplateData(ctx: HookFileContext): Record<string, unknown> | null;
+
+  /** Produce templateData for the page entry file */
+  buildPageTemplateData(ctx: PageFileContext): Record<string, unknown>;
+
+  /** Produce templateData for a child component file */
+  buildComponentTemplateData(ctx: ComponentFileContext): Record<string, unknown>;
 }
 
 export interface FrameworkImportNeeds {

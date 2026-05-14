@@ -1,7 +1,7 @@
 import styles from './index.less';
 
 interface RemixTileProps {
-  featureTiles: Record<string, unknown>[];
+  featureTiles: unknown;
   handleRemixTileClick: () => void;
 }
 

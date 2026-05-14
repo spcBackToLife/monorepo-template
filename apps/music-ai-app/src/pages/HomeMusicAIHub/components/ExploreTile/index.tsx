@@ -1,7 +1,7 @@
 import styles from './index.less';
 
 interface ExploreTileProps {
-  featureTiles: Record<string, unknown>[];
+  featureTiles: unknown;
   handleExploreTileClick: () => void;
 }
 

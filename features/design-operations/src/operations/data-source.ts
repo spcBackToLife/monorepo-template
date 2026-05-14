@@ -3,6 +3,7 @@ import type {
   DataSource,
   ApiDataSource,
   MockScenario,
+  DataSourceTypeDef,
 } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
@@ -129,11 +130,15 @@ export function executeUpdateDataSource(project: DesignProject, params: DataSour
   const oldName = ds.name;
   const oldDescription = ds.description;
   const oldAutoFetchOnEnter = ds.type === 'api' ? ds.autoFetchOnEnter : undefined;
+  const oldTypeDef = (ds.type === 'api' && ds.typeDef) ? deepClone(ds.typeDef) : undefined;
 
   if (params.name !== undefined) ds.name = params.name;
   if (params.description !== undefined) ds.description = params.description;
   if (params.autoFetchOnEnter !== undefined && ds.type === 'api') {
     ds.autoFetchOnEnter = params.autoFetchOnEnter;
+  }
+  if (params.typeDef !== undefined && ds.type === 'api') {
+    ds.typeDef = params.typeDef;
   }
 
   newProject.updatedAt = new Date().toISOString();
@@ -153,6 +158,7 @@ export function executeUpdateDataSource(project: DesignProject, params: DataSour
         name: oldName,
         description: oldDescription,
         autoFetchOnEnter: oldAutoFetchOnEnter,
+        typeDef: oldTypeDef as DataSourceTypeDef | undefined,
       },
     },
   };

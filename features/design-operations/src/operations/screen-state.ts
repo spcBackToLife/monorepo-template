@@ -3,7 +3,7 @@
  * 写入 Screen.stateInit.view[name] 与 Screen.stateInit.data[key]。
  */
 
-import type { DesignProject, ViewVariableDef, ScreenStateInit } from '@globallink/design-schema';
+import type { DesignProject, ViewVariableDef, ScreenStateInit, DataTypeAnnotation } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
   ScreenStateAddViewVariableOp,
@@ -219,7 +219,18 @@ export function executeSetDataInit(
   const stateInit = ensureStateInit(screen);
   const had = params.key in stateInit.data!;
   const previous = had ? deepClone(stateInit.data![params.key]) : undefined;
+  const previousTypeAnnotation = stateInit.dataTypes?.[params.key]
+    ? deepClone(stateInit.dataTypes[params.key])
+    : undefined;
+
   stateInit.data![params.key] = params.value;
+
+  // Persist type annotation if provided
+  if (params.typeAnnotation) {
+    if (!stateInit.dataTypes) stateInit.dataTypes = {};
+    stateInit.dataTypes[params.key] = params.typeAnnotation;
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
@@ -232,7 +243,12 @@ export function executeSetDataInit(
     inverse: had
       ? {
           type: 'screenState.setDataInit',
-          params: { screenId: params.screenId, key: params.key, value: previous },
+          params: {
+            screenId: params.screenId,
+            key: params.key,
+            value: previous,
+            typeAnnotation: previousTypeAnnotation as DataTypeAnnotation | undefined,
+          },
         }
       : {
           type: 'screenState.removeDataInit',

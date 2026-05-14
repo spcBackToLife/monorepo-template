@@ -1,7 +1,8 @@
 import styles from './index.less';
+import type { Message } from '../../types';
 
 interface MessageListProps {
-  messages: Record<string, unknown>[];
+  messages: Message[];
 }
 
 

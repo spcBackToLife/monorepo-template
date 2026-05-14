@@ -40,11 +40,19 @@ export const ViewVariableDefSchema = z.object({
   previewValue: z.unknown().optional(),
 });
 
+// ===== DataTypeAnnotation =====
+
+export const DataTypeAnnotationSchema = z.object({
+  typeName: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/),
+  isArray: z.boolean(),
+});
+
 // ===== ScreenStateInit =====
 
 export const ScreenStateInitSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
   view: z.record(z.string(), ViewVariableDefSchema).optional(),
+  dataTypes: z.record(z.string(), DataTypeAnnotationSchema).optional(),
 });
 
 // ===== GlobalStateInit =====
