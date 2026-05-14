@@ -66,8 +66,9 @@ export function compileExpression(raw: string, scope: ExpressionScope = 'compone
   const trimmed = raw.trim();
 
   // Check if it's a single pure expression (entire string is one {{ ... }})
-  // Use [\s\S] instead of . to handle multiline expressions
-  const pureMatch = trimmed.match(/^\{\{\s*([\s\S]*?)\s*\}\}$/);
+  // Count how many {{ blocks exist — if more than one, it's a mixed template
+  const blockCount = (trimmed.match(/\{\{/g) || []).length;
+  const pureMatch = blockCount === 1 ? trimmed.match(/^\{\{\s*([\s\S]*?)\s*\}\}$/) : null;
 
   if (pureMatch) {
     // Single expression: compile the inner content directly

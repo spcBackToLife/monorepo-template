@@ -327,7 +327,7 @@ function NodeRenderer({
 
   // Step 5: Render children — 统一"静态 children 先渲染"，再在 list container 情况下追加 N 份 template
   // 默认 + delta 合并 visualState 的 childrenVisibility / childrenStates
-  const rawPreviewState = interactionPreview?.nodeId === node.id
+  const rawPreviewState = interactionPreview && interactionPreview.nodeId === node.id
     ? interactionPreview.state
     : null;
 

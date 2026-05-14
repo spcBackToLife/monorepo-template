@@ -130,7 +130,7 @@ export function computePageImports(
     serviceImports,
     hookImports,
     componentImports,
-    styleRelativePath: './index.less',
+    styleRelativePath: `./${paths.page.stylePath.split('/').pop() || 'index.module.less'}`,
   };
 }
 

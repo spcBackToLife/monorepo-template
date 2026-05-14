@@ -203,8 +203,8 @@ export function buildPageTemplateData(
     .map(h => `  ${adapter.emitHandler(h)}`)
     .join('\n\n');
 
-  // JSX
-  const jsx = adapter.renderTree(plan.page.node, 4);
+  // JSX — indent level 2 for standard `return (` nesting
+  const jsx = adapter.renderTree(plan.page.node, 2);
 
   return {
     imports: imports.join('\n'),

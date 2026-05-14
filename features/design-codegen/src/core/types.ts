@@ -94,6 +94,11 @@ export interface NodeIR {
   // Splitter fills these:
   splitAs?: 'component';
   splitComponentName?: string;
+  /** Props to pass when this node is rendered as a component reference */
+  splitProps?: PropDefinition[];
+
+  /** HTML element attributes (src, placeholder, href, alt, type, etc.) */
+  htmlProps?: Record<string, string | ExpressionIR>;
 }
 
 export interface DynamicStyleIR {

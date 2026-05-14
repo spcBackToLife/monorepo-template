@@ -21,7 +21,7 @@ export function emitPageComponent(page: PageIR, adapter: ReactAdapter): string {
   }
 
   // 3. Style import
-  lines.push(adapter.emitStyleImport('./index.less'));
+  lines.push(adapter.emitStyleImport('./index.module.less'));
   lines.push('');
 
   // 4. Component declaration
@@ -90,7 +90,7 @@ export function emitChildComponent(split: ComponentSplit, adapter: ReactAdapter)
   // Imports
   lines.push(`import React from 'react';`);
   if (split.hasStyle) {
-    lines.push(adapter.emitStyleImport('./index.less'));
+    lines.push(adapter.emitStyleImport('./index.module.less'));
   }
   lines.push('');
 

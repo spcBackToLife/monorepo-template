@@ -6,6 +6,11 @@
   padding: 0;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
@@ -17,8 +22,8 @@ body {
     'Noto Sans', sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  color: @text-primary;
-  background-color: @bg-base;
+  color: @color-text;
+  background-color: @color-bg;
 }
 
 a {
@@ -58,4 +63,5 @@ select {
 
 #root {
   min-height: 100vh;
+  height: 100%;
 }

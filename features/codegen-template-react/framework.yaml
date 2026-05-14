@@ -7,12 +7,12 @@ fileOrganization:
     baseDir: src/pages
     dirNaming: PascalCase
     entryFile: index.tsx
-    styleFile: index.less
+    styleFile: index.module.less
   component:
     dir: components
     filePattern: folder
     entryFile: index.tsx
-    styleFile: index.less
+    styleFile: index.module.less
   hook:
     dir: hooks
     fileNaming: camelCase

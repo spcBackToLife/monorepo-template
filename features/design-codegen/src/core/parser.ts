@@ -60,6 +60,9 @@ import {
  * Parse a design-schema Screen into a framework-agnostic PageIR.
  */
 export function parseScreen(screen: Screen): PageIR {
+  // Reset synthetic ID counter for each screen
+  syntheticIdCounter = 0;
+
   const componentName = toPascalCase(screen.name);
   const slug = toKebabCase(screen.name);
 
@@ -129,13 +132,26 @@ function extractDataState(screen: Screen): DataStateIR[] {
 
   return Object.entries(dataInit).map(([key, value]) => {
     let type: string;
+    let actualValue = value;
+
+    // Phase 9f: Handle JSON string values (some screens store data as JSON strings)
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed === 'object' && parsed !== null) {
+          actualValue = parsed;
+        }
+      } catch {
+        // Not JSON — regular string value
+      }
+    }
 
     // 只从显式 dataTypes 注解读取，不推断
     const annotation = dataTypes?.[key];
     if (annotation) {
       type = annotation.isArray ? `${annotation.typeName}[]` : annotation.typeName;
     } else {
-      // 没有类型注解 → 标记为 TODO，后续由 AI 补全
+      // 没有类型注解 → 标记为 unknown (上游 schema 应补全)
       type = 'unknown';
     }
 
@@ -143,7 +159,8 @@ function extractDataState(screen: Screen): DataStateIR[] {
       name: key,
       pascalName: toPascalCase(key),
       type,
-      defaultValue: '[]',
+      // Phase 9c: Use serializeDefaultValue instead of hardcoded '[]'
+      defaultValue: serializeDefaultValue(actualValue),
     };
   });
 }
@@ -221,12 +238,18 @@ function inferResponseType(ds: ApiDataSource): string | undefined {
 
 // ─── Node Tree Parsing ──────────────────────────────────────────────────────
 
+// Counter for generating synthetic node IDs when schema nodes lack them
+let syntheticIdCounter = 0;
+
 function parseNode(
   node: ComponentNode,
   dataSources: DataSourceIR[],
   handlerCollector: HandlerIR[],
   scope: ExpressionScope = 'component',
 ): NodeIR {
+  // Ensure node has an ID (some schema nodes may lack it)
+  const nodeId = node.id || `syn_${++syntheticIdCounter}`;
+
   // Determine tag
   const tag = resolveTag(node.type);
 
@@ -235,6 +258,9 @@ function parseNode(
 
   // Parse text content
   const textContent = parseTextContent(node.props, scope);
+
+  // Parse HTML element attributes (src, placeholder, href, alt, type, etc.)
+  const htmlProps = parseHtmlProps(node.props, scope);
 
   // Parse events → EventBindingIR (references to handlers)
   const events = parseEvents(node, dataSources, handlerCollector);
@@ -254,12 +280,13 @@ function parseNode(
   );
 
   return {
-    id: node.id,
+    id: nodeId,
     tag,
     name: node.name,
     staticStyles,
     dynamicStyles,
     textContent,
+    htmlProps,
     children,
     events,
     bind,
@@ -338,6 +365,53 @@ function parseTextContent(
   };
 }
 
+// ─── HTML Props Parsing (Phase 6) ──────────────────────────────────────────
+
+/**
+ * Standard HTML attributes that should be passed through to JSX elements.
+ * textContent/children are handled separately by parseTextContent.
+ *
+ * @see design_docs/03-tech/codegen-quality-fix.md — Phase 6
+ */
+const HTML_PROP_WHITELIST = new Set([
+  'src', 'alt', 'href', 'target', 'placeholder', 'type', 'disabled',
+  'readOnly', 'maxLength', 'minLength', 'pattern', 'autoFocus',
+  'autoComplete', 'name', 'id', 'title', 'role', 'tabIndex',
+  'aria-label', 'aria-hidden', 'aria-expanded',
+  'rel', 'download', 'action', 'method', 'accept',
+  'min', 'max', 'step', 'value', 'checked', 'multiple',
+  'rows', 'cols', 'wrap', 'spellCheck', 'autoPlay', 'controls',
+  'loop', 'muted', 'poster', 'preload',
+]);
+
+function parseHtmlProps(
+  props: Record<string, unknown>,
+  scope: ExpressionScope,
+): Record<string, string | ExpressionIR> | undefined {
+  if (!props) return undefined;
+
+  const result: Record<string, string | ExpressionIR> = {};
+  let hasAny = false;
+
+  for (const [key, value] of Object.entries(props)) {
+    // Skip text content (handled separately)
+    if (key === 'textContent' || key === 'children') continue;
+    // Only pass through known HTML attributes
+    if (!HTML_PROP_WHITELIST.has(key)) continue;
+    if (value === null || value === undefined) continue;
+
+    const strValue = String(value);
+    if (isExpressionString(strValue)) {
+      result[key] = compileExpression(strValue, scope);
+    } else {
+      result[key] = strValue;
+    }
+    hasAny = true;
+  }
+
+  return hasAny ? result : undefined;
+}
+
 // ─── Event Parsing ──────────────────────────────────────────────────────────
 
 function parseEvents(
@@ -348,6 +422,7 @@ function parseEvents(
   if (!node.events || node.events.length === 0) return [];
 
   const bindings: EventBindingIR[] = [];
+  const seenTriggers = new Set<string>();
 
   for (const event of node.events) {
     // Skip disabled events
@@ -355,6 +430,10 @@ function parseEvents(
 
     // Skip screenEnter/screenExit — handled separately as onMount
     if (event.trigger === 'screenEnter' || event.trigger === 'screenExit') continue;
+
+    // Deduplicate: skip if we already have a handler for this trigger on this node
+    if (seenTriggers.has(event.trigger)) continue;
+    seenTriggers.add(event.trigger);
 
     // Generate handler name
     const handlerName = generateHandlerName(node, event.trigger);
@@ -375,7 +454,7 @@ function parseEvents(
 function generateHandlerName(node: ComponentNode, trigger: string): string {
   const nodePart = node.name
     ? toPascalCase(node.name)
-    : toPascalCase(node.id.slice(-6));
+    : toPascalCase((node.id || 'node').slice(-6));
   const triggerPart = toPascalCase(trigger);
   return `handle${nodePart}${triggerPart}`;
 }
@@ -461,7 +540,7 @@ function buildHandler(
     isAsync,
     guard,
     steps,
-    ownerNodeId: node.id,
+    ownerNodeId: node.id || 'unknown',
   };
 }
 
@@ -806,8 +885,7 @@ function serializeDefaultValue(value: unknown): string {
 /**
  * Infer TypeScript interfaces by examining:
  * 1. dataSource.typeDef (explicit type definitions — highest priority)
- * 2. stateInit.data values (initial data shapes)
- * 3. dataSource mock responseBody shapes (fallback)
+ * 2. stateInit.dataTypes + stateInit.data (type annotation name + initial value shape)
  *
  * Produces named interfaces like "Message", "ChatSendResponse" etc.
  */
@@ -815,7 +893,7 @@ function inferTypesFromSchema(screen: Screen): InferredTypeIR[] {
   const types: InferredTypeIR[] = [];
   const seen = new Set<string>();
 
-  // 只从显式 typeDef 读取，不做任何推断
+  // Source 1: 从 dataSource.typeDef 读取（最高优先级）
   for (const ds of screen.dataSources) {
     if (ds.type !== 'api') continue;
     const apiDs = ds as ApiDataSource;
@@ -847,6 +925,39 @@ function inferTypesFromSchema(screen: Screen): InferredTypeIR[] {
           description: f.description,
         })),
       });
+    }
+  }
+
+  // Source 2: 从 stateInit.dataTypes + stateInit.data 推断
+  // dataTypes 提供类型名，data 提供初始值结构（用于推断 fields）
+  const dataTypes = screen.stateInit?.dataTypes;
+  const dataValues = screen.stateInit?.data;
+  if (dataTypes && dataValues) {
+    for (const [key, annotation] of Object.entries(dataTypes)) {
+      const typeName = annotation.typeName;
+      if (seen.has(typeName)) continue; // 已被 dataSource.typeDef 覆盖
+
+      const rawValue = dataValues[key];
+      if (rawValue === undefined || rawValue === null) continue;
+
+      // 取样本对象：数组取第一个元素，对象直接用
+      let sampleObj: Record<string, unknown> | undefined;
+      if (annotation.isArray && Array.isArray(rawValue) && rawValue.length > 0) {
+        const first = rawValue[0];
+        if (typeof first === 'object' && first !== null && !Array.isArray(first)) {
+          sampleObj = first as Record<string, unknown>;
+        }
+      } else if (!annotation.isArray && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+        sampleObj = rawValue as Record<string, unknown>;
+      }
+
+      if (sampleObj) {
+        seen.add(typeName);
+        types.push({
+          name: typeName,
+          fields: inferFieldsFromObject(sampleObj),
+        });
+      }
     }
   }
 

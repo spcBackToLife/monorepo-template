@@ -5,18 +5,23 @@ import { makeIndent } from './index';
  * Emit the body of a handler function — the ordered action steps.
  *
  * Each step is translated to React-idiomatic code.
+ *
+ * @see design_docs/03-tech/codegen-quality-fix.md — Phase 9a, 9d
  */
 export function emitHandlerBody(steps: ActionStepIR[], baseDepth: number): string[] {
   const lines: string[] = [];
+  // Track fetch step count to generate unique result variable names
+  let fetchCounter = 0;
 
   for (const step of steps) {
-    lines.push(...emitStep(step, baseDepth));
+    lines.push(...emitStep(step, baseDepth, fetchCounter));
+    if (step.kind === 'fetch') fetchCounter++;
   }
 
   return lines;
 }
 
-function emitStep(step: ActionStepIR, depth: number): string[] {
+function emitStep(step: ActionStepIR, depth: number, fetchIndex: number = 0): string[] {
   const pad = makeIndent(depth);
   const lines: string[] = [];
 
@@ -45,7 +50,9 @@ function emitStep(step: ActionStepIR, depth: number): string[] {
     }
 
     case 'fetch': {
-      const { serviceName, params, resultVar, onSuccess, onError } = step;
+      const { serviceName, params, resultVar: baseResultVar, onSuccess, onError } = step;
+      // Unique result variable name to avoid redeclaration with sequential fetches
+      const resultVar = fetchIndex === 0 ? (baseResultVar || 'result') : `result${fetchIndex + 1}`;
       const callExpr = params
         ? `await ${serviceName}(${params})`
         : `await ${serviceName}()`;
@@ -54,20 +61,26 @@ function emitStep(step: ActionStepIR, depth: number): string[] {
         lines.push(`${pad}try {`);
         lines.push(`${pad}  const ${resultVar} = ${callExpr};`);
         if (onSuccess && onSuccess.length > 0) {
+          let nestedFetchIdx = 0;
           for (const s of onSuccess) {
-            lines.push(...emitStep(s, depth + 1));
+            lines.push(...emitStep(s, depth + 1, nestedFetchIdx));
+            if (s.kind === 'fetch') nestedFetchIdx++;
           }
         }
         lines.push(`${pad}} catch (error) {`);
+        let errorFetchIdx = 0;
         for (const s of onError) {
-          lines.push(...emitStep(s, depth + 1));
+          lines.push(...emitStep(s, depth + 1, errorFetchIdx));
+          if (s.kind === 'fetch') errorFetchIdx++;
         }
         lines.push(`${pad}}`);
       } else {
         lines.push(`${pad}const ${resultVar} = ${callExpr};`);
         if (onSuccess && onSuccess.length > 0) {
+          let nestedFetchIdx = 0;
           for (const s of onSuccess) {
-            lines.push(...emitStep(s, depth));
+            lines.push(...emitStep(s, depth, nestedFetchIdx));
+            if (s.kind === 'fetch') nestedFetchIdx++;
           }
         }
       }
@@ -75,7 +88,7 @@ function emitStep(step: ActionStepIR, depth: number): string[] {
     }
 
     case 'navigate':
-      lines.push(`${pad}navigate('${step.path}');`);
+      lines.push(`${pad}navigate(${JSON.stringify(step.path)});`);
       break;
 
     case 'navigate-back':
@@ -84,10 +97,11 @@ function emitStep(step: ActionStepIR, depth: number): string[] {
 
     case 'toast': {
       const { toastType, message, duration } = step;
+      // message is already a compiled JS expression, don't wrap in extra quotes
       if (duration) {
-        lines.push(`${pad}toast.${toastType}('${message}', { duration: ${duration} });`);
+        lines.push(`${pad}toast.${toastType}(${message}, { duration: ${duration} });`);
       } else {
-        lines.push(`${pad}toast.${toastType}('${message}');`);
+        lines.push(`${pad}toast.${toastType}(${message});`);
       }
       break;
     }

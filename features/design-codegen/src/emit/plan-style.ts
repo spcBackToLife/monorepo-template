@@ -3,10 +3,13 @@
  *
  * Generates Less/CSS content from static styles on nodes.
  * Framework-agnostic (CSS is universal).
+ *
+ * @see design_docs/03-tech/codegen-quality-fix.md — Phase 1
  */
 
 import type { NodeIR } from '../core/types';
 import { toCamelCase } from '../utils/naming';
+import { normalizeCssValue, camelToKebab } from './css-normalizer';
 
 /**
  * Generate a Less stylesheet from a node tree's static styles.
@@ -23,8 +26,9 @@ function collectNodeStyles(node: NodeIR, out: string[]): void {
     const className = toCamelCase(node.name || `node${node.id.slice(-6)}`);
     out.push(`.${className} {`);
     for (const [prop, value] of Object.entries(statics)) {
-      const kebabProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
-      out.push(`  ${kebabProp}: ${value};`);
+      const kebabProp = camelToKebab(prop);
+      const normalized = normalizeCssValue(prop, value);
+      out.push(`  ${kebabProp}: ${normalized};`);
     }
     out.push('}');
     out.push('');

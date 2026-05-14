@@ -3,7 +3,6 @@ import type { Screen } from '../types/screen';
 import type { DesignProject } from '../types/project';
 import type { Action, ComponentEvent } from '../types/action';
 import { normalizeExpression } from '../types/expression';
-
 /**
  * Deep clone a value.
  * Uses JSON round-trip to ensure compatibility with MobX observable proxies
@@ -62,6 +61,14 @@ function normalizeEvents(events: ComponentEvent[] | undefined): void {
  * 误判为字面量、导致 `repeat.expression: "state.data.messages"` 这类静默失败。
  */
 export function normalizeNode(node: ComponentNode): ComponentNode {
+  // id 缺失是数据异常，这里只报错不兜底生成——生成假 ID 会导致前后端不一致。
+  // 应该在数据源头修复（MCP / 后端迁移脚本），而不是在 normalizeNode 里偷偷造 ID。
+  if (!node.id) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[design-schema] normalizeNode: node missing id! type=${node.type}, props=${JSON.stringify(node.props ?? {}).slice(0, 100)}`,
+    );
+  }
   if (!node.styles) node.styles = {};
   if (!node.props) node.props = {};
   if (!node.states) node.states = [];

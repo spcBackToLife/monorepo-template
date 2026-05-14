@@ -3,7 +3,15 @@
  * 写入 Screen.stateInit.view[name] 与 Screen.stateInit.data[key]。
  */
 
-import type { DesignProject, ViewVariableDef, ScreenStateInit, DataTypeAnnotation } from '@globallink/design-schema';
+import type {
+  DesignProject,
+  ViewVariableDef,
+  ScreenStateInit,
+  DataTypeAnnotation,
+  Screen,
+  ComponentNode,
+  ApiDataSource,
+} from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
   ScreenStateAddViewVariableOp,
@@ -199,6 +207,78 @@ export function executeSetViewPreview(
   };
 }
 
+// ===== Auto-bridge helpers: infer DataTypeAnnotation from DataSource.typeDef =====
+
+/**
+ * Recursively scan node tree events looking for effect.fetch actions
+ * whose onSuccess contains a state.set targeting `data.${key}`.
+ */
+function scanEventsForFetchTarget(node: ComponentNode, dataSourceId: string, key: string): boolean {
+  for (const event of node.events) {
+    for (const action of event.actions) {
+      if (action.type === 'effect.fetch' && action.dataSourceId === dataSourceId) {
+        // Check onSuccess for state.set with path matching data.<key>
+        if (action.onSuccess) {
+          for (const subAction of action.onSuccess) {
+            if (subAction.type === 'state.set' && matchesDataPath(subAction.path, key)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+  // Recurse into children
+  if (node.children) {
+    for (const child of node.children) {
+      if (scanEventsForFetchTarget(child, dataSourceId, key)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Check if a state.set path targets data.<key> */
+function matchesDataPath(path: string, key: string): boolean {
+  // Matches "data.messages", "data.messages[0]" etc.
+  return path === `data.${key}` || path.startsWith(`data.${key}[`) || path.startsWith(`data.${key}.`);
+}
+
+function matchesDataSourceToKey(screen: Screen, ds: ApiDataSource, key: string): boolean {
+  // Strategy 1: Name-based matching (ds.name or ds.id matches the key)
+  const dsNameNorm = ds.name.replace(/[-_]/g, '').toLowerCase();
+  const dsIdNorm = ds.id.replace(/[-_]/g, '').toLowerCase();
+  const keyNorm = key.replace(/[-_]/g, '').toLowerCase();
+  if (dsNameNorm === keyNorm || dsIdNorm === keyNorm) {
+    return true;
+  }
+
+  // Strategy 2: Scan events for effect.fetch that writes to this key
+  return scanEventsForFetchTarget(screen.rootNode, ds.id, key);
+}
+
+/**
+ * Auto-infer DataTypeAnnotation from matching DataSources on the same screen.
+ * Called when params.typeAnnotation is not explicitly provided in setDataInit.
+ */
+function autoInferTypeAnnotationFromDataSources(
+  screen: Screen,
+  key: string,
+): DataTypeAnnotation | undefined {
+  for (const ds of screen.dataSources) {
+    if (ds.type !== 'api' || !ds.typeDef) continue;
+    const typeDef = ds.typeDef;
+    if (matchesDataSourceToKey(screen, ds, key)) {
+      return {
+        typeName: typeDef.responseName,
+        isArray: typeDef.responseShape === 'array',
+      };
+    }
+  }
+  return undefined;
+}
+
 // ===== screenState.setDataInit =====
 
 export function executeSetDataInit(
@@ -229,6 +309,15 @@ export function executeSetDataInit(
   if (params.typeAnnotation) {
     if (!stateInit.dataTypes) stateInit.dataTypes = {};
     stateInit.dataTypes[params.key] = params.typeAnnotation;
+  }
+
+  // Auto-bridge: if no typeAnnotation provided, try to infer from DataSource.typeDef
+  if (!params.typeAnnotation) {
+    const inferred = autoInferTypeAnnotationFromDataSources(screen, params.key);
+    if (inferred) {
+      if (!stateInit.dataTypes) stateInit.dataTypes = {};
+      stateInit.dataTypes[params.key] = inferred;
+    }
   }
 
   newProject.updatedAt = new Date().toISOString();
@@ -275,7 +364,17 @@ export function executeRemoveDataInit(
   }
 
   const previous = deepClone(screen.stateInit.data[params.key]);
+  const previousTypeAnnotation = screen.stateInit.dataTypes?.[params.key]
+    ? deepClone(screen.stateInit.dataTypes[params.key])
+    : undefined;
+
   delete screen.stateInit.data[params.key];
+
+  // Clean up type annotation for removed data key
+  if (screen.stateInit.dataTypes?.[params.key]) {
+    delete screen.stateInit.dataTypes[params.key];
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
@@ -287,7 +386,12 @@ export function executeRemoveDataInit(
     },
     inverse: {
       type: 'screenState.setDataInit',
-      params: { screenId: params.screenId, key: params.key, value: previous },
+      params: {
+        screenId: params.screenId,
+        key: params.key,
+        value: previous,
+        typeAnnotation: previousTypeAnnotation as DataTypeAnnotation | undefined,
+      },
     },
   };
 }

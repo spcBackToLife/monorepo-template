@@ -69,9 +69,16 @@ export class ReactAdapter implements FrameworkAdapter {
       return this.emitConditional(node.visibleWhen, content);
     }
 
-    // Repeat rendering
+    // Repeat rendering — render the container node with the map expression inside
     if (node.repeat) {
-      return this.emitRepeat(node.repeat, indent);
+      const pad = makeIndent(indent);
+      const tag = node.tag;
+      const attrs = buildAttributes(node, this);
+      const repeatContent = this.emitRepeat(node.repeat, indent + 1);
+      // Also render static children (before repeat items)
+      const staticChildren = node.children.map(c => this.renderTree(c, indent + 1)).join('\n');
+      const inner = staticChildren ? `${staticChildren}\n${repeatContent}` : repeatContent;
+      return `${pad}<${tag}${attrs}>\n${inner}\n${pad}</${tag}>`;
     }
 
     const rendered = this.renderNodeDeep(node, indent);
@@ -383,13 +390,50 @@ export class ReactAdapter implements FrameworkAdapter {
     }
 
     for (const child of node.children) {
-      childrenLines.push(this.renderTree(child, indent + 1));
+      // Bug D4 fix: If child is marked as a split component, emit a component
+      // reference instead of recursing into its subtree (which would duplicate HTML).
+      if (child.splitAs === 'component' && child.splitComponentName) {
+        childrenLines.push(this.emitComponentReference(child, indent + 1));
+      } else {
+        childrenLines.push(this.renderTree(child, indent + 1));
+      }
     }
 
     return [
       `${pad}<${tag}${attrs}>`,
       ...childrenLines,
       `${pad}</${tag}>`,
+    ].join('\n');
+  }
+
+  /**
+   * Emit a component reference (e.g., <FeatureList onClick={handleClick} />)
+   * instead of rendering the subtree inline.
+   */
+  private emitComponentReference(node: NodeIR, indent: number): string {
+    const pad = makeIndent(indent);
+    const componentName = node.splitComponentName!;
+    const props = node.splitProps || [];
+
+    if (props.length === 0) {
+      return `${pad}<${componentName} />`;
+    }
+
+    // Build prop assignments
+    const propEntries = props.map(p => `${p.name}={${p.name}}`);
+
+    // If short enough, render on one line
+    const inlineProps = propEntries.join(' ');
+    if (inlineProps.length <= 60) {
+      return `${pad}<${componentName} ${inlineProps} />`;
+    }
+
+    // Multi-line props
+    const propLines = propEntries.map(p => `${makeIndent(indent + 1)}${p}`);
+    return [
+      `${pad}<${componentName}`,
+      ...propLines,
+      `${pad}/>`,
     ].join('\n');
   }
 

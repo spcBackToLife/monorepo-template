@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useChatList } from './hooks/useChatList';
-import { MessageList } from './components/MessageList';
-import styles from './index.less';
+import { ChatHeader } from './components/ChatHeader';
+import { MessageItemItem } from './components/MessageItemItem';
+import { InputBar } from './components/InputBar';
+import styles from './index.module.less';
 
 export function ChatAIConversation() {
 
@@ -10,30 +12,26 @@ export function ChatAIConversation() {
 
 
   const handleBackButtonClick = () => {
-  navigate('/home');
+  navigate("/home");
 };
 
   return (
-        <div className={styles.chatPage}>
-          <div className={styles.chatHeader}>
-            <div className={styles.backButton} onClick={handleBackButtonClick}>‹</div>
-            <h3 className={styles.pageTitle}>Chat</h3>
-            <div className={styles.moreButton}>⋮</div>
-          </div>
-          {messages.map((item, index) => (
-              <div key={item.id ?? index} className={styles.messageItem} style={{ flexDirection: item.role === 'user' ? 'row-reverse' : 'row' }}>
-                <div className={styles.avatar} style={{ border: item.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.1)', background: item.role === 'user' ? 'linear-gradient(135deg, #f472b6, #fb923c)' : '#1f1f2e' }} />
-                <div className={styles.bubble} style={{ background: item.role === 'user' ? 'linear-gradient(135deg, #f472b6, #fb923c)' : 'rgba(255,255,255,0.08)', borderTopLeftRadius: item.role === 'user' ? '16px' : '4px', borderBottomRightRadius: item.role === 'user' ? '4px' : '16px' }}>
-                  <p className={styles.messageText}>{item.text}</p>
-                </div>
+    <div className={styles.chatPage}>
+      <ChatHeader handleBackButtonClick={handleBackButtonClick} />
+      <div className={styles.messageList}>
+        {messages.map((item, index) => (
+            <div key={item.id ?? index} className={styles.messageItem} style={{ flexDirection: item.role === 'user' ? 'row-reverse' : 'row' }}>
+              <div className={styles.avatar} style={{ border: item.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.1)', background: item.role === 'user' ? 'linear-gradient(135deg, #f472b6, #fb923c)' : '#1f1f2e' }} />
+              <div className={styles.bubble} style={{ background: item.role === 'user' ? 'linear-gradient(135deg, #f472b6, #fb923c)' : 'rgba(255,255,255,0.08)', borderTopLeftRadius: item.role === 'user' ? '16px' : '4px', borderBottomRightRadius: item.role === 'user' ? '4px' : '16px' }}>
+                <p className={styles.messageText}>{item.text}</p>
               </div>
-          ))}
-          <div className={styles.inputBar}>
-            <input className={styles.messageInput} value={inputDraft} onChange={e => setInputDraft(e.target.value)} />
-            <div className={styles.sendButton} onClick={handleSendButtonClick} />
-            <div className={styles.voiceButton}>🎙</div>
-            <div className={styles.imageButton}>🖼</div>
-          </div>
-        </div>
+            </div>
+        ))}
+      </div>
+      <InputBar
+        inputDraft={inputDraft}
+        handleSendButtonClick={handleSendButtonClick}
+      />
+    </div>
   );
 }

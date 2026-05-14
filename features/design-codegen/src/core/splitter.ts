@@ -83,6 +83,8 @@ export function splitPage(
 interface SplitCandidate {
   node: NodeIR;
   reason: ComponentSplit['reason'];
+  /** repeat 模板拆分时，父节点 repeat.dataExpression.compiled（即 data state 变量名） */
+  repeatDataVar?: string;
 }
 
 /**
@@ -127,6 +129,7 @@ function identifySplitNodes(
     candidates.push({
       node: templateNode,
       reason: 'repeat-template',
+      repeatDataVar: node.repeat.dataExpression.compiled,
     });
   }
 
@@ -261,8 +264,11 @@ function buildChildComponents(
   page: PageIR,
 ): ComponentSplit[] {
   return candidates.map((candidate) => {
-    const props = inferComponentProps(candidate.node, page);
+    const props = inferComponentProps(candidate.node, page, candidate.repeatDataVar);
     const hasStyle = hasNonEmptyStyles(candidate.node);
+
+    // Store inferred props on the node so the adapter can emit a component reference
+    candidate.node.splitProps = props;
 
     return {
       componentName: candidate.node.splitComponentName || generateComponentName(candidate.node),
@@ -282,7 +288,7 @@ function buildChildComponents(
  * - It has a bind to a parent state variable
  * - It's in a repeat and needs item/index
  */
-function inferComponentProps(node: NodeIR, page: PageIR): PropDefinition[] {
+function inferComponentProps(node: NodeIR, page: PageIR, repeatDataVar?: string): PropDefinition[] {
   const props: PropDefinition[] = [];
   const seenNames = new Set<string>();
 
@@ -323,12 +329,13 @@ function inferComponentProps(node: NodeIR, page: PageIR): PropDefinition[] {
     }
   }
 
-  // If the node has events, add handler props
-  for (const event of node.events) {
-    if (!seenNames.has(event.handlerName)) {
-      seenNames.add(event.handlerName);
+  // Collect event handlers from the ENTIRE subtree (not just root node)
+  const allHandlerNames = collectHandlerNames(node);
+  for (const handlerName of allHandlerNames) {
+    if (!seenNames.has(handlerName)) {
+      seenNames.add(handlerName);
       props.push({
-        name: event.handlerName,
+        name: handlerName,
         type: '() => void',
         required: true,
       });
@@ -336,11 +343,12 @@ function inferComponentProps(node: NodeIR, page: PageIR): PropDefinition[] {
   }
 
   // If inside a repeat context, add item/index props
-  // (detected by checking if any expression references "item" or "index")
+  // Resolve item type from the repeat's data source array type
   if (hasRepeatContextReference(node)) {
     if (!seenNames.has('item')) {
       seenNames.add('item');
-      props.push({ name: 'item', type: 'unknown', required: true });
+      const itemType = resolveRepeatItemType(repeatDataVar, page);
+      props.push({ name: 'item', type: itemType, required: true });
     }
     if (!seenNames.has('index')) {
       seenNames.add('index');
@@ -349,6 +357,34 @@ function inferComponentProps(node: NodeIR, page: PageIR): PropDefinition[] {
   }
 
   return props;
+}
+
+/**
+ * Recursively collect all event handler names from a node and its descendants.
+ */
+function collectHandlerNames(node: NodeIR): Set<string> {
+  const handlers = new Set<string>();
+
+  for (const event of node.events) {
+    handlers.add(event.handlerName);
+  }
+
+  for (const child of node.children) {
+    const childHandlers = collectHandlerNames(child);
+    for (const h of childHandlers) {
+      handlers.add(h);
+    }
+  }
+
+  // Also check repeat template
+  if (node.repeat) {
+    const templateHandlers = collectHandlerNames(node.repeat.template);
+    for (const h of templateHandlers) {
+      handlers.add(h);
+    }
+  }
+
+  return handlers;
 }
 
 /**
@@ -419,6 +455,36 @@ function compileTextDependencies(raw: string): string[] {
     deps.push(match[1]);
   }
   return deps;
+}
+
+/**
+ * Resolve the item type for a repeat template component.
+ * Given the repeat's data variable name (e.g. "messages"), look up the
+ * corresponding dataState or viewState type (e.g. "Message[]") and
+ * extract the element type (e.g. "Message").
+ */
+function resolveRepeatItemType(repeatDataVar: string | undefined, page: PageIR): string {
+  if (!repeatDataVar) return 'unknown';
+
+  // Look up in dataState first, then viewState
+  const dataVar = page.dataState.find((d) => d.name === repeatDataVar);
+  const viewVar = page.viewState.find((v) => v.name === repeatDataVar);
+  const arrayType = dataVar?.type || viewVar?.type;
+
+  if (!arrayType) return 'unknown';
+
+  // Strip trailing "[]" to get the element type
+  if (arrayType.endsWith('[]')) {
+    return arrayType.slice(0, -2);
+  }
+
+  // Handle Array<T> generic syntax
+  const genericMatch = arrayType.match(/^Array<(.+)>$/);
+  if (genericMatch) {
+    return genericMatch[1];
+  }
+
+  return 'unknown';
 }
 
 /**

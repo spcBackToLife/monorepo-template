@@ -228,7 +228,10 @@ function emitRouter(
     return { path, componentName, importPath };
   });
 
-  const routerContent = renderPattern(template.patternsDir, 'router.tsx.ejs', { routes });
+  // Default path: the first screen's route (for root "/" redirect)
+  const defaultPath = routes.length > 0 ? routes[0].path : undefined;
+
+  const routerContent = renderPattern(template.patternsDir, 'router.tsx.ejs', { routes, defaultPath });
   writeFileSafe(join(outputDir, routerPath), routerContent);
   return [routerPath];
 }

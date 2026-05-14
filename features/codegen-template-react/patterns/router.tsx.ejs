@@ -1,9 +1,12 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 <% for (const route of routes) { %>
 import { <%- route.componentName %> } from '<%- route.importPath %>';
 <% } %>
 
 export const router = createBrowserRouter([
+<% if (defaultPath) { %>
+  { path: '/', element: <Navigate to="<%- defaultPath %>" replace /> },
+<% } %>
 <% for (const route of routes) { %>
   { path: '<%- route.path %>', element: <<%- route.componentName %> /> },
 <% } %>
