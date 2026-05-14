@@ -37,7 +37,8 @@ function normalizeActionChain(actions: Action[] | undefined): void {
 }
 
 /** 规范化整个事件配置：condition.when + actions 链 */
-function normalizeEvent(event: ComponentEvent): void {
+function normalizeEvent(event: ComponentEvent | undefined): void {
+  if (!event) return;
   if (event.condition && typeof event.condition.when === 'string') {
     event.condition.when = normalizeExpression(event.condition.when);
   }
@@ -47,6 +48,14 @@ function normalizeEvent(event: ComponentEvent): void {
 // ===== event.add =====
 
 export function executeAddEvent(project: DesignProject, params: EventAddOp['params']): Result {
+  if (!params.event) {
+    return {
+      project,
+      result: { success: false, description: 'event.add: params.event is required but received undefined', affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
@@ -122,6 +131,14 @@ export function executeRemoveEvent(project: DesignProject, params: EventRemoveOp
 // ===== event.update =====
 
 export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp['params']): Result {
+  if (!params.event) {
+    return {
+      project,
+      result: { success: false, description: 'event.update: params.event is required but received undefined', affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const newProject = deepClone(project);
   const node = findNodeInProject(newProject, params.nodeId);
 
