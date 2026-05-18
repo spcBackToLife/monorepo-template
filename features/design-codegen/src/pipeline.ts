@@ -60,6 +60,16 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
   ensureDir(outputDir);
   copyScaffold(template.scaffoldDir, outputDir, { projectName });
 
+  // 4b. Infer theme from schema and override variables.less if needed
+  const detectedTheme = detectThemeFromSchema(schema);
+  if (detectedTheme === 'dark') {
+    const variablesPath = join(outputDir, 'src/styles/variables.less');
+    if (existsSync(variablesPath)) {
+      const darkVariables = generateDarkThemeVariables();
+      writeFileSafe(variablesPath, darkVariables);
+    }
+  }
+
   // 5. Compile each screen
   const generatedFiles: string[] = [];
 
@@ -100,6 +110,19 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
   // 6. Generate router
   const routerFiles = emitRouter(schema.screens, adapter, template, outputDir, screenPathMap);
   generatedFiles.push(...routerFiles);
+
+  // 6b. Download material assets referenced in schema and rewrite CSS URLs
+  const apiBase = input.schemaSource.type === 'api' ? input.schemaSource.apiBase : undefined;
+  if (apiBase) {
+    // Derive the server origin from apiBase (e.g. "http://localhost:3001/api" → "http://localhost:3001")
+    // Material assets are served at the server root (/uploads/...), not under /api
+    const serverOrigin = new URL(apiBase).origin;
+    const materialResult = await downloadMaterialAssets(schema, outputDir, serverOrigin);
+    if (materialResult.rewriteMap.size > 0) {
+      rewriteCssUrls(outputDir, materialResult.rewriteMap);
+      generatedFiles.push(...materialResult.downloadedFiles);
+    }
+  }
 
   // 7. Format (optional)
   // await formatOutput(outputDir);
@@ -291,6 +314,137 @@ function buildScreenPathMap(screens: Screen[]): Map<string, string> {
   return map;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Theme Detection
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Detect whether the design schema uses a dark or light theme
+ * by analyzing root node background colors across all screens.
+ *
+ * Heuristic: parse the backgroundColor of each screen's root node.
+ * If the majority of screens have a dark background (luminance < 0.5),
+ * the project is dark-themed.
+ */
+function detectThemeFromSchema(schema: DesignProject): 'dark' | 'light' {
+  let darkCount = 0;
+  let lightCount = 0;
+
+  for (const screen of schema.screens) {
+    const rootStyles = screen.rootNode?.styles;
+    if (!rootStyles) continue;
+
+    const bg = rootStyles.backgroundColor || rootStyles.background;
+    if (typeof bg !== 'string') continue;
+
+    const luminance = estimateLuminance(bg);
+    if (luminance !== null) {
+      if (luminance < 0.4) darkCount++;
+      else lightCount++;
+    }
+  }
+
+  return darkCount > lightCount ? 'dark' : 'light';
+}
+
+/**
+ * Estimate luminance from a CSS color string.
+ * Supports: #hex (3/6/8 digits), rgb(), rgba().
+ * Returns 0-1 scale (0 = black, 1 = white) or null if unparseable.
+ */
+function estimateLuminance(color: string): number | null {
+  const trimmed = color.trim().toLowerCase();
+
+  // #hex
+  const hexMatch = trimmed.match(/^#([0-9a-f]{3,8})$/);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    if (hex.length >= 6) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      // Relative luminance (WCAG formula simplified)
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+  }
+
+  // rgb() / rgba()
+  const rgbMatch = trimmed.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1]) / 255;
+    const g = parseInt(rgbMatch[2]) / 255;
+    const b = parseInt(rgbMatch[3]) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  return null;
+}
+
+/**
+ * Generate dark theme variables.less content.
+ */
+function generateDarkThemeVariables(): string {
+  return `// Colors
+@color-primary: #1677ff;
+@color-primary-hover: #4096ff;
+@color-primary-active: #0958d9;
+@color-success: #52c41a;
+@color-warning: #faad14;
+@color-error: #ff4d4f;
+
+// Text colors (dark theme)
+@color-text: #ffffff;
+@color-text-secondary: rgba(255, 255, 255, 0.65);
+@color-text-tertiary: rgba(255, 255, 255, 0.45);
+@color-text-disabled: rgba(255, 255, 255, 0.25);
+
+// Background colors (dark theme)
+@color-bg: #121212;
+@color-bg-secondary: #1a1a22;
+@color-bg-tertiary: #242430;
+
+// Border
+@color-border: rgba(255, 255, 255, 0.12);
+@color-border-secondary: rgba(255, 255, 255, 0.06);
+@border-radius-sm: 4px;
+@border-radius-base: 6px;
+@border-radius-lg: 8px;
+
+// Font
+@font-size-sm: 12px;
+@font-size-base: 14px;
+@font-size-lg: 16px;
+@font-size-xl: 20px;
+@font-size-xxl: 24px;
+
+// Spacing
+@spacing-xs: 4px;
+@spacing-sm: 8px;
+@spacing-md: 12px;
+@spacing-base: 16px;
+@spacing-lg: 24px;
+@spacing-xl: 32px;
+
+// Shadows (dark theme — brighter borders instead of dark shadows)
+@shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2), 0 1px 6px -1px rgba(0, 0, 0, 0.15);
+@shadow-base: 0 2px 8px 0 rgba(0, 0, 0, 0.3), 0 1px 4px -1px rgba(0, 0, 0, 0.2);
+@shadow-lg: 0 6px 16px 0 rgba(0, 0, 0, 0.4), 0 3px 6px -4px rgba(0, 0, 0, 0.3);
+
+// Transitions
+@transition-duration: 0.2s;
+@transition-timing: cubic-bezier(0.645, 0.045, 0.355, 1);
+
+// Breakpoints
+@screen-xs: 480px;
+@screen-sm: 576px;
+@screen-md: 768px;
+@screen-lg: 992px;
+@screen-xl: 1200px;
+@screen-xxl: 1600px;
+`;
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 // Template Rendering
@@ -332,6 +486,158 @@ function ensureDir(dir: string): void {
 function writeFileSafe(filePath: string, content: string): void {
   ensureDir(dirname(filePath));
   writeFileSync(filePath, content, 'utf-8');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Material Asset Download & CSS URL Rewriting
+// ═══════════════════════════════════════════════════════════════
+
+interface MaterialDownloadResult {
+  downloadedFiles: string[];
+  rewriteMap: Map<string, string>; // oldUrlPath → newRelativePath
+}
+
+const MATERIAL_URL_PATTERN = /url\(["']?(\/uploads\/materials\/[^"')]+)["']?\)/g;
+
+/**
+ * Extract all unique material asset URLs from the schema's node styles.
+ */
+function extractMaterialUrls(schema: DesignProject): string[] {
+  const urls = new Set<string>();
+
+  function walkStyles(styles: Record<string, unknown> | undefined): void {
+    if (!styles) return;
+    for (const value of Object.values(styles)) {
+      if (typeof value !== 'string') continue;
+      const matches = value.matchAll(/\/uploads\/materials\/[^\s"')]+/g);
+      for (const m of matches) {
+        urls.add(m[0]);
+      }
+    }
+  }
+
+  function walkNode(node: Record<string, unknown>): void {
+    walkStyles(node.styles as Record<string, unknown> | undefined);
+    const children = node.children as Record<string, unknown>[] | undefined;
+    if (children) {
+      for (const child of children) walkNode(child);
+    }
+    const repeat = node.repeat as { template?: Record<string, unknown> } | undefined;
+    if (repeat?.template) {
+      walkNode(repeat.template);
+    }
+  }
+
+  for (const screen of schema.screens) {
+    if (screen.rootNode) walkNode(screen.rootNode as unknown as Record<string, unknown>);
+  }
+
+  return Array.from(urls);
+}
+
+/**
+ * Download material assets from the design API to the output project's public dir,
+ * and return a mapping from original URL paths to new relative paths.
+ */
+async function downloadMaterialAssets(
+  schema: DesignProject,
+  outputDir: string,
+  apiBase: string,
+): Promise<MaterialDownloadResult> {
+  const sourceUrls = extractMaterialUrls(schema);
+  if (sourceUrls.length === 0) {
+    return { downloadedFiles: [], rewriteMap: new Map() };
+  }
+
+  const rewriteMap = new Map<string, string>();
+  const downloadedFiles: string[] = [];
+  const assetsDir = join(outputDir, 'public', 'assets');
+
+  for (const urlPath of sourceUrls) {
+    // urlPath e.g. /uploads/materials/833478e8-xxx/abc.svg
+    // Save to public/assets/materials/833478e8-xxx/abc.svg
+    const relativeAssetPath = urlPath.replace(/^\/uploads\//, '');
+    const localFilePath = join(assetsDir, relativeAssetPath);
+    const newUrlPath = `/assets/${relativeAssetPath}`;
+
+    // Skip if already downloaded
+    if (existsSync(localFilePath)) {
+      rewriteMap.set(urlPath, newUrlPath);
+      continue;
+    }
+
+    // Download from API
+    const downloadUrl = `${apiBase}${urlPath}`;
+    try {
+      const res = await fetch(downloadUrl);
+      if (!res.ok) {
+        console.warn(`  ⚠️ Failed to download material: ${downloadUrl} (${res.status})`);
+        continue;
+      }
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      ensureDir(dirname(localFilePath));
+      writeFileSync(localFilePath, buffer);
+      rewriteMap.set(urlPath, newUrlPath);
+      downloadedFiles.push(localFilePath);
+    } catch (err) {
+      console.warn(`  ⚠️ Error downloading material ${downloadUrl}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  if (downloadedFiles.length > 0) {
+    console.log(`  📦 Downloaded ${downloadedFiles.length} material assets → public/assets/`);
+  }
+
+  return { downloadedFiles, rewriteMap };
+}
+
+/**
+ * Rewrite CSS url() references in all .less/.css files under outputDir.
+ */
+function rewriteCssUrls(outputDir: string, rewriteMap: Map<string, string>): void {
+  const cssFiles = findCssFiles(outputDir);
+  let rewriteCount = 0;
+
+  for (const filePath of cssFiles) {
+    let content = readFileSync(filePath, 'utf-8');
+    let modified = false;
+
+    content = content.replace(MATERIAL_URL_PATTERN, (match, urlPath: string) => {
+      const newPath = rewriteMap.get(urlPath);
+      if (newPath) {
+        modified = true;
+        rewriteCount++;
+        return match.replace(urlPath, newPath);
+      }
+      return match;
+    });
+
+    if (modified) {
+      writeFileSync(filePath, content, 'utf-8');
+    }
+  }
+
+  if (rewriteCount > 0) {
+    console.log(`  ✏️  Rewrote ${rewriteCount} material URL(s) in CSS files`);
+  }
+}
+
+function findCssFiles(dir: string): string[] {
+  const results: string[] = [];
+  if (!existsSync(dir)) return results;
+
+  const entries = readdirSync(dir);
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+    if (stat.isDirectory()) {
+      results.push(...findCssFiles(fullPath));
+    } else if (entry.endsWith('.less') || entry.endsWith('.css')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
 }
 
 // ═══════════════════════════════════════════════════════════════

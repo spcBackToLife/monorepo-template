@@ -94,8 +94,8 @@ export function planScreenEmit(
   });
   files.push({ outputPath: paths.page.entryPath, pattern: 'page.tsx.ejs', templateData: pageData });
 
-  // 6. Page style file
-  const pageStyle = generateLessFromNode(pageIR.rootNode);
+  // 6. Page style file — skip nodes that belong to child components
+  const pageStyle = generateLessFromNode(pageIR.rootNode, /* skipSplitChildren */ true);
   if (pageStyle.trim()) {
     files.push({ outputPath: paths.page.stylePath, pattern: null, templateData: { content: pageStyle } });
   }

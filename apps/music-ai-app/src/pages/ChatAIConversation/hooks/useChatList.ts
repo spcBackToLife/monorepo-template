@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { chatList } from '../../../services/chat';
-import { chatSend } from '../../../services/chat';
+import { chatList, chatSend } from '../../../services/chat';
 import type { Message } from '../types';
 
 export function useChatList() {
@@ -23,12 +22,12 @@ export function useChatList() {
     fetchData();
   }, []);
   const handleSendButtonClick = async () => {
-  if (!(inputDraft.length > 0)) return;
-  const result = await chatSend({ text: inputDraft });
-  setMessages(prev => [...prev, result.userMessage]);
-  setMessages(prev => [...prev, result.aiReply]);
-  setInputDraft("");
-};
+    if (!(inputDraft.length > 0)) return;
+    const result = await chatSend({ text: inputDraft });
+    setMessages(prev => [...prev, result.userMessage]);
+    setMessages(prev => [...prev, result.aiReply]);
+    setInputDraft("");
+  };
 
-  return { messages, inputDraft, setMessages, setInputDraft, isChatListLoading, chatList, handleSendButtonClick };
+  return { messages, inputDraft, setMessages, setInputDraft, isChatListLoading, handleSendButtonClick };
 }

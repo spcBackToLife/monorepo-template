@@ -6,7 +6,7 @@ import styles from './index.module.less';
 
 export function WelcomeOnboarding() {
   const [welcomePagerIndex, setWelcomePagerIndex] = useState<string>("0");
-  const [slide, setSlide] = useState<Slide>({"title":"Your Music, Your Imagination\nAI Makes It Real.","eyebrow":"Welcome to","description":"Create your own music with the help of AI. Choose a genre, set a mood, and let AI create your song!","emptyBanner":""});
+  const [slide] = useState<Slide>({"title":"Your Music, Your Imagination\nAI Makes It Real.","eyebrow":"Welcome to","description":"Create your own music with the help of AI. Choose a genre, set a mood, and let AI create your song!","emptyBanner":""});
 
   const navigate = useNavigate();
 

@@ -114,7 +114,17 @@ export class ReactAdapter implements FrameworkAdapter {
 
   emitStateDeclaration(state: ViewStateIR | DataStateIR): string {
     const { name, pascalName, type, defaultValue } = state;
+    const isReadonly = 'isReadonly' in state && state.isReadonly;
     const setter = `set${pascalName}`;
+
+    // Readonly state: no setter needed — use const [name] destructuring
+    if (isReadonly) {
+      if (type && type !== 'any' && type !== 'unknown') {
+        return `const [${name}] = useState<${type}>(${defaultValue});`;
+      }
+      return `const [${name}] = useState(${defaultValue});`;
+    }
+
     if (type && type !== 'any') {
       return `const [${name}, ${setter}] = useState<${type}>(${defaultValue});`;
     }

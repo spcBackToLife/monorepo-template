@@ -1,5 +1,6 @@
 import type { NodeIR } from '../../core/types';
 import type { ReactAdapter } from './index';
+import { resolveClassName } from '../../emit/plan-style';
 
 /**
  * Build the attribute string for a JSX element.
@@ -9,19 +10,21 @@ import type { ReactAdapter } from './index';
  * Static styles are extracted to .less files and referenced via className (CSS Modules).
  * Only dynamic styles (containing expressions) are emitted as inline style={{}}.
  *
+ * Uses resolveClassName() to get the disambiguated class name that matches
+ * the .less file output from plan-style.ts, preventing mismatches when
+ * sibling nodes share the same semantic name.
+ *
  * @see design_docs/03-tech/codegen-quality-fix.md — Phase 6, 9e
  */
 export function buildAttributes(node: NodeIR, adapter: ReactAdapter): string {
   const parts: string[] = [];
 
   // className (via CSS Modules) — covers static styles extracted to .less file
-  // For named nodes: use the name. For unnamed nodes with styles: use synthetic name.
+  // Use resolveClassName() which returns the disambiguated name matching plan-style.ts
   const hasStaticStyles = node.staticStyles && Object.keys(node.staticStyles).length > 0;
-  if (node.name) {
-    parts.push(adapter.emitClassName(toCssClassName(node.name)));
-  } else if (hasStaticStyles && node.id) {
-    // Unnamed node with styles — use synthetic class name matching plan-style.ts
-    parts.push(adapter.emitClassName(`node${node.id.slice(-6)}`));
+  if (hasStaticStyles || node.name) {
+    const className = resolveClassName(node);
+    parts.push(adapter.emitClassName(className));
   }
 
   // Dynamic styles as inline style object (only dynamic expressions)
@@ -52,19 +55,5 @@ export function buildAttributes(node: NodeIR, adapter: ReactAdapter): string {
 
   if (parts.length === 0) return '';
   return ' ' + parts.join(' ');
-}
-
-/**
- * Convert a semantic name to a valid CSS class name.
- * E.g. "Message Card" → "messageCard", "send-button" → "sendButton"
- */
-function toCssClassName(name: string): string {
-  // Already camelCase? Return as-is
-  if (/^[a-z][a-zA-Z0-9]*$/.test(name)) return name;
-
-  // Convert kebab-case or space-separated to camelCase
-  return name
-    .replace(/[^a-zA-Z0-9]+(.)?/g, (_, char) => (char ? char.toUpperCase() : ''))
-    .replace(/^[A-Z]/, c => c.toLowerCase());
 }
 

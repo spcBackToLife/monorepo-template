@@ -91,6 +91,15 @@ export function parseScreen(screen: Screen): PageIR {
   // 7. Infer TypeScript interfaces from data shapes
   const inferredTypes = inferTypesFromSchema(screen);
 
+  // 8. Mark readonly state variables — those not mutated by any handler
+  const mutatedVars = collectMutatedStateVars([...handlers, ...(onMount ? [onMount] : [])]);
+  for (const v of viewState) {
+    v.isReadonly = !mutatedVars.has(v.name);
+  }
+  for (const d of dataState) {
+    d.isReadonly = !mutatedVars.has(d.name);
+  }
+
   return {
     name: componentName,
     slug,
@@ -874,8 +883,8 @@ function serializeDefaultValue(value: unknown): string {
   if (value === null) return 'null';
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  // For arrays and objects, just use [] or {} as initial (real data comes from API)
-  if (Array.isArray(value)) return '[]';
+  // For arrays and objects, serialize the full initial value to preserve schema data
+  if (Array.isArray(value)) return JSON.stringify(value);
   if (typeof value === 'object') return JSON.stringify(value);
   return JSON.stringify(value);
 }
@@ -1003,4 +1012,37 @@ function deriveItemTypeName(key: string): string {
 
 function deriveResponseTypeName(dsName: string): string {
   return toPascalCase(dsName) + 'Response';
+}
+
+// ─── Readonly State Detection ───────────────────────────────────────────────
+
+/**
+ * Scan all handler steps to find which state variables are mutated
+ * (state-set, state-append, state-toggle, state-remove).
+ *
+ * State variables NOT in this set are readonly — their setter is not needed.
+ */
+function collectMutatedStateVars(handlers: HandlerIR[]): Set<string> {
+  const mutated = new Set<string>();
+  for (const handler of handlers) {
+    collectMutatedVarsFromSteps(handler.steps, mutated);
+  }
+  return mutated;
+}
+
+function collectMutatedVarsFromSteps(steps: ActionStepIR[], mutated: Set<string>): void {
+  for (const step of steps) {
+    switch (step.kind) {
+      case 'state-set':
+      case 'state-append':
+      case 'state-toggle':
+      case 'state-remove':
+        mutated.add(step.variable);
+        break;
+      case 'fetch':
+        if (step.onSuccess) collectMutatedVarsFromSteps(step.onSuccess, mutated);
+        if (step.onError) collectMutatedVarsFromSteps(step.onError, mutated);
+        break;
+    }
+  }
 }

@@ -248,11 +248,17 @@ function shouldSplitLegacy(
 
 /**
  * Generate a PascalCase component name for a split node.
+ * Avoids double-suffix: if base already ends with the suffix, don't append again.
+ * E.g., node "MessageItem" + suffix "Item" → "MessageItem" (not "MessageItemItem")
  */
 function generateComponentName(node: NodeIR, suffix?: string): string {
   const base = node.name
     ? toPascalCase(node.name)
     : toPascalCase(node.id.slice(-8));
+
+  if (suffix && base.endsWith(suffix)) {
+    return base;
+  }
 
   return suffix ? `${base}${suffix}` : base;
 }
@@ -738,8 +744,13 @@ function buildHookReturnFields(
   // Add loading state
   fields.push(`is${toPascalCase(ds.name)}Loading`);
 
-  // Add the fetch function name
-  fields.push(ds.functionName);
+  // NOTE: We intentionally do NOT expose ds.functionName in returnFields.
+  // The raw service function (e.g., "chatList") is an internal implementation
+  // detail of the hook. Exposing it:
+  //   1. Shadows the imported service function name, causing variable conflicts
+  //   2. Leaks implementation details to the consuming component
+  // If the consuming component needs to trigger a refetch, expose a named
+  // wrapper like `refetch${PascalCase(ds.name)}` instead.
 
   // If there's a related handler, include it
   if (handler) {

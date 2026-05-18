@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useChatList } from './hooks/useChatList';
 import { ChatHeader } from './components/ChatHeader';
-import { MessageItemItem } from './components/MessageItemItem';
+import { MessageItem } from './components/MessageItem';
 import { InputBar } from './components/InputBar';
 import styles from './index.module.less';
 
 export function ChatAIConversation() {
 
-  const { messages, inputDraft, setMessages, setInputDraft, isChatListLoading, chatList, handleSendButtonClick } = useChatList();
+  const { messages, inputDraft, setMessages, setInputDraft, isChatListLoading, handleSendButtonClick } = useChatList();
   const navigate = useNavigate();
 
 

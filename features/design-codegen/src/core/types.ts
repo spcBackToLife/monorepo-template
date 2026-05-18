@@ -33,6 +33,8 @@ export interface ViewStateIR {
   pascalName: string;              // "InputDraft" (for setter)
   type: string;                    // "string"
   defaultValue: string;            // JSON serialized: "''" or "[]"
+  /** True if no handler mutates this variable (state-set/append/toggle/remove) */
+  isReadonly?: boolean;
 }
 
 export interface DataStateIR {
@@ -40,6 +42,8 @@ export interface DataStateIR {
   pascalName: string;
   type: string;                    // "Message[]"
   defaultValue: string;            // "[]"
+  /** True if no handler mutates this variable (state-set/append/toggle/remove) */
+  isReadonly?: boolean;
 }
 
 export interface HookStateDef {

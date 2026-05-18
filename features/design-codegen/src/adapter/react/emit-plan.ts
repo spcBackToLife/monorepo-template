@@ -79,9 +79,17 @@ export function buildHookTemplateData(
   });
   imports.push(...fwImports);
 
-  // Service imports
+  // Service imports — merge multiple imports from the same module
+  const svcImportsByPath = new Map<string, string[]>();
   for (const svc of resolvedImports.serviceImports) {
-    imports.push(`import { ${svc.functionName} } from '${svc.relativePath}';`);
+    const existing = svcImportsByPath.get(svc.relativePath) || [];
+    if (!existing.includes(svc.functionName)) {
+      existing.push(svc.functionName);
+    }
+    svcImportsByPath.set(svc.relativePath, existing);
+  }
+  for (const [path, names] of svcImportsByPath) {
+    imports.push(`import { ${names.join(', ')} } from '${path}';`);
   }
 
   // Type imports
@@ -115,7 +123,12 @@ export function buildHookTemplateData(
   // Handler logic
   let logic = '';
   if (hook.handler) {
-    logic = `  ${adapter.emitHandler(hook.handler)}`;
+    // emitHandler returns a multi-line string; indent every line consistently
+    const handlerCode = adapter.emitHandler(hook.handler);
+    logic = handlerCode
+      .split('\n')
+      .map(line => (line.trim() ? `  ${line}` : line))
+      .join('\n');
   }
 
   // Navigation setup
