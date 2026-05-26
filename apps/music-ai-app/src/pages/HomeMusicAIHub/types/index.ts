@@ -1,5 +1,5 @@
 
-export interface HeroInfo {
+export interface HeroConfig {
 
   cta: string;
 
@@ -14,7 +14,7 @@ export interface HeroInfo {
 }
 
 
-export interface UserInfo {
+export interface HomeUser {
 
   name: string;
 
@@ -37,8 +37,6 @@ export interface FeatureTile {
 
   subtitle: string;
 
-  description: string;
-
 }
 
 
@@ -46,11 +44,7 @@ export interface PopularPrompt {
 
   id: string;
 
-  text: string;
-
   title: string;
-
-  category: string;
 
 }
 

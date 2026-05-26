@@ -69,7 +69,22 @@ export function planScreenEmit(
     }
   }
 
-  // 4. Component files
+  // 4. Pre-compute all styles FIRST (this assigns _resolvedClassName on nodes).
+  // JSX emit reads _resolvedClassName via resolveClassName(), so style must run first.
+
+  // 4a. Component styles
+  const componentStyleContents = new Map<string, string>();
+  for (const comp of plan.childComponents) {
+    if (comp.hasStyle) {
+      const styleContent = generateLessFromNode(comp.node);
+      componentStyleContents.set(comp.componentName, styleContent);
+    }
+  }
+
+  // 4b. Page style (skip split children — their styles are in component files)
+  const pageStyle = generateLessFromNode(pageIR.rootNode, /* skipSplitChildren */ true);
+
+  // 5. Component files (JSX + style output)
   for (const comp of plan.childComponents) {
     const propsTypes = comp.props.map(p => p.type);
     const imports = computeComponentImports(
@@ -79,14 +94,14 @@ export function planScreenEmit(
     const compPath = paths.components.find(c => c.componentName === comp.componentName)!;
     files.push({ outputPath: compPath.entryPath, pattern: 'component.tsx.ejs', templateData: data });
 
-    // Style file
-    if (comp.hasStyle) {
-      const styleContent = generateLessFromNode(comp.node);
+    // Style file (already computed above)
+    const styleContent = componentStyleContents.get(comp.componentName);
+    if (styleContent) {
       files.push({ outputPath: compPath.stylePath, pattern: null, templateData: { content: styleContent } });
     }
   }
 
-  // 5. Page file
+  // 6. Page file (JSX)
   const pageOwnedStateTypes = semantics.pageOwnedState.map(v => v.type);
   const pageImports = computePageImports(paths, plan, typeNames, pageOwnedStateTypes);
   const pageData = adapter.buildPageTemplateData({
@@ -94,8 +109,7 @@ export function planScreenEmit(
   });
   files.push({ outputPath: paths.page.entryPath, pattern: 'page.tsx.ejs', templateData: pageData });
 
-  // 6. Page style file — skip nodes that belong to child components
-  const pageStyle = generateLessFromNode(pageIR.rootNode, /* skipSplitChildren */ true);
+  // 6b. Page style file (already computed above)
   if (pageStyle.trim()) {
     files.push({ outputPath: paths.page.stylePath, pattern: null, templateData: { content: pageStyle } });
   }

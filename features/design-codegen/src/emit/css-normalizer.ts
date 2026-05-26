@@ -48,15 +48,21 @@ const UNITLESS_PROPERTIES = new Set([
  * Normalize a CSS value from schema representation to valid CSS string.
  *
  * Rules:
- * 1. Pure numeric value + property that requires unit → append "px"
- * 2. Pure numeric 0 → "0" (no unit needed)
- * 3. Value already has unit/is not pure numeric → return as-is
- * 4. Special keywords (auto, none, inherit, etc.) → return as-is
+ * 1. Token reference "$token:xxx" → CSS var(--xxx)
+ * 2. Pure numeric value + property that requires unit → append "px"
+ * 3. Pure numeric 0 → "0" (no unit needed)
+ * 4. Value already has unit/is not pure numeric → return as-is
+ * 5. Special keywords (auto, none, inherit, etc.) → return as-is
  *
  * @param property CSS property name (camelCase or kebab-case)
  * @param value    String representation of the value
  */
 export function normalizeCssValue(property: string, value: string): string {
+  // Token reference → CSS var()
+  if (value.includes('$token:')) {
+    return resolveTokenToCssVar(value);
+  }
+
   // Not a pure number → already has unit or is a keyword/expression
   if (!/^-?\d+(\.\d+)?$/.test(value)) return value;
 
@@ -72,6 +78,50 @@ export function normalizeCssValue(property: string, value: string): string {
   }
 
   return `${value}px`;
+}
+
+/**
+ * Convert $token:xxx references to CSS var(--xxx).
+ *
+ * Mapping rules:
+ *   - Colors (no prefix): "$token:primary" → "var(--color-primary)"
+ *   - Spacing: "$token:spacing-md" → "var(--spacing-md)"
+ *   - Radius: "$token:radius-md" → "var(--radius-md)"
+ *   - Shadow: "$token:shadow-sm" → "var(--shadow-sm)"
+ *   - Transition: "$token:transition-fast" → "var(--transition-fast)"
+ *   - Font sub-property: "$token:font-body.fontSize" → "var(--font-body-fontSize)"
+ *
+ * Supports compound values: "$token:spacing-sm $token:spacing-md" → "var(--spacing-sm) var(--spacing-md)"
+ */
+function resolveTokenToCssVar(value: string): string {
+  return value.replace(/\$token:([a-zA-Z0-9_.-]+)/g, (_match, tokenName: string) => {
+    const cssVarName = tokenToCssVarName(tokenName);
+    return `var(--${cssVarName})`;
+  });
+}
+
+/**
+ * Map a token name to a CSS custom property name.
+ *
+ * - "primary" → "color-primary" (bare names are colors)
+ * - "spacing-md" → "spacing-md" (already prefixed)
+ * - "radius-lg" → "radius-lg"
+ * - "shadow-sm" → "shadow-sm"
+ * - "transition-fast" → "transition-fast"
+ * - "font-body.fontSize" → "font-body-fontSize"
+ */
+function tokenToCssVarName(tokenName: string): string {
+  // Replace dots with hyphens (for font sub-properties)
+  const normalized = tokenName.replace(/\./g, '-');
+
+  // If already prefixed with a category, use as-is
+  const categories = ['spacing-', 'radius-', 'shadow-', 'transition-', 'font-'];
+  for (const cat of categories) {
+    if (normalized.startsWith(cat)) return normalized;
+  }
+
+  // Bare name (e.g. "primary", "textPrimary", "surface") → prefix with "color-"
+  return `color-${camelToKebab(normalized)}`;
 }
 
 /**

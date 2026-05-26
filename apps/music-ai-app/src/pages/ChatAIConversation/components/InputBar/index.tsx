@@ -2,11 +2,12 @@ import styles from './index.module.less';
 
 interface InputBarProps {
   inputDraft: string;
+  setInputDraft: (value: string) => void;
   handleSendButtonClick: () => void;
 }
 
 
-export function InputBar({ inputDraft, handleSendButtonClick }: InputBarProps) {
+export function InputBar({ inputDraft, setInputDraft, handleSendButtonClick }: InputBarProps) {
 
 
   return (

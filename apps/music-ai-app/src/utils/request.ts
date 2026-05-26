@@ -1,5 +1,6 @@
 import axios from 'axios';
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { AxiosInstance, AxiosRequestConfig } from 'axios';
+import { isMockEnabled, tryGetMockResponse } from './mock-manager';
 
 const instance: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE,
@@ -25,7 +26,7 @@ instance.interceptors.request.use(
 
 // Response interceptor
 instance.interceptors.response.use(
-  (response: AxiosResponse) => {
+  (response) => {
     const { data } = response;
     if (data.code !== 0) {
       console.error(`[API Error] ${data.message || 'Unknown error'}`);
@@ -45,6 +46,23 @@ instance.interceptors.response.use(
   },
 );
 
-export function request<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+/**
+ * Unified request function with mock support.
+ *
+ * When mock mode is enabled, matching requests are intercepted BEFORE
+ * hitting the network — avoiding 500 errors from missing backend.
+ */
+export async function request<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+  // ── Mock interception (before network) ──
+  if (isMockEnabled()) {
+    const url = config.url ?? '';
+    const method = (config.method ?? 'GET').toUpperCase();
+    const mockResult = tryGetMockResponse(url, method);
+    if (mockResult) {
+      await new Promise(resolve => setTimeout(resolve, mockResult.delay));
+      return mockResult.data as T;
+    }
+  }
+
   return instance.request<unknown, T>(config);
 }

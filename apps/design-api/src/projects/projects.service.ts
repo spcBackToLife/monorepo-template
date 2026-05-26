@@ -15,6 +15,7 @@ import {
   generateScreenId,
   generateNodeId,
   normalizeNode,
+  DEFAULT_THEME_CONFIG,
 } from '@globallink/design-schema';
 import {
   OperationExecutor,
@@ -206,6 +207,11 @@ export class ProjectsService {
       if (asset.schema) normalizeNode(asset.schema);
     }
 
+    // 迁移：旧项目无 themeConfig → 自动补全默认值
+    if (!project.themeConfig) {
+      project.themeConfig = DEFAULT_THEME_CONFIG;
+    }
+
     return project;
   }
 
@@ -226,5 +232,53 @@ export class ProjectsService {
       `UPDATE design_projects SET thumbnail = $1, updated_at = NOW() WHERE id = $2`,
       [thumbnail, id],
     );
+  }
+
+  // ===== Theme API =====
+
+  /** 获取项目主题配置（从快照重放的完整 project 中提取 themeConfig） */
+  async getTheme(id: string): Promise<unknown> {
+    const project = await this.findOne(id);
+    return project.themeConfig ?? null;
+  }
+
+  /**
+   * 更新项目主题配置。
+   *
+   * 实现方式：直接更新最新快照中的 themeConfig 字段（JSONB path update）。
+   * themeConfig 不走 operation 流程——它是项目级配置而非画布设计操作，
+   * 不需要 undo/redo，也不需要 WebSocket 推送给协作者画布刷新。
+   */
+  async updateTheme(id: string, themeConfig: unknown): Promise<{ success: boolean }> {
+    const pool = this.db.getPool();
+
+    // 获取最新快照
+    const snapResult = await pool.query<{ id: string; schema: unknown }>(
+      `SELECT id, schema FROM design_snapshots
+       WHERE project_id = $1
+       ORDER BY version DESC
+       LIMIT 1`,
+      [id],
+    );
+    const snapshot = snapResult.rows[0];
+    if (!snapshot) {
+      throw new NotFoundException('项目快照不存在');
+    }
+
+    // 更新快照 schema 中的 themeConfig 字段
+    await pool.query(
+      `UPDATE design_snapshots
+       SET schema = jsonb_set(schema::jsonb, '{themeConfig}', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(themeConfig), snapshot.id],
+    );
+
+    // 更新项目 updated_at
+    await pool.query(
+      `UPDATE design_projects SET updated_at = NOW() WHERE id = $1`,
+      [id],
+    );
+
+    return { success: true };
   }
 }

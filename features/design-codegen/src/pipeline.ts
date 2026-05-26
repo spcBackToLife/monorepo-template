@@ -92,19 +92,40 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
 
   const screenPathMap = buildScreenPathMap(schema.screens);
 
+  // 5a. Parse all screens first (needed for cross-page shared component detection)
+  const allPageIRs: PageIR[] = [];
   for (const screen of schema.screens) {
-    // 5a. Parse: Schema → IR
     const pageIR = parseScreen(screen);
-
-    // 5a-post: Resolve screenIds to paths in navigate actions
     resolveNavigationPaths(pageIR, screenPathMap);
+    allPageIRs.push(pageIR);
+  }
 
-    // 5b. Split: IR → SplitPlan
+  // 5b. Detect shared components: templateId that appears in multiple pages
+  const sharedComponents = detectSharedComponents(allPageIRs);
+
+  // 5c. Emit shared components (one copy per template) to src/components/
+  if (sharedComponents.size > 0) {
+    const sharedFiles = emitSharedComponents(sharedComponents, adapter, template, outputDir, config);
+    generatedFiles.push(...sharedFiles);
+  }
+
+  // 5d. Split and emit each page (shared component instances become references)
+  for (const pageIR of allPageIRs) {
+    // Remove handlers that belong to shared component subtrees
+    // (they're now generated inside the shared component, not in the page)
+    if (sharedComponents.size > 0) {
+      filterOutSharedHandlers(pageIR, sharedComponents);
+    }
+
     const plan = splitPage(pageIR, config.splitting, strategies);
 
-    // 5c. Emit: Generate files for this screen
     const files = emitScreen(pageIR, plan, adapter, template, outputDir, screenPathMap);
     generatedFiles.push(...files);
+  }
+
+  // 5e. Inject shared component imports into page files that reference them
+  if (sharedComponents.size > 0) {
+    injectSharedComponentImports(allPageIRs, sharedComponents, outputDir, config);
   }
 
   // 6. Generate router
@@ -122,6 +143,14 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
       rewriteCssUrls(outputDir, materialResult.rewriteMap);
       generatedFiles.push(...materialResult.downloadedFiles);
     }
+  }
+
+  // 6c. Generate mock data config from schema's ApiDataSource.mock
+  const mockDataFile = emitMockData(schema, template, outputDir);
+  if (mockDataFile) {
+    generatedFiles.push(mockDataFile);
+    // 6d. Inject mock bootstrap into main.tsx (import + enableMock)
+    injectMockBootstrap(outputDir);
   }
 
   // 7. Format (optional)
@@ -257,6 +286,106 @@ function emitRouter(
   const routerContent = renderPattern(template.patternsDir, 'router.tsx.ejs', { routes, defaultPath });
   writeFileSafe(join(outputDir, routerPath), routerContent);
   return [routerPath];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 6c: Mock Data Generation
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Extract all mock scenarios from schema screens' ApiDataSource.mock configs
+ * and generate src/mock-data.ts for the mock manager.
+ *
+ * @returns generated file path, or null if no mock data exists
+ */
+function emitMockData(
+  schema: DesignProject,
+  template: ResolvedTemplate,
+  outputDir: string,
+): string | null {
+  const mockData: Record<string, unknown> = {};
+  const endpointMap: Record<string, string> = {};
+  let hasAnyMock = false;
+
+  for (const screen of schema.screens) {
+    const dataSources = screen.dataSources ?? [];
+    for (const ds of dataSources) {
+      if (ds.type !== 'api' || !ds.mock) continue;
+      if (ds.mock.scenarios.length === 0) continue;
+
+      hasAnyMock = true;
+      mockData[ds.id] = {
+        scenarios: ds.mock.scenarios.map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+          statusCode: s.statusCode,
+          delay: s.delay,
+          isTimeout: s.isTimeout || false,
+          responseBody: s.responseBody,
+        })),
+        activeScenarioId: ds.mock.activeScenarioId,
+      };
+
+      // Store endpoint path for URL matching in interceptor
+      if (ds.endpoint) {
+        endpointMap[ds.id] = ds.endpoint.path;
+      }
+    }
+  }
+
+  if (!hasAnyMock) return null;
+
+  const mockDataPath = join(outputDir, 'src', 'utils', 'mock-data.ts');
+  const content = renderPattern(template.patternsDir, 'mock-data.ts.ejs', { mockData, endpointMap });
+  writeFileSafe(mockDataPath, content);
+  return mockDataPath;
+}
+
+/**
+ * Inject mock bootstrap code into main.tsx.
+ *
+ * After mock-data.ts is generated, this patches the entry file to:
+ *   1. import '@/utils/mock-data' (registers configs into mock-manager)
+ *   2. import { enableMock } from '@/utils/mock-manager' + enableMock()
+ *
+ * This ensures mock mode is active by default in generated projects.
+ */
+function injectMockBootstrap(outputDir: string): void {
+  const mainPath = join(outputDir, 'src', 'main.tsx');
+  if (!existsSync(mainPath)) return;
+
+  let mainContent = readFileSync(mainPath, 'utf-8');
+
+  // Skip if already injected (idempotent)
+  if (mainContent.includes('mock-data')) return;
+
+  // Insert mock imports after the last import statement
+  const mockImportLines = [
+    "import '@/utils/mock-data';",
+    "import { enableMock } from '@/utils/mock-manager';",
+    '',
+    'enableMock();',
+    '',
+  ].join('\n');
+
+  // Find the last import line and inject after it
+  const lines = mainContent.split('\n');
+  let lastImportIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trimStart().startsWith('import ')) {
+      lastImportIndex = i;
+    }
+  }
+
+  if (lastImportIndex >= 0) {
+    lines.splice(lastImportIndex + 1, 0, '', mockImportLines);
+  } else {
+    // No imports found (unlikely), prepend
+    lines.unshift(mockImportLines);
+  }
+
+  writeFileSafe(mainPath, lines.join('\n'));
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -634,6 +763,269 @@ function findCssFiles(dir: string): string[] {
     if (stat.isDirectory()) {
       results.push(...findCssFiles(fullPath));
     } else if (entry.endsWith('.less') || entry.endsWith('.css')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 5b: Shared Component Detection
+// ═══════════════════════════════════════════════════════════════
+
+interface SharedComponentInfo {
+  templateId: string;
+  componentName: string;
+  /** The first occurrence node (used as the "source of truth" for code generation) */
+  sourceNode: NodeIR;
+  /** All instance nodes across all pages (will be marked as shared references) */
+  instances: NodeIR[];
+  /** Handlers from the source page that belong to this component's node tree */
+  handlers: import('./core/types').HandlerIR[];
+}
+
+import type { NodeIR } from './core/types';
+
+/**
+ * Detect component instances (nodes with templateId) that appear across multiple pages.
+ * These should be emitted once to src/components/ rather than duplicated per page.
+ *
+ * Also marks each instance node with `splitAs = 'component'` and `splitComponentName`
+ * so that the page emitter knows to emit a component reference instead of inlining.
+ */
+function detectSharedComponents(allPageIRs: PageIR[]): Map<string, SharedComponentInfo> {
+  // Collect all nodes with a templateId, grouped by templateId
+  const templateMap = new Map<string, NodeIR[]>();
+
+  for (const pageIR of allPageIRs) {
+    collectTemplateInstances(pageIR.rootNode, templateMap);
+  }
+
+  // Only keep templateIds that appear in more than one page
+  const shared = new Map<string, SharedComponentInfo>();
+  for (const [templateId, instances] of templateMap) {
+    if (instances.length >= 2) {
+      // Use the first instance's node as the source for code generation
+      const sourceNode = instances[0];
+      const componentName = toPascalCase(sourceNode.name || `SharedComponent_${templateId.slice(0, 8)}`);
+
+      // Mark ALL instances as shared component references
+      for (const inst of instances) {
+        inst.splitAs = 'component';
+        inst.splitComponentName = componentName;
+        // Store reference to shared template so emitter knows it's cross-page shared
+        (inst as NodeIR & { _sharedTemplateId?: string })._sharedTemplateId = templateId;
+      }
+
+      // Collect handlers relevant to this component (from the source page)
+      const eventHandlerNames = new Set<string>();
+      collectEventHandlerNames(sourceNode, eventHandlerNames);
+
+      // Find the page that contains the sourceNode
+      const sourcePage = allPageIRs.find(p => nodeExistsInTree(p.rootNode, sourceNode.id));
+      const handlers = sourcePage
+        ? sourcePage.handlers.filter(h => eventHandlerNames.has(h.name))
+        : [];
+
+      shared.set(templateId, {
+        templateId,
+        componentName,
+        sourceNode,
+        instances,
+        handlers,
+      });
+    }
+  }
+
+  return shared;
+}
+
+/** Collect all handler names referenced by events in a node tree */
+function collectEventHandlerNames(node: NodeIR, names: Set<string>): void {
+  for (const ev of node.events) {
+    names.add(ev.handlerName);
+  }
+  for (const child of node.children) {
+    collectEventHandlerNames(child, names);
+  }
+}
+
+/** Check if a node with the given ID exists in a tree */
+function nodeExistsInTree(node: NodeIR, id: string): boolean {
+  if (node.id === id) return true;
+  for (const child of node.children) {
+    if (nodeExistsInTree(child, id)) return true;
+  }
+  if (node.repeat && nodeExistsInTree(node.repeat.template, id)) return true;
+  return false;
+}
+
+/**
+ * Remove handlers from a PageIR whose ownerNodeId is within a shared component subtree.
+ * These handlers are emitted inside the shared component instead.
+ */
+function filterOutSharedHandlers(
+  pageIR: PageIR,
+  sharedComponents: Map<string, SharedComponentInfo>,
+): void {
+  // Collect all node IDs that belong to shared component subtrees
+  const sharedNodeIds = new Set<string>();
+  for (const [, info] of sharedComponents) {
+    for (const inst of info.instances) {
+      collectAllNodeIds(inst, sharedNodeIds);
+    }
+  }
+
+  // Filter out handlers whose owner is within a shared component
+  pageIR.handlers = pageIR.handlers.filter(h => !sharedNodeIds.has(h.ownerNodeId));
+}
+
+/** Collect all node IDs in a subtree */
+function collectAllNodeIds(node: NodeIR, ids: Set<string>): void {
+  ids.add(node.id);
+  for (const child of node.children) {
+    collectAllNodeIds(child, ids);
+  }
+  if (node.repeat) {
+    collectAllNodeIds(node.repeat.template, ids);
+  }
+}
+
+/**
+ * Walk a node tree and collect all nodes that are component instances (have templateId).
+ */
+function collectTemplateInstances(node: NodeIR, map: Map<string, NodeIR[]>): void {
+  if (node.templateId && node.isComponentInstance) {
+    const list = map.get(node.templateId) || [];
+    list.push(node);
+    map.set(node.templateId, list);
+  }
+  for (const child of node.children) {
+    collectTemplateInstances(child, map);
+  }
+  if (node.repeat) {
+    collectTemplateInstances(node.repeat.template, map);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Step 5c: Emit Shared Components
+// ═══════════════════════════════════════════════════════════════
+
+import { generateLessFromNode } from './emit/plan-style';
+
+/**
+ * For each shared component, generate a single component file to src/components/{Name}/.
+ * Each page that uses it will just `import { Name } from '@/components/Name'`.
+ */
+function emitSharedComponents(
+  sharedComponents: Map<string, SharedComponentInfo>,
+  adapter: FrameworkAdapter,
+  template: ResolvedTemplate,
+  outputDir: string,
+  config: ReturnType<typeof loadTemplate>['config'],
+): string[] {
+  const files: string[] = [];
+  const org = config.fileOrganization;
+
+  for (const [, info] of sharedComponents) {
+    const compDir = join('src', org.component.dir, info.componentName);
+
+    // Generate style
+    const styleContent = generateLessFromNode(info.sourceNode);
+    if (styleContent.trim()) {
+      const stylePath = join(compDir, org.component.styleFile);
+      writeFileSafe(join(outputDir, stylePath), styleContent);
+      files.push(stylePath);
+    }
+
+    // Generate component TSX using the adapter
+    const componentContent = adapter.renderSharedComponent({
+      componentName: info.componentName,
+      node: info.sourceNode,
+      hasStyle: !!styleContent.trim(),
+      styleFile: org.component.styleFile,
+      handlers: info.handlers,
+    });
+    const entryPath = join(compDir, org.component.entryFile);
+    writeFileSafe(join(outputDir, entryPath), componentContent);
+    files.push(entryPath);
+  }
+
+  return files;
+}
+
+/**
+ * After all page files are emitted, scan generated .tsx files for shared component
+ * references and inject the necessary import statements.
+ *
+ * Strategy: look for `<ComponentName` in each .tsx file; if that component exists
+ * in src/components/, add `import { ComponentName } from '@/components/ComponentName'`.
+ */
+function injectSharedComponentImports(
+  _allPageIRs: PageIR[],
+  sharedComponents: Map<string, SharedComponentInfo>,
+  outputDir: string,
+  _config: ReturnType<typeof loadTemplate>['config'],
+): void {
+  const sharedNames = [...sharedComponents.values()].map(c => c.componentName);
+  if (sharedNames.length === 0) return;
+
+  // Scan all .tsx files under src/pages/
+  const pagesDir = join(outputDir, 'src', 'pages');
+  const tsxFiles = findTsxFiles(pagesDir);
+
+  for (const filePath of tsxFiles) {
+    let content = readFileSync(filePath, 'utf-8');
+    const importsToAdd: string[] = [];
+
+    for (const name of sharedNames) {
+      // Check if this component is used in the file (as JSX tag)
+      const usagePattern = new RegExp(`<${name}[\\s/>]`);
+      if (!usagePattern.test(content)) continue;
+
+      // Skip if already imported
+      if (content.includes(`from '@/components/${name}'`) || content.includes(`from "@/components/${name}"`)) continue;
+
+      // Also skip if it's the shared component's own file
+      if (filePath.includes(`/components/${name}/`)) continue;
+
+      importsToAdd.push(`import { ${name} } from '@/components/${name}';`);
+    }
+
+    if (importsToAdd.length === 0) continue;
+
+    // Insert after the last import statement
+    const lines = content.split('\n');
+    let lastImportIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trimStart().startsWith('import ')) {
+        lastImportIdx = i;
+      }
+    }
+
+    if (lastImportIdx >= 0) {
+      lines.splice(lastImportIdx + 1, 0, ...importsToAdd);
+    } else {
+      lines.unshift(...importsToAdd, '');
+    }
+
+    writeFileSafe(filePath, lines.join('\n'));
+  }
+}
+
+/** Recursively find all .tsx files in a directory */
+function findTsxFiles(dir: string): string[] {
+  const results: string[] = [];
+  if (!existsSync(dir)) return results;
+
+  const entries = readdirSync(dir);
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+    if (stat.isDirectory()) {
+      results.push(...findTsxFiles(fullPath));
+    } else if (entry.endsWith('.tsx')) {
       results.push(fullPath);
     }
   }

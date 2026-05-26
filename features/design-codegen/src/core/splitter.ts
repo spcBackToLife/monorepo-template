@@ -104,6 +104,12 @@ function identifySplitNodes(
 
   // Don't split the root node itself
   if (!isRoot) {
+    // If already marked as split by external logic (e.g., shared component detection),
+    // skip — don't add to candidates (it's emitted separately) but also don't recurse.
+    if (node.splitAs === 'component' && node.splitComponentName) {
+      return candidates;
+    }
+
     const reason = shouldSplit(node, rules, strategies, page, depth, parent);
     if (reason) {
       // Mark the node
@@ -335,6 +341,20 @@ function inferComponentProps(node: NodeIR, page: PageIR, repeatDataVar?: string)
     }
   }
 
+  // Recursively collect bind setters from ALL descendants (not just root)
+  // Fixes bug where child <input> with bind didn't propagate setter to component props
+  const descendantBindSetters = collectBindSetters(node);
+  for (const setter of descendantBindSetters) {
+    if (!seenNames.has(setter)) {
+      seenNames.add(setter);
+      props.push({
+        name: setter,
+        type: '(value: string) => void',
+        required: true,
+      });
+    }
+  }
+
   // Collect event handlers from the ENTIRE subtree (not just root node)
   const allHandlerNames = collectHandlerNames(node);
   for (const handlerName of allHandlerNames) {
@@ -367,6 +387,8 @@ function inferComponentProps(node: NodeIR, page: PageIR, repeatDataVar?: string)
 
 /**
  * Recursively collect all event handler names from a node and its descendants.
+ * Skips children that are already marked as split components (their handlers
+ * are internal to the split component, not props of the parent).
  */
 function collectHandlerNames(node: NodeIR): Set<string> {
   const handlers = new Set<string>();
@@ -376,6 +398,9 @@ function collectHandlerNames(node: NodeIR): Set<string> {
   }
 
   for (const child of node.children) {
+    // Skip children that are shared/split components — their events are self-contained
+    if (child.splitAs === 'component') continue;
+
     const childHandlers = collectHandlerNames(child);
     for (const h of childHandlers) {
       handlers.add(h);
@@ -391,6 +416,38 @@ function collectHandlerNames(node: NodeIR): Set<string> {
   }
 
   return handlers;
+}
+
+/**
+ * Recursively collect all bind setter names from a node and its descendants.
+ * Used to propagate setter props to split component interfaces when a
+ * descendant node (e.g. <input> inside InputBar) has a two-way binding.
+ */
+function collectBindSetters(node: NodeIR): Set<string> {
+  const setters = new Set<string>();
+
+  // Only check children — root node's bind is already handled above in inferComponentProps
+  // Skip split components — their bindings are self-contained
+  for (const child of node.children) {
+    if (child.splitAs === 'component') continue;
+    if (child.bind) {
+      setters.add(child.bind.setter);
+    }
+    const childSetters = collectBindSetters(child);
+    for (const s of childSetters) {
+      setters.add(s);
+    }
+  }
+
+  // Also check repeat template
+  if (node.repeat) {
+    const templateSetters = collectBindSetters(node.repeat.template);
+    for (const s of templateSetters) {
+      setters.add(s);
+    }
+  }
+
+  return setters;
 }
 
 /**
@@ -438,8 +495,9 @@ function collectDependencies(node: NodeIR): Set<string> {
     }
   }
 
-  // Recurse into children
+  // Recurse into children (skip split components — they're self-contained)
   for (const child of node.children) {
+    if (child.splitAs === 'component') continue;
     const childDeps = collectDependencies(child);
     for (const dep of childDeps) {
       deps.add(dep);

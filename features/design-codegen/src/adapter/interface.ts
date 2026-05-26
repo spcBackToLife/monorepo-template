@@ -128,6 +128,20 @@ export interface FrameworkAdapter {
 
   /** Produce templateData for a child component file */
   buildComponentTemplateData(ctx: ComponentFileContext): Record<string, unknown>;
+
+  // ═══ Shared (cross-page) components ═══
+
+  /** Render a complete shared component file (used by pipeline for cross-page shared components) */
+  renderSharedComponent(opts: SharedComponentRenderOpts): string;
+}
+
+export interface SharedComponentRenderOpts {
+  componentName: string;
+  node: NodeIR;
+  hasStyle: boolean;
+  styleFile: string;
+  /** Handlers from the source PageIR that are referenced by events in this node tree */
+  handlers: import('../core/types').HandlerIR[];
 }
 
 export interface FrameworkImportNeeds {

@@ -1,7 +1,5 @@
 
-export interface ProfileUser {
-
-  name: string;
+export interface User {
 
   email: string;
 
@@ -11,16 +9,18 @@ export interface ProfileUser {
 
   joinDate: string;
 
+  displayName: string;
+
 }
 
 
 export interface UserStats {
 
-  totalLikes: number;
+  hours: number;
 
-  totalPlays: number;
+  shared: number;
 
-  totalCreations: number;
+  creations: number;
 
 }
 

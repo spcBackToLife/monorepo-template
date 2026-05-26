@@ -80,6 +80,13 @@ export function parseScreen(screen: Screen): PageIR {
   const handlerCollector: HandlerIR[] = [];
   const rootNode = parseNode(screen.rootNode, dataSources, handlerCollector);
 
+  // 4b. Post-process root node: ensure full-screen flex containers have explicit height.
+  // In the design editor, canvas has a fixed height so `minHeight: 100%` works.
+  // In a real page, flex children with `flex: 1` need the parent to have a definite
+  // height — otherwise the container collapses to content height and the bottom
+  // bar floats up instead of sticking to the viewport bottom.
+  normalizeRootNodeHeight(rootNode);
+
   // 5. Extract onMount (screenEnter event on rootNode)
   const onMount = extractOnMount(screen.rootNode, dataSources);
 
@@ -155,12 +162,19 @@ function extractDataState(screen: Screen): DataStateIR[] {
       }
     }
 
-    // 只从显式 dataTypes 注解读取，不推断
+    // STRICT: Types must come from schema's explicit dataTypes annotation.
+    // If missing, this is a data quality issue — NOT a codegen concern to guess.
     const annotation = dataTypes?.[key];
     if (annotation) {
       type = annotation.isArray ? `${annotation.typeName}[]` : annotation.typeName;
     } else {
-      // 没有类型注解 → 标记为 unknown (上游 schema 应补全)
+      // No type annotation in schema — log warning, mark as unknown.
+      // Root cause: state.data_set_init should have been called with typeAnnotation,
+      // or dataSource.typeDef should define response types. Fix at schema level, not here.
+      console.warn(
+        `[codegen] WARNING: screen "${screen.name}" data key "${key}" has no dataTypes annotation. ` +
+        `Schema writes must include type information. Falling back to 'unknown'.`,
+      );
       type = 'unknown';
     }
 
@@ -236,13 +250,63 @@ function extractParamsFromEndpoint(ds: ApiDataSource): ParamIR[] {
 }
 
 function inferResponseType(ds: ApiDataSource): string | undefined {
-  // 只从显式 typeDef 读取，不推断
+  // Priority 1: explicit typeDef (designer-specified)
   if (ds.typeDef) {
     const { responseName, responseShape } = ds.typeDef;
     return responseShape === 'array' ? `${responseName}[]` : responseName;
   }
-  // 没有 typeDef → 返回 unknown，后续由 AI 补全
+
+  // Priority 2: endpoint.responseSchema (OpenAPI JSON Schema format)
+  const rs = ds.endpoint?.responseSchema;
+  if (rs && typeof rs === 'object' && !Array.isArray(rs)) {
+    const schema = rs as Record<string, unknown>;
+    if (schema.type === 'array' && schema.items) {
+      const items = schema.items as Record<string, unknown>;
+      if (typeof items.$ref === 'string') {
+        return extractTypeName(items.$ref) + '[]';
+      }
+      if (items.type) {
+        return mapJsonSchemaType(items.type as string) + '[]';
+      }
+      return 'unknown[]';
+    }
+    if (schema.type === 'object' || schema.properties) {
+      // Object response: generate a typed name from data source name
+      const typeName = toPascalCase(ds.name) + 'Response';
+      return typeName;
+    }
+  }
+
+  // Priority 3: fallback to mock responseBody shape inference
+  const activeMock = ds.mock?.scenarios?.find(
+    (s) => s.id === ds.mock?.activeScenarioId,
+  );
+  if (activeMock?.responseBody) {
+    const body = activeMock.responseBody;
+    if (Array.isArray(body)) {
+      return 'unknown[]';
+    }
+    if (typeof body === 'object' && body !== null) {
+      return toPascalCase(ds.name) + 'Response';
+    }
+  }
+
   return 'unknown';
+}
+
+/** Extract type name from a $ref like '#/components/schemas/ChatMessage' */
+function extractTypeName(ref: string): string {
+  const parts = ref.split('/');
+  return parts[parts.length - 1] || ref;
+}
+
+/** Map JSON Schema primitive types to TypeScript types */
+function mapJsonSchemaType(schemaType: string): string {
+  const map: Record<string, string> = {
+    string: 'string', number: 'number', integer: 'number',
+    boolean: 'boolean', array: 'unknown[]', object: 'Record<string, unknown>',
+  };
+  return map[schemaType] || 'unknown';
 }
 
 // ─── Node Tree Parsing ──────────────────────────────────────────────────────
@@ -302,8 +366,8 @@ function parseNode(
     repeat,
     visibleWhen,
     componentBoundary: node.componentBoundary,
-    isComponentInstance: node.type.startsWith('component:'),
-    templateId: node.type.startsWith('component:') ? node.type.slice('component:'.length) : undefined,
+    isComponentInstance: isComponentInstanceNode(node),
+    templateId: resolveTemplateId(node),
   };
 }
 
@@ -314,6 +378,31 @@ function resolveTag(type: string): string {
   }
   // Primitive HTML tags pass through directly
   return type;
+}
+
+/**
+ * Determine if a node is a component instance.
+ * Supports two conventions:
+ *   1. type starts with "component:" (explicit component type)
+ *   2. templateRef with mode "reference" (instantiated from asset library)
+ */
+function isComponentInstanceNode(node: ComponentNode): boolean {
+  if (node.type.startsWith('component:')) return true;
+  if (node.templateRef && node.templateRef.mode === 'reference') return true;
+  return false;
+}
+
+/**
+ * Extract the template ID from a component instance node.
+ */
+function resolveTemplateId(node: ComponentNode): string | undefined {
+  if (node.type.startsWith('component:')) {
+    return node.type.slice('component:'.length);
+  }
+  if (node.templateRef && node.templateRef.mode === 'reference') {
+    return node.templateRef.templateId;
+  }
+  return undefined;
 }
 
 // ─── Style Parsing ──────────────────────────────────────────────────────────
@@ -430,20 +519,19 @@ function parseEvents(
 ): EventBindingIR[] {
   if (!node.events || node.events.length === 0) return [];
 
-  const bindings: EventBindingIR[] = [];
-  const seenTriggers = new Set<string>();
-
+  // Deduplicate by trigger: last event with the same trigger wins
+  // (later bindings override earlier ones — handles schema dirty data from
+  // multiple add_navigation calls)
+  const dedupedByTrigger = new Map<string, typeof node.events[number]>();
   for (const event of node.events) {
-    // Skip disabled events
     if (event.disabled) continue;
-
-    // Skip screenEnter/screenExit — handled separately as onMount
     if (event.trigger === 'screenEnter' || event.trigger === 'screenExit') continue;
+    dedupedByTrigger.set(event.trigger, event); // last one wins
+  }
 
-    // Deduplicate: skip if we already have a handler for this trigger on this node
-    if (seenTriggers.has(event.trigger)) continue;
-    seenTriggers.add(event.trigger);
+  const bindings: EventBindingIR[] = [];
 
+  for (const [, event] of dedupedByTrigger) {
     // Generate handler name
     const handlerName = generateHandlerName(node, event.trigger);
 
@@ -460,12 +548,60 @@ function parseEvents(
   return bindings;
 }
 
+/**
+ * Generate a semantic handler name from a node + trigger.
+ *
+ * Priority:
+ *   1. node.name (designer-assigned semantic name)
+ *   2. Role-based heuristic from tag + CSS class patterns
+ *   3. Generic fallback: handle{Trigger}Click / handle{Trigger}Change — NEVER use raw node ID
+ */
 function generateHandlerName(node: ComponentNode, trigger: string): string {
-  const nodePart = node.name
-    ? toPascalCase(node.name)
-    : toPascalCase((node.id || 'node').slice(-6));
-  const triggerPart = toPascalCase(trigger);
-  return `handle${nodePart}${triggerPart}`;
+  if (node.name) {
+    return `handle${toPascalCase(node.name)}${toPascalCase(trigger)}`;
+  }
+
+  // Semantic fallback: infer role from tag + first CSS class
+  const role = inferNodeRole(node);
+  if (role) {
+    return `handle${role}${toPascalCase(trigger)}`;
+  }
+
+  // Ultimate generic fallback — no IDs, just trigger
+  return `handle${toPascalCase(trigger)}`;
+}
+
+/**
+ * Infer a short PascalCase role name from a node's tag and styles.
+ * e.g. <button> with class ".skipButton" → "Skip",
+ *      <div> with class ".tabMessages" → "TabMessages"
+ */
+function inferNodeRole(node: ComponentNode): string | null {
+  // ComponentNode uses 'type' for the HTML tag (not 'tag' — that's NodeIR)
+  const tag = resolveTag(node.type).toLowerCase();
+  // For interactive elements, try to extract a name from CSS classes
+  const styles = node.styles as Record<string, unknown> | undefined;
+  const classes = (styles?.className ?? '') as string;
+  if (classes && typeof classes === 'string') {
+    // Pick the most descriptive class token (longest one that isn't purely numeric)
+    const tokens = classes.split(/\s+/).filter(t => /^[a-zA-Z][a-zA-Z0-9_]*$/.test(t));
+    if (tokens.length > 0) {
+      // Skip generic class names that are likely auto-generated
+      const meaningful = tokens.find(t =>
+        !/^node[a-f0-9]{6}$/i.test(t) && t.length > 2,
+      );
+      if (meaningful) {
+        return toPascalCase(meaningful);
+      }
+    }
+  }
+
+  // Tag-based fallback for common interactive elements
+  if (tag === 'button' || tag === 'a') return 'Button';
+  if (tag === 'input' || tag === 'textarea') return 'Input';
+  if (tag === 'img' || tag === 'image') return 'Image';
+
+  return null;
 }
 
 // ─── Bind Parsing ───────────────────────────────────────────────────────────
@@ -894,7 +1030,8 @@ function serializeDefaultValue(value: unknown): string {
 /**
  * Infer TypeScript interfaces by examining:
  * 1. dataSource.typeDef (explicit type definitions — highest priority)
- * 2. stateInit.dataTypes + stateInit.data (type annotation name + initial value shape)
+ * 2. dataSource endpoint.responseSchema + mock.responseBody (API response shape)
+ * 3. stateInit.dataTypes + stateInit.data (type annotation name + initial value shape)
  *
  * Produces named interfaces like "Message", "ChatSendResponse" etc.
  */
@@ -937,7 +1074,44 @@ function inferTypesFromSchema(screen: Screen): InferredTypeIR[] {
     }
   }
 
-  // Source 2: 从 stateInit.dataTypes + stateInit.data 推断
+  // Source 2: 从 endpoint.responseSchema / mock.responseBody 推断 API 响应包装类型
+  for (const ds of screen.dataSources) {
+    if (ds.type !== 'api') continue;
+    const apiDs = ds as ApiDataSource;
+
+    // Skip if typeDef already handled this
+    if (apiDs.typeDef?.responseName && seen.has(apiDs.typeDef.responseName)) continue;
+
+    const rs = apiDs.endpoint?.responseSchema;
+    const typeName = toPascalCase(apiDs.name) + 'Response';
+
+    if (rs && typeof rs === 'object' && !Array.isArray(rs)) {
+      const schema = rs as Record<string, unknown>;
+      if ((schema.type === 'object' || schema.properties) && !seen.has(typeName)) {
+        seen.add(typeName);
+        const fields = inferFieldsFromResponseSchema(schema);
+        types.push({ name: typeName, fields });
+      }
+      continue;
+    }
+
+    // Fallback: infer from mock responseBody
+    if (!seen.has(typeName)) {
+      const activeMock = apiDs.mock?.scenarios?.find(
+        (s) => s.id === apiDs.mock?.activeScenarioId,
+      );
+      if (activeMock?.responseBody && typeof activeMock.responseBody === 'object' &&
+          !Array.isArray(activeMock.responseBody)) {
+        seen.add(typeName);
+        types.push({
+          name: typeName,
+          fields: inferFieldsFromObject(activeMock.responseBody as Record<string, unknown>),
+        });
+      }
+    }
+  }
+
+  // Source 3: 从 stateInit.dataTypes + stateInit.data 推断
   // dataTypes 提供类型名，data 提供初始值结构（用于推断 fields）
   const dataTypes = screen.stateInit?.dataTypes;
   const dataValues = screen.stateInit?.data;
@@ -971,6 +1145,40 @@ function inferTypesFromSchema(screen: Screen): InferredTypeIR[] {
   }
 
   return types;
+}
+
+/**
+ * Infer TypeScript fields from an OpenAPI JSON Schema responseSchema.
+ * Handles $ref references to extract type names.
+ */
+function inferFieldsFromResponseSchema(schema: Record<string, unknown>): InferredTypeIR['fields'] {
+  const properties = schema.properties as Record<string, unknown> | undefined;
+  if (!properties || typeof properties !== 'object') return [];
+
+  return Object.entries(properties).map(([key, propSchema]) => {
+    const prop = propSchema as Record<string, unknown> | undefined;
+    if (!prop) return { name: key, type: 'unknown' };
+
+    // Handle $ref: { "$ref": "#/components/schemas/ChatMessage" }
+    if (typeof prop.$ref === 'string') {
+      return { name: key, type: extractTypeName(prop.$ref) };
+    }
+
+    // Handle inline type: { "type": "string" } or { "type": "array", "items": {...} }
+    if (prop.type) {
+      let tsType = mapJsonSchemaType(prop.type as string);
+      // Array with items ref
+      if (tsType === 'unknown[]' && prop.items) {
+        const items = prop.items as Record<string, unknown>;
+        if (typeof items.$ref === 'string') {
+          tsType = extractTypeName(items.$ref) + '[]';
+        }
+      }
+      return { name: key, type: tsType };
+    }
+
+    return { name: key, type: 'unknown' };
+  });
 }
 
 /**
@@ -1044,5 +1252,31 @@ function collectMutatedVarsFromSteps(steps: ActionStepIR[], mutated: Set<string>
         if (step.onError) collectMutatedVarsFromSteps(step.onError, mutated);
         break;
     }
+  }
+}
+
+// ─── Root Node Height Normalization ─────────────────────────────────────────
+
+/**
+ * Ensure full-screen flex page containers have a definite height.
+ *
+ * Problem: In the design editor, the canvas constrains height, so
+ * `minHeight: 100%` on the root + `flex: 1` on a child works perfectly.
+ * In a real browser, the root is a normal block/flex element whose height
+ * is determined by content unless explicitly set. Without `height: 100%`,
+ * `flex: 1` children cannot expand to fill remaining space, causing
+ * sticky footers / bottom bars to float up.
+ *
+ * Fix: If root has `minHeight: 100%` + `display: flex` but no explicit
+ * `height`, inject `height: 100%`.
+ */
+function normalizeRootNodeHeight(rootNode: NodeIR): void {
+  const s = rootNode.staticStyles;
+  const hasMinHeight100 = s.minHeight === '100%' || s.minHeight === '100vh';
+  const isFlex = s.display === 'flex';
+  const hasNoHeight = !s.height;
+
+  if (hasMinHeight100 && isFlex && hasNoHeight) {
+    s.height = '100%';
   }
 }

@@ -17,6 +17,7 @@ export type { PrimitiveRendererProps } from './renderers/PrimitiveRenderer';
 
 // ===== Style Resolution =====
 export { resolveStyles, resolveNodeStyles } from './styles/resolveStyles';
+export { resolveTokenValue, resolveTokensInStyles } from './styles/resolveTokens';
 export { resolveActiveState } from './styles/resolveState';
 export { resolveNodeProps } from './styles/resolveProps';
 export type { ResolvedProps } from './styles/resolveProps';

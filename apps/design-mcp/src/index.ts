@@ -26,6 +26,9 @@ import { registerMaterialProjectTools } from './tools/domain/material-project.js
 import { registerMaterialSlotTools } from './tools/domain/material-slot.js';
 import { registerCanvasTools } from './tools/domain/canvas.js';
 
+// ── 主题工具 ──
+import { registerThemeTools } from './tools/domain/theme.js';
+
 // ── 保留的快捷工具（不合并，高频使用）──────────
 import { registerSnapshotTools } from './tools/snapshot-tools.js';
 import { registerBatchTool } from './tools/batch.js';
@@ -37,6 +40,7 @@ import { registerDatasourceResources } from './resources/datasource-resources.js
 import { registerStateResources } from './resources/state-resources.js';
 import { registerTemplateResources } from './resources/template-resources.js';
 import { registerMaterialResources } from './resources/material-resources.js';
+import { registerThemeResources } from './resources/theme-resources.js';
 
 const server = new McpServer({
   name: '@globallink/design-mcp',
@@ -85,6 +89,7 @@ registerMaterialTools(server);                 // material
 registerMaterialProjectTools(server);          // material_project
 registerMaterialSlotTools(server);             // material_slot
 registerCanvasTools(server);                   // canvas
+registerThemeTools(server);                    // theme
 
 // ===== Shortcut / Recipe tools =====
 registerSnapshotTools(server);                 // generate_snapshots
@@ -97,6 +102,7 @@ registerDatasourceResources(server);
 registerStateResources(server);                // state://screen | state://project（v2）
 registerTemplateResources(server);
 registerMaterialResources(server);
+registerThemeResources(server);                // theme://project/{projectId}
 
 // ===== Start =====
 async function main(): Promise<void> {

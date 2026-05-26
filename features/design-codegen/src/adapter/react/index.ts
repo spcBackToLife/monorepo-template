@@ -177,7 +177,19 @@ export class ReactAdapter implements FrameworkAdapter {
   emitRepeat(repeat: RepeatIR, indent: number): string {
     const pad = makeIndent(indent);
     const { dataExpression, itemName, indexName, template } = repeat;
-    const templateStr = this.renderNodeDeep(template, indent + 2);
+
+    // If the repeat template was split into its own component, emit a component
+    // reference instead of inlining the entire subtree (which would lack styles
+    // since plan-style.ts skips split-component nodes from the page .less).
+    let templateStr: string;
+    if (template.splitAs === 'component' && template.splitComponentName) {
+      const innerPad = makeIndent(indent + 2);
+      const componentName = template.splitComponentName;
+      // Pass item and index as props to the split component
+      templateStr = `${innerPad}<${componentName} ${itemName}={${itemName}} ${indexName}={${indexName}} />`;
+    } else {
+      templateStr = this.renderNodeDeep(template, indent + 2);
+    }
 
     // Determine key expression: use item.id if exists, fallback to index
     const keyAttr = ` key={${itemName}.id ?? ${indexName}}`;
@@ -469,6 +481,57 @@ export class ReactAdapter implements FrameworkAdapter {
 
   buildComponentTemplateData(ctx: ComponentFileContext): Record<string, unknown> {
     return emitPlanFns.buildComponentTemplateData(ctx, this);
+  }
+
+  renderSharedComponent(opts: import('../interface').SharedComponentRenderOpts): string {
+    const { componentName, node, hasStyle, styleFile, handlers } = opts;
+    const lines: string[] = [];
+
+    // Determine if navigate is needed
+    const hasNavigation = handlers.some(h =>
+      h.steps.some(s => s.kind === 'navigate' || s.kind === 'navigate-back'),
+    );
+
+    // Imports
+    lines.push("import React from 'react';");
+    if (hasNavigation) {
+      lines.push("import { useNavigate } from 'react-router-dom';");
+    }
+    if (hasStyle) {
+      lines.push(`import styles from './${styleFile}';`);
+    }
+    lines.push('');
+
+    // Component function
+    lines.push(`export function ${componentName}() {`);
+
+    // Navigation hook
+    if (hasNavigation) {
+      lines.push('  const navigate = useNavigate();');
+      lines.push('');
+    }
+
+    // Handler functions (from HandlerIR)
+    for (const handler of handlers) {
+      const bodyLines = emitHandlerBody(handler.steps, 2);
+      const asyncPrefix = handler.isAsync ? 'async ' : '';
+      lines.push(`  const ${handler.name} = ${asyncPrefix}() => {`);
+      for (const line of bodyLines) {
+        lines.push(`    ${line}`);
+      }
+      lines.push('  };');
+      lines.push('');
+    }
+
+    // Render JSX
+    const jsx = this.renderTree(node, 2);
+    lines.push('  return (');
+    lines.push(jsx);
+    lines.push('  );');
+    lines.push('}');
+    lines.push('');
+
+    return lines.join('\n');
   }
 }
 

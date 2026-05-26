@@ -1,8 +1,7 @@
 import styles from './index.module.less';
-import type { UserInfo } from '../../types';
 
 interface HomeHeaderProps {
-  user: UserInfo;
+  user: unknown;
 }
 
 

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { PageWrapper } from './components/PageWrapper';
-import type { ProfileUser, UserStats } from './types';
 import styles from './index.module.less';
 
 export function ProfileMyAccount() {
-  const [user] = useState<ProfileUser>({"name":"","email":"","isPro":false,"avatar":"","joinDate":""});
-  const [stats] = useState<UserStats>({"totalLikes":0,"totalPlays":0,"totalCreations":0});
+  const [user] = useState({"email":"","isPro":false,"avatar":"","joinDate":"","displayName":""});
+  const [stats] = useState({"hours":0,"shared":0,"creations":0});
 
 
 

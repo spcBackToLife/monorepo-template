@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ContentCard } from './components/ContentCard';
-import type { Slide } from './types';
 import styles from './index.module.less';
 
 export function WelcomeOnboarding() {
   const [welcomePagerIndex, setWelcomePagerIndex] = useState<string>("0");
-  const [slide] = useState<Slide>({"title":"Your Music, Your Imagination\nAI Makes It Real.","eyebrow":"Welcome to","description":"Create your own music with the help of AI. Choose a genre, set a mood, and let AI create your song!","emptyBanner":""});
+  const [slide] = useState({"title":"Your Music, Your Imagination\nAI Makes It Real.","eyebrow":"Welcome to","description":"Create your own music with AI","emptyBanner":""});
 
   const navigate = useNavigate();
 
@@ -15,11 +14,11 @@ export function WelcomeOnboarding() {
   setWelcomePagerIndex("0");
 };
 
-  const handle7b28a3Click = () => {
+  const handleDotIndicator2Click = () => {
   setWelcomePagerIndex("1");
 };
 
-  const handle8ab03fClick = () => {
+  const handleDotIndicator3Click = () => {
   setWelcomePagerIndex("2");
 };
 
@@ -37,8 +36,8 @@ export function WelcomeOnboarding() {
       <ContentCard
         slide={slide}
         handleDotIndicatorClick={handleDotIndicatorClick}
-        handle7b28a3Click={handle7b28a3Click}
-        handle8ab03fClick={handle8ab03fClick}
+        handleDotIndicator2Click={handleDotIndicator2Click}
+        handleDotIndicator3Click={handleDotIndicator3Click}
         handleSkipButtonClick={handleSkipButtonClick}
         handleNextButtonClick={handleNextButtonClick}
       />

@@ -4,14 +4,14 @@
  * Generates Less/CSS content from static styles on nodes.
  * Framework-agnostic (CSS is universal).
  *
- * Key design: detects class name collisions among sibling/cousin nodes and
- * disambiguates by prefixing with the parent node's name.
- * E.g., three "tabIcon" children under homeTab / messagesTab / historyTab
- * become: homeTabTabIcon, messagesTabTabIcon, historyTabTabIcon.
- *
- * This is necessary because CSS Modules hashes class names per-file:
- * two `.tabIcon` in the same .less file get the SAME hash, causing
- * last-definition-wins. Unique names → unique hashes → correct styles.
+ * Naming strategy: "sequential dedup"
+ *   - Each node's class name is derived from its schema name (toCamelCase).
+ *   - Within a single .less file scope, if the same name appears multiple times,
+ *     the 2nd/3rd/... occurrence gets a numeric suffix: menuItem, menuItem2, menuItem3.
+ *   - This guarantees uniqueness within a CSS Modules file while keeping names
+ *     short and readable.
+ *   - The resolved name is written to node._resolvedClassName ONCE and never
+ *     overwritten, ensuring JSX emit (via resolveClassName()) stays in sync.
  *
  * @see design_docs/03-tech/codegen-quality-fix.md — Phase 1
  */
@@ -28,76 +28,53 @@ import { normalizeCssValue, camelToKebab } from './css-normalizer';
  *   Used by the page-level style file to avoid duplicating component styles.
  */
 export function generateLessFromNode(rootNode: NodeIR, skipSplitChildren = false): string {
-  // Phase 1: Collect all raw class names to detect collisions
-  const nameCount = new Map<string, number>();
-  countClassNames(rootNode, nameCount, skipSplitChildren);
-  const duplicateNames = new Set(
-    Array.from(nameCount.entries())
-      .filter(([, count]) => count > 1)
-      .map(([name]) => name),
-  );
+  // Single pass: walk tree in document order, assign unique class names using
+  // a "seen" counter map, then emit Less.
+  const seen = new Map<string, number>();
+  assignClassNames(rootNode, seen, skipSplitChildren);
 
-  // Phase 2: Walk tree and assign unique class names.
-  // Nodes whose raw name collides get prefixed with parent's name.
-  assignUniqueClassNames(rootNode, duplicateNames, null, skipSplitChildren);
-
-  // Phase 3: Emit flat Less using the resolved unique class names
+  // Emit flat Less
   const lines: string[] = [];
   collectStyles(rootNode, lines, skipSplitChildren);
   return lines.join('\n');
 }
 
 /**
- * Count how many times each raw class name appears across the entire tree.
+ * Walk tree in document order and assign `_resolvedClassName` to each styled node.
+ *
+ * Uses a sequential dedup strategy:
+ *   - First occurrence of "menuItem" → "menuItem"
+ *   - Second → "menuItem2"
+ *   - Third → "menuItem3"
+ *
+ * Only writes _resolvedClassName if it hasn't been set yet (idempotent).
  */
-function countClassNames(node: NodeIR, counts: Map<string, number>, skipSplit: boolean): void {
-  if (Object.keys(node.staticStyles).length > 0) {
-    const rawName = rawClassName(node);
-    counts.set(rawName, (counts.get(rawName) || 0) + 1);
-  }
-  for (const child of node.children) {
-    if (skipSplit && child.splitAs === 'component') continue;
-    countClassNames(child, counts, skipSplit);
-  }
-  if (node.repeat) {
-    if (skipSplit && node.repeat.template.splitAs === 'component') return;
-    countClassNames(node.repeat.template, counts, skipSplit);
-  }
-}
-
-/**
- * Walk the tree and assign `_resolvedClassName` to each styled node.
- * If a node's raw class name is in the duplicate set and it has a named parent,
- * prefix with the parent's name to make it unique.
- */
-function assignUniqueClassNames(
+function assignClassNames(
   node: NodeIR,
-  duplicates: Set<string>,
-  parentName: string | null,
+  seen: Map<string, number>,
   skipSplit: boolean,
 ): void {
-  if (Object.keys(node.staticStyles).length > 0) {
+  // Only assign if node has static styles AND hasn't been named yet
+  if (Object.keys(node.staticStyles).length > 0 && !(node as NodeIRWithResolved)._resolvedClassName) {
     const raw = rawClassName(node);
-    if (duplicates.has(raw) && parentName) {
-      // Prefix with parent name: "homeTab" + "TabIcon" → "homeTabTabIcon"
-      const prefixed = parentName + raw.charAt(0).toUpperCase() + raw.slice(1);
-      (node as NodeIRWithResolved)._resolvedClassName = prefixed;
-    } else {
-      (node as NodeIRWithResolved)._resolvedClassName = raw;
-    }
+    const count = (seen.get(raw) || 0) + 1;
+    seen.set(raw, count);
+
+    // First occurrence: use raw name; subsequent: append count
+    const resolved = count === 1 ? raw : `${raw}${count}`;
+    (node as NodeIRWithResolved)._resolvedClassName = resolved;
   }
 
-  // Determine the "name context" for children — use this node's resolved or raw name
-  const currentName = (node as NodeIRWithResolved)._resolvedClassName
-    || (node.name ? toCamelCase(node.name) : null);
-
+  // Recurse children
   for (const child of node.children) {
     if (skipSplit && child.splitAs === 'component') continue;
-    assignUniqueClassNames(child, duplicates, currentName, skipSplit);
+    assignClassNames(child, seen, skipSplit);
   }
+
+  // Recurse repeat template
   if (node.repeat) {
     if (skipSplit && node.repeat.template.splitAs === 'component') return;
-    assignUniqueClassNames(node.repeat.template, duplicates, currentName, skipSplit);
+    assignClassNames(node.repeat.template, seen, skipSplit);
   }
 }
 
@@ -127,14 +104,11 @@ function collectStyles(node: NodeIR, out: string[], skipSplit: boolean): void {
 
 /**
  * Compute the raw (un-prefixed) class name for a node.
- * Schema nodes MUST have a name; if missing, it's a schema data bug.
- * Using node ID as fallback is intentional to make the issue visible.
  */
 function rawClassName(node: NodeIR): string {
   if (node.name) {
     return toCamelCase(node.name);
   }
-  // Schema bug: node has no name — use ID suffix to make the issue visible
   return `node${node.id.slice(-6)}`;
 }
 

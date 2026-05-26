@@ -557,6 +557,44 @@ export class EditorStore {
     });
   }
 
+  // ===== Theme Management =====
+
+  /** 切换当前激活的主题 */
+  switchTheme(themeId: string): void {
+    if (!this.projectState?.themeConfig) return;
+    runInAction(() => {
+      this.projectState!.themeConfig!.activeThemeId = themeId;
+    });
+    this.persistThemeConfig();
+  }
+
+  /** 切换当前主题内的色彩方案（light/dark） */
+  switchColorScheme(schemeId: string): void {
+    if (!this.projectState?.themeConfig) return;
+    const theme = this.projectState.themeConfig.themes.find(
+      t => t.id === this.projectState!.themeConfig!.activeThemeId,
+    );
+    if (!theme) return;
+    runInAction(() => {
+      theme.activeColorSchemeId = schemeId;
+    });
+    this.persistThemeConfig();
+  }
+
+  /** 持久化 themeConfig 到后端（不走 operation 流程） */
+  private async persistThemeConfig(): Promise<void> {
+    if (!this.projectState?.id || !this.projectState.themeConfig) return;
+    try {
+      await apiJson(`/projects/${this.projectState.id}/theme`, {
+        method: 'PUT',
+        body: JSON.stringify({ themeConfig: this.projectState.themeConfig }),
+        token: authStore.token,
+      });
+    } catch (err) {
+      console.error('[editor] failed to persist themeConfig:', err);
+    }
+  }
+
   /** Selection */
   select(nodeId: string | null): void {
     const next = nodeId ? [nodeId] : [];

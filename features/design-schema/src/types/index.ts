@@ -90,3 +90,26 @@ export type { PropType, ComponentPropDefinition, PropBinding } from './props';
 
 // ===== Envelope =====
 export type { OperationEnvelope } from './envelope';
+
+// ===== Theme =====
+export type {
+  AestheticTag,
+  StyleIntent,
+  ColorToken,
+  SpacingToken,
+  RadiusToken,
+  TypographyToken,
+  ShadowToken,
+  TransitionToken,
+  CustomToken,
+  ColorTokenGroup,
+  DesignTokenSet,
+  TokenOverrides,
+  ThemeVariant,
+  ColorScheme,
+  ThemeDefinition,
+  BackgroundRule,
+  DecorationRules,
+  ComponentStateSpec,
+  ThemeConfig,
+} from './theme';

@@ -47,7 +47,7 @@ export function migrateV1toV2(raw: unknown): DesignProject {
     ? (v1.componentAssets as unknown[])
     : [];
 
-  return {
+  const result: DesignProject = {
     id: typeof v1.id === 'string' ? v1.id : '',
     name: typeof v1.name === 'string' ? v1.name : '',
     platform:
@@ -65,6 +65,13 @@ export function migrateV1toV2(raw: unknown): DesignProject {
     updatedAt:
       typeof v1.updatedAt === 'string' ? v1.updatedAt : new Date(0).toISOString(),
   };
+
+  // 保留 themeConfig（如果快照中已有）
+  if (v1.themeConfig && typeof v1.themeConfig === 'object') {
+    result.themeConfig = v1.themeConfig as DesignProject['themeConfig'];
+  }
+
+  return result;
 }
 
 // ===== Screen =====

@@ -85,10 +85,33 @@ export type {
   PropBinding,
   // Envelope
   OperationEnvelope,
+  // Theme
+  AestheticTag,
+  StyleIntent,
+  ColorToken,
+  SpacingToken,
+  RadiusToken,
+  TypographyToken,
+  ShadowToken,
+  TransitionToken,
+  CustomToken,
+  ColorTokenGroup,
+  DesignTokenSet,
+  TokenOverrides,
+  ThemeVariant,
+  ColorScheme,
+  ThemeDefinition,
+  BackgroundRule,
+  DecorationRules,
+  ComponentStateSpec,
+  ThemeConfig,
 } from './types';
 
 // Expression 运行期工具（既是类型也是 runtime）
 export { expr, isExpression, normalizeExpression } from './types';
+
+// ===== Theme Defaults =====
+export { DEFAULT_THEME_CONFIG } from './presets/theme-defaults';
 
 // ===== Viewport Presets =====
 export {

@@ -329,6 +329,13 @@ export const Toolbar = observer(function Toolbar() {
           onClick={() => navigate('overview')}
           title="项目资源总览"
         />
+        <Button
+          type="text"
+          onClick={() => navigate('theme')}
+          title="主题风格中心"
+        >
+          🎨
+        </Button>
         {/* 「产品全景 PRD」按钮已随 v1 Blueprint 模块一并移除，待 D.6 按 v2 schema 重写后恢复 */}
         <Button
           type="text"

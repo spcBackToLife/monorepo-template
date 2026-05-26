@@ -1,6 +1,7 @@
-import type { CSSProperties, ComponentNode, ExpressionStyles } from '@globallink/design-schema';
+import type { CSSProperties, ComponentNode, ExpressionStyles, ThemeConfig } from '@globallink/design-schema';
 import type { DataContext } from '../data/dataContext';
 import { hasExpression, resolveExpression } from '../data/dataContext';
+import { resolveTokensInStyles } from './resolveTokens';
 
 /**
  * Convert design-schema CSSProperties to React.CSSProperties.
@@ -36,6 +37,7 @@ const UNITLESS_PROPERTIES = new Set([
 export function resolveStyles(
   styles: CSSProperties | ExpressionStyles,
   dataContext: DataContext,
+  themeConfig?: ThemeConfig | null,
 ): React.CSSProperties {
   // `background` shorthand resets background-color when both appear on the same inline style.
   // Layer merges can leave both; prefer explicit backgroundColor unless background is a gradient/image.
@@ -56,25 +58,29 @@ export function resolveStyles(
     delete merged.background;
   }
 
+  // Layer 0: Token 解析（在表达式求值之前）
+  // "$token:primary" → "#667eea"
+  const tokenResolved = resolveTokensInStyles(merged, themeConfig);
+
   // 求表达式
-  for (const key of Object.keys(merged)) {
-    const v = merged[key];
+  for (const key of Object.keys(tokenResolved)) {
+    const v = tokenResolved[key];
     if (typeof v === 'string' && hasExpression(v)) {
       const resolved = resolveExpression(v, dataContext);
       if (typeof resolved === 'number' || typeof resolved === 'string' || resolved === undefined) {
-        merged[key] = resolved;
+        tokenResolved[key] = resolved;
       } else if (resolved === null) {
-        merged[key] = undefined;
+        tokenResolved[key] = undefined;
       } else {
         // 数组/对象不是合法 CSS 值
-        merged[key] = String(resolved);
+        tokenResolved[key] = String(resolved);
       }
     }
   }
 
   const resolved: Record<string, string | number | undefined> = {};
 
-  for (const [key, value] of Object.entries(merged)) {
+  for (const [key, value] of Object.entries(tokenResolved)) {
     if (value === undefined) continue;
 
     if (typeof value === 'number' && !UNITLESS_PROPERTIES.has(key)) {
@@ -116,6 +122,8 @@ export function resolveNodeStyles(
   interactionState?: string | null,
   /** State override from parent's childrenStates mapping */
   parentStateOverride?: string | null,
+  /** 项目主题配置，用于解析 $token:xxx 引用 */
+  themeConfig?: ThemeConfig | null,
 ): React.CSSProperties {
   // Layer 1: base styles
   let merged: ExpressionStyles = { ...node.styles };
@@ -149,5 +157,5 @@ export function resolveNodeStyles(
     }
   }
 
-  return resolveStyles(merged, dataContext);
+  return resolveStyles(merged, dataContext, themeConfig);
 }

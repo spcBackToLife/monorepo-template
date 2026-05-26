@@ -1,8 +1,7 @@
 import styles from './index.module.less';
-import type { Message } from '../../types';
 
 interface MessageItemProps {
-  item: Message;
+  item: unknown;
   index: number;
 }
 

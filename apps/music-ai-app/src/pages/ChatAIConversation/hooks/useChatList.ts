@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { chatList, chatSend } from '../../../services/chat';
-import type { Message } from '../types';
 
 export function useChatList() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<unknown>([{"id":"msg_1","role":"user","text":"Hello!"}]);
   const [inputDraft, setInputDraft] = useState<string>("");
   const [isChatListLoading, setIsChatListLoading] = useState(false);
 

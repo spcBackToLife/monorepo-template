@@ -2,6 +2,7 @@ import type { Screen } from './screen';
 import type { Viewport } from './viewport';
 import type { ComponentTemplate } from './template';
 import type { GlobalStateInit } from './state';
+import type { ThemeConfig } from './theme';
 
 /** Top-level design project — aggregates all screens, viewports, and assets（v2） */
 export interface DesignProject {
@@ -23,6 +24,8 @@ export interface DesignProject {
   componentAssets: ComponentTemplate[];
   /** 项目级全局 state（替换 v1 environmentStates） */
   globalStateInit?: GlobalStateInit;
+  /** 主题风格配置（项目级唯一） */
+  themeConfig?: ThemeConfig;
   /** ISO timestamp */
   createdAt: string;
   /** ISO timestamp */

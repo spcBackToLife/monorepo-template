@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Param,
   Body,
@@ -37,5 +38,22 @@ export class ProjectsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.projects.remove(id);
+  }
+
+  // ===== Theme API =====
+
+  /** GET /api/projects/:id/theme — 获取项目主题配置 */
+  @Get(':id/theme')
+  getTheme(@Param('id') id: string) {
+    return this.projects.getTheme(id);
+  }
+
+  /** PUT /api/projects/:id/theme — 更新项目主题配置（全量替换） */
+  @Put(':id/theme')
+  updateTheme(
+    @Param('id') id: string,
+    @Body() body: { themeConfig: unknown },
+  ) {
+    return this.projects.updateTheme(id, body.themeConfig);
   }
 }

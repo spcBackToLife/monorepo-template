@@ -671,6 +671,22 @@ export async function deleteSlot(
   });
 }
 
+// ===== Theme =====
+
+export async function getTheme(projectId: string): Promise<unknown> {
+  return request(`/api/projects/${projectId}/theme`);
+}
+
+export async function updateTheme(
+  projectId: string,
+  themeConfig: unknown,
+): Promise<unknown> {
+  return request(`/api/projects/${projectId}/theme`, {
+    method: 'PUT',
+    body: { themeConfig },
+  });
+}
+
 // Default export for compatibility with dynamic import().default patterns used in domain tools
 const apiClient = {
   getProject, listProjects, deleteProject,
@@ -687,6 +703,7 @@ const apiClient = {
   getMaterialEditorPresets, getMaterialEditorCapabilities,
   findSlotsByNode, findSlot, createSlot, updateSlot, deleteSlot,
   uploadExportedMaterial,
+  getTheme, updateTheme,
 };
 export { apiClient };
 export { apiClient as default };

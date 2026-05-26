@@ -1,11 +1,11 @@
 import { request } from '@/utils/request';
 
-import type { Message, ChatSendResponse } from '../pages/ChatAIConversation/types';
+import type { ChatSendResponse } from '../pages/ChatAIConversation/types';
 
 
 
 /** 拉取历史消息（screenEnter 自动触发） */
-export async function chatList(): Promise<Message[]> {
+export async function chatList(): Promise<ChatMessage[]> {
   return request({
     method: 'GET',
     url: '/chat/list',
