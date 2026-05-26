@@ -179,6 +179,55 @@ lg: 0 0 32px rgba(primaryR, primaryG, primaryB, 0.25)
 | brutalist | 1.0 | +0%(换色) | same | 3px black |
 | playful | 1.05 | +8% | up | 2px primary + animated |
 
+### Phase 5b: 图标规格推导（IconSpec）
+
+根据 aesthetics 标签和装饰密度推导 `iconSpec`：
+
+| 风格 | style | strokeWidth | linecap | linejoin | cornerRadius | complexity | geometric |
+|------|-------|-------------|---------|----------|-------------|-----------|-----------|
+| minimal/flat | outline | 1.5 | round | round | 0 | simple | true |
+| glassmorphism | outline | 1.5 | round | round | 1 | medium | false |
+| luxury | solid | — | — | — | — | medium | false |
+| futuristic | outline | 1.5 | butt | miter | 0 | medium | true |
+| organic/hand-drawn | outline | 2.0 | round | round | 2 | detailed | false |
+| brutalist | glyph | 2.5 | square | miter | 0 | simple | true |
+| playful | duotone | 1.5 | round | round | 1 | medium | false |
+| corporate | outline | 1.5 | round | round | 0 | simple | true |
+
+**颜色推导**：
+```
+colors.default   = $token:textSecondary（大多数风格）
+colors.active    = $token:primary
+colors.inactive  = $token:textTertiary
+colors.secondary = $token:primaryLight（duotone 模式的填充层）
+
+特殊情况：
+- luxury → colors.default 可用 $token:primary（金色图标）
+- futuristic → colors.default 可用 primary 的低透明度版本
+- colorful → palette 取 [primary, secondary, success, warning, info]
+```
+
+**尺寸推导**：
+```
+containerRatio:
+  - simple 图标 → 0.50（留更多呼吸空间）
+  - medium 图标 → 0.55
+  - detailed 图标 → 0.60（需要更多绘制空间）
+
+minPadding:
+  - 小图标(≤24px) → 4px
+  - 中图标(24~48px) → 6px
+  - 大图标(>48px) → 8px
+```
+
+**状态变体推导**：
+```
+inactive: { opacity: 0.5~0.6, color: textTertiary }
+active:   { opacity: 1.0, strokeWidth: +0.3(outline), color: primary }
+hover:    { opacity: 0.8~0.9 }
+disabled: { opacity: 0.3, grayscale: brightness==='dark' ? false : true }
+```
+
 ### Phase 6: 输出
 
 调用 MCP 工具 `theme/update`，传入完整的 ThemeConfig JSON：
@@ -192,6 +241,7 @@ theme/update {
     themes: [{ id: "default", ... }, { id: "dark", ... }],
     activeThemeId: "default",
     decorationRules: { ... },
+    iconSpec: { style, stroke: {...}, colors: {...}, sizing: {...}, variants: {...}, consistency: {...} },
     stateSpec: { ... }
   }
 }
