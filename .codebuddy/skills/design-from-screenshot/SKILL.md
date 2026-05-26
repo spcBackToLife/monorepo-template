@@ -133,6 +133,30 @@ path 的 pathData: 坐标相对于对象自身的 viewBox(0,0,width,height)（I-
 不用 group（I-6），文字用 path 不用 textbox（I-7）
 ```
 
+**图标绘制必须从 ThemeConfig.iconSpec 读取参数**（零自由度）：
+
+```
+theme / get → iconSpec = {
+  style,                      // 决定用 stroke 还是 fill
+  stroke.width,               // 直接用作 strokeWidth 参数
+  stroke.linecap,             // 影响 pathData 端点设计
+  stroke.linejoin,            // 影响 pathData 转角设计
+  colors.default/active/inactive,  // 解析 $token 引用后用作 stroke/fill 色值
+  sizing.containerRatio,      // 绘图区域 = refFrame × containerRatio
+  sizing.minPadding,          // pathData 坐标必须 ≥ minPadding 且 ≤ (size-minPadding)
+  consistency.targetComplexity, // 控制笔画数量
+  consistency.geometricOnly   // 是否只用直线+圆弧
+}
+```
+
+**绘图区域计算**：
+```
+参考框尺寸 = 目标节点尺寸（如 32×32）
+padding = max(iconSpec.sizing.minPadding, 参考框 × (1-containerRatio) / 2)
+绘图区域 = (padding, padding) ~ (参考框-padding, 参考框-padding)
+pathData 所有坐标必须落在此区域内
+```
+
 ### Step 7: 导出后清理
 
 ```
