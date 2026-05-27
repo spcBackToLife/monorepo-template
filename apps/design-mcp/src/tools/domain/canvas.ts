@@ -997,8 +997,12 @@ export function registerCanvasTools(server: McpServer): void {
         }
 
         // 🔒 将每个对象从「前端画布坐标」转换为「参考框内局部坐标」后再渲染到 rw×rh 画布
+        // ★ 跳过默认矩形（fill:#ffffff, 铺满参考框），避免导出 PNG 产生白底
+        const defaultId = schema.defaultElementId;
         const flatObjects = expandMaterialGroupsForServerRender(objects);
         for(const rawObj of flatObjects){
+          // 跳过默认矩形 — 它仅用于编辑器画布显示组件边界，不应出现在导出产物中
+          if (defaultId && rawObj.id === defaultId) continue;
           // 浅拷贝，避免修改原 schema 对象
           const obj = { ...rawObj };
           if(obj.x != null) obj.x = Number(obj.x) - rfx;
