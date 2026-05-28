@@ -266,6 +266,15 @@ function generateEventHandlerBody(evt: ComponentEvent, stateNodes: Map<string, s
       case 'ui.delay':
         parts.push(`/* ui.delay: ${action.duration}ms */`);
         break;
+      case 'ui.startTimer':
+        parts.push(`/* ui.startTimer: ${action.timerId} for ${action.duration}ms */`);
+        break;
+      case 'ui.stopTimer':
+        parts.push(`/* ui.stopTimer: ${action.timerId} */`);
+        break;
+      case 'ui.resetTimer':
+        parts.push(`/* ui.resetTimer: ${action.timerId} */`);
+        break;
       case 'custom':
         parts.push(`/* custom: ${action.handler} */`);
         break;
@@ -312,6 +321,12 @@ function actionSummary(a: Action): string {
       return `ui.showToast:${a.toastType}`;
     case 'ui.delay':
       return `ui.delay:${a.duration}ms`;
+    case 'ui.startTimer':
+      return `ui.startTimer:${a.timerId}`;
+    case 'ui.stopTimer':
+      return `ui.stopTimer:${a.timerId}`;
+    case 'ui.resetTimer':
+      return `ui.resetTimer:${a.timerId}`;
     case 'custom':
       return `custom:${a.handler}`;
     default:

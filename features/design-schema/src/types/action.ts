@@ -123,6 +123,35 @@ export interface UiDelayAction {
   duration: number;
 }
 
+/** ui.startTimer — 启动计时器，支持单次延迟或循环执行 */
+export interface UiStartTimerAction {
+  type: 'ui.startTimer';
+  /** 计时器唯一标识 */
+  timerId: string;
+  /** 总运行时长（ms） */
+  duration: number;
+  /** 循环间隔（ms），不传或 ≤ 0 则单次执行 */
+  interval?: number;
+  /** 每个 interval 周期触发的动作链（仅 interval > 0 时生效） */
+  onTick?: Action[];
+  /** 计时完成后执行的动作链 */
+  onComplete?: Action[];
+  /** 启动时是否自动取消同 id 的旧计时器（默认 true） */
+  autoCancel?: boolean;
+}
+
+/** ui.stopTimer — 停止指定计时器 */
+export interface UiStopTimerAction {
+  type: 'ui.stopTimer';
+  timerId: string;
+}
+
+/** ui.resetTimer — 重置指定计时器（停止后需重新启动） */
+export interface UiResetTimerAction {
+  type: 'ui.resetTimer';
+  timerId: string;
+}
+
 // ===== 自定义扩展 =====
 
 export interface CustomAction {
@@ -185,6 +214,9 @@ export type Action =
   | UiShowToastAction
   | UiOpenUrlAction
   | UiDelayAction
+  | UiStartTimerAction
+  | UiStopTimerAction
+  | UiResetTimerAction
   | LogicIfAction
   | LogicSwitchAction
   | CustomAction;

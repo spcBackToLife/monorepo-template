@@ -29,6 +29,8 @@ import type {
   StateToggleAction,
   LogicIfAction,
   LogicSwitchAction,
+  UiStartTimerAction,
+  UiStopTimerAction,
 } from '@globallink/design-schema';
 import { reduceStateAction } from './Reducer';
 import type { Store } from './Store';
@@ -66,7 +68,106 @@ export interface DispatcherDeps {
   host?: HostAdapters;
 }
 
+/**
+ * 计时器管理器
+ * 维护所有活动的计时器，支持延迟执行和循环执行
+ */
+class TimerManager {
+  private timers = new Map<string, {
+    timeoutId: ReturnType<typeof setTimeout>;
+    intervalId?: ReturnType<typeof setInterval>;
+    startTime: number;
+    duration: number;
+  }>();
+
+  async run(
+    action: UiStartTimerAction,
+    dispatcher: Dispatcher,
+    ctx: EvalContext,
+  ): Promise<void> {
+    // 若已存在同 id 的计时器，停止旧的
+    const autoCancel = action.autoCancel !== false; // 默认 true
+    if (autoCancel) {
+      this.stop(action.timerId);
+    }
+
+    const startTime = Date.now();
+
+    if (action.interval && action.interval > 0) {
+      // 循环执行模式：每 interval ms 执行一次 onTick，直到 duration 超时
+      const intervalId = setInterval(async () => {
+        if (action.onTick && action.onTick.length > 0) {
+          try {
+            await dispatcher.run(action.onTick, ctx);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn('[TimerManager] onTick execution failed:', err);
+          }
+        }
+      }, action.interval);
+
+      const timeoutId = setTimeout(() => {
+        clearInterval(intervalId);
+        if (action.onComplete && action.onComplete.length > 0) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            dispatcher.run(action.onComplete, ctx);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn('[TimerManager] onComplete execution failed:', err);
+          }
+        }
+        this.timers.delete(action.timerId);
+      }, action.duration);
+
+      this.timers.set(action.timerId, { timeoutId, intervalId, startTime, duration: action.duration });
+    } else {
+      // 单次执行模式：duration 后执行 onComplete
+      const timeoutId = setTimeout(() => {
+        if (action.onComplete && action.onComplete.length > 0) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            dispatcher.run(action.onComplete, ctx);
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn('[TimerManager] onComplete execution failed:', err);
+          }
+        }
+        this.timers.delete(action.timerId);
+      }, action.duration);
+
+      this.timers.set(action.timerId, { timeoutId, startTime, duration: action.duration });
+    }
+  }
+
+  stop(timerId: string): void {
+    const timer = this.timers.get(timerId);
+    if (timer) {
+      clearTimeout(timer.timeoutId);
+      if (timer.intervalId) {
+        clearInterval(timer.intervalId);
+      }
+      this.timers.delete(timerId);
+    }
+  }
+
+  reset(timerId: string): void {
+    // 重置就是先停止再重新启动，但需要记住原始配置
+    // 这里简单实现：停止旧计时器，上层调用者需要重新发起 startTimer
+    this.stop(timerId);
+  }
+
+  getStatus(timerId: string): { elapsed: number; remaining: number } | null {
+    const timer = this.timers.get(timerId);
+    if (!timer) return null;
+    const elapsed = Date.now() - timer.startTime;
+    return { elapsed, remaining: Math.max(0, timer.duration - elapsed) };
+  }
+}
+
 export class Dispatcher {
+  private timerManager = new TimerManager();
+
   constructor(private deps: DispatcherDeps) {}
 
   /**
@@ -128,6 +229,15 @@ export class Dispatcher {
         return;
       case 'ui.delay':
         await delay(action.duration);
+        return;
+
+      case 'ui.startTimer':
+        return this.timerManager.run(action as UiStartTimerAction, this, ctx);
+      case 'ui.stopTimer':
+        this.timerManager.stop((action as UiStopTimerAction).timerId);
+        return;
+      case 'ui.resetTimer':
+        this.timerManager.reset((action as Extract<Action, { type: 'ui.resetTimer' }>).timerId);
         return;
 
       case 'logic.if':
