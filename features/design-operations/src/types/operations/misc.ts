@@ -210,6 +210,12 @@ export interface MaterialApplyDesignOp {
     clearStyleKeys?: string[];
     propUpdates?: Record<string, unknown>;
     materialProjectId?: string;
+    /**
+     * 目标视觉状态名。如指定，styleUpdates/propUpdates 写入该 visualState 而非 node.styles。
+     * 用于"有条件的素材"（如 success 态的 checkmark），避免覆盖节点默认态。
+     * 不传或传 'default' 则行为与之前一致（写入 node.styles）。
+     */
+    targetState?: string;
   };
 }
 

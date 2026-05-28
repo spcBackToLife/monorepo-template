@@ -20,6 +20,7 @@ import type { DataContext } from '../data/dataContext';
 import { buildScreenDataContext, buildEditorPreviewState } from '../data/dataContext';
 import { ListRenderer } from '../data/ListRenderer';
 import { CSSPseudoInjector } from './CSSPseudoInjector';
+import { compileExpression } from '../expression';
 import { ToastRenderer, type ToastItem } from './ToastRenderer';
 import {
   createStore,
@@ -197,6 +198,22 @@ function PreviewInteractiveShell({
       const events = getLifecycleEvents(trigger);
       if (events.length === 0) return;
       for (const event of events) {
+        // Check event condition before firing
+        if (event.condition?.when) {
+          try {
+            const conditionFn = compileExpression(event.condition.when);
+            // Get current state for condition evaluation
+            const evalCtx = { state: storeRef.current.getState() };
+            const result = conditionFn(evalCtx);
+            // Skip if condition is false, 0, '', null, or undefined
+            if (result === false || result === 0 || result === '' || result === null || result === undefined) {
+              continue;
+            }
+          } catch (err) {
+            console.warn('[PreviewRenderer] lifecycle event condition evaluation failed:', err, event);
+            // Default to execute on evaluation error
+          }
+        }
         await dispatcher.run(event.actions as Action[]);
       }
     },
@@ -436,33 +453,68 @@ function PreviewNodeRenderer({
 
   // 节点级事件（click / change / focus / blur 等）
   const handlers: Record<string, (e: React.SyntheticEvent) => void> = {};
+  
+  // Helper: check if event condition is satisfied
+  const shouldFireEvent = (event: typeof effectiveNode.events[0]) => {
+    if (event.condition?.when) {
+      try {
+        const conditionFn = compileExpression(event.condition.when);
+        const result = conditionFn(dataContext);
+        // Treat false, 0, '', null, undefined as condition not met
+        return result !== false && result !== 0 && result !== '' && result !== null && result !== undefined;
+      } catch (err) {
+        console.warn('[PreviewRenderer] event condition evaluation failed:', err, event);
+        return true; // Default to execute on evaluation error
+      }
+    }
+    return true; // Execute if no condition
+  };
+  
   for (const event of effectiveNode.events ?? []) {
     if (event.disabled) continue;
     if (event.trigger === 'click') {
       const prev = handlers.onClick;
       handlers.onClick = (e) => {
         prev?.(e);
-        dispatcher.run(event.actions as Action[]);
+        if (shouldFireEvent(event)) {
+          dispatcher.run(event.actions as Action[]);
+        }
       };
     } else if (event.trigger === 'doubleClick') {
-      handlers.onDoubleClick = () => dispatcher.run(event.actions as Action[]);
+      handlers.onDoubleClick = () => {
+        if (shouldFireEvent(event)) {
+          dispatcher.run(event.actions as Action[]);
+        }
+      };
     } else if (event.trigger === 'focus') {
-      handlers.onFocus = () => dispatcher.run(event.actions as Action[]);
+      handlers.onFocus = () => {
+        if (shouldFireEvent(event)) {
+          dispatcher.run(event.actions as Action[]);
+        }
+      };
     } else if (event.trigger === 'blur') {
-      handlers.onBlur = () => dispatcher.run(event.actions as Action[]);
+      handlers.onBlur = () => {
+        if (shouldFireEvent(event)) {
+          dispatcher.run(event.actions as Action[]);
+        }
+      };
     } else if (event.trigger === 'change') {
       const prev = propsForRender.onChange as ((e: React.ChangeEvent) => void) | undefined;
       propsForRender = {
         ...propsForRender,
         onChange: (e: React.ChangeEvent) => {
           prev?.(e);
-          dispatcher.run(event.actions as Action[]);
+          if (shouldFireEvent(event)) {
+            dispatcher.run(event.actions as Action[]);
+          }
         },
       };
     } else if (event.trigger === 'submit') {
       handlers.onSubmit = (e) => {
         e.preventDefault();
-        dispatcher.run(event.actions as Action[]);
+        if (shouldFireEvent(event)) {
+          dispatcher.run(event.actions as Action[]);
+        }
       };
     }
     // hover / longPress / 其它在 PrimitiveRenderer 内更合适，由 CSSPseudoInjector + 后续 B.2 处理

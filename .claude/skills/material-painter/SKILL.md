@@ -274,6 +274,27 @@ pathData 所有坐标必须落在此区域内
 7c. component_prop/update_props → { textContent: "", children: "" }
 ```
 
+### ⚠️ 条件素材：只 export 不 apply
+
+当 design-executor 委托绘制的素材标注了 `应用条件`（如"只在 success 态显示"），流程变为：
+
+```
+Step 6 变体: export_and_apply 到一个临时纯展示 div（不是最终目标节点）
+  → 记录导出的 imageUrl
+  → 返回 imageUrl 给 executor
+  → executor 负责将 URL 写入目标节点的对应 visualState
+
+为什么不直接 apply 到目标节点？
+  因为 applyMaterialDesign 会覆盖 9 个样式属性（I-10），
+  如果素材只在某个状态使用（如 success），直接 apply 会摧毁节点的默认态样式。
+
+如何识别"条件素材"？
+  design-executor 在委托时会明确标注:
+    应用模式: 条件应用
+    条件: "{{state.view.submitState === 'success'}}"
+  看到此标注 → 不 apply 到目标节点！
+```
+
 ---
 
 ## 节点结构模式

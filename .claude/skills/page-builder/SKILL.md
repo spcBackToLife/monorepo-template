@@ -442,6 +442,80 @@ generate_snapshots → { projectId }
 | 事件不响应 | 事件绑在了被遮挡的父元素上 | 检查 z-index 和 pointer-events |
 | 新增屏幕看不到 | 未 switch 到该屏幕 | screen / activate 切换 |
 
+## 防御性规则（从 design-executor 测试中总结的必须遵守项）
+
+### 元素类型决策
+
+当 design-executor 委托本技能搭建节点时，元素 type 的选择优先级：
+
+```
+交互行为（interaction.trigger）> 视觉外观
+
+trigger = input/change → type 必须是 "input" 或 "textarea"
+trigger = click（操作类）→ type 优先用 "button"
+trigger = submit → type = "button"
+无 trigger → type = "div"
+```
+
+**绝对禁止**: 因为视觉上像"格子/方块"就用 div 实现可输入元素。
+
+### 强制背景色（平台默认样式问题）
+
+平台对 input/textarea/select 的默认背景色可能不是白色。**必须显式设置**：
+
+```json
+// 所有 input 类型节点:
+{ "backgroundColor": "#FFFFFF" }
+
+// 所有 button 类型节点（有设计背景色时）:
+{ "backgroundColor": "<设计稿色值>" }
+```
+
+### z-index 使用限制
+
+```
+❌ 禁止: z-index: -1（在有 overflow:hidden 或 position:relative 的父级中不可见）
+✅ 正确: 装饰层用 z-index: 0 + pointer-events: none，内容层 z-index: 1
+✅ 正确: 利用 DOM 顺序（先渲染=底层），不设 z-index
+```
+
+### visibleWhen 与 display 互斥
+
+```
+❌ 禁止: 同时设置 visibleWhen 和 styles.display: "none"
+✅ 正确: 设了 visibleWhen 后，styles.display 设为该节点可见时的值（如 "flex"）
+原因: visibleWhen 完全接管显隐逻辑，额外的 display:none 会冲突
+```
+
+### state.set 必须伴随视觉联动
+
+当事件 actions 中包含 `state.set` 且该 state 变化会影响其他节点的视觉时：
+
+```json
+// ❌ 不完整（只改状态，不联动视觉）:
+{"actions": [{"type": "state.set", "path": "view.loginMode", "value": "code"}]}
+
+// ✅ 完整（状态 + 视觉联动）:
+{"actions": [
+  {"type": "state.set", "path": "view.loginMode", "value": "code"},
+  {"type": "node.setVisualState", "nodeId": "<code-tab>", "stateName": "active"},
+  {"type": "node.setVisualState", "nodeId": "<password-tab>", "stateName": "default"}
+]}
+```
+
+**前提**: 被引用的节点必须先通过 `visual_state/add` 创建对应的状态。
+
+### overflow:hidden 容器中的绝对定位
+
+```
+如果父级有 overflow:hidden:
+  - 绝对定位子元素超出父级边界的部分会被裁切
+  - 装饰性元素不要设置负值的 top/right/bottom/left（会被裁切不可见）
+  - 如果装饰需要溢出，父级不能用 overflow:hidden（改用 overflow:visible）
+```
+
+---
+
 ## 设计能力边界
 
 ### ✅ 本技能覆盖

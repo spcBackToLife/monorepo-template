@@ -33,4 +33,16 @@ export interface VisualState {
   childrenVisibility?: Record<string, boolean>;
   /** 此态下需禁用的事件触发器（trigger 名） */
   disabledEvents?: string[];
+  /**
+   * 自动激活条件表达式。当表达式求值为 truthy 时，自动进入该视觉状态。
+   * 用于替代 node.setVisualState 事件联动，实现"state 变化→视觉自动响应"。
+   *
+   * 示例:
+   *   activeWhen: "{{ state.view.loginMode === 'code' }}"
+   *   → 当 loginMode 为 'code' 时，此节点自动切换到该 visualState
+   *
+   * 优先级: activeWhen 求值优先于 node.activeState；
+   *          多个 state 的 activeWhen 同时为 true 时，取 states 数组中的第一个匹配。
+   */
+  activeWhen?: string;
 }

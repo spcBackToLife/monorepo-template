@@ -81,12 +81,35 @@ export function executeApplyMaterialDesign(
 
   // ---- Apply changes ----
 
-  if (params.styleUpdates) {
-    Object.assign(node.styles, params.styleUpdates);
-  }
+  // 确定应用目标：默认态(node.styles) 或 特定 visualState
+  const targetState = params.targetState;
+  const applyToVisualState = targetState && targetState !== 'default';
 
-  if (params.propUpdates) {
-    Object.assign(node.props, params.propUpdates);
+  if (applyToVisualState) {
+    // 应用到指定的 visualState（不影响节点默认样式）
+    if (!node.states) {
+      node.states = [];
+    }
+    let stateObj = node.states.find((s) => s.name === targetState);
+    if (!stateObj) {
+      // 自动创建该 visualState
+      stateObj = { name: targetState, styles: {} };
+      node.states.push(stateObj);
+    }
+    if (params.styleUpdates) {
+      stateObj.styles = { ...stateObj.styles, ...params.styleUpdates };
+    }
+    if (params.propUpdates) {
+      stateObj.props = { ...(stateObj.props ?? {}), ...params.propUpdates };
+    }
+  } else {
+    // 应用到节点默认态（原有行为）
+    if (params.styleUpdates) {
+      Object.assign(node.styles, params.styleUpdates);
+    }
+    if (params.propUpdates) {
+      Object.assign(node.props, params.propUpdates);
+    }
   }
 
   if (params.materialProjectId !== undefined) {

@@ -128,9 +128,24 @@ export function resolveNodeStyles(
   // Layer 1: base styles
   let merged: ExpressionStyles = { ...node.styles };
 
+  // Layer 1.5: autoVisualState（activeWhen 表达式自动激活）
+  // 检查是否有 visualState 的 activeWhen 表达式匹配当前数据上下文
+  let autoActivatedState: string | null = null;
+  if (node.states?.length) {
+    for (const state of node.states) {
+      if (state.activeWhen && typeof state.activeWhen === 'string' && hasExpression(state.activeWhen)) {
+        const result = resolveExpression(state.activeWhen, dataContext);
+        if (result) {
+          autoActivatedState = state.name;
+          break; // 取第一个匹配的
+        }
+      }
+    }
+  }
+
   // Layer 2: business state (activeState override)
-  // Priority: interactionState > parentStateOverride > node.activeState
-  const effectiveStateName = parentStateOverride ?? (node.activeState ?? 'default');
+  // Priority: interactionState > parentStateOverride > autoActivatedState > node.activeState
+  const effectiveStateName = parentStateOverride ?? autoActivatedState ?? (node.activeState ?? 'default');
   if (!interactionState && effectiveStateName !== 'default') {
     const activeState = node.states?.find((s) => s.name === effectiveStateName);
     if (activeState?.styles) {
@@ -155,6 +170,15 @@ export function resolveNodeStyles(
     if (interactionStateObj?.styles) {
       merged = { ...merged, ...(interactionStateObj.styles as ExpressionStyles) };
     }
+  }
+
+  // Layer 4: 表单元素默认背景色补丁
+  // 修复: 平台使用 Tailwind Preflight（form 元素 background:transparent），
+  // 加上编辑器可能的 color-scheme:dark 导致 input/textarea/select 呈现深色背景。
+  // 当设计者未显式设置 backgroundColor 时，注入白色默认值。
+  const FORM_ELEMENTS = new Set(['input', 'textarea', 'select']);
+  if (FORM_ELEMENTS.has(node.type) && !merged.backgroundColor && !merged.background) {
+    merged = { ...merged, backgroundColor: '#ffffff' };
   }
 
   return resolveStyles(merged, dataContext, themeConfig);

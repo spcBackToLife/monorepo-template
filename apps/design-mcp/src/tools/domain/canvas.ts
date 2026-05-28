@@ -943,9 +943,12 @@ export function registerCanvasTools(server: McpServer): void {
         sizeMode: z.enum(['contain','cover','auto','original']).optional().describe(
           "背景尺寸模式：'auto'(默认)=按参考框实际像素尺寸设置 backgroundSize；'contain'=填充容器(适合装饰/品牌)；'cover'=覆盖容器；'original'=使用原始图片尺寸不缩放"
         ),
+        targetState: z.string().optional().describe(
+          "目标视觉状态名。如指定（如 'success'/'hover'），素材样式写入该 visualState 的 styleOverrides 而非节点默认 styles。用于有条件的素材（如 success 态的 checkmark）。不传则应用到默认态（兼容旧行为）。"
+        ),
       }),
       handler: async (p)=>{
-        const { projectId, materialId, nodeId, format = 'png', quality = 92, scale: scaleIn = 2, sizeMode = 'auto' } = p as ApiJsonResponse & {
+        const { projectId, materialId, nodeId, format = 'png', quality = 92, scale: scaleIn = 2, sizeMode = 'auto', targetState } = p as ApiJsonResponse & {
           projectId: string;
           materialId: string;
           nodeId: string;
@@ -953,6 +956,7 @@ export function registerCanvasTools(server: McpServer): void {
           quality?: number;
           scale?: number;
           sizeMode?: 'contain' | 'cover' | 'auto' | 'original';
+          targetState?: string;
         };
         const scale = Number(scaleIn);
 
@@ -1078,6 +1082,7 @@ export function registerCanvasTools(server: McpServer): void {
                     boxSizing: 'border-box',
                   },
                   materialProjectId: materialId,
+                  targetState,
                 }
               : {
                   nodeId,
@@ -1101,6 +1106,7 @@ export function registerCanvasTools(server: McpServer): void {
                     // ✅ 移除硬编码 boxShadow：光晕等效果应由调用者按需添加，不应在此写死
                   },
                   materialProjectId: materialId,
+                  targetState,
                 },
         });
 

@@ -4,6 +4,39 @@
 
 ---
 
+## Implementation Checklist 验证标准
+
+每个节点的 `implementation.checklist` 中的每项，必须有以下对应的验证动作才能标 true：
+
+| Checklist 项 | 标 true 的必要条件 | 验证方法 |
+|-------------|-------------------|---------|
+| **structure** | 节点已创建 + type 正确 | `query/screen_schema` 确认 nodeId 存在且 type 与 interaction.trigger 推断一致 |
+| **styles** | 完整样式已设置 | 对照 visual.md §6 表格中该节点的**全部**属性（不是 keyStyles 子集），逐个确认 |
+| **events** | 事件数量和内容完整 | 确认: ①事件数量=交互层定义数 ②每个 state.set 有 node.setVisualState 联动 ③condition 已设置 |
+| **materials** | 素材正确绑定 | 确认: ①无 condition 素材 → 已 apply 到默认态 ②有 condition 素材 → URL 在对应 visualState 中，**NOT** 在默认态 |
+| **visualStates** | 业务视觉状态已创建 | `screen_schema` 确认 node.states 数组包含 design.visualStates 中的**全部** key |
+| **interactionStates** | CSS 交互态已添加 | 确认 hover/pressed/focus 视觉状态存在（如设计要求） |
+| **dataBinding** | 数据绑定已设置 | 确认 visibleWhen/bind/repeat 在 schema 中存在且表达式正确 |
+| **extremeCases** | 极端情况已处理 | 对照 node.extremeCases 字段逐项确认；如无此字段则自动 true |
+
+### ❌ 绝对不可以做的事
+
+- 在没有执行验证方法的情况下标 true
+- 全部 8 项一次性标 true（极不可能全部一次做完且正确）
+- 依靠"应该没问题"的主观判断替代实际检查
+
+### ✅ 正确的验证流程
+
+```
+1. 完成一项实现（如 structure）
+2. 立即执行对应验证方法（如 query/screen_schema）
+3. 确认通过 → 标 true
+4. 如不通过 → 修复 → 再验证 → 通过后标 true
+5. 进入下一项
+```
+
+---
+
 ## 清单生成规则
 
 ### 1. 阶段划分
