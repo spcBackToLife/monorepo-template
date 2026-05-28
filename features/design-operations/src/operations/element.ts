@@ -147,10 +147,30 @@ function createNode(
   const defaultStyles = isPrimitiveType(tag) ? getDefaultStyles(tag) : {};
   const practicalDefaults = inferPracticalDefaults(tag, parent?.styles, layoutHint);
 
+  // User-provided styles always take priority over defaults.
+  // Remove defaults that semantically conflict with user intent.
+  const userStyles = (styles ?? {}) as Record<string, unknown>;
+  const mergedDefaults = { ...defaultStyles, ...practicalDefaults };
+
+  if (userStyles.height !== undefined || userStyles.minHeight !== undefined) {
+    delete mergedDefaults.minHeight;
+  }
+  if (userStyles.width !== undefined || userStyles.minWidth !== undefined) {
+    delete mergedDefaults.minWidth;
+  }
+  if (userStyles.position === 'absolute' || userStyles.position === 'fixed') {
+    delete mergedDefaults.flex;
+    delete mergedDefaults.minHeight;
+    delete mergedDefaults.minWidth;
+  }
+  if (userStyles.flex !== undefined) {
+    delete mergedDefaults.flex;
+  }
+
   return {
     id: explicitId ?? generateNodeId(),
     type: tag as ComponentNode['type'],
-    styles: { ...defaultStyles, ...practicalDefaults, ...(styles ?? {}) } as ExpressionStyles,
+    styles: { ...mergedDefaults, ...userStyles } as ExpressionStyles,
     children: [],
     props: props ?? {},
     states: [],

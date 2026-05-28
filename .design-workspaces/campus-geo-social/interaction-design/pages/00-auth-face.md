@@ -111,24 +111,24 @@ success → routed: push 00-auth-status
 00-auth-face/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   └── back-btn.json
 ├── info-card/
-│   ├── _block.json             (引导：为什么 + 注意事项 + 隐私说明)
+│   ├── _component.json             (引导：为什么 + 注意事项 + 隐私说明)
 │   └── help-btn.json           (展开/收起)
 ├── start-btn.json
 ├── face-camera/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── preview.json            (实时预览，trigger=onFrame 活体检测)
 │   ├── guide-frame.json        (椭圆引导框，纯展示但作为独立 element)
 │   ├── hint-text.json          (顶部指令文案 + 实时异常提示，纯展示)
 │   └── action-icon.json        (动作图标动画)
 ├── error-card/
-│   ├── _block.json             (component: liveness/no-match/max-retries 的占位)
+│   ├── _component.json             (component: liveness/no-match/max-retries 的占位)
 │   ├── retry-btn.json
 │   └── upload-video-btn.json
 └── permission-denied-card/
-    ├── _block.json
+    ├── _component.json
     └── settings-btn.json
 ```
 

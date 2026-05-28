@@ -16,26 +16,26 @@
 阶段 D: 验证与修复
 ```
 
-### 2. 区块拆分原则
+### 2. 组件拆分原则
 
-从 index.md 的"节点结构树"中，按以下规则拆分区块：
+从 index.md 的"节点结构树"中，按以下规则拆分组件：
 
 ```
-一个区块 = 一个有明确视觉边界的容器 + 其直接子元素
+一个组件 = 一个有明确视觉边界的容器 + 其直接子元素（对应一个 _component.json 节点）
 
-示例（从节点树中识别区块）:
+示例（从节点树中识别组件）:
   root
-  ├── nav-bar ← 区块1: NavBar
+  ├── nav-bar ← 组件1: NavBar
   │   ├── avatar-btn
   │   ├── title
   │   └── toggle-btn
-  ├── map-container ← 区块2: MapContainer + 装饰
+  ├── map-container ← 组件2: MapContainer + 装饰
   │   ├── ambient-glow
   │   ├── light-dot-1/2/3
-  │   └── empty-state ← 区块3: EmptyState
-  ├── locate-btn ← 区块4: 浮动按钮组（可与FAB合并）
+  │   └── empty-state ← 组件3: EmptyState
+  ├── locate-btn ← 组件4: 浮动按钮组（可与FAB合并）
   ├── fab-btn
-  └── tab-bar ← 区块5: TabBar
+  └── tab-bar ← 组件5: TabBar
 ```
 
 ### 3. 任务描述格式
@@ -80,7 +80,7 @@
 | # | 检查项 | 状态 |
 |---|--------|:---:|
 | AV-01 | generate_snapshots 截图 | ⬜ |
-| AV-02 | 对照样式审计检查表逐区块核对 | ⬜ |
+| AV-02 | 对照样式审计检查表逐组件核对 | ⬜ |
 | AV-03 | 修复发现的问题 | ⬜ |
 
 ### 阶段 B: 素材绘制（可并行 ‖）

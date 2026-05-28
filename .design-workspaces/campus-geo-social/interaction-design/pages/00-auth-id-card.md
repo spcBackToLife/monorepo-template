@@ -114,25 +114,25 @@ OCR 处理超时 30s → 视为失败 + 提示用户重拍。
 00-auth-id-card/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   └── back-btn.json
 ├── why-card/
-│   ├── _block.json             (引导卡：为什么需要学生证 + 隐私说明)
+│   ├── _component.json             (引导卡：为什么需要学生证 + 隐私说明)
 │   └── help-btn.json           (展开/收起更多)
 ├── preview-area/
-│   ├── _block.json             (相机预览 + 已拍图 + 裁剪框)
+│   ├── _component.json             (相机预览 + 已拍图 + 裁剪框)
 │   └── preview.json            (实时预览元素，trigger=onFrame 边缘检测)
 ├── actions/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── capture-btn.json        (拍照)
 │   ├── album-btn.json          (相册)
 │   └── recapture-btn.json      (重拍，仅 cropping/ocr-result 显示)
 ├── ocr-result/
-│   ├── _block.json             (component: OCR 结果卡)
+│   ├── _component.json             (component: OCR 结果卡)
 │   └── fields.json             (姓名/学号/院系/年级 可编辑字段组)
 ├── manual-toggle.json
 ├── permission-denied-card/
-│   ├── _block.json             (全屏占位)
+│   ├── _component.json             (全屏占位)
 │   └── settings-btn.json
 └── submit-btn.json
 ```

@@ -93,22 +93,22 @@ visible → adding-friend → routed:    点加好友 → push 06-add-friend
 02-greets-received/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   └── back-btn.json
 ├── top-tabs/
-│   ├── _block.json              (received | sent)
+│   ├── _component.json              (received | sent)
 │   ├── received-tab.json
 │   └── sent-tab.json
 ├── greets-list/
-│   ├── _block.json              (LazyList)
+│   ├── _component.json              (LazyList)
 │   ├── items.json               (单条招呼，含展开折叠)
 │   └── actions/
-│       ├── _block.json          (展开后的操作区)
+│       ├── _component.json          (展开后的操作区)
 │       ├── reply-btn.json
 │       ├── add-friend-btn.json
 │       └── decline-btn.json
 └── empty-state/
-    └── _block.json              (component, 暂无招呼)
+    └── _component.json              (component, 暂无招呼)
 ```
 
 通用组件：`Toast`、`ConfirmDialog`、`EmptyState`、`ErrorView`、`Skeleton`

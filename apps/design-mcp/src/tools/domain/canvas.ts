@@ -940,15 +940,19 @@ export function registerCanvasTools(server: McpServer): void {
         format: z.enum(['png','jpeg']).optional().describe('默认 png'),
         quality: z.number().min(0).max(100).optional().describe('jpeg 质量，默认 92'),
         scale: z.number().min(0.5).max(4).optional().describe('缩放倍数，默认 2x 高清'),
+        sizeMode: z.enum(['contain','cover','auto','original']).optional().describe(
+          "背景尺寸模式：'auto'(默认)=按参考框实际像素尺寸设置 backgroundSize；'contain'=填充容器(适合装饰/品牌)；'cover'=覆盖容器；'original'=使用原始图片尺寸不缩放"
+        ),
       }),
       handler: async (p)=>{
-        const { projectId, materialId, nodeId, format = 'png', quality = 92, scale: scaleIn = 2 } = p as ApiJsonResponse & {
+        const { projectId, materialId, nodeId, format = 'png', quality = 92, scale: scaleIn = 2, sizeMode = 'auto' } = p as ApiJsonResponse & {
           projectId: string;
           materialId: string;
           nodeId: string;
           format?: 'png' | 'jpeg';
           quality?: number;
           scale?: number;
+          sizeMode?: 'contain' | 'cover' | 'auto' | 'original';
         };
         const scale = Number(scaleIn);
 
@@ -1083,8 +1087,11 @@ export function registerCanvasTools(server: McpServer): void {
                     // 素材 PNG/SVG 应该是透明底的，让用户设置的 backgroundColor 能透出来。
                     // 如果之前写了 backgroundColor（旧行为），用 clearStyleKeys 清除它
                     backgroundImage: `url("${imgUrl}")`,
-                    backgroundSize: 'contain',
-                    backgroundPosition: 'center center',
+                    backgroundSize: sizeMode === 'contain' ? 'contain'
+                      : sizeMode === 'cover' ? 'cover'
+                      : sizeMode === 'original' ? 'auto'
+                      : `${rw}px ${rh}px`, // 'auto' mode: use reference frame pixel dimensions
+                    backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
                     border: 'none',
                     borderWidth: 0,

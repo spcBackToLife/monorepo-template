@@ -94,22 +94,22 @@ visible:* → saving → saved:                              点保存
 01-publish-visibility/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   └── cancel-btn.json          (右上取消)
 ├── visibility-cards/
-│   ├── _block.json              (3 卡片容器)
+│   ├── _component.json              (3 卡片容器)
 │   └── items.json               (public/friends/capsule)
 ├── friends-row/
-│   ├── _block.json              (visible:friends 时显示)
+│   ├── _component.json              (visible:friends 时显示)
 │   ├── select-trigger.json      (点击跳 target-friends)
 │   └── avatar-bubbles.json      (已选好友头像气泡，含 x 移除)
 ├── duration-options/
-│   ├── _block.json              (预设 4 项 + 自定义)
+│   ├── _component.json              (预设 4 项 + 自定义)
 │   ├── items.json               (永久/24h/7天)
 │   └── custom-item.json         (自定义按钮)
 ├── custom-duration-sheet/
-│   ├── _block.json              (component sheet)
+│   ├── _component.json              (component sheet)
 │   ├── input.json
 │   └── confirm-btn.json
 ├── anonymous-toggle.json

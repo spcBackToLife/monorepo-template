@@ -77,12 +77,12 @@ restricted:* → visible:             权限改变后（仅离开当前 sheet �
 ├── _page.json
 ├── mask.json                    (蒙层，click 关闭)
 ├── app-bar/
-│   ├── _block.json              (sheet 顶部，含拖手柄+标题+关闭)
+│   ├── _component.json              (sheet 顶部，含拖手柄+标题+关闭)
 │   ├── handle.json              (拖手柄)
 │   └── close-btn.json
 ├── restricted-banner.json       (restricted 时显示，含 click→跳认证)
 └── entry-cards/
-    ├── _block.json
+    ├── _component.json
     ├── moment-btn.json          (发动态 - M1)
     └── capsule-btn.json         (埋胶囊 - M3)
 ```

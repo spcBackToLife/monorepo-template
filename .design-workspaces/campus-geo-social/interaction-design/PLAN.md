@@ -16,7 +16,7 @@
 
 ### 节点级深钻
 
-- [x] `pages/00-splash/<block>/<element>.json` — 7 个节点（brand-area/_block,logo + status-area/_block,progress,retry-btn + update-modal/_block,store-btn）
+- [x] `pages/00-splash/<block>/<element>.json` — 7 个节点（brand-area/_component,logo + status-area/_component,progress,retry-btn + update-modal/_component,store-btn）
 
 ### 收尾
 
@@ -33,7 +33,7 @@
 
 ### 节点级深钻
 
-- [x] `pages/00-onboarding/<block>/<element>.json` — 10 个节点（top-bar/_block,skip-btn + swiper/_block,page-1..4 + page-indicator/_block,dots + bottom-cta-btn）
+- [x] `pages/00-onboarding/<block>/<element>.json` — 10 个节点（top-bar/_component,skip-btn + swiper/_component,page-1..4 + page-indicator/_component,dots + bottom-cta-btn）
 
 ### 收尾
 
@@ -50,7 +50,7 @@
 
 ### 节点级深钻
 
-- [x] `pages/00-login/<block>/<element>.json` — 11 个节点（top-area/_block + mode-toggle + form-card/_block,phone-input,code-input,password-input,send-code-btn + submit-btn + footer/_block,register-link,forgot-link）
+- [x] `pages/00-login/<block>/<element>.json` — 11 个节点（top-area/_component + mode-toggle + form-card/_component,phone-input,code-input,password-input,send-code-btn + submit-btn + footer/_component,register-link,forgot-link）
 
 ### 收尾
 
@@ -460,7 +460,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/03-capsule-bury/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -479,7 +479,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/03-capsule-list/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -498,7 +498,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/03-capsule-riddle/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -517,7 +517,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/03-capsule-open/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -536,7 +536,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/04-campus-switch/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -555,7 +555,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/04-campus-plaza/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -574,7 +574,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/04-campus-detail/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -593,7 +593,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/06-conversation-list/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -612,7 +612,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/06-conversation/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -631,7 +631,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/06-friends-list/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -650,7 +650,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/06-friend-requests/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -669,7 +669,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/06-add-friend/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -688,7 +688,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-wallet/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -707,7 +707,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-tasks/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -726,7 +726,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-shop/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -745,7 +745,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-recharge/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -764,7 +764,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-recharge-result/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -783,7 +783,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-coin-history/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -802,7 +802,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/07-gem-history/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -821,7 +821,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/08-notification-center/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -840,7 +840,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/09-report/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -859,7 +859,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/09-appeal/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -876,7 +876,7 @@
 
 ### 节点级深钻
 
-- [x] `pages/09-community-guidelines/<block>/<element>.json` — 13 个节点（app-bar/_block,back-btn,title,toc-btn + version-banner + update-banner + content-area/_block,markdown-body + toc-sheet/_block,mask,items + bottom-cta/_block,agree-btn）
+- [x] `pages/09-community-guidelines/<block>/<element>.json` — 13 个节点（app-bar/_component,back-btn,title,toc-btn + version-banner + update-banner + content-area/_component,markdown-body + toc-sheet/_component,mask,items + bottom-cta/_component,agree-btn）
 
 ### 收尾
 
@@ -895,7 +895,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/10-profile-self/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -914,7 +914,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/10-profile-other/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -933,7 +933,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/10-profile-edit/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -952,7 +952,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/10-footprints/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -971,7 +971,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-settings/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -990,7 +990,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-account-security/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1026,7 +1026,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-devices/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1045,7 +1045,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-privacy/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1064,7 +1064,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-blocks/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1083,7 +1083,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-notification-prefs/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1102,7 +1102,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-feedback/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1119,7 +1119,7 @@
 
 ### 节点级深钻
 
-- [x] `pages/11-about/<block>/<element>.json` — 21 个节点（app-bar/_block,back-btn,title + hero/_block,logo,app-name,version-text + menu/_block + 6 个 menu rows + contact-sheet/_block + 3 个 options + rating-banner + icp-footer/_block,text）
+- [x] `pages/11-about/<block>/<element>.json` — 21 个节点（app-bar/_component,back-btn,title + hero/_component,logo,app-name,version-text + menu/_component + 6 个 menu rows + contact-sheet/_component + 3 个 options + rating-banner + icp-footer/_component,text）
 
 ### 收尾
 
@@ -1138,7 +1138,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/11-logout-account/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 
@@ -1157,7 +1157,7 @@
 ### 节点级深钻（按目录深度排序，父先于子）
 
 - [ ] `pages/12-search/<block>/<element>.json` — 从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）
-      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录
+      ↳ 每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录
 
 ### 收尾
 

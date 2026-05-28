@@ -21,28 +21,22 @@
     "nodeId": null,
     "status": "pending"
   },
-  "design": {
-    "summary": "忘记密码链接：同 register-link 样式（保持视觉一致）",
-    "ref": "design-plan/pages/00-login/index.md#§4.5-forgot-link",
-    "visualRef": "design-plan/pages/00-login/visual.md#§6-footer-link",
-    "visualStates": {
-      "default": {
-        "summary": "color primary"
-      },
-      "hover": {
-        "summary": "color primaryHover + underline"
-      },
-      "active": {
-        "summary": "color primaryActive + scale(0.98)"
-      },
-      "focused": {
-        "summary": "outline 2px primary"
-      }
-    }
-  },
   "content": {
     "type": "text",
     "value": "忘记密码"
   },
-  "_updatedAt": "2026-05-28T06:25:45.227Z"
+  "_updatedAt": "2026-05-28T08:02:32.594Z",
+  "design": {
+    "summary": "忘记密码链接 body 14px color:primary，active时primaryActive+scale(0.98)",
+    "keyStyles": {
+      "color": "#FF6F91",
+      "fontSize": "14px"
+    },
+    "visualStates": {
+      "active": {
+        "color": "#FB406F",
+        "transform": "scale(0.98)"
+      }
+    }
+  }
 }

@@ -17,11 +17,6 @@
     "nodeId": null,
     "status": "pending"
   },
-  "design": {
-    "summary": "品牌 Logo：64×64，B-01 素材绑定，入场 bounce-in 400ms spring",
-    "ref": "design-plan/pages/00-login/index.md#§4.1-logo",
-    "visualRef": "design-plan/pages/00-login/visual.md#§3.5-brand-logo"
-  },
   "materials": [
     {
       "id": "B-01",
@@ -29,5 +24,13 @@
       "ref": "design-plan/pages/00-login/materials/B-01-brand-logo.md"
     }
   ],
-  "_updatedAt": "2026-05-28T06:25:45.225Z"
+  "_updatedAt": "2026-05-28T07:59:52.581Z",
+  "design": {
+    "summary": "品牌Logo图标 64×64, src=B-01 brand-logo",
+    "keyStyles": {
+      "width": "64px",
+      "height": "64px",
+      "marginBottom": "16px"
+    }
+  }
 }

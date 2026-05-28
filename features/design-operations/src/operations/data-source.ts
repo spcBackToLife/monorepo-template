@@ -30,6 +30,19 @@ function findScreen(project: DesignProject, screenId: string) {
 // ===== dataSource.add =====
 
 export function executeAddDataSource(project: DesignProject, params: DataSourceAddOp['params']): Result {
+  // 防御性检查：batch 路径可能传入不完整的 params
+  if (!params || !params.dataSource) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: 'Missing required field "dataSource" in params. Expected: { screenId: string, dataSource: { id, name, type, ... } }',
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   const newProject = deepClone(project);
   const screen = findScreen(newProject, params.screenId);
 
@@ -42,6 +55,18 @@ export function executeAddDataSource(project: DesignProject, params: DataSourceA
   }
 
   if (!screen.dataSources) screen.dataSources = [];
+
+  if (!params.dataSource.id) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: 'Data source must have an "id" field',
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
 
   if (screen.dataSources.some((ds) => ds.id === params.dataSource.id)) {
     return {

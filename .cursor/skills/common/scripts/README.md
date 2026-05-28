@@ -87,4 +87,4 @@ npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/stats.ts \
 - `--registry` 指向 `.design-workspaces/<task>/design-registry/` 目录
 - `--workspace` 指向 `.design-workspaces/<task>/`（默认是 registry 的上级）
 - `--path` 是相对于 registry 的节点路径（不含 `.json` 后缀）
-- 特殊文件用下划线前缀：`_page`, `_block`, `_materials`, `_index`
+- 特殊文件用下划线前缀：`_page`, `_component`, `_materials`, `_index`

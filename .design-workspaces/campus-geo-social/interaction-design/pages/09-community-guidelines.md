@@ -96,21 +96,21 @@ submitting → routed:                  本地写 acceptedVersion → pop 返回
 09-community-guidelines/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   ├── title.json
 │   └── toc-btn.json
 ├── version-banner.json          顶部"v2.1 · 2026-01-01 生效"
 ├── update-banner.json           新版本变更提示（非注册场景才显示）
 ├── content-area/
-│   ├── _block.json              Markdown 渲染容器
+│   ├── _component.json              Markdown 渲染容器
 │   └── markdown-body.json       内容主体（含锚点跟踪）
 ├── toc-sheet/                   目录抽屉（component）
-│   ├── _block.json
+│   ├── _component.json
 │   ├── mask.json
 │   └── items.json               目录项列表
 └── bottom-cta/                  仅 source=register 时显示
-    ├── _block.json
+    ├── _component.json
     └── agree-btn.json           同意并继续
 ```
 

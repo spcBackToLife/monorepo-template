@@ -21,28 +21,22 @@
     "nodeId": null,
     "status": "pending"
   },
-  "design": {
-    "summary": "注册链接：text-only primary 色 body 14px + hover underline",
-    "ref": "design-plan/pages/00-login/index.md#§4.5-register-link",
-    "visualRef": "design-plan/pages/00-login/visual.md#§6-footer-link",
-    "visualStates": {
-      "default": {
-        "summary": "color primary + 无下划线"
-      },
-      "hover": {
-        "summary": "color primaryHover + text-decoration underline"
-      },
-      "active": {
-        "summary": "color primaryActive + scale(0.98)"
-      },
-      "focused": {
-        "summary": "outline 2px primary（键盘聚焦）"
-      }
-    }
-  },
   "content": {
     "type": "text",
     "value": "注册"
   },
-  "_updatedAt": "2026-05-28T06:25:45.226Z"
+  "_updatedAt": "2026-05-28T08:02:29.752Z",
+  "design": {
+    "summary": "注册链接 body 14px color:primary，active时primaryActive+scale(0.98)",
+    "keyStyles": {
+      "color": "#FF6F91",
+      "fontSize": "14px"
+    },
+    "visualStates": {
+      "active": {
+        "color": "#FB406F",
+        "transform": "scale(0.98)"
+      }
+    }
+  }
 }

@@ -41,7 +41,7 @@
       },
       {
         "op": "拖动地图",
-        "triggerNodePath": "map-canvas/_block"
+        "triggerNodePath": "map-canvas/_component"
       },
       {
         "op": "输入搜索",

@@ -93,16 +93,16 @@ idle → debug-mode:            长按版本号 7 次（间隔 ≤ 500ms）
 11-about/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   └── title.json
 ├── hero/
-│   ├── _block.json              品牌头部（logo + 应用名 + 版本号）
+│   ├── _component.json              品牌头部（logo + 应用名 + 版本号）
 │   ├── logo.json
 │   ├── app-name.json
 │   └── version-text.json        版本号（长按 7 次彩蛋）
 ├── menu/
-│   ├── _block.json              功能行容器
+│   ├── _component.json              功能行容器
 │   ├── check-update-row.json    检查更新（含状态：idle/up-to-date/has-update）
 │   ├── user-agreement-row.json  用户协议
 │   ├── privacy-policy-row.json  隐私政策
@@ -110,13 +110,13 @@ idle → debug-mode:            长按版本号 7 次（间隔 ≤ 500ms）
 │   ├── about-us-row.json        关于我们
 │   └── contact-row.json         联系客服（触发 sheet）
 ├── contact-sheet/                客服选项 sheet（component）
-│   ├── _block.json
+│   ├── _component.json
 │   ├── faq-option.json
 │   ├── online-option.json
 │   └── ticket-option.json
 ├── rating-banner.json            评分彩蛋浮层（条件显示）
 └── icp-footer/
-    ├── _block.json
+    ├── _component.json
     └── text.json                 ICP备案 + 公司信息
 ```
 

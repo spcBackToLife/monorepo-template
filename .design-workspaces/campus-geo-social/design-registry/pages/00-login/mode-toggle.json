@@ -25,30 +25,27 @@
     "nodeId": null,
     "status": "pending"
   },
-  "design": {
-    "summary": "胶囊 segmented control：primaryLight 容器 + 白底滑块 + spring 200ms 切换",
-    "ref": "design-plan/pages/00-login/index.md#§4.2-mode-toggle",
-    "visualRef": "design-plan/pages/00-login/visual.md#§8-mode-toggle",
-    "visualStates": {
-      "code-mode": {
-        "summary": "滑块停在左半，左 tab 字色 primary，右 tab 字色 textSecondary"
-      },
-      "password-mode": {
-        "summary": "滑块平移到右半（translateX 100%），右 tab 字色 primary，左 tab 字色 textSecondary"
-      }
-    },
-    "interactionStates": {
-      "hover": {
-        "summary": "滑块轻微抬升 shadow-sm（仅桌面端）"
-      },
-      "active": {
-        "summary": "scale(0.98) 短暂按压感"
-      }
-    }
-  },
   "content": {
     "type": "text",
     "value": "验证码 / 密码"
   },
-  "_updatedAt": "2026-05-28T06:25:45.225Z"
+  "_updatedAt": "2026-05-28T08:00:47.722Z",
+  "design": {
+    "summary": "登录方式切换胶囊 bg:#F5EDE6 radius:full h:32，active tab bg:primary color:white spring 200ms",
+    "keyStyles": {
+      "background": "#F5EDE6",
+      "borderRadius": "9999px",
+      "height": "32px",
+      "padding": "2px",
+      "marginBottom": "16px"
+    },
+    "visualStates": {
+      "code-mode": {
+        "leftTab": "bg:primary color:white"
+      },
+      "password-mode": {
+        "rightTab": "bg:primary color:white"
+      }
+    }
+  }
 }

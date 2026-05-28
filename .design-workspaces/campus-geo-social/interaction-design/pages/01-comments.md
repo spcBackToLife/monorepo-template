@@ -116,24 +116,24 @@ deleting → visible:                 确认删除/取消
 01-comments/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json              (sheet 顶部，含拖手柄 + 关闭)
+│   ├── _component.json              (sheet 顶部，含拖手柄 + 关闭)
 │   ├── handle.json              (拖手柄，纯展示)
 │   ├── title.json               (评论 (N)，纯展示)
 │   └── close-btn.json
 ├── sort-tabs.json               (最新/最热)
 ├── comment-list/
-│   ├── _block.json              (component: 评论列表容器)
+│   ├── _component.json              (component: 评论列表容器)
 │   └── items.json               (含子树：avatar+content+like+reply+expand-replies)
 ├── composer/
-│   ├── _block.json              (底部固定输入区)
+│   ├── _component.json              (底部固定输入区)
 │   ├── text-input.json          (含 @ 触发)
 │   ├── add-image-btn.json       (V1.x，MVP 隐藏)
 │   ├── reply-cancel-btn.json    (replying 态显示)
 │   └── send-btn.json
 ├── mention-picker/
-│   ├── _block.json              (component: @ 好友选择)
+│   ├── _component.json              (component: @ 好友选择)
 │   └── items.json
-└── empty-state/_block            (引用 overview.md)
+└── empty-state/_component            (引用 overview.md)
 ```
 
 通用组件：`ActionSheet`（长按菜单）、`ConfirmDialog`（删除）、`Toast`、`MediaPicker`（V1.x）、`EmptyState`

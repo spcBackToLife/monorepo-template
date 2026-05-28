@@ -103,7 +103,7 @@ npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/validate.ts --registry $RE
 | 完成什么 md 分析 | 执行什么写入命令 |
 |-----------------|---------------|
 | 页面 visual.md + index.md | `write-node --layer design` 追加 design + dataLayer 到 _page |
-| index.md §8 节点树完成 | `create-node` 逐个创建区块目录和节点文件 |
+| index.md §7 节点树完成 | `create-node` 逐个创建组件目录和节点文件 |
 | 组件 .md 完成 | `create-node` 展开组件内部子节点 + `write-node --layer design` |
 | 素材 .md 完成 | `write-node --path _materials` 追加条目 |
 | 完整性验证通过 | `write-node --path _page --field status --value ready` |
@@ -113,7 +113,7 @@ npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/validate.ts --registry $RE
 ```jsonc
 {
   "id": "节点ID",
-  "type": "block | element | component",
+  "type": "component | element",  // ★ 历史 type 'block' 已废弃，统一为 'component'
   "name": "节点名",
 
   // 上游已写入（不可动）
@@ -151,19 +151,21 @@ npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/validate.ts --registry $RE
 ```
 .design-workspaces/<task>/design-plan/
 ├── design-system.md
+├── components/                          ← 通用业务组件（跨页面复用）
+│   └── <name>/
+│       ├── <name>.visual.md             ← ★ 组件视觉分析
+│       └── <name>.md                    ← 组件结构+交互
 ├── pages/
 │   ├── 01-home-map/
-│   │   ├── visual.md              ← ★ 页面视觉分析
-│   │   ├── index.md               ← 页面骨架
-│   │   ├── components/
-│   │   │   ├── [name].visual.md   ← ★ 组件视觉分析
-│   │   │   └── [name].md          ← 组件结构+交互
+│   │   ├── visual.md                    ← ★ 页面视觉分析
+│   │   ├── index.md                     ← 页面汇总（组件清单+节点树）
+│   │   ├── components/                  ← 页面专属业务组件
+│   │   │   └── <name>/
+│   │   │       ├── <name>.visual.md
+│   │   │       └── <name>.md
 │   │   └── materials/
-│   │       └── [ID]-[name].md     ← 素材绘制指令
+│   │       └── [ID]-[name].md           ← 素材绘制指令
 │   └── ...
-└── components/                     ← 通用组件（跨页面复用）
-    └── [NN]-[name]/
-        ├── index.md / visual.md / materials/
 ```
 
 ### design-registry（结构化索引）
@@ -175,7 +177,10 @@ npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/validate.ts --registry $RE
 │   ├── _index.json
 │   └── <page-id>/
 │       ├── _page.json / _materials.json
-│       └── <block>/ → _block.json + <element>.json
+│       └── <component>/ → _component.json + <element>.json
 ```
+
+**注**: 历史上叫 `_block.json`，已统一为 `_component.json`。文件名仅是约定，
+所有 `_component.json` 都是组件根节点（通用或专属由 SKILL「三步走」判定）。
 
 **关系**: md = 完整信息载体 | registry = 结构化索引+摘要+ref引用 | ref 连接两者

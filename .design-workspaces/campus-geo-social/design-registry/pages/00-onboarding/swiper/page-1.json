@@ -1,6 +1,6 @@
 {
   "id": "page-1",
-  "type": "block",
+  "type": "component",
   "name": "第1屏 · 地理动态",
   "interaction": {
     "summary": "插画 + 标题（在校园发现身边的故事）+ 副标题",

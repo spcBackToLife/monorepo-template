@@ -103,22 +103,22 @@ success → routed:                自动登录 → push 00-auth-school-select (
 ```
 00-register/
 ├── _page.json
-├── top-area/_block            (标题/slogan，纯展示)
+├── top-area/_component            (标题/slogan，纯展示)
 ├── form-card/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── phone-input.json
 │   ├── code-input.json
 │   ├── send-code-btn.json
 │   └── password-input.json
 ├── agreement-row/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── checkbox.json
 │   ├── link-user.json         用户协议 link
 │   ├── link-privacy.json      隐私政策 link
 │   └── link-guidelines.json   社区公约 link
 ├── submit-btn.json
 └── footer/
-    ├── _block.json
+    ├── _component.json
     └── login-link.json
 ```
 

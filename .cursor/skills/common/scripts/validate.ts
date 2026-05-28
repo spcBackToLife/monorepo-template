@@ -9,8 +9,11 @@
  *   1. 层级完整性: interaction有trigger但无design → ⚠️
  *   2. 内容完整性: 叶子节点无content且无materials → ❌
  *   3. 交互完整性: 有trigger但无flows.success/error → ⚠️
- *   4. 引用完整性: 所有ref字段指向的文件是否存在
+ *   4. 引用完整性: 所有 ref 字段指向的文件是否存在
  *   5. 实施验收: status=completed但checklist有false → ⚠️
+ *   6. 组件独立文档存在性（★ 新增）: 每个 _component.json 必须有对应的
+ *      <name>.visual.md + <name>.md（在 design-plan/components/<name>/ 或
+ *      design-plan/pages/<pid>/components/<name>/ 任一处）
  */
 
 import * as fs from 'fs';
@@ -104,7 +107,7 @@ function checkNode(filePath: string, registry: string, workspaceRoot: string): I
   // 2. 内容完整性（仅叶子节点）
   const dir = path.dirname(filePath);
   const hasSubDirs = fs.readdirSync(dir, { withFileTypes: true }).some(e => e.isDirectory());
-  const isLeaf = !hasSubDirs || basename !== '_block.json';
+  const isLeaf = !hasSubDirs || basename !== '_component.json';
 
   if (isLeaf && basename !== '_page.json' && basename !== '_materials.json') {
     if (content?.['type'] === 'none' && (materials === null || materials === undefined)) {
@@ -154,6 +157,65 @@ function checkNode(filePath: string, registry: string, workspaceRoot: string): I
         path: relPath,
         message: `status=completed 但 checklist 未通过: ${incomplete.map(([k]) => k).join(', ')}`,
       });
+    }
+  }
+
+  // 6. 组件独立文档存在性（仅检查 _component.json 节点）
+  //    每个组件必须有 <name>.visual.md + <name>.md，路径在
+  //    design-plan/components/<name>/ 或 design-plan/pages/<pid>/components/<name>/ 任一处。
+  //    要求两份文件都存在；都缺则 ❌；只缺其一则 ⚠️；两处都存在则 ⚠️（路径冲突）。
+  if (basename === '_component.json') {
+    // 从 registry 路径推断 pageId 和组件名
+    // relPath 形如: pages/<pid>/<comp-dir-or-nested>/_component.json
+    const segments = relPath.split(path.sep);
+    if (segments.length >= 4 && segments[0] === 'pages') {
+      const pid = segments[1];
+      const compName = segments[segments.length - 2]; // 父目录名
+
+      const universalDir = path.join(workspaceRoot, 'design-plan', 'components', compName);
+      const pageScopedDir = path.join(workspaceRoot, 'design-plan', 'pages', pid, 'components', compName);
+
+      const checkPair = (dir: string) => {
+        const hasVisual = fs.existsSync(path.join(dir, `${compName}.visual.md`));
+        const hasMain = fs.existsSync(path.join(dir, `${compName}.md`));
+        return { hasVisual, hasMain, exists: hasVisual || hasMain, complete: hasVisual && hasMain };
+      };
+
+      const u = checkPair(universalDir);
+      const p = checkPair(pageScopedDir);
+
+      if (!u.exists && !p.exists) {
+        issues.push({
+          level: '❌',
+          path: relPath,
+          message: `组件 ${compName} 缺独立文档：应在 design-plan/components/${compName}/ 或 design-plan/pages/${pid}/components/${compName}/ 任一处放 ${compName}.visual.md + ${compName}.md`,
+        });
+      } else if (u.exists && p.exists) {
+        issues.push({
+          level: '⚠️',
+          path: relPath,
+          message: `组件 ${compName} 在通用目录和页面专属目录两处都有文档，路径冲突，需决定唯一来源`,
+        });
+      } else {
+        const target = u.exists ? u : p;
+        const dirHint = u.exists
+          ? `design-plan/components/${compName}/`
+          : `design-plan/pages/${pid}/components/${compName}/`;
+        if (!target.hasVisual) {
+          issues.push({
+            level: '⚠️',
+            path: relPath,
+            message: `组件 ${compName} 缺 visual.md：${dirHint}${compName}.visual.md`,
+          });
+        }
+        if (!target.hasMain) {
+          issues.push({
+            level: '⚠️',
+            path: relPath,
+            message: `组件 ${compName} 缺结构文档：${dirHint}${compName}.md`,
+          });
+        }
+      }
     }
   }
 

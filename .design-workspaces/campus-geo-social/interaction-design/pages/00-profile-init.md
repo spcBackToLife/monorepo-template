@@ -99,18 +99,18 @@ success:partial → routed:        直接跳 01-home-map
 00-profile-init/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   └── skip-btn.json
 ├── progress-indicator.json     (进度，纯展示)
 ├── avatar-picker.json          (头像选择器，click trigger)
 ├── form-card/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── nickname-input.json     (含 nickname-suggestion 子元素)
 │   ├── nickname-suggestion.json(冲突时显示，click trigger)
 │   ├── gender-picker.json      (3 选 1 单选)
 │   └── bio-input.json          (textarea + 计数)
 ├── xuexin-info-card/
-│   ├── _block.json             (展示学信网拉取的院系/年级，可展开收起)
+│   ├── _component.json             (展示学信网拉取的院系/年级，可展开收起)
 │   └── toggle-btn.json
 └── submit-btn.json
 ```

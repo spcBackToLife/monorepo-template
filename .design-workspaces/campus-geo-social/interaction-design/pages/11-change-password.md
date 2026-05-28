@@ -89,11 +89,11 @@ success → routed:               L2 Toast + 1.5s 后 pop
 11-change-password/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json             (含 title「修改密码」)
+│   ├── _component.json             (含 title「修改密码」)
 │   └── back-btn.json
 ├── security-note.json          (顶部提示「修改后所有设备需重新登录」，纯展示)
 ├── form-card/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── old-password-input.json
 │   ├── new-password-input.json (含强度条 - 内联在 input)
 │   └── confirm-password-input.json

@@ -97,22 +97,22 @@ visible → routed (06-conversation):  点 replied 项进入会话
 02-greets-sent/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   └── clear-finished-btn.json
 ├── top-tabs/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── received-tab.json
 │   └── sent-tab.json
 ├── greets-list/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── items.json               (单条，按子状态展示不同 actions)
 │   └── actions/
-│       ├── _block.json
+│       ├── _component.json
 │       ├── withdraw-btn.json    (仅 pending 显示)
 │       └── open-conversation-btn.json (仅 replied 显示)
 └── empty-state/
-    └── _block.json              (component)
+    └── _component.json              (component)
 ```
 
 通用组件：`Toast`、`ConfirmDialog`、`EmptyState`

@@ -106,27 +106,27 @@ submitting → error:insufficient-diamonds: 钻石不足
 02-greet-compose/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   └── target-info.json         (右侧迷你头像+昵称，纯展示)
 ├── diamond-cost-info.json       (剩余 3/3 免费次数 + 钻石消耗，纯展示)
 ├── preset-list/
-│   ├── _block.json
+│   ├── _component.json
 │   └── items.json               (预设话术，click 直接发送)
 ├── divider.json                 (or 分隔线，纯展示)
 ├── custom-input.json            (自定义文本输入)
 ├── emoji-trigger.json           (表情触发按钮)
 ├── emoji-picker/
-│   ├── _block.json              (component: 表情面板)
+│   ├── _component.json              (component: 表情面板)
 │   ├── mask.json
 │   └── items.json
 ├── send-btn.json
 ├── confirm-cost-sheet/
-│   ├── _block.json              (component: rate-limit 时的钻石消耗确认)
+│   ├── _component.json              (component: rate-limit 时的钻石消耗确认)
 │   ├── yes-btn.json
 │   └── no-btn.json
 └── insufficient-diamonds-sheet/
-    ├── _block.json
+    ├── _component.json
     └── buy-btn.json
 ```
 

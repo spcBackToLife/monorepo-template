@@ -10,11 +10,16 @@
 ✅ **Phase 3 完成**，**product stage-gate 已通过**（0 ❌ + 4 ⚠️ 系统页可忽略警告）。
 ✅ **theme-generator 完成**：D6 青春治愈风 ThemeConfig 已生成并写入设计编辑器项目。
 🔄 **interaction-designer**：完成 29/64 页（M0 认证全套 + M1 位置动态全套 + M2 捞网全套 + 几个系统页）。
-🧪 **design-planner 样板验证（2026-05-28）**：以 00-login 为样板跑通全流程
-  - Phase 0 / Phase 1 design-system.md（11 章）/ Phase 2 完整跑通
-  - 产物：`design-plan/design-system.md` + `design-plan/pages/00-login/{visual,index}.md` + 6 个素材 md
-  - 13 节点 design 层写入完成，validate 0 ❌ + 0 ⚠️
-  - 修复了 `validate.ts` 的 workspaceRoot 计算 bug（path.resolve registry, '../..' → '..'）
+🧪 **design-planner 样板验证（2026-05-28 第二轮）**：以 00-login 为样板跑通全流程
+  - Phase 1 design-system.md（11 章）完成
+  - Phase 2 完整跑通：visual.md → 3 组件深钻(form-card通用+top-area/footer专属) → 6 素材 md → index.md
+  - 产物 15 个文件：
+    - `design-plan/design-system.md`
+    - `design-plan/pages/00-login/{visual,index}.md`
+    - `design-plan/pages/00-login/materials/{B-01,I-01,I-02,I-04,D-02,D-03}.md`
+    - `design-plan/pages/00-login/components/{top-area,footer}/{*.visual.md,*.md}`
+    - `design-plan/components/form-card/{form-card.visual.md,form-card.md}`
+  - 13 节点 design 层写入完成，validate **0 ❌ + 1 ⚠️**（_page 页面逻辑态，可忽略）
 🚧 **下一步候选**：
   1. 补完剩余 35 页 interaction 后再开 design 阶段全量
   2. 直接基于已完成 29 页 interaction 走完 design 阶段（约 28 页 × 17 项 ≈ 470 项任务）

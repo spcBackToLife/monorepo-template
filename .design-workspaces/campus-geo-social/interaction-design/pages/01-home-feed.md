@@ -100,17 +100,17 @@ visible ↔ map-mode:                顶部 Tab → 01-home-map (replace)
 01-home-feed/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── campus-btn.json
 │   ├── search-btn.json
 │   └── notify-btn.json
 ├── top-tabs.json                (Map/Feed 切换)
 ├── sort-tabs.json               (距离/最新/最热)
 ├── feed-list/
-│   ├── _block.json              (component: 列表容器)
+│   ├── _component.json              (component: 列表容器)
 │   └── items.json               (动态卡片，含 click/double-tap/long-press)
 ├── empty-state/
-│   ├── _block.json              (component, 引用 overview.md#empty-state)
+│   ├── _component.json              (component, 引用 overview.md#empty-state)
 │   ├── expand-radius-btn.json
 │   ├── plaza-btn.json
 │   └── post-btn.json

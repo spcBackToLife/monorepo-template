@@ -70,11 +70,11 @@ success → routed:                  push 01-home-map (fade)
 ```
 00-forgot-password/
 ├── _page.json
-├── app-bar/_block             (含 back 按钮，挂 _block 描述)
+├── app-bar/_component             (含 back 按钮，挂 _component 描述)
 ├── app-bar/back-btn.json
 ├── progress-indicator.json    (1/2 → 2/2 步骤指示，trigger=none，但作为独立 element 因为有 state 切换)
 ├── form-card/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── phone-input.json
 │   ├── code-input.json
 │   ├── send-code-btn.json

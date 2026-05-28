@@ -95,14 +95,14 @@ updating-blocked → external:        点击"去更新" → 跳应用商店（Ap
 00-splash/
 ├── _page.json
 ├── brand-area/
-│   ├── _block.json              品牌区容器
+│   ├── _component.json              品牌区容器
 │   └── logo.json                logo 元素（动画 + 长按彩蛋）
 ├── status-area/
-│   ├── _block.json              状态区容器
+│   ├── _component.json              状态区容器
 │   ├── progress.json            隐式进度（旋转粒子或脉冲）
 │   └── retry-btn.json           重试按钮（仅 timeout 态可见）
 └── update-modal/
-    ├── _block.json              强制更新弹窗（component）
+    ├── _component.json              强制更新弹窗（component）
     └── store-btn.json           跳应用商店按钮
 ```
 

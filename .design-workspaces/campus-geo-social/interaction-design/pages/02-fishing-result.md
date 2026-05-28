@@ -100,20 +100,20 @@ finished → routed:              pop 回 fishing-cast
 02-fishing-result/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json              (透明顶部)
+│   ├── _component.json              (透明顶部)
 │   └── back-btn.json            (返回 fishing-cast，需确认)
 ├── skip-btn.json                (右上跳过)
 ├── ceremony-animation.json      (撒网仪式 lottie，state-driven 动画)
 ├── card-stack/
-│   ├── _block.json              (component: 卡片堆叠容器)
+│   ├── _component.json              (component: 卡片堆叠容器)
 │   └── items.json               (单张卡片，含 swipe gesture + click 详情)
 ├── action-buttons/
-│   ├── _block.json              (底部三按钮)
+│   ├── _component.json              (底部三按钮)
 │   ├── greet-btn.json           (打招呼)
 │   ├── ignore-btn.json          (无视)
 │   └── collect-btn.json         (收藏)
 └── empty-state/
-    ├── _block.json              (component, 治愈空网)
+    ├── _component.json              (component, 治愈空网)
     └── cast-again-btn.json
 ```
 

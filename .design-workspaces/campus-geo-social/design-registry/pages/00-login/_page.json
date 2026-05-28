@@ -71,46 +71,22 @@
       }
     ]
   },
-  "_updatedAt": "2026-05-28T06:34:39.207Z",
+  "_updatedAt": "2026-05-28T10:32:27.519Z",
   "design": {
-    "summary": "登录页设计：奶油白底 + 顶部温暖光晕 + Logo + mode-toggle + form-card(48px input) + 主 CTA 草莓粉 full 圆角 + footer 链接 + 3 装饰",
-    "ref": "design-plan/pages/00-login/index.md",
+    "summary": "暖白底+顶部粉色渐变+角落装饰+居中品牌+表单卡+药丸CTA的青春治愈登录页",
     "visualRef": "design-plan/pages/00-login/visual.md",
-    "visualStates": {
-      "idle:code-mode": {
-        "summary": "默认验证码登录模式，mode-toggle 滑块在左，code-input 显示"
-      },
-      "idle:password-mode": {
-        "summary": "密码登录模式，mode-toggle 滑块在右，password-input 显示"
-      },
-      "inputting": {
-        "summary": "任一 input 获得焦点，label 上浮 + 焦点光圈"
-      },
-      "code-sending": {
-        "summary": "send-code-btn 显示倒计时 60s + disabled"
-      },
-      "submitting": {
-        "summary": "form-card 半透禁用 + submit-btn spinner"
-      },
-      "success": {
-        "summary": "submit-btn 变 success 绿 + I-04 checkmark + glow-success + 0.5s fade 跳转"
-      },
-      "error:credential": {
-        "summary": "form-card shake + 字段下 caption 红字"
-      },
-      "error:locked": {
-        "summary": "ConfirmDialog warning + 忘记密码按钮"
-      },
-      "error:banned": {
-        "summary": "ConfirmDialog error + 申诉按钮"
-      },
-      "error:logging-off": {
-        "summary": "ConfirmDialog info + 撤回/继续注销双按钮"
-      },
-      "error:remote-login": {
-        "summary": "Toast + submit-btn 显示等待主设备 + 轮询"
-      }
-    },
-    "layoutHint": "single-screen"
+    "indexRef": "design-plan/pages/00-login/index.md",
+    "palette": [
+      "#FFFAF6",
+      "#FFE6EC",
+      "#FF6F91",
+      "#6FE2A8",
+      "#FFFFFF"
+    ],
+    "keyStyles": {
+      "background": "linear-gradient(180deg, #FFE6EC 0%, #FFFAF6 40%)",
+      "overflow": "hidden",
+      "position": "relative"
+    }
   }
 }

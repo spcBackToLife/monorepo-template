@@ -244,7 +244,7 @@ design-registry/
 
 **页面列表来源：** 从信息架构分析中推导出的所有页面。
 
-**⚠️ 注意：** 此阶段只创建骨架（project级 + 页面级 product 层），不创建区块/元素节点文件。
+**⚠️ 注意：** 此阶段只创建骨架（project级 + 页面级 product 层），不创建组件/元素节点文件。
 后续技能（interaction-designer/design-planner）会逐步通过脚本追加节点。
 
 ---

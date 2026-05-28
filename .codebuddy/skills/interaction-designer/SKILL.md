@@ -250,18 +250,18 @@ Step 3: 写入 design-registry（★ 通过脚本，不可跳过）
 
   b. 构建 children 骨架节点（★ 每个 operation 的 triggerNodePath 都必须真实存在）:
 
-     遍历 md 中的「操作清单」表格，每一行至少创建 2 个节点（区块 + 元素）：
+     遍历 md 中的「操作清单」表格，每一行至少创建 2 个节点（组件 + 元素）：
 
-     # 创建区块容器
+     # 创建组件容器（_component.json）
      execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/create-node.ts \
        --registry $REGISTRY \
-       --path pages/<page>/<block>/_block \
-       --data '{ "id": "<block>", "type": "block", "name": "<显示名>", "interaction": {...} }'
+       --path pages/<page>/<component>/_component \
+       --data '{ "id": "<component>", "type": "component", "name": "<显示名>", "interaction": {...} }'
 
      # 创建触发元素（从「操作清单」逐行映射）
      execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/create-node.ts \
        --registry $REGISTRY \
-       --path pages/<page>/<block>/<element> \
+       --path pages/<page>/<component>/<element> \
        --data '{
          "id": "publish-btn",
          "type": "element",
@@ -283,7 +283,7 @@ Step 3: 写入 design-registry（★ 通过脚本，不可跳过）
      识别为组件的（md 中标记"独立文档=✅"） → 创建组件目录:
      execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/create-node.ts \
        --registry $REGISTRY \
-       --path pages/<page>/<component>/_block \
+       --path pages/<page>/<component>/_component \
        --data '{ "id": "...", "type": "component", "name": "...", "interaction": {...} }'
 
   c. 更新全局交互规范引用到 _index.json (仅首次):

@@ -92,16 +92,16 @@ appealing → polling:        继续轮询
 00-auth-status/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json             (注册流入口 back-btn 隐藏；从设置入口才显示)
+│   ├── _component.json             (注册流入口 back-btn 隐藏；从设置入口才显示)
 │   └── back-btn.json
 ├── status-card/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── animation.json          (审核中沙漏 / 通过烟花 / 驳回失落小人 - 按 state 切换)
 │   ├── title.json              (状态标题，按 state 切换文案)
 │   ├── desc.json               (状态描述，含预计时长)
 │   └── reason.json             (驳回原因卡片，仅 rejected 显示)
 ├── cta-area/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── explore-btn.json        (去探索，reviewing/appealing 显示)
 │   ├── contact-btn.json        (联系客服，超期显示)
 │   ├── resubmit-btn.json       (修改重提，rejected 显示)

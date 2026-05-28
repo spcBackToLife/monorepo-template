@@ -16,6 +16,129 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
 /**
+ * 递归判断一个 Zod schema 是否期望 object 或 array 类型的值。
+ * 支持 unwrap：ZodOptional / ZodNullable / ZodDefault / ZodUnion / ZodDiscriminatedUnion。
+ */
+function isObjectOrArraySchema(schema: z.ZodTypeAny): boolean {
+  if (!schema || !schema._def) return false;
+  const typeName = schema._def.typeName as string;
+
+  // 直接是 object/array/record 类型
+  if (
+    typeName === 'ZodObject' ||
+    typeName === 'ZodArray' ||
+    typeName === 'ZodRecord' ||
+    typeName === 'ZodTuple'
+  ) {
+    return true;
+  }
+
+  // Wrapper 类型：递归检查内部
+  if (typeName === 'ZodOptional' || typeName === 'ZodNullable' || typeName === 'ZodDefault') {
+    return isObjectOrArraySchema(schema._def.innerType);
+  }
+
+  // Union：任一分支是 object/array 即视为需要 parse
+  if (typeName === 'ZodUnion' || typeName === 'ZodDiscriminatedUnion') {
+    const options: z.ZodTypeAny[] = schema._def.options ?? [];
+    return options.some(opt => isObjectOrArraySchema(opt));
+  }
+
+  return false;
+}
+
+/**
+ * 递归判断一个 Zod schema 是否期望 number 类型的值。
+ */
+function isNumberSchema(schema: z.ZodTypeAny): boolean {
+  if (!schema || !schema._def) return false;
+  const typeName = schema._def.typeName as string;
+
+  if (typeName === 'ZodNumber') return true;
+
+  // Wrapper 类型：递归检查内部
+  if (typeName === 'ZodOptional' || typeName === 'ZodNullable' || typeName === 'ZodDefault') {
+    return isNumberSchema(schema._def.innerType);
+  }
+
+  return false;
+}
+
+/**
+ * 递归判断一个 Zod schema 是否期望 boolean 类型的值。
+ */
+function isBooleanSchema(schema: z.ZodTypeAny): boolean {
+  if (!schema || !schema._def) return false;
+  const typeName = schema._def.typeName as string;
+
+  if (typeName === 'ZodBoolean') return true;
+
+  if (typeName === 'ZodOptional' || typeName === 'ZodNullable' || typeName === 'ZodDefault') {
+    return isBooleanSchema(schema._def.innerType);
+  }
+
+  return false;
+}
+
+/**
+ * 预处理参数：将 MCP 客户端误传为 JSON 字符串的 object/array 字段还原为对象。
+ * 同时处理 number 和 boolean 类型的字符串→原始类型转换。
+ *
+ * 仅对标记的字段执行尝试；若 parse 失败则保持原值
+ * （让后续 Zod 校验给出精确错误信息）。
+ */
+function coerceStringifiedObjects(
+  params: Record<string, unknown>,
+  objectFields: Set<string>,
+  numberFields?: Set<string>,
+  booleanFields?: Set<string>,
+): Record<string, unknown> {
+  // 处理 object/array 字段
+  for (const field of objectFields) {
+    const val = params[field];
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))
+      ) {
+        try {
+          params[field] = JSON.parse(val);
+        } catch {
+          // parse 失败保持原值，由 Zod 报错
+        }
+      }
+    }
+  }
+
+  // 处理 number 字段
+  if (numberFields) {
+    for (const field of numberFields) {
+      const val = params[field];
+      if (typeof val === 'string' && val.trim() !== '') {
+        const num = Number(val);
+        if (!isNaN(num)) {
+          params[field] = num;
+        }
+      }
+    }
+  }
+
+  // 处理 boolean 字段
+  if (booleanFields) {
+    for (const field of booleanFields) {
+      const val = params[field];
+      if (typeof val === 'string') {
+        if (val === 'true') params[field] = true;
+        else if (val === 'false') params[field] = false;
+      }
+    }
+  }
+
+  return params;
+}
+
+/**
  * 单个 action 定义，handler 参数类型从 schema 的 z.infer<S> 自动推导。
  *
  * schema 约束为 z.ZodObject — 保证：
@@ -86,6 +209,42 @@ export function registerDomainTool(
     actionFieldMap[name] = Object.keys(def.schema.shape);
   }
 
+  // ── 提取各 action 中期望为 object/array 的字段名，用于自动 JSON.parse 字符串 ──
+  //
+  // 背景：looseInputSchema 用 passthrough() 不声明具体字段类型，
+  // 导致 MCP 客户端生成的 JSON Schema 里 additionalProperties=true 但无类型提示。
+  // 某些客户端（包括 Claude MCP）会把本应是 object/array 的参数序列化为 JSON 字符串。
+  // 在此预处理阶段，根据各 action 的 Zod schema 推断哪些字段应是 object/array，
+  // 若实际收到 string，则尝试 JSON.parse 还原。
+  const actionObjectFields: Record<string, Set<string>> = {};
+  for (const [name, def] of entries) {
+    const objFields = new Set<string>();
+    for (const [fieldName, fieldSchema] of Object.entries(def.schema.shape)) {
+      if (isObjectOrArraySchema(fieldSchema as z.ZodTypeAny)) {
+        objFields.add(fieldName);
+      }
+    }
+    actionObjectFields[name] = objFields;
+  }
+
+  // ── 提取各 action 中期望为 number / boolean 的字段名 ──
+  const actionNumberFields: Record<string, Set<string>> = {};
+  const actionBooleanFields: Record<string, Set<string>> = {};
+  for (const [name, def] of entries) {
+    const numFields = new Set<string>();
+    const boolFields = new Set<string>();
+    for (const [fieldName, fieldSchema] of Object.entries(def.schema.shape)) {
+      if (isNumberSchema(fieldSchema as z.ZodTypeAny)) {
+        numFields.add(fieldName);
+      }
+      if (isBooleanSchema(fieldSchema as z.ZodTypeAny)) {
+        boolFields.add(fieldName);
+      }
+    }
+    actionNumberFields[name] = numFields;
+    actionBooleanFields[name] = boolFields;
+  }
+
   // 🔒 宽松 schema：让 SDK 放行所有参数，由我们在 handler 里手动验证
   //
   // ⚠️ 关键陷阱（2026-05-06 修复）：
@@ -128,7 +287,18 @@ export function registerDomainTool(
         );
       }
 
-      // ── 2. 手动 Zod 验证（核心加固点）──
+      // ── 2. 预处理：将 MCP 客户端误传的字符串类型还原为正确类型 ──
+      const objectFields = actionObjectFields[actionKey];
+      const numberFields = actionNumberFields[actionKey];
+      const booleanFields = actionBooleanFields[actionKey];
+      coerceStringifiedObjects(
+        params,
+        objectFields ?? new Set(),
+        numberFields,
+        booleanFields,
+      );
+
+      // ── 3. 手动 Zod 验证（核心加固点）──
       const parseResult = fullSchema.safeParse(params);
       if (!parseResult.success) {
         const zodErr = parseResult.error;
@@ -148,7 +318,7 @@ export function registerDomainTool(
         );
       }
 
-      // ── 3. 执行业务逻辑 ──
+      // ── 4. 执行业务逻辑 ──
       const rest = Object.fromEntries(
         Object.entries(params).filter(([k]) => k !== 'action'),
       );

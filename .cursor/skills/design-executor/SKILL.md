@@ -34,9 +34,9 @@ design-registry/
 │   └── <page-id>/
 │       ├── _page.json         ← 页面级信息（product/interaction/dataLayer）
 │       ├── _materials.json    ← 该页面素材索引
-│       └── <block>/           ← 区块目录
-│           ├── _block.json    ← 区块自身信息
-│           └── <element>.json ← 叶子节点文件
+│       └── <component>/       ← 组件目录
+│           ├── _component.json    ← 组件根节点信息
+│           └── <element>.json     ← 叶子节点文件
 └── scripts/                   ← 校验/查询/任务生成脚本
 ```
 
@@ -125,14 +125,14 @@ Step 4: 验证 checklist 各项
 Step 5: 回写实施结果（通过脚本，确保格式正确）
   execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/write-node.ts \
     --registry $REGISTRY \
-    --path pages/<page>/<block>/<node> \
+    --path pages/<page>/<component>/<node> \
     --layer implementation \
     --data '{"nodeId":"nd_xxx","status":"completed","checklist":{"structure":true,"styles":true,...}}'
 ```
 
 ### Phase 2: 阶段验证
 
-每完成一个区块目录（_block + 所有子节点）后：
+每完成一个组件目录（_component + 所有子节点）后：
 
 ```
 1. 运行校验脚本:
@@ -141,7 +141,7 @@ Step 5: 回写实施结果（通过脚本，确保格式正确）
    → 如有问题输出告警列表
 
 2. MCP: generate_snapshots → 截图验证视觉效果
-3. 对照该区块的 design.ref 检查截图与设计文档是否一致
+3. 对照该组件的 design.ref 检查截图与设计文档是否一致
 4. 如有问题 → 修复 → 二次截图
 
 5. 更新页面状态（通过脚本）:

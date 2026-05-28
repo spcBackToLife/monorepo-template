@@ -97,24 +97,24 @@ not-found-submitting → idle:default:  Toast「已提交申诉，48h 内回复�
 00-auth-school-select/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json             (内含 progress-indicator 步骤展示，纯展示)
+│   ├── _component.json             (内含 progress-indicator 步骤展示，纯展示)
 │   └── back-btn.json
 ├── search-input.json
 ├── hot-list/
-│   ├── _block.json
+│   ├── _component.json
 │   └── items.json              (热门学校列表，click trigger)
 ├── result-list/
-│   ├── _block.json
+│   ├── _component.json
 │   └── items.json              (搜索结果列表，click trigger)
-├── empty-state/_block          (no-result 时显示，含 not-found-link)
+├── empty-state/_component          (no-result 时显示，含 not-found-link)
 ├── not-found-link.json
 ├── campus-sheet/
-│   ├── _block.json             (component sheet)
+│   ├── _component.json             (component sheet)
 │   ├── mask.json
 │   ├── items.json              (校区项列表)
 │   └── confirm-btn.json
 └── appeal-sheet/
-    ├── _block.json             (找不到学校的申诉表 sheet)
+    ├── _component.json             (找不到学校的申诉表 sheet)
     ├── form-fields.json        (统一字段 element，含 input/select)
     └── submit-btn.json
 ```

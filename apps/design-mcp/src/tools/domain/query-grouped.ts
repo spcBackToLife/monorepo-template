@@ -22,6 +22,22 @@ export function registerQueryTools(server: McpServer): void {
         }, null, 2) }] };
       },
     }),
+    create_project: defineAction({
+      description: '创建一个新的设计项目，返回 projectId',
+      schema: z.object({ name: z.string(), platform: z.string().optional().default('mobile') }),
+      handler: async (p) => {
+        const result = await apiClient.createProject({ name: p.name, platform: p.platform });
+        return { content: [{ type:'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
+    list_projects: defineAction({
+      description: '列出所有设计项目',
+      schema: z.object({}),
+      handler: async () => {
+        const result = await apiClient.listProjects();
+        return { content: [{ type:'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
     screen_schema: defineAction({
       description: '获取指定屏幕的完整 Schema（组件树、样式、交互、状态）',
       schema: z.object({ projectId: z.string(), screenId: z.string() }),

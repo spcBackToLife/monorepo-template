@@ -49,6 +49,13 @@ export async function getProject(projectId: string): Promise<DesignProject> {
   return request<DesignProject>(`/api/projects/${projectId}`);
 }
 
+export async function createProject(data: { name: string; platform?: string }): Promise<unknown> {
+  return request('/api/projects', {
+    method: 'POST',
+    body: data,
+  });
+}
+
 export async function listProjects(): Promise<unknown> {
   return request('/api/projects');
 }
@@ -689,7 +696,7 @@ export async function updateTheme(
 
 // Default export for compatibility with dynamic import().default patterns used in domain tools
 const apiClient = {
-  getProject, listProjects, deleteProject,
+  getProject, createProject, listProjects, deleteProject,
   executeOperation, executeBatch, getOperationsSince, undo,
   listAssets, createAsset, updateAsset, deleteAsset,
   listDataSources, getDataSource, uploadFile,

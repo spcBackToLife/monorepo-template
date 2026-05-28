@@ -113,17 +113,17 @@ success → routed:                      跳转目标页（首选 01-home-map；
 ```
 00-login/
 ├── _page.json
-├── top-area/_block            (block, 内含 logo + slogan，无 trigger，不再独立建)
+├── top-area/_component            (block, 内含 logo + slogan，无 trigger，不再独立建)
 ├── mode-toggle.json            切换登录方式（验证码/密码 双 tab）
 ├── form-card/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── phone-input.json        手机号输入框
 │   ├── code-input.json         6 格验证码（code-mode）
 │   ├── password-input.json     密码框（password-mode，含眼睛切换 - 内联）
 │   └── send-code-btn.json      获取验证码按钮（含 60s 倒计时）
 ├── submit-btn.json             登录按钮
 └── footer/
-    ├── _block.json
+    ├── _component.json
     ├── register-link.json      跳注册
     └── forgot-link.json        跳忘记密码
 ```

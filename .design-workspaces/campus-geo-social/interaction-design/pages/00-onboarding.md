@@ -85,16 +85,16 @@ finishing      → routed:    写入 onboarding_completed=true → push 00-login
 00-onboarding/
 ├── _page.json
 ├── top-bar/
-│   ├── _block.json              顶部条
+│   ├── _component.json              顶部条
 │   └── skip-btn.json            跳过按钮
 ├── swiper/
-│   ├── _block.json              swiper 容器
+│   ├── _component.json              swiper 容器
 │   ├── page-1.json              第 1 屏（地理动态 · 插画+标题+副标题）
 │   ├── page-2.json              第 2 屏（捞网交友）
 │   ├── page-3.json              第 3 屏（时空胶囊）
 │   └── page-4.json              第 4 屏（跨校漫游）
 ├── page-indicator/
-│   ├── _block.json              4 个 dot 容器
+│   ├── _component.json              4 个 dot 容器
 │   └── dots.json                指示器组合（4 个圆点）
 └── bottom-cta-btn.json          底部 CTA（"下一页" / "立即体验"）
 ```

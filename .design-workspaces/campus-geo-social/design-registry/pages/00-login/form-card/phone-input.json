@@ -32,36 +32,29 @@
     "nodeId": null,
     "status": "pending"
   },
-  "design": {
-    "summary": "手机号输入框：48px 高 + radius-md + 1px border + focus 双层 ring（2px primary + 4px 10%）",
-    "ref": "design-plan/pages/00-login/index.md#§4.3-phone-input",
-    "visualRef": "design-plan/pages/00-login/visual.md#§6-input-样式表",
-    "visualStates": {
-      "default": {
-        "summary": "border: 1px borderLight, label 居中默认位"
-      },
-      "focused": {
-        "summary": "border: 2px primary + box-shadow 0 0 0 4px rgba(255,111,145,0.1), label translateY(-22px) scale(0.85) 色变 primary"
-      },
-      "has-value": {
-        "summary": "label 保持上浮位（同 focused 的 label 状态，但 border 回到默认）"
-      },
-      "error": {
-        "summary": "border: 2px error + label 色变 error + 字段下方 inline 红字 caption"
-      },
-      "disabled": {
-        "summary": "opacity 0.45, pointer-events:none（submitting 时）"
-      }
-    },
-    "interactionStates": {
-      "focus": {
-        "summary": "焦点光圈 200ms ease-out 展开"
-      }
-    }
-  },
   "content": {
     "type": "text",
     "value": "手机号"
   },
-  "_updatedAt": "2026-05-28T06:25:45.225Z"
+  "_updatedAt": "2026-05-28T08:00:12.523Z",
+  "design": {
+    "summary": "手机号输入框 h:48 radius:md border:1px#FFE0E8 focus:2px#FF6F91+ring font:body-lg",
+    "keyStyles": {
+      "height": "48px",
+      "borderRadius": "12px",
+      "border": "1px solid #FFE0E8",
+      "fontSize": "16px",
+      "padding": "12px 16px"
+    },
+    "visualStates": {
+      "focus": {
+        "border": "2px solid #FF6F91",
+        "boxShadow": "0 0 0 3px rgba(255,111,145,0.1)"
+      },
+      "error": {
+        "border": "2px solid #ED5A5A",
+        "boxShadow": "0 0 0 3px rgba(237,90,90,0.1)"
+      }
+    }
+  }
 }

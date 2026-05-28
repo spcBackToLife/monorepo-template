@@ -100,14 +100,14 @@ confirmed → routed:                  pop 回 edit（带 location 参数）
 01-publish-pick-location/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   └── back-btn.json
 ├── search-input.json
 ├── search-result-list/
-│   ├── _block.json              (搜索结果下拉，覆盖在地图上方)
+│   ├── _component.json              (搜索结果下拉，覆盖在地图上方)
 │   └── items.json
 ├── map-canvas/
-│   ├── _block.json              (component: 地图本体)
+│   ├── _component.json              (component: 地图本体)
 │   ├── center-pin.json          (中心 pin，纯展示但跟随 state)
 │   └── radius-overlay.json      (半径圈圈叠加层)
 ├── radius-toggle.json
@@ -115,7 +115,7 @@ confirmed → routed:                  pop 回 edit（带 location 参数）
 ├── poi-card.json                (底部 POI 卡片，纯展示 + 距离)
 ├── confirm-btn.json
 └── out-of-campus-modal/
-    ├── _block.json              (component)
+    ├── _component.json              (component)
     ├── confirm-btn.json
     └── cancel-btn.json
 ```

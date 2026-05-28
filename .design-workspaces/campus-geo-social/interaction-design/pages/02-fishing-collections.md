@@ -96,19 +96,19 @@ visible → clearing-expired:          点清理过期
 02-fishing-collections/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   └── clear-expired-btn.json
 ├── collections-grid/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── items.json               (卡片，含 click 展开 + long-press 多选)
 │   ├── sheet-mask.json          (详情 sheet 遮罩)
 │   └── actions/
-│       ├── _block.json          (展开详情 sheet 内的操作)
+│       ├── _component.json          (展开详情 sheet 内的操作)
 │       ├── greet-btn.json
 │       └── remove-btn.json
 └── empty-state/
-    └── _block.json              (component)
+    └── _component.json              (component)
 ```
 
 通用组件：`Toast`、`ConfirmDialog`、`EmptyState`、`Sheet`、`ErrorView`

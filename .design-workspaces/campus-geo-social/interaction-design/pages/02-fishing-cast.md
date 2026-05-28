@@ -94,20 +94,20 @@ restricted:cooldown → ready:         倒计时结束
 02-fishing-cast/
 ├── _page.json
 ├── top-bar/
-│   ├── _block.json              (顶部右侧按钮组)
+│   ├── _component.json              (顶部右侧按钮组)
 │   ├── collections-entry-btn.json (我的收藏入口 + 徽章)
 │   └── greets-entry-btn.json    (我的招呼入口 + 未读徽章)
 ├── map-preview/
-│   ├── _block.json              (component: 地图预览+撒网半径圆)
+│   ├── _component.json              (component: 地图预览+撒网半径圆)
 │   └── radius-circle.json       (半径圈圈，跟随选定网类型变化)
 ├── prediction-card.json         (附近活跃人数预测，纯展示)
 ├── net-type-cards/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── items.json               (4 张网卡片，click 选择)
 │   └── info-btn.json            (问号 icon，展开说明)
 ├── cast-btn.json                (大撒网按钮)
 ├── insufficient-sheet/
-│   ├── _block.json              (component: 余额不足 sheet)
+│   ├── _component.json              (component: 余额不足 sheet)
 │   ├── buy-btn.json
 │   └── cancel-btn.json
 └── restricted-banner.json       (unverified/roaming/cooldown 三态)

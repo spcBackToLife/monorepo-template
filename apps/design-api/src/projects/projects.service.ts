@@ -8,6 +8,7 @@ import {
   type DesignProject,
   type Screen,
   type Viewport,
+  type ComponentNode,
   MOBILE_VIEWPORTS,
   TABLET_VIEWPORTS,
   DESKTOP_VIEWPORTS,
@@ -207,6 +208,25 @@ export class ProjectsService {
       if (asset.schema) normalizeNode(asset.schema);
     }
 
+    // 修复：为缺失 id 的节点生成并持久化 ID（一次性自愈）。
+    // 原因：v2 早期通过 batch insertSubtree 时未在 ensureDeterministicIds 中补 id，
+    // 导致部分节点无 id。此处检测到后生成 id 并写入新快照（at current_version），
+    // 确保后续加载稳定且不会重放已有 ops。
+    const repaired = this.repairMissingNodeIds(project);
+    if (repaired) {
+      const { current_version } = projRow;
+      // 写入新快照覆盖当前完整状态（含修复后的 id）
+      await pool.query(
+        `INSERT INTO design_snapshots (project_id, version, schema)
+         VALUES ($1, $2, $3)`,
+        [id, current_version, JSON.stringify(project)],
+      );
+      await pool.query(
+        `UPDATE design_projects SET latest_snapshot = $1 WHERE id = $2`,
+        [current_version, id],
+      );
+    }
+
     // 迁移：旧项目无 themeConfig → 自动补全默认值
     if (!project.themeConfig) {
       project.themeConfig = DEFAULT_THEME_CONFIG;
@@ -224,6 +244,42 @@ export class ProjectsService {
     if (result.rowCount === 0) {
       throw new NotFoundException('项目不存在');
     }
+  }
+
+  /**
+   * 修复项目中缺失 id 的节点（就地赋值 generateNodeId）。
+   * @returns true 如果有修复发生（需要持久化）
+   */
+  private repairMissingNodeIds(project: DesignProject): boolean {
+    let repaired = false;
+
+    const walkAndRepair = (node: ComponentNode) => {
+      if (!node.id) {
+        node.id = generateNodeId();
+        repaired = true;
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          walkAndRepair(child);
+        }
+      }
+      if (node.repeat?.template) {
+        walkAndRepair(node.repeat.template);
+      }
+    };
+
+    for (const screen of project.screens ?? []) {
+      if (screen.rootNode) walkAndRepair(screen.rootNode);
+    }
+    for (const asset of project.componentAssets ?? []) {
+      if (asset.schema) walkAndRepair(asset.schema);
+    }
+
+    if (repaired) {
+      // eslint-disable-next-line no-console
+      console.warn(`[ProjectsService] Repaired missing node IDs in project ${project.id}`);
+    }
+    return repaired;
   }
 
   /** 更新项目缩略图 */

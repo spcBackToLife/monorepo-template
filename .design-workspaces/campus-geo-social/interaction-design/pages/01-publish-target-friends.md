@@ -91,25 +91,25 @@ empty:no-friends → routed (fishing):   点 CTA 跳捞网
 01-publish-target-friends/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── back-btn.json
 │   └── cancel-btn.json
 ├── selected-bubbles/
-│   ├── _block.json              (顶部已选气泡区，可横向滚动)
+│   ├── _component.json              (顶部已选气泡区，可横向滚动)
 │   └── items.json               (含 x 移除)
 ├── search-input.json
 ├── top-bar/
-│   ├── _block.json              (search 之下的副 bar)
+│   ├── _component.json              (search 之下的副 bar)
 │   └── select-all-btn.json      (searching 时显示)
 ├── friends-list/
-│   ├── _block.json              (component: 列表容器)
+│   ├── _component.json              (component: 列表容器)
 │   └── items.json               (好友行，含 click toggle)
 ├── letter-index/
-│   ├── _block.json              (右侧字母索引)
+│   ├── _component.json              (右侧字母索引)
 │   └── items.json               (字母项，tap+drag)
 ├── confirm-btn.json
 └── empty-state/
-    ├── _block.json              (引用 overview.md)
+    ├── _component.json              (引用 overview.md)
     └── cast-net-btn.json
 ```
 

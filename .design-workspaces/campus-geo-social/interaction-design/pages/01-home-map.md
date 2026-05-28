@@ -112,24 +112,24 @@ permission-denied → bootstrapping: 用户授权
 01-home-map/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   ├── campus-btn.json          (左上：校园切换 + 当前校园名)
 │   ├── search-btn.json
 │   └── notify-btn.json
 ├── top-tabs.json                (Map/Feed 切换 tab)
 ├── map-canvas/
-│   ├── _block.json              (component: 地图本体)
+│   ├── _component.json              (component: 地图本体)
 │   ├── markers.json             (单个动态点位，含 click trigger)
 │   └── clusters.json            (聚合气泡，含 click trigger)
 ├── radius-toggle.json           (50/200/500m 切换)
 ├── recenter-btn.json            (回到当前位置)
 ├── cluster-sheet/
-│   ├── _block.json              (component: 聚合气泡展开 sheet)
+│   ├── _component.json              (component: 聚合气泡展开 sheet)
 │   ├── mask.json
 │   └── items.json               (动态列表项)
 ├── fab.json                     (右下 + 按钮)
 ├── permission-card/
-│   ├── _block.json              (定位被拒占位)
+│   ├── _component.json              (定位被拒占位)
 │   └── grant-btn.json
 └── roaming-banner.json          (引用 overview.md#八-全局-banner，trigger=close)
 ```

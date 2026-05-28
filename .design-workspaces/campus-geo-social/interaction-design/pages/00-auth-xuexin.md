@@ -101,15 +101,15 @@ submitting → success:                 API 200 → push 00-auth-face
 00-auth-xuexin/
 ├── _page.json
 ├── app-bar/
-│   ├── _block.json
+│   ├── _component.json
 │   └── back-btn.json
 ├── info-card/
-│   ├── _block.json             (说明：为什么需要 + 数据安全)
+│   ├── _component.json             (说明：为什么需要 + 数据安全)
 │   └── help-btn.json
 ├── privacy-note.json           (隐私承诺，纯展示无 trigger - 但需要独立 element 用于 design 阶段引用)
 ├── start-auth-btn.json
 ├── awaiting-card/
-│   ├── _block.json             (等待回调时显示)
+│   ├── _component.json             (等待回调时显示)
 │   └── cancel-btn.json
 └── fallback-btn.json           (降级人工审核按钮，callback-error/rejected 时显示)
 ```

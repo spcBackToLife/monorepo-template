@@ -24,12 +24,16 @@ interface TaskItem {
   summary: string;
   refs: string[];
   depth: number;
+  hasMaterials?: boolean;  // 节点自身有 materials 数组依赖
+  boundNodes?: string[];   // 素材任务绑定的目标节点
 }
 
 function parseArgs(argv: string[]) {
   let registry = '';
   let forSkill = '';
   let page = '';
+  let workspace = '';
+  let output = '';
 
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
@@ -41,6 +45,12 @@ function parseArgs(argv: string[]) {
         break;
       case '--page':
         page = argv[++i];
+        break;
+      case '--workspace':
+        workspace = argv[++i];
+        break;
+      case '--output':
+        output = argv[++i];
         break;
     }
   }
@@ -66,7 +76,7 @@ function parseArgs(argv: string[]) {
     process.exit(1);
   }
 
-  return { registry, forSkill, page };
+  return { registry, forSkill, page, workspace, output };
 }
 
 function findJsonFiles(dir: string): string[] {
@@ -113,7 +123,7 @@ function collectRefs(data: Record<string, unknown>): string[] {
 }
 
 function main() {
-  const { registry, forSkill, page } = parseArgs(process.argv);
+  const { registry, forSkill, page, workspace, output } = parseArgs(process.argv);
 
   let scanDir = path.join(registry, 'pages');
   if (page) {
@@ -141,6 +151,7 @@ function main() {
     if (forSkill === 'executor') {
       // 找 status=pending 且有 design 层的节点
       if (implementation?.['status'] === 'pending' && design) {
+        const nodeMaterials = data['materials'] as unknown[] | undefined;
         tasks.push({
           path: relPath,
           id: data['id'] as string,
@@ -149,6 +160,7 @@ function main() {
           summary: (design['summary'] as string) || '',
           refs: collectRefs(data),
           depth,
+          hasMaterials: Array.isArray(nodeMaterials) && nodeMaterials.length > 0,
         });
       }
     } else if (forSkill === 'planner') {
@@ -180,10 +192,49 @@ function main() {
     }
   }
 
+  // ═══ executor 模式：扫描 _materials.json 生成独立素材任务 ═══
+  if (forSkill === 'executor') {
+    // 重新扫描目录找 _materials.json（主循环跳过了它）
+    const allFiles = findJsonFiles(scanDir);
+    for (const file of allFiles) {
+      if (path.basename(file) !== '_materials.json') continue;
+
+      const matData = readJson(file);
+      if (!matData) continue;
+
+      const materials = matData['materials'] as Record<string, Record<string, unknown>> | undefined;
+      if (!materials) continue;
+
+      const pageDir = path.relative(path.join(registry, 'pages'), path.dirname(file));
+
+      for (const [matId, matInfo] of Object.entries(materials)) {
+        const status = matInfo['status'] as string;
+        if (status !== 'pending') continue; // 已完成的素材不再生成任务
+
+        const matRef = matInfo['ref'] as string || '';
+        const boundNodes = matInfo['boundNodes'] as string[] || [];
+        const matName = matInfo['name'] as string || matId;
+        const matType = matInfo['type'] as string || 'unknown';
+        const size = matInfo['size'] as string || '';
+
+        tasks.push({
+          path: `${pageDir}/_materials/${matId}`,
+          id: matId,
+          type: 'material',
+          name: `${matName} (${matType} ${size})`,
+          summary: `绘制素材 ${matName} → 应用到 ${boundNodes.join(', ')}`,
+          refs: matRef ? [matRef] : [],
+          depth: 100, // 素材排在所有节点之后（先有节点才能 apply）
+          boundNodes,
+        });
+      }
+    }
+  }
+
   // 排序：按深度（父先于子），同深度按路径字母序
   tasks.sort((a, b) => a.depth - b.depth || a.path.localeCompare(b.path));
 
-  // 输出
+  // ═══ 控制台输出（始终打印）═══
   console.log(`\n═══ 任务列表 (--for ${forSkill}) ═══\n`);
 
   if (tasks.length === 0) {
@@ -202,6 +253,84 @@ function main() {
   if (tasks.length > 0 && tasks[0].refs.length > 0) {
     console.log(`\n📖 第一个任务需要读取的 ref 文件:`);
     tasks[0].refs.forEach(ref => console.log(`   - ${ref}`));
+  }
+
+  // ═══ 写文件（executor 模式必须生成 EXECUTOR-PLAN.md）═══
+  const outputPath = output
+    || (workspace && forSkill === 'executor'
+      ? path.join(workspace, 'design-plan', 'EXECUTOR-PLAN.md')
+      : '');
+
+  if (outputPath && forSkill === 'executor') {
+    const lines: string[] = [];
+    lines.push('# Executor 任务计划');
+    lines.push('');
+    lines.push(`> 生成时间: ${new Date().toISOString()}`);
+    lines.push(`> 总任务数: ${tasks.length}`);
+    lines.push(`> 范围: ${page || '全部页面'}`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+
+    // 按页面分组
+    const pageGroups: Record<string, TaskItem[]> = {};
+    for (const task of tasks) {
+      const pageId = task.path.split('/')[0] || task.path;
+      if (!pageGroups[pageId]) pageGroups[pageId] = [];
+      pageGroups[pageId].push(task);
+    }
+
+    for (const [pageId, pageTasks] of Object.entries(pageGroups)) {
+      lines.push(`## ${pageId}（${pageTasks.length} 个节点）`);
+      lines.push('');
+
+      for (const task of pageTasks) {
+        lines.push(`### ${task.path}`);
+        lines.push(`- **名称**: ${task.name}`);
+        lines.push(`- **类型**: ${task.type}`);
+        lines.push(`- **摘要**: ${task.summary}`);
+        lines.push('');
+
+        // checklist — 根据类型不同
+        if (task.type === 'material') {
+          lines.push('- [ ] 读取素材规格文档 (§6 绘制要求)');
+          lines.push('- [ ] 调用 material-painter 绘制');
+          lines.push('- [ ] export_and_apply 到目标节点');
+          lines.push('- [ ] 建立素材槽位');
+          lines.push('- [ ] 验证视觉效果');
+          if (task.boundNodes && task.boundNodes.length > 0) {
+            lines.push(`- **绑定节点**: ${task.boundNodes.join(', ')}`);
+          }
+        } else {
+          lines.push('- [ ] 读取节点 JSON + 所有 ref 文档');
+          lines.push('- [ ] 结构搭建 (page-builder)');
+          lines.push('- [ ] 样式设置');
+          lines.push('- [ ] 事件/交互绑定');
+          if (task.hasMaterials) {
+            lines.push('- [ ] 素材绘制 (material-painter) ⚠️ 节点有 materials 依赖');
+          }
+          lines.push('- [ ] 验证 checklist');
+          lines.push('- [ ] 回写 implementation');
+        }
+        lines.push('');
+
+        // ref 文件列表
+        if (task.refs.length > 0) {
+          lines.push('📖 需读文档:');
+          task.refs.forEach(ref => lines.push(`  - ${ref}`));
+          lines.push('');
+        }
+      }
+    }
+
+    // 确保输出目录存在
+    const outDir = path.dirname(outputPath);
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+
+    fs.writeFileSync(outputPath, lines.join('\n'), 'utf-8');
+    console.log(`\n✅ 任务计划已写入: ${outputPath}`);
   }
 }
 

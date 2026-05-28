@@ -12,7 +12,7 @@
 文件系统即数据库：
   - 目录结构 = 树的父子关系
   - 单个 JSON 文件 = 一个节点的完整信息（15-40行）
-  - _index.json / _page.json / _block.json = 目录级元数据
+  - _index.json / _page.json / _component.json = 目录级元数据
   - 文件名 = 节点ID，可直接搜索定位
 
 Schema + md 分工：
@@ -45,14 +45,14 @@ AI读写模式：
 │   │   │   ├── _page.json                 ← 页面级信息（~80行）
 │   │   │   ├── _materials.json            ← 该页面素材索引（~40行）
 │   │   │   ├── nav-bar/
-│   │   │   │   ├── _block.json            ← 区块自身信息（~25行）
+│   │   │   │   ├── _component.json            ← 区块自身信息（~25行）
 │   │   │   │   ├── avatar-btn.json        ← 叶子节点（~30行）
 │   │   │   │   ├── nav-title.json
 │   │   │   │   └── toggle-btn/
-│   │   │   │       ├── _block.json
+│   │   │   │       ├── _component.json
 │   │   │   │       └── toggle-icon.json
 │   │   │   ├── map-container/
-│   │   │   │   ├── _block.json
+│   │   │   │   ├── _component.json
 │   │   │   │   ├── ambient-glow.json
 │   │   │   │   └── ...
 │   │   │   └── tab-bar/
@@ -63,26 +63,26 @@ AI读写模式：
 │   │   │   ├── nav-bar/
 │   │   │   ├── map-preview/
 │   │   │   ├── editor-section/
-│   │   │   │   ├── _block.json
+│   │   │   │   ├── _component.json
 │   │   │   │   ├── textarea.json
 │   │   │   │   ├── char-count.json
 │   │   │   │   ├── image-grid/
-│   │   │   │   │   ├── _block.json
+│   │   │   │   │   ├── _component.json
 │   │   │   │   │   ├── image-thumb.json
 │   │   │   │   │   └── add-image-btn.json
 │   │   │   │   └── visibility-row/
-│   │   │   │       ├── _block.json
+│   │   │   │       ├── _component.json
 │   │   │   │       ├── vis-icon.json
 │   │   │   │       ├── vis-label.json
 │   │   │   │       └── chevron.json
 │   │   │   ├── visibility-sheet/          ← 组件 = 一个目录
-│   │   │   │   ├── _block.json
+│   │   │   │   ├── _component.json
 │   │   │   │   ├── option-public.json
 │   │   │   │   ├── option-targeted.json
 │   │   │   │   ├── option-timed.json
 │   │   │   │   └── confirm-btn.json
 │   │   │   └── location-fail-overlay/
-│   │   │       ├── _block.json
+│   │   │       ├── _component.json
 │   │   │       ├── fail-icon.json
 │   │   │       ├── fail-text.json
 │   │   │       └── retry-btn.json
@@ -364,10 +364,10 @@ AI读写模式：
 }
 ```
 
-### 区块目录的 _block.json（~25行）
+### 区块目录的 _component.json（~25行）
 
 ```jsonc
-// design-registry/pages/02-publish-moment/nav-bar/_block.json
+// design-registry/pages/02-publish-moment/nav-bar/_component.json
 {
   "id": "nav-bar",
   "type": "block",
@@ -516,7 +516,7 @@ executor 模式:
   2. 按目录深度排序（父先于子）
   3. 检查依赖（父节点 completed 才能做子节点）
   4. 输出有序任务列表:
-     [1] 02-publish-moment/visibility-sheet/_block → 搭建Sheet容器
+     [1] 02-publish-moment/visibility-sheet/_component → 搭建Sheet容器
      [2] 02-publish-moment/visibility-sheet/option-public → 搭建公开选项
      [3] 02-publish-moment/visibility-sheet/option-targeted → 搭建定向选项
      ...
@@ -593,7 +593,7 @@ interaction 模式:
 
 操作:
   1. 创建目录: pages/02-publish-moment/visibility-sheet/
-  2. write_to_file _block.json  (组件自身信息)
+  2. write_to_file _component.json  (组件自身信息)
   3. write_to_file option-public.json
   4. write_to_file option-targeted.json
   5. write_to_file option-timed.json

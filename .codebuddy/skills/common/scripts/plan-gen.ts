@@ -121,9 +121,9 @@ function collectInteractionPlan(registry: string, pageIds: string[]): PagePlan[]
     });
 
     plan.nodes.push({
-      path: `pages/${pid}/<block>/<element>.json`,
+      path: `pages/${pid}/<component>/<element>.json`,
       desc: '从 md「操作清单」逐行 create-node.ts 创建触发元素节点（含 interaction.trigger + flows）',
-      hint: '每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _block.json 建组件目录',
+      hint: '每个非基准状态的独立 UI 区域也要建节点；识别出的组件用 _component.json 建组件目录',
     });
 
     plan.post.push({
@@ -135,8 +135,43 @@ function collectInteractionPlan(registry: string, pageIds: string[]): PagePlan[]
   return plans;
 }
 
+/**
+ * 组件占用索引：组件名 → 出现在哪些页面（按 PageId 排序）
+ * 用于：
+ *   1. 跨页面同名 ≥2 次 → 视为通用组件，深钻任务只挂在首次出现页面；后续页面挂"引用核对"轻任务
+ *   2. 单页出现 → 任务挂在当前页面（路径按 SKILL「三步走」由 AI 判定通用/专属）
+ */
+interface ComponentOccurrence {
+  name: string;
+  pages: string[];      // 已按 pageIds 顺序排序
+  firstPage: string;
+}
+
+function buildComponentIndex(registry: string, pageIds: string[]): Map<string, ComponentOccurrence> {
+  const map = new Map<string, ComponentOccurrence>();
+  for (const pid of pageIds) {
+    const pageDir = path.join(registry, 'pages', pid);
+    if (!fs.existsSync(pageDir)) continue;
+    const allFiles = findJsonFiles(pageDir);
+    for (const file of allFiles) {
+      if (path.basename(file) !== '_component.json') continue;
+      const name = path.basename(path.dirname(file));
+      if (!map.has(name)) {
+        map.set(name, { name, pages: [], firstPage: pid });
+      }
+      const occ = map.get(name)!;
+      if (!occ.pages.includes(pid)) occ.pages.push(pid);
+    }
+  }
+  return map;
+}
+
 function collectDesignPlan(registry: string, workspace: string, pageIds: string[]): PagePlan[] {
   const plans: PagePlan[] = [];
+
+  // ★ 先全局构建组件索引（跨页面统计）
+  const componentIndex = buildComponentIndex(registry, pageIds);
+
   for (const pid of pageIds) {
     const pageJson = readJson(path.join(registry, 'pages', pid, '_page.json'));
     if (!pageJson) continue;
@@ -171,7 +206,6 @@ function collectDesignPlan(registry: string, workspace: string, pageIds: string[
     for (const it of items) {
       const interaction = it.data['interaction'] as Record<string, unknown> | undefined;
       const design = it.data['design'] as Record<string, unknown> | undefined;
-      const type = it.data['type'] as string;
       if (design) continue; // 已完成跳过
       if (!interaction && it.bn !== '_page.json') continue;
 
@@ -181,21 +215,32 @@ function collectDesignPlan(registry: string, workspace: string, pageIds: string[
         plan.nodes.push({
           path: `pages/${pid}/_page.json#design`,
           desc: `页面级 design 层 + 写 design-plan/pages/${pid}/index.md`,
-          hint: 'index.md 必须最后写，是对所有区块/节点样式的汇总+节点结构树',
+          hint: 'index.md 必须最后写，是对所有组件/素材的汇总+节点结构树',
         });
-      } else if (it.bn === '_block.json' && type === 'component') {
-        const compDir = path.dirname(it.rel);
-        const compName = path.basename(compDir);
-        plan.nodes.push({
-          path: `pages/${pid}/${refRel}#design`,
-          desc: `[组件] ${compName}: 先写 components/${compName}/${compName}.visual.md → 再写 ${compName}.md → write-node.ts 追加 design 层`,
-          hint: '组件 visual.md 必须先于结构文档',
-        });
-      } else if (it.bn === '_block.json') {
-        plan.nodes.push({
-          path: `pages/${pid}/${refRel}#design`,
-          desc: `[区块] ${path.dirname(it.rel)}: write-node.ts 追加 design 层（summary/ref/visualRef/layoutHint）`,
-        });
+      } else if (it.bn === '_component.json') {
+        const compName = path.basename(path.dirname(it.rel));
+        const occ = componentIndex.get(compName);
+        const reusedCount = occ ? occ.pages.length : 1;
+
+        if (reusedCount >= 2 && occ && occ.firstPage !== pid) {
+          // 跨页面复用 + 非首次出现 → 引用核对轻任务
+          plan.nodes.push({
+            path: `pages/${pid}/${refRel}#design`,
+            desc: `${compName}: 引用核对（首次深钻在 ${occ.firstPage}）→ write-node.ts 追加 design 层`,
+            hint: `核对 design-plan/components/${compName}/ 是否已覆盖本页面所需 variant；缺则补到组件文档并标注引用页面`,
+          });
+        } else {
+          // 首次出现或单页出现 → 完整深钻任务
+          const statHint =
+            reusedCount >= 2
+              ? `跨页面同名出现 ${reusedCount} 次：${occ!.pages.join(', ')} → 倾向通用组件 (design-plan/components/${compName}/)`
+              : `仅本页面出现 → 按 SKILL「组件文档放哪？三步走」判定路径（通用/专属）`;
+          plan.nodes.push({
+            path: `pages/${pid}/${refRel}#design`,
+            desc: `${compName}: 写独立 visual.md + .md → write-node.ts 追加 design 层`,
+            hint: `${statHint}；visual.md 必须先于结构文档`,
+          });
+        }
       } else {
         plan.nodes.push({
           path: `pages/${pid}/${refRel}#design`,
@@ -225,7 +270,7 @@ function collectDesignPlan(registry: string, workspace: string, pageIds: string[
     // 收尾
     plan.post.push({
       path: `design-plan/pages/${pid}/index.md`,
-      desc: '汇总：写页面 index.md（区块详细 + 节点结构树，引用前面已写的节点/组件/素材）',
+      desc: '汇总：写页面 index.md（组件清单 + 素材清单 + 节点结构树，引用前面已写的组件/素材，不再发明新东西）',
       hint: '必须遵守节点结构树 4 条红线（组件内联展开/状态对应节点/样式关键词/叶子有内容）',
     });
     plan.post.push({
@@ -259,6 +304,31 @@ function parseExistingPlan(content: string): ExistingChecks {
     map[m[2]] = checked;
   }
   return map;
+}
+
+/**
+ * 文件存在性校正：path 指向具体 .md / .json 文件时，
+ * 若文件已不存在，则强制把打勾状态降为未完成（防止 AI 误以为已完成而跳过）。
+ * 仅校正"产物文件"类任务（路径形如 design-plan/.../*.md 或 pages/.../*.json）；
+ * 节点设计层任务（path 形如 `pages/<x>/...#design`）不在此校正范围。
+ */
+function reconcileExistingWithFs(
+  existing: ExistingChecks,
+  workspace: string,
+  registry: string,
+): void {
+  for (const p of Object.keys(existing)) {
+    if (!existing[p]) continue; // 只校正已打勾项
+    let absPath: string | null = null;
+    if (p.startsWith('design-plan/') && p.endsWith('.md')) {
+      absPath = path.join(workspace, p);
+    } else if (p.startsWith('pages/') && p.endsWith('.json')) {
+      absPath = path.join(registry, p);
+    }
+    if (absPath && !fs.existsSync(absPath)) {
+      existing[p] = false; // 文件已删 → 视为未完成
+    }
+  }
 }
 
 function renderRow(t: TaskRow, existing: ExistingChecks): string {
@@ -299,7 +369,7 @@ function renderPlan(stage: Stage, plans: PagePlan[], existing: ExistingChecks): 
       lines.push('');
     }
     if (plan.nodes.length > 0) {
-      lines.push('### 节点级深钻（按目录深度排序，父先于子）');
+      lines.push('### 组件深钻 + 节点级任务（按目录深度排序，父先于子）');
       lines.push('');
       for (const t of plan.nodes) lines.push(renderRow(t, existing));
       lines.push('');
@@ -350,6 +420,7 @@ function main() {
   if (fs.existsSync(planPath)) {
     const old = fs.readFileSync(planPath, 'utf-8');
     existing = parseExistingPlan(old);
+    reconcileExistingWithFs(existing, workspace, registry);
   }
 
   // 生成任务

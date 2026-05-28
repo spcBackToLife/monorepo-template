@@ -32,7 +32,7 @@
     "operations": [
       {
         "op": "左右滑切换屏",
-        "triggerNodePath": "swiper/_block"
+        "triggerNodePath": "swiper/_component"
       },
       {
         "op": "点击 dot 跳页",

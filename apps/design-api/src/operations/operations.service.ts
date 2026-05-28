@@ -71,6 +71,21 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
       break;
     }
 
+    case 'element.insertSubtree': {
+      // subtree 中所有缺少 id 的节点都需要预生成确定性 ID。
+      // MCP 直接调用 element/insert_subtree 时会在 handler 里 walkTree 赋值，
+      // 但通过 execute_operations_batch 调用时不经过 MCP handler，需要在此兜底。
+      const subtree = p.subtree as ComponentNode | undefined;
+      if (subtree) {
+        walkTreeApi(subtree, (node) => {
+          if (!node.id) {
+            node.id = generateNodeId();
+          }
+        });
+      }
+      break;
+    }
+
     case 'element.duplicate': {
       if (!p.newElementId) p.newElementId = generateNodeId();
       if (!p._childIds) {

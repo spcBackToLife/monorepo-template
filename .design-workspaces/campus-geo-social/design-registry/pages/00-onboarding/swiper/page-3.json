@@ -1,6 +1,6 @@
 {
   "id": "page-3",
-  "type": "block",
+  "type": "component",
   "name": "第3屏 · 时空胶囊",
   "interaction": {
     "summary": "插画 + 标题（埋下信物，与未来重逢）+ 副标题",

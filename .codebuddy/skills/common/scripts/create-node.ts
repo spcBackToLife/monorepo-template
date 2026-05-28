@@ -111,14 +111,14 @@ function main() {
   }
 
   // 确定文件路径
-  // 如果路径以 _block 结尾 → 写入 _block.json
+  // 如果路径以 _component 结尾 → 写入 _component.json
   // 如果路径以 _page 结尾 → 写入 _page.json
   // 否则 → 写入 <last-segment>.json
   let filePath: string;
   const lastSegment = path.basename(nodePath);
 
   if (lastSegment.startsWith('_')) {
-    // _block, _page 等特殊文件
+    // _component, _page 等特殊文件
     const dirPath = path.join(registry, path.dirname(nodePath));
     filePath = path.join(dirPath, `${lastSegment}.json`);
   } else {
