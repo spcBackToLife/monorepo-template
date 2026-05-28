@@ -116,6 +116,7 @@ AI读写模式：
     "platform": "mobile",
     "viewport": { "width": 393, "height": 852 },
     "designSystemRef": "design-plan/design-system.md",
+    "interactionSystemRef": "interaction-design/overview.md",
     "projectId": "f77b323b-8fa7-43d1-b6d1-5eb3f8fade00",
 
     "targetUser": {
@@ -435,6 +436,9 @@ AI读写模式：
 
 ## 6. 脚本能力
 
+> 所有脚本统一存放在 `.codebuddy/skills/common/scripts/`，各技能共用。
+> 调用方式：`npx ts-node .codebuddy/skills/common/scripts/<script>.ts --registry <registry-path> [options]`
+
 ### validate.ts — 完整性校验
 
 ```typescript
@@ -604,7 +608,7 @@ interaction 模式:
 | 阶段 | 读什么 | 写什么 | 可能新增什么 |
 |------|-------|-------|------------|
 | product-analyst | 无(从零创建) | _index.json + pages/_index.json + 每页 _page.json(product层) | 整个 design-registry/ 骨架 |
-| interaction-designer | _index + _page | _page.json(interaction层) + 节点文件(interaction层) | 新节点文件(操作元素/状态节点) |
+| interaction-designer | _index + _page | _page.json(interaction层) + 节点文件(interaction层) + _index.json(interactionSystemRef) | 新节点文件(操作元素/状态节点) |
 | design-planner | _index + _page + 节点文件 | 节点文件(design层) + _materials.json | 新节点目录(组件展开/装饰元素) |
 | design-executor | _index + _page + 节点文件 + ref→md | 节点文件(implementation层) | 无(不新增节点) |
 

@@ -89,129 +89,37 @@ Effects:
 
 ### Phase 2: 操作反馈设计
 
-为每个用户操作设计完整的反馈链：
+为每个用户操作设计完整的反馈链。详细规范表见 `references/interaction-patterns.md`。
 
-#### 反馈层级体系
-
-| 层级 | 适用场景 | UI 形式 | 持续时间 |
-|------|---------|---------|---------|
-| L0 即时 | 点击/触摸 | 按压态/涟漪/scale | 100-150ms |
-| L1 微反馈 | 点赞/收藏/切换 | 图标动画/颜色变化/数字跳动 | 200-400ms |
-| L2 轻提示 | 操作成功/信息提示 | Toast/Snackbar | 2-3s 自动消失 |
-| L3 中反馈 | 表单提交/网络请求 | Loading + 结果提示 | 跟随异步操作 |
-| L4 强确认 | 不可逆操作/重大变更 | Modal 确认 + 倒计时 | 用户主动关闭 |
-| L5 全屏状态 | 空数据/网络断开/严重错误 | 全屏占位 + 操作引导 | 持续到状态恢复 |
-
-#### 每个操作的反馈清单（必填）
-
-```markdown
-## [操作名] 交互规格
-
-### 触发条件
-- 触发方式: click / long-press / swipe / ...
-- 前置条件: 表单校验通过 / 网络可用 / ...
-
-### 即时反馈 (L0, 0-150ms)
-- 按钮: scale(0.97) + shadow 降低
-- 触觉: 轻震动（移动端）
-
-### 进行中反馈 (L3)
-- 按钮: 文字→spinner + 禁用点击
-- 表单: 全部 input 禁用（防重复提交）
-- 进度: 无确定进度 → 用 indeterminate spinner
-
-### 成功反馈
-- 按钮: spinner → ✓ 图标 + 背景变绿
-- 延迟: 500ms 后执行跳转/关闭
-- 数据: 本地状态立即更新（乐观更新）
-
-### 失败反馈
-- 类型区分:
-  - 网络错误 → Toast "网络异常，请重试" + 按钮恢复
-  - 业务错误 → Inline 红字（紧贴相关字段下方）
-  - 服务错误 → Toast "服务繁忙" + 按钮恢复
-- 表单: 恢复可编辑 + 聚焦到错误字段
-- 动画: 表单容器 shake (translateX ±4px × 3)
-
-### 边界情况
-- 重复点击: 第一次点击后立即禁用，不响应后续点击
-- 超时: 15s 无响应 → 自动恢复 + Toast "请求超时"
-- 离开页面: 取消进行中的请求
-```
+核心要求：
+- 每个操作必须覆盖 5 层反馈: 触发条件 → 即时反馈(L0) → 进行中(L3) → 成功 → 失败
+- 边界情况必填: 重复点击/超时/离开页面
+- 反馈层级匹配操作重要性(L0~L5)
 
 ---
 
 ### Phase 3: 加载策略设计
 
-每个数据加载场景都需要明确的加载策略：
+为每个数据加载场景设计策略。详见 `references/interaction-patterns.md#加载策略`。
 
-#### 加载模式选择
-
-| 场景 | 策略 | 说明 |
-|------|------|------|
-| 首次进入页面 | 骨架屏 (Skeleton) | 占位形状模拟最终布局 |
-| 下拉刷新 | 顶部 Pull Indicator | 不清空已有内容 |
-| 上拉加载更多 | 底部 Loading Spinner | 追加到列表末尾 |
-| 按钮触发请求 | 按钮内 Spinner | 按钮本身变为 loading 态 |
-| 后台静默刷新 | 无 UI 变化 | 数据更新后直接替换 |
-| 长时间加载 (>5s) | 进度条 + 文案 | "正在加载，请稍候..." |
-
-#### 加载失败的恢复策略
-
-```
-首次加载失败 → 全屏错误占位 + "点击重试"按钮
-刷新失败    → Toast 提示 + 保留旧数据展示
-加载更多失败 → 列表底部 "加载失败，点击重试"
-静默刷新失败 → 忽略，不打扰用户
-```
+核心: 首次/刷新/加载更多/按钮请求/静默刷新 各自有加载态+失败恢复方案。
 
 ---
 
 ### Phase 4: 错误处理模式设计
 
-#### 错误分类 & 对应 UI 模式
+按错误类型设计 UI 响应。详见 `references/interaction-patterns.md#错误处理模式`。
 
-| 错误类型 | 原因 | UI 模式 | 用户可操作 |
-|---------|------|---------|:----------:|
-| 表单校验错误 | 输入不合规 | Inline 红字 + 字段高亮 | ✅ 修改输入 |
-| 业务逻辑错误 | 手机号已注册/密码错误 | Inline 红字 / Toast | ✅ 修改/切换操作 |
-| 权限错误 | 未登录/无权限 | 弹窗引导登录 / Toast | ✅ 去登录 |
-| 网络错误 | 断网/超时 | Toast + 重试按钮 | ✅ 检查网络后重试 |
-| 服务错误 | 500/503 | Toast "服务繁忙" | ⏳ 稍后重试 |
-| 未知错误 | 未预期异常 | Toast "出了点问题" + 上报 | ❌ 联系客服 |
-
-#### 表单校验时机
-
-```
-即时校验（onChange）: 格式类（手机号位数/邮箱格式）
-失焦校验（onBlur）:   规则类（密码强度/用户名长度）
-提交校验（onSubmit）:  依赖类（两次密码一致/必填检查）
-异步校验（debounce）:  唯一性（用户名是否已存在）
-```
+核心: 6类错误(校验/业务/权限/网络/服务/未知) → 各有对应 UI 模式和用户操作。
+表单校验 4 个时机: onChange/onBlur/onSubmit/debounce。
 
 ---
 
 ### Phase 5: 微交互 & 转场设计
 
-#### 页面转场
+定义页面转场和组件微交互。详见 `references/interaction-patterns.md#微交互与转场`。
 
-| 转场类型 | 动画 | 时长 | 适用 |
-|---------|------|------|------|
-| Push (正向导航) | 新页面从右滑入 | 300ms ease-out | 进入子页面 |
-| Pop (返回) | 当前页从右滑出 | 250ms ease-in | 返回上一页 |
-| Modal (弹出层) | 底部上滑 + 背景暗化 | 300ms spring | 独立操作 |
-| Fade (平级切换) | 交叉淡入淡出 | 200ms | Tab 切换 |
-
-#### 组件微交互
-
-```
-按钮 hover:   scale(1.02) + shadow 升级, 150ms ease
-按钮 press:   scale(0.97) + shadow 降级, 100ms ease
-卡片 hover:   scale(1.01) + border 亮度提升, 150ms
-输入框 focus: border-color 变 primary + label 上浮, 200ms
-开关 toggle:  thumb 滑动 + track 变色, 200ms spring
-列表项删除:   slide-out + 后续项上移填充, 300ms
-```
+产出写入 `interaction-design/overview.md`，供所有页面引用。
 
 ---
 
@@ -271,72 +179,181 @@ Effects: (每个转换的UI响应描述)
 
 ## 执行节奏
 
-### 计划驱动（与 product-analyst 对齐）
+### 启动门禁（★ 必须先跑，跑挂了就回上游修）
 
-交互设计同样是**逐模块精细化**的过程，必须有计划、有进度、可续接：
+```bash
+SCRIPTS=".cursor/skills/common/scripts"
+REGISTRY=".design-workspaces/<task>/design-registry"
+WORKSPACE=".design-workspaces/<task>"
 
-```
-Step 1: 生成交互设计计划
-  - 从 product-analyst 的 PRD / 模块清单中提取所有需要交互设计的页面和组件
-  - 按优先级排列（核心流程页面优先）
-  - 输出计划清单到 .design-workspaces/<task>/interaction-design/plan.md
+# 1. 上游门禁：必须 product 阶段已通过
+npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/stage-gate.ts \
+  --registry $REGISTRY --workspace $WORKSPACE \
+  --stage interaction --mode entry
+# 退出码 0/2 才能继续；退出码 1 → 回 product-analyst 补完缺项
 
-Step 2: 输出全局交互规范（overview.md）
-  - 反馈层级体系
-  - 加载策略总则
-  - 错误处理总则
-  - 转场动画规则
-  - 暂停确认
+# 2. 生成本阶段任务清单（PLAN.md），覆盖每页所有任务
+npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/plan-gen.ts \
+  --registry $REGISTRY --workspace $WORKSPACE \
+  --stage interaction
+# 产物：interaction-design/PLAN.md
 
-Step 3: 逐模块/逐页面精细化设计
-  - 每次只做一个页面/模块
-  - 每个产出完整的状态机 + 操作反馈 + 边界处理
-  - 完成后写入 pages/<page-name>.md
-  - 更新 plan.md 中的状态 ❌→✅
-  - 暂停确认后继续下一个
-
-Step 4: 通用组件交互设计（跨页面复用的）
-  - 表单输入组件
-  - 操作按钮
-  - 列表/卡片
-  - 弹窗/Toast
-  - 写入 components/<name>.md
+# 3. 看待分析任务列表
+npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/task-gen.ts \
+  --registry $REGISTRY --for interaction
+# 输出: 所有有 product 但无 interaction 的页面列表
 ```
 
-### 计划文档格式（plan.md）
+### 工作纪律
 
-```markdown
-# 交互设计计划
+- **PLAN.md 是真理之源**：每完成一项必须把 `[ ]` 改成 `[x]`，不可跳过
+- **逐页面分析，逐页面打勾**：一个页面 4 项任务（写 md / 写 _page.json interaction 层 / 创建子节点 / 跑收尾门禁）必须全部完成才能进下一页
+- **绝不允许 operations 写成字符串数组**：必须是 `[{ "op": "...", "triggerNodePath": "<block>/<element>" }]`，且每个 triggerNodePath 必须对应到真实节点文件
 
-## 全局规范
-- [x] overview.md — 反馈层级/加载/错误/转场
+### 每个页面的执行步骤
 
-## 页面交互规格
-| 序号 | 页面/模块 | 优先级 | 状态 | 依赖 |
-|:----:|---------|:------:|:----:|------|
-| 01 | 注册页 | P0 | ✅ | — |
-| 02 | 登录页 | P0 | ⏳ | — |
-| 03 | 主页Feed | P0 | ❌ | — |
-| 04 | 发布内容 | P1 | ❌ | 03 |
-| 05 | 个人中心 | P1 | ❌ | 01 |
-| ... | | | | |
+```
+Step 1: 读取产品层信息
+  - read_file design-registry/pages/<id>/_page.json → product 层 summary + ref
+  - read_file product.ref 指向的产品模块 md → 获取完整流程/规则/异常
 
-## 通用组件交互
-| 组件 | 状态 |
-|------|:----:|
-| form-input | ❌ |
-| action-button | ❌ |
-| list-card | ❌ |
+Step 2: 分析交互（产出 md 文档）
+  - 状态机设计（States + Transitions + Effects）
+  - 操作清单（穷举所有交互）
+  - 加载策略 + 错误处理 + 边界情况
+  - 组件识别（哪些交互足够复杂需要独立组件文档）
+  - 写入 interaction-design/pages/<page>.md
+
+Step 3: 写入 design-registry（★ 通过脚本，不可跳过）
+
+  SCRIPTS=".cursor/skills/common/scripts"
+  REGISTRY=".design-workspaces/<task>/design-registry"
+
+  a. 更新 _page.json 追加 interaction 层（operations 必须是结构化对象数组）:
+     execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/write-node.ts \
+       --registry $REGISTRY \
+       --path pages/<page>/_page \
+       --layer interaction \
+       --data '{
+         "summary": "...",
+         "ref": "interaction-design/pages/<page>.md",
+         "states": ["loading", "idle", "submitting", ...],
+         "operations": [
+           { "op": "点击发布按钮", "triggerNodePath": "nav-bar/publish-btn" },
+           { "op": "输入文字", "triggerNodePath": "editor-section/textarea" },
+           { "op": "选择可见性", "triggerNodePath": "editor-section/visibility-row" }
+         ]
+       }'
+
+     ❌ 严禁: "operations": ["点击发布", "输入文字"] (字符串数组)
+     ✅ 正确: 每条 operation 必须有 triggerNodePath，且对应到下面 b 步创建的节点
+
+  b. 构建 children 骨架节点（★ 每个 operation 的 triggerNodePath 都必须真实存在）:
+
+     遍历 md 中的「操作清单」表格，每一行至少创建 2 个节点（区块 + 元素）：
+
+     # 创建区块容器
+     execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/create-node.ts \
+       --registry $REGISTRY \
+       --path pages/<page>/<block>/_block \
+       --data '{ "id": "<block>", "type": "block", "name": "<显示名>", "interaction": {...} }'
+
+     # 创建触发元素（从「操作清单」逐行映射）
+     execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/create-node.ts \
+       --registry $REGISTRY \
+       --path pages/<page>/<block>/<element> \
+       --data '{
+         "id": "publish-btn",
+         "type": "element",
+         "name": "发布按钮",
+         "interaction": {
+           "summary": "click(条件)→loading→success/error",
+           "ref": "interaction-design/pages/<page>.md#操作清单:点击发布",
+           "trigger": "click",
+           "condition": "{{ ... }}",
+           "flows": {
+             "success": { "summary": "...", "ref": "..." },
+             "error": { "summary": "...", "ref": "..." }
+           },
+           "states": ["disabled", "active", "loading"]
+         }
+       }'
+
+     每个非基准状态的独立UI区域（如 ErrorBanner / EmptyState） → 也是节点文件
+     识别为组件的（md 中标记"独立文档=✅"） → 创建组件目录:
+     execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/create-node.ts \
+       --registry $REGISTRY \
+       --path pages/<page>/<component>/_block \
+       --data '{ "id": "...", "type": "component", "name": "...", "interaction": {...} }'
+
+  c. 更新全局交互规范引用到 _index.json (仅首次):
+     execute_command: npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/write-node.ts \
+       --registry $REGISTRY --path _index \
+       --field interactionSystemRef --value '"interaction-design/overview.md"'
+
+  d. 在 PLAN.md 把该页 4 个任务全部 [x]
+
+Step 4: 暂停确认后继续下一个页面
 ```
 
-### 跨会话续接
+### 收尾门禁（★ 全部页面分析完后必跑，未通过不准移交 design-planner）
 
-新会话时：
-1. 读取 `.design-workspaces/<task>/interaction-design/plan.md`
-2. 找到第一个 ❌ 项
-3. 读取相关的 product-analysis 模块文档作为输入
-4. 执行分析并输出
-5. 更新 plan.md + STATUS.md
+```bash
+npx ts-node --project $SCRIPTS/tsconfig.json $SCRIPTS/stage-gate.ts \
+  --registry $REGISTRY --workspace $WORKSPACE \
+  --stage interaction --mode exit
+```
+
+**必须 0 ❌**，否则 design-planner 启动时会被拒绝。常见 ❌：
+
+| 报错 | 含义 | 修复 |
+|------|------|------|
+| `pages/<id>/: 没有任何子节点文件` | 该页只写了 _page.json 没建节点骨架 | 回 Step 3.b 补 create-node |
+| `operations[N] 是字符串而非对象` | 偷懒用字符串数组 | 回 Step 3.a 重写 _page.json |
+| `operation 引用的节点文件不存在` | triggerNodePath 写错或对应节点未建 | 检查路径，create-node 补上 |
+| `缺 interaction 层` | 整个页面跳过了 | 必须分析该页 |
+
+### Design Registry 写入规则
+
+**写入的 interaction 层结构示例：**
+
+```jsonc
+// 节点 .json 中的 interaction 层
+{
+  "interaction": {
+    "summary": "click(条件)→loading→success/error",
+    "ref": "interaction-design/pages/02-publish-moment.md#操作清单:点击发布",
+    "trigger": "click",
+    "condition": "{{ content || images.length > 0 }}",
+    "flows": {
+      "success": { "summary": "按钮✓+粒子飘落+返回", "ref": "同上#Effects→success" },
+      "error": { "summary": "恢复+Toast+表单可编辑", "ref": "同上#Effects→error" },
+      "timeout": { "summary": "15s恢复+Toast超时", "ref": "同上#边界情况" },
+      "boundary": { "summary": "重复点击忽略", "ref": "同上#边界情况" }
+    },
+    "states": ["disabled", "active", "loading"]
+  }
+}
+```
+
+**写入原则：**
+- 节点文件中已有的 `product` 层 **不可修改不可删除**
+- 只追加 `interaction` 层
+- 如果发现需要新节点（产品层未预见的UI区域）→ 通过 `create-node.ts` 创建新文件
+- 每个非基准状态如果需要独立UI容器 → 必须创建对应节点文件（不能只写在 md 里不写 registry）
+
+### 产品需求覆盖验证
+
+每个页面分析完后，必须检查：
+
+```
+遍历 product-analysis 中该模块的:
+  - 每个异常故事(E1~En) → 是否都有对应的状态或错误处理
+  - 每个业务规则 → 是否都在操作清单的某行被覆盖
+  - 每个流程节点 → 是否都有交互反馈设计
+
+不通过 → 补充遗漏的交互设计
+```
 
 ---
 
@@ -344,13 +361,14 @@ Step 4: 通用组件交互设计（跨页面复用的）
 
 | 上游 | 提供给本技能 | 本技能输出 | 下游消费 |
 |------|------------|-----------|---------|
-| product-analyst | 业务流程 + 规则 + 边界Case | 状态机 + 反馈规格 | design-planner 编排任务 |
-| theme-generator | motion strategy + transitions | 动画时长/缓动参考 | design-from-reference 实现 |
+| product-analyst | Registry 中的 product 层 + md 详情 | interaction 层 + md 文档 | design-planner 消费 |
+| theme-generator | motion strategy + transitions | 动画时长/缓动参考 | design-planner 引用 |
 
 ---
 
 ## 详细参考（按需加载）
 
+- `references/interaction-patterns.md` — ★ 全局交互规范（反馈层级/操作模板/加载策略/错误处理/微交互/转场）
 - `references/feedback-patterns.md` — 常见产品的反馈模式案例库
 - `references/state-machine-examples.md` — 典型页面状态机设计案例
 - `references/error-handling-patterns.md` — 错误处理最佳实践
