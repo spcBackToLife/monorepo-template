@@ -1,0 +1,17 @@
+{
+  "id": "app-bar",
+  "type": "component",
+  "name": "顶部导航",
+  "interaction": {
+    "summary": "透明/半透明 app-bar，滚动后变实",
+    "ref": "interaction-design/pages/01-moment-detail.md",
+    "states": [
+      "transparent",
+      "solid"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

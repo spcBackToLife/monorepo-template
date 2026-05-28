@@ -1,0 +1,181 @@
+---
+description: 设计链路全流程的平台问题清单和技能执行规范。从 campus-geo-social 登录页三轮测试中提炼的根本性问题和修复方案。适用于所有 design-executor / material-painter / page-builder 技能执行。
+alwaysApply: true
+---
+
+# 设计链路平台与流程规范
+
+从实际测试中提炼的系统性问题和强制规范。非建议，是红线。
+
+---
+
+## 一、平台已知问题清单（必须修复）
+
+### P1: element/add 双重默认样式注入 — ✅ 已修复 (2026-05-28)
+
+- **位置**: `features/design-operations/src/operations/element.ts` 第 138-182 行
+- **修复内容**:
+  - 用户传入 `height`/`minHeight` → 不注入 `minHeight:40px`
+  - 用户传入 `width`/`minWidth` → 不注入 `minWidth:40px`
+  - 用户传入 `position:absolute/fixed` → 不注入 `flex`/`minHeight`/`minWidth`
+  - 用户传入 `flex` → 不覆盖为 `flex:1`
+- **原则**: 用户显式传入的样式永远优先于平台默认值
+- **不再需要临时绕过**: 之前的 "创建后立即 style/reset" 步骤已不再必要（但做了也无害）
+
+### P2: export_and_apply backgroundSize 硬编码 — ✅ 已修复 (2026-05-28)
+
+- **位置**: `apps/design-mcp/src/tools/domain/canvas.ts` 第 943-1094 行
+- **修复内容**: 新增 `sizeMode` 参数（`auto`/`contain`/`cover`/`original`）
+  - `auto`（默认）: 使用参考框实际像素尺寸（如 `20px 20px`）
+  - `contain`: 填充容器（装饰/插画）
+  - `cover`: 覆盖容器（全屏背景）
+  - `original`: CSS `auto`（原始图片尺寸）
+- **使用规范**: 见下方"规范 6"
+
+### P3: element/add 对 position:absolute 元素不应注入 flex 默认值 — ✅ 随 P1 一并修复
+
+---
+
+## 二、技能执行规范
+
+### 规范 1: executor 必须理解平台能力边界
+
+**问题**: executor 写了 state.set/visibleWhen/effect.fetch 等指令，但不知道 preview 引擎是否真正支持这些的完整联动。
+
+**规范**:
+- executor 在 Phase 0 必须确认当前设计编辑器的运行时能力（通过查代码或阅读文档）
+- 如果能力不确定，必须先做**最小探针测试**（创建一个简单的 state.set + visibleWhen 验证联动是否生效）再开始批量实现
+- 不得"写了事件就默认它能跑"——必须实际验证
+
+**preview 引擎已确认支持的能力**（从源码验证）:
+- ✅ visibleWhen 表达式实时求值（resolveProps.ts）
+- ✅ state.set 触发不可变更新 + 重新渲染（Store.ts/Reducer.ts）
+- ✅ effect.fetch 调用 mock scenario
+- ✅ ui.showToast 渲染
+- ✅ 动态表达式 {{ }} 在 props 中求值
+
+### 规范 2: "实现交互" ≠ "绑定事件"
+
+**问题**: executor 把 `event.add({ trigger:'click', actions:[...] })` 视为"交互完成"，但实际只做了操作清单 7 列中的 1 列。
+
+**规范**: 对每个有 interaction.trigger 的节点，必须逐列实现：
+
+| 列 | 必须实现的内容 | 示例 |
+|---|---|---|
+| 触发 | event.add + trigger | click |
+| 前置条件 | condition 表达式 + **disabled 态视觉**（节点样式联动状态） | `{{ phone.length < 11 }}` → 按钮灰色 |
+| 即时反馈 | 文案变化 / press 动效 / 触觉 | textContent 绑定动态表达式 |
+| 进行中 | loading 状态联动 UI（spinner/禁用） | submitState==='submitting' → 按钮 spinner |
+| 成功 | Toast / 跳转 / 状态切换 / 动效 | ui.showToast + nav.go |
+| 失败 | 错误提示 / 恢复 / shake | error-msg 节点 + visibleWhen |
+| 边界 | 防重 / 超时 / 极端数据 | debounce / timeout 恢复 |
+
+**每完成一个操作，对照这 7 列逐个确认，缺任何一列不得标记完成。**
+
+### 规范 3: 素材绘制的质量门槛
+
+**问题**: material-painter 画的图标坐标随手写、没参考标准、export 后没验证渲染效果。
+
+**规范**:
+
+1. **绘制前**:
+   - 必须参考成熟图标库（Lucide/Phosphor/Feather）的同类图标构型逻辑
+   - 必须读素材文档 §2 风格分析 + §3 构图方案的精确描述
+   - pathData 坐标必须基于参考框的数学计算（对称性/比例/控制点距离）
+   - 不得"凭感觉画"——每个坐标点必须有几何依据
+
+2. **绘制后**:
+   - 必须检查 export 后目标节点的 backgroundSize/backgroundPosition 值
+   - Icon 类素材: backgroundSize 必须是精确像素值（如 "20px 20px"），不是 "contain"
+   - 如果发现 backgroundSize 错误 → sizeMode 参数传错了，重新 export
+   - 关键素材（Logo/首个图标）必须 generate_snapshots 截图验证
+
+3. **风格一致性**:
+   - 同项目所有 Icon 必须统一 strokeWidth / linecap / color（从 iconSpec 读取）
+   - 不得同时存在 outline 和 filled 两种风格（除非设计文档明确要求）
+   - 首个图标完成后记录参数快照，后续图标强制对照
+
+### 规范 4: 创建元素后的默认样式（P1 已修复）
+
+**原问题已修复**：用户传入的 styles 现在会正确覆盖平台默认值。
+
+**仍需注意的场景**：
+- 不传任何 styles 时，元素仍会获得基础默认值（flex:1, minHeight:40px）
+- 如果不需要这些默认值：在 element/add 时就传入正确的 styles（如 `flex:"none"`, `minHeight:"auto"`）
+- 不再需要"创建后立即 reset"的绕过步骤
+
+### 规范 5: 状态联动到 UI 的实现模式
+
+**问题**: executor 只做了 state.set 但没有把状态变化反映到 UI 渲染上。
+
+**规范**: 状态驱动 UI 的标准实现模式：
+
+| 需求 | 实现方式 |
+|------|---------|
+| 条件显示/隐藏 | `element.setVisibleWhen({ expression: "{{ state.view.xxx === 'yyy' }}" })` |
+| 动态文案 | `props.textContent` 或 `props.children` 使用 `{{ }}` 表达式 |
+| 条件样式 | `visualState.add` 添加业务状态 + 对应样式覆盖 |
+| disabled 态 | 组合：condition 阻止事件 + visualState 灰色样式 + cursor:not-allowed |
+| loading 态 | state.set(submitting) + visualState 切换 + textContent 表达式切换文案/spinner |
+
+**每个状态变量创建时，必须同时定义它驱动的 UI 变化——不允许创建"悬空状态"（有 state 但没有对应的 UI 联动）。**
+
+### 规范 6: export_and_apply 的 sizeMode 选择
+
+**问题**: P2 已修复，但需要确保正确选择 sizeMode 参数。
+
+**规范**: 调用 `canvas/export_and_apply` 时必须显式指定 `sizeMode`：
+
+| 素材类型 | sizeMode | 原因 |
+|---------|----------|------|
+| Icon（功能图标） | `"auto"` | 保持精确像素，不拉伸 |
+| Logo（品牌标识） | `"auto"` | 保持精确比例 |
+| Decoration（装饰背景） | `"contain"` | 自适应容器 |
+| Illustration（插画） | `"contain"` | 自适应容器 |
+| 全屏背景装饰 | `"cover"` | 铺满不留白 |
+
+**禁止**：
+- 🚫 不传 sizeMode（虽然默认是 auto，但必须显式声明意图）
+- 🚫 Icon 用 contain（会拉伸变形）
+- 🚫 全屏背景用 auto（会留大片空白）
+
+---
+
+## 三、流程检查点（每次执行时强制自检）
+
+### executor 执行自检清单
+
+在每个节点完成后，必须自问：
+
+```
+□ 结构是否正确（标签/层级/命名）？
+□ 默认样式是否已清理（flex:1/minHeight 是否影响布局）？
+□ 文案是否正确（placeholder/textContent 来自文档而非记忆）？
+□ 事件是否完整（不只是 trigger，还有 condition/反馈/loading/error）？
+□ 状态联动是否闭环（state.set 后 UI 是否跟着变了）？
+□ 素材是否正确（尺寸/缩放/位置/风格一致性）？
+□ visibleWhen 是否有对应的 preview 值设置？
+```
+
+### material-painter 执行自检清单
+
+```
+□ 是否参考了标准图标库的同类图标？
+□ path 坐标是否基于精确计算（非手算近似）？
+□ 风格是否与 design-system.md 的 iconSpec 一致？
+□ export_and_apply 后目标节点渲染是否正确？
+□ backgroundSize 是否需要手动修正（Icon 类 → auto+center）？
+```
+
+---
+
+## 四、待修复的平台问题 Backlog
+
+| 优先级 | 问题 | 文件 | 状态 |
+|:------:|------|------|:----:|
+| P0 | element/add 双重默认样式 | `features/design-operations/src/operations/element.ts:138` | ✅ 已修复 |
+| P0 | export_and_apply backgroundSize 硬编码 | `apps/design-mcp/src/tools/domain/canvas.ts` | ✅ 已修复（新增 sizeMode 参数） |
+| P1 | task-gen 不扫描 _materials.json | ✅ 已修复 | ✅ |
+| P1 | MCP 参数 number/boolean 序列化 | ✅ 已修复 | ✅ |
+| P1 | MCP 参数 object 序列化 | ✅ 已修复 | ✅ |
+| P2 | insertSubtree 顺序反转 | `features/design-operations/` | 待验证（可用 element.reorder(newIndex) 绕过） |

@@ -1,0 +1,17 @@
+{
+  "id": "map-preview",
+  "type": "component",
+  "name": "地图预览",
+  "interaction": {
+    "summary": "当前位置+撒网范围圆，跟随选定网类型变化",
+    "ref": "interaction-design/pages/02-fishing-cast.md#节点骨架",
+    "states": [
+      "idle",
+      "no-gps"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

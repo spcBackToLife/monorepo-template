@@ -1,0 +1,18 @@
+{
+  "id": "form-card",
+  "type": "component",
+  "name": "注册表单",
+  "interaction": {
+    "summary": "承载 4 个输入字段",
+    "ref": "interaction-design/pages/00-register.md",
+    "states": [
+      "idle",
+      "inputting",
+      "submitting"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

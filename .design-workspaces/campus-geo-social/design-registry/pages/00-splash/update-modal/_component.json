@@ -1,0 +1,17 @@
+{
+  "id": "update-modal",
+  "type": "component",
+  "name": "强制更新弹窗",
+  "interaction": {
+    "summary": "L4 不可关闭 Modal；含图标 + 标题 + 描述 + 跳商店按钮",
+    "ref": "interaction-design/pages/00-splash.md#状态机:updating-blocked",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

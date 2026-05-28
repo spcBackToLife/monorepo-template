@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "component",
+  "name": "顶部导航",
+  "interaction": {
+    "summary": "标题+返回（中途返回需重走）",
+    "ref": "interaction-design/pages/00-auth-face.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

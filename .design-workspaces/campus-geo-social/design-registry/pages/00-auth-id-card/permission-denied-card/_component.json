@@ -1,0 +1,17 @@
+{
+  "id": "permission-denied-card",
+  "type": "component",
+  "name": "权限拒绝占位",
+  "interaction": {
+    "summary": "全屏占位+去设置",
+    "ref": "interaction-design/pages/00-auth-id-card.md",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "appeal-sheet",
+  "type": "component",
+  "name": "申诉表 sheet",
+  "interaction": {
+    "summary": "找不到学校时填学校名/省市/补充材料",
+    "ref": "interaction-design/pages/00-auth-school-select.md",
+    "states": [
+      "hidden",
+      "visible",
+      "submitting"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

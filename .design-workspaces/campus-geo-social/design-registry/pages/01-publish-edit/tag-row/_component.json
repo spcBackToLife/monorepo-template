@@ -1,0 +1,18 @@
+{
+  "id": "tag-row",
+  "type": "component",
+  "name": "标签行",
+  "interaction": {
+    "summary": "≤5 个标签",
+    "ref": "interaction-design/pages/01-publish-edit.md",
+    "states": [
+      "empty",
+      "filled",
+      "at-limit"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

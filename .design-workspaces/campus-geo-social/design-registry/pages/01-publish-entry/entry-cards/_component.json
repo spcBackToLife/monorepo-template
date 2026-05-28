@@ -1,0 +1,17 @@
+{
+  "id": "entry-cards",
+  "type": "component",
+  "name": "入口卡片组",
+  "interaction": {
+    "summary": "发动态/埋胶囊 两卡片",
+    "ref": "interaction-design/pages/01-publish-entry.md",
+    "states": [
+      "normal",
+      "restricted"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

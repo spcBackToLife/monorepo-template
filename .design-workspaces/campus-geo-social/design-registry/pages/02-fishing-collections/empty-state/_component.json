@@ -1,0 +1,17 @@
+{
+  "id": "empty-state",
+  "type": "component",
+  "name": "空状态",
+  "interaction": {
+    "summary": "\"还没有收藏\"插画+引导去 fishing-cast",
+    "ref": "interaction-design/pages/02-fishing-collections.md#节点骨架",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

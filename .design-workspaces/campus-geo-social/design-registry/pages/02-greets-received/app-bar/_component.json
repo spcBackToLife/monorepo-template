@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "component",
+  "name": "顶部栏",
+  "interaction": {
+    "summary": "左返回，标题\"我的招呼\"",
+    "ref": "interaction-design/pages/02-greets-received.md#操作清单:1",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

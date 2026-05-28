@@ -1,0 +1,18 @@
+{
+  "id": "friends-list",
+  "type": "component",
+  "name": "好友列表",
+  "interaction": {
+    "summary": "按字母索引+搜索过滤",
+    "ref": "interaction-design/pages/01-publish-target-friends.md",
+    "states": [
+      "loading",
+      "visible",
+      "searching"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "contact-sheet",
+  "type": "component",
+  "name": "客服选项 sheet",
+  "interaction": {
+    "summary": "3 选项 sheet：FAQ / 在线客服 / 提交工单",
+    "ref": "interaction-design/pages/11-about.md",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "top-bar",
+  "type": "component",
+  "name": "顶部条",
+  "interaction": {
+    "summary": "右上跳过按钮所在容器",
+    "ref": "interaction-design/pages/00-onboarding.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

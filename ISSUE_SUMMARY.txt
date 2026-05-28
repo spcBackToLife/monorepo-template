@@ -1,0 +1,201 @@
+================================================================================
+DESIGN UI MONOREPO: ISSUE INVESTIGATION SUMMARY
+================================================================================
+
+Three critical issues were investigated with detailed code analysis and 
+architectural review. Full findings documented below.
+
+================================================================================
+ISSUE 1: ELEMENT/ADD DEFAULT STYLES INJECTION
+================================================================================
+
+LOCATION:
+  - features/design-schema/src/registry/primitives.ts (Lines 26-40, 377-379)
+  - features/design-operations/src/operations/element.ts (Lines 53-162, 186-248)
+
+CURRENT BEHAVIOR:
+  When creating divs via MCP element/add, automatic default styles are 
+  injected causing unwanted layout:
+  - display: flex
+  - flexDirection: column  
+  - flex: 1
+  - minHeight: 40px
+  - minWidth: 40px
+  
+  This squishes pill-shaped tabs into circles and interferes with parent layouts.
+
+WHAT IT DOES:
+  1. primitives.ts PRIMITIVES registry defines defaultStyles for each element
+  2. getDefaultStyles() returns copy of primitive's defaultStyles
+  3. element.ts createNode() applies defaults in 3 steps:
+     - Gets defaultStyles from primitives registry (Line 147)
+     - Applies inferPracticalDefaults() based on layoutHint (Line 148)
+     - Merges both with user-provided styles (Line 153)
+  4. Result: combination of two default sources + user styles
+
+ASSESSMENT: BUG / MISSING FEATURE
+  - Type: Both a bug (unintended side effect) and missing feature (no opt-out)
+  - Severity: HIGH - breaks basic layout patterns
+  - Root cause: Too many automatic defaults with no user control
+
+RECOMMENDED FIX:
+  Option A (Minimal): Add skipDefaults?: boolean parameter to element/add
+  Option B (Best): Remove defaults from PRIMITIVES, let users specify via params
+  Option C (Hybrid): Make defaults context-aware (only top-level)
+
+================================================================================
+ISSUE 2: MATERIAL DESIGN APPLICATION STRETCHING ICONS  
+================================================================================
+
+LOCATION:
+  - apps/design-mcp/src/tools/domain/canvas.ts (export_and_apply handler)
+  - features/design-operations/src/operations/material.ts (Lines 22-131)
+
+CURRENT BEHAVIOR:
+  When applying a 20x20 icon to a 48x48 button container via canvas/export_and_apply,
+  the icon appears distorted/stretched to fill the entire container instead of 
+  maintaining its original size.
+
+WHAT IT DOES:
+  1. canvas.ts export_and_apply applies 9 hardcoded CSS styles to target node:
+     - backgroundImage: url("...")
+     - backgroundSize: 'contain'        ← PROBLEM: causes stretching
+     - backgroundPosition: 'center center'
+     - backgroundRepeat: 'no-repeat'
+     - border: 'none'
+     - borderWidth: 0
+     - boxSizing: 'border-box'
+     - backgroundClip: 'border-box'
+     - backgroundOrigin: 'border-box'
+  2. material.ts executeApplyMaterialDesign() is generic handler, just applies styles
+  3. backgroundSize: 'contain' scales image to fit 48x48 container, stretching 20x20 icon
+
+ASSESSMENT: BUG (incorrect CSS value)
+  - Type: CSS value choice bug
+  - Severity: HIGH - visually breaks icon designs
+  - Root cause: background-image approach fundamentally flawed for precise sizing
+    * Background images designed for patterns, not exact sizing
+    * No way to show 20x20 icon within 48x48 container without scaling
+
+RECOMMENDED FIX:
+  Option A (Best): Use CSS masking with explicit size (maskSize: '20px 20px')
+  Option B: Use fixed backgroundSize ('20px 20px' instead of 'contain')
+  Option C: Store icon metadata and calculate scale ratio
+  Option D: Use <img> element with fixed size, absolutely positioned
+
+================================================================================
+ISSUE 3: PREVIEW ENGINE - VISIBLEHEN + STATE.SET NOT RE-RENDERING
+================================================================================
+
+LOCATION:
+  - features/design-engine/src/preview/PreviewRenderer.tsx (Lines 84-90, 181-185)
+  - features/design-engine/src/state/Store.ts (Lines 17-68)
+  - features/design-engine/src/state/Dispatcher.ts (Lines 84-90, 145-153)
+  - features/design-engine/src/styles/resolveProps.ts (Lines 52-59)
+
+CURRENT BEHAVIOR:
+  In preview mode, clicking a tab that dispatches state.set({loginMode: 'password'})
+  does NOT cause elements with visibleWhen: {{ state.view.loginMode === 'password' }}
+  to show/hide. Expected: reactive UI updates. Actual: no change.
+
+WHAT IT DOES (Architecture Review):
+  1. Store.ts:
+     - subscribe() method registers listeners in a Set
+     - setState() notifies all listeners when state changes ✅ CORRECT
+  
+  2. PreviewRenderer.tsx (Lines 86-90):
+     - Subscribes to store via: store.subscribe(() => forceTick((n) => n + 1))
+     - Returns unsub function in cleanup ✅ CORRECT
+     - forceTick counter triggers React re-render on store change ✅ CORRECT
+  
+  3. PreviewRenderer.tsx (Lines 181-185):
+     - DataContext created in useMemo
+     - Depends on storeRef.current.getState() (fresh state each render) ✅ CORRECT
+  
+  4. Dispatcher.ts:
+     - state.set action calls applyStateMutation()
+     - applyStateMutation calls store.setState() ✅ CORRECT
+  
+  5. resolveProps.ts (Lines 52-59):
+     - visibleWhen expression evaluated per-render
+     - Uses current dataContext with fresh state ✅ CORRECT
+
+ASSESSMENT: LIKELY NOT A BUG (architecture is correct), but possible issues
+  - Type: Possible user error or edge case
+  - Severity: CRITICAL (if real) - breaks reactive patterns
+  - All mechanisms in place and should work
+
+POSSIBLE CAUSES:
+  1. Type mismatch: state.set({loginMode: ...}) sets to state.data,
+     but visibleWhen references state.view.loginMode
+  2. DataContext dependency: getState() returns new reference each call,
+     unlikely to break visibility but could cause issues
+  3. Expression evaluation: stale closure or timing issue
+
+RECOMMENDED VERIFICATION:
+  1. Create test screen with button that does state.set({ view.loginMode: 'password' })
+  2. Verify correct state path used in state.set call
+  3. Add debug logging in resolveNodeProps() and PreviewRenderer subscription
+  4. Check for timing issues between state.set and re-render
+  5. Verify expression evaluation gets current state value
+
+RECOMMENDED FIX (if confirmed):
+  1. Add explicit documentation on state.set path usage
+  2. Consider separate state.view.set action type for easier API
+  3. Add warnings for undefined path references in visibleWhen
+
+================================================================================
+COMPLETE FILE REFERENCE
+================================================================================
+
+ISSUE 1 FILES:
+  - features/design-schema/src/registry/primitives.ts
+    * Lines 26-40: PRIMITIVES registry with defaultStyles
+    * Lines 377-379: getDefaultStyles() function
+  
+  - features/design-operations/src/operations/element.ts
+    * Lines 53-136: inferPracticalDefaults() function
+    * Lines 139-162: createNode() function
+    * Lines 186-248: executeAddElement() function
+
+ISSUE 2 FILES:
+  - apps/design-mcp/src/tools/domain/canvas.ts
+    * export_and_apply handler with 9 hardcoded styles
+  
+  - features/design-operations/src/operations/material.ts
+    * Lines 22-131: executeApplyMaterialDesign() function
+
+ISSUE 3 FILES:
+  - features/design-engine/src/preview/PreviewRenderer.tsx
+    * Lines 84-90: Store subscription setup
+    * Lines 181-185: DataContext creation
+  
+  - features/design-engine/src/state/Store.ts
+    * Lines 17-27: Store interface
+    * Lines 39-68: Store implementation
+    * Lines 47-59: setState() with listener notification
+  
+  - features/design-engine/src/state/Dispatcher.ts
+    * Lines 84-90: state.set action handling
+    * Lines 145-153: applyStateMutation() implementation
+  
+  - features/design-engine/src/styles/resolveProps.ts
+    * Lines 52-59: visibleWhen expression evaluation
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+✅ Issue 1: Clearly identified - default styles in two locations
+   -> Definitive bug/missing feature with clear fix paths
+
+✅ Issue 2: Clearly identified - CSS value choice bug
+   -> Definitive bug with clear fix paths
+
+⚠️  Issue 3: Architecture appears correct, no obvious bugs found
+   -> Likely user error (state path mismatch) or edge case
+   -> Needs verification with actual test case
+   -> All reactive mechanisms in place and should work
+
+END OF SUMMARY
+================================================================================

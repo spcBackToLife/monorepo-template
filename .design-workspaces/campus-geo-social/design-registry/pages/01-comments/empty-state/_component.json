@@ -1,0 +1,17 @@
+{
+  "id": "empty-state",
+  "type": "component",
+  "name": "评论空状态",
+  "interaction": {
+    "summary": "治愈插画+「来抢沙发吧」",
+    "ref": "interaction-design/pages/01-comments.md",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

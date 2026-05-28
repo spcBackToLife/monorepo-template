@@ -1,0 +1,20 @@
+{
+  "id": "preview-area",
+  "type": "component",
+  "name": "预览/拍摄区",
+  "interaction": {
+    "summary": "相机预览/已拍图/裁剪框/OCR 进度",
+    "ref": "interaction-design/pages/00-auth-id-card.md",
+    "states": [
+      "idle",
+      "capturing",
+      "cropping",
+      "uploading",
+      "ocr-processing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

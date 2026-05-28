@@ -1,0 +1,21 @@
+{
+  "id": "greets-list",
+  "type": "component",
+  "name": "招呼列表",
+  "interaction": {
+    "summary": "LazyList，支持下拉刷新+上拉加载更多+WebSocket 顶部插入",
+    "ref": "interaction-design/pages/02-greets-received.md#操作清单:8-9",
+    "states": [
+      "loading:initial",
+      "loading:more",
+      "loading:refresh",
+      "visible",
+      "empty",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

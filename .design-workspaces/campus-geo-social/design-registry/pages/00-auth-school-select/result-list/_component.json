@@ -1,0 +1,18 @@
+{
+  "id": "result-list",
+  "type": "component",
+  "name": "搜索结果列表",
+  "interaction": {
+    "summary": "results-shown 时显示",
+    "ref": "interaction-design/pages/00-auth-school-select.md",
+    "states": [
+      "hidden",
+      "skeleton",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

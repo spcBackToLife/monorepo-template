@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "component",
+  "name": "顶部导航",
+  "interaction": {
+    "summary": "标题+返回",
+    "ref": "interaction-design/pages/01-publish-pick-location.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

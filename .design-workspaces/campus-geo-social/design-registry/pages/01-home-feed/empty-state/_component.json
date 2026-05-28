@@ -1,0 +1,17 @@
+{
+  "id": "empty-state",
+  "type": "component",
+  "name": "空状态",
+  "interaction": {
+    "summary": "治愈插画+三出口 CTA",
+    "ref": "interaction-design/pages/01-home-feed.md",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

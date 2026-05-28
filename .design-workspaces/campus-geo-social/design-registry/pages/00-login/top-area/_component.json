@@ -1,0 +1,22 @@
+{
+  "id": "top-area",
+  "type": "component",
+  "name": "品牌头部",
+  "interaction": {
+    "summary": "展示 logo + slogan（纯展示，无 trigger）",
+    "ref": "interaction-design/pages/00-login.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "_updatedAt": "2026-05-28T10:33:37.770Z",
+  "design": {
+    "summary": "品牌头部：Logo 64×64 + Slogan h3，flex column center，pt:80px pb:32px",
+    "visualRef": "design-plan/pages/00-login/components/top-area/top-area.visual.md",
+    "structRef": "design-plan/pages/00-login/components/top-area/top-area.md"
+  }
+}

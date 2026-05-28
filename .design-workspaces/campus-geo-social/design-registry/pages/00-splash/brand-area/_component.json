@@ -1,0 +1,17 @@
+{
+  "id": "brand-area",
+  "type": "component",
+  "name": "品牌区",
+  "interaction": {
+    "summary": "承载 logo 与应用名，启动期间播放入场动画",
+    "ref": "interaction-design/pages/00-splash.md#状态机",
+    "states": [
+      "bootstrapping",
+      "routing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

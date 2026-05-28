@@ -1,0 +1,18 @@
+{
+  "id": "media-carousel",
+  "type": "component",
+  "name": "媒体轮播",
+  "interaction": {
+    "summary": "图片/视频沉浸式展示",
+    "ref": "interaction-design/pages/01-moment-detail.md",
+    "states": [
+      "images",
+      "video-playing",
+      "video-paused"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

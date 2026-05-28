@@ -1,0 +1,19 @@
+{
+  "id": "map-canvas",
+  "type": "component",
+  "name": "地图本体",
+  "interaction": {
+    "summary": "拖动+pin 跟随+反查 POI",
+    "ref": "interaction-design/pages/01-publish-pick-location.md",
+    "states": [
+      "loading",
+      "map-ready",
+      "dragging",
+      "pin-settled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

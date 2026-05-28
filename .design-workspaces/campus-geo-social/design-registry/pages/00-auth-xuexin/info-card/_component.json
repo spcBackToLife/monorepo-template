@@ -1,0 +1,17 @@
+{
+  "id": "info-card",
+  "type": "component",
+  "name": "为什么需要学信网",
+  "interaction": {
+    "summary": "标题+说明+展开",
+    "ref": "interaction-design/pages/00-auth-xuexin.md",
+    "states": [
+      "collapsed",
+      "expanded"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}
