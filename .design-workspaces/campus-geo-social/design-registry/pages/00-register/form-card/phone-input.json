@@ -1,0 +1,30 @@
+{
+  "id": "phone-input",
+  "type": "element",
+  "name": "手机号输入",
+  "interaction": {
+    "summary": "input→11位实时校验+onBlur 异步查重",
+    "ref": "interaction-design/pages/00-register.md#操作清单:1",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "校验通过激活下一步",
+        "ref": "interaction-design/pages/00-register.md#操作清单:1"
+      },
+      "error": {
+        "summary": "已注册→L4 Modal 跳登录；格式错→inline",
+        "ref": "interaction-design/pages/00-register.md#错误处理"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "valid",
+      "invalid"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

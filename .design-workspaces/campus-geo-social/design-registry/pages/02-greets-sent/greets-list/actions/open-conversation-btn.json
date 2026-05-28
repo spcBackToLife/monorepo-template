@@ -1,0 +1,24 @@
+{
+  "id": "open-conversation-btn",
+  "type": "element",
+  "name": "进入会话",
+  "interaction": {
+    "summary": "click→push 06-conversation；仅 replied 显示",
+    "ref": "interaction-design/pages/02-greets-sent.md#操作清单:6",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push 06-conversation",
+        "ref": "操作清单:6"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

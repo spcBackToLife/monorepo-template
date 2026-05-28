@@ -1,0 +1,66 @@
+{
+  "id": "00-auth-status",
+  "type": "page",
+  "name": "认证状态等待",
+  "product": {
+    "summary": "提交认证后展示当前状态（reviewing/approved/rejected/appealing），含估时与去其他页面探索的引导",
+    "ref": "product-analysis/modules/M5-user-auth.md#c2-业务规则",
+    "fromModules": [
+      "M5"
+    ],
+    "rules": [
+      "审核中状态展示动画（不让用户干等）+ 预计时长说明",
+      "通过状态 1.5s 后自动跳转 00-profile-init",
+      "驳回状态明确给出失败原因 + 一键申诉入口 + 修改后重提入口",
+      "申诉中状态展示进度（48h SLA）",
+      "用户在审核中可以继续探索（看广场公开内容），但不能发动态/捞网"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "4 个认证状态展示（reviewing/approved/rejected/appealing）+ 各自 CTA + 30s 轮询自动刷新",
+    "ref": "interaction-design/pages/00-auth-status.md",
+    "states": [
+      "reviewing",
+      "reviewing:fallback",
+      "approved",
+      "rejected",
+      "appealing",
+      "polling"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "去探索（受限模式）",
+        "triggerNodePath": "cta-area/explore-btn"
+      },
+      {
+        "op": "联系客服",
+        "triggerNodePath": "cta-area/contact-btn"
+      },
+      {
+        "op": "修改重提",
+        "triggerNodePath": "cta-area/resubmit-btn"
+      },
+      {
+        "op": "立即申诉",
+        "triggerNodePath": "cta-area/appeal-btn"
+      },
+      {
+        "op": "查看申诉进度",
+        "triggerNodePath": "cta-area/appeal-progress-btn"
+      },
+      {
+        "op": "后台轮询（30s）",
+        "triggerNodePath": "refresh-trigger"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:05:15.635Z"
+}

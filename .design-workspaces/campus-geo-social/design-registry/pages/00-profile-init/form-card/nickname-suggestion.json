@@ -1,0 +1,26 @@
+{
+  "id": "nickname-suggestion",
+  "type": "element",
+  "name": "昵称建议",
+  "interaction": {
+    "summary": "click(建议)→填入 input",
+    "ref": "interaction-design/pages/00-profile-init.md#操作清单:3",
+    "trigger": "click",
+    "condition": "{{ nicknameStatus == \"conflict\" }}",
+    "flows": {
+      "success": {
+        "summary": "填入+自动重校验",
+        "ref": "interaction-design/pages/00-profile-init.md#操作清单:3"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

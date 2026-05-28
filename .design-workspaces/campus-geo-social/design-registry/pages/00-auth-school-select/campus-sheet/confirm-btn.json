@@ -1,0 +1,30 @@
+{
+  "id": "confirm-btn",
+  "type": "element",
+  "name": "sheet 确认按钮",
+  "interaction": {
+    "summary": "click→关 sheet + submitting",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:6",
+    "trigger": "click",
+    "condition": "{{ selectedCampusId != null }}",
+    "flows": {
+      "success": {
+        "summary": "关 sheet + 提交 → 跳 auth-id-card",
+        "ref": "interaction-design/pages/00-auth-school-select.md#状态机"
+      },
+      "error": {
+        "summary": "网络错→Toast+恢复",
+        "ref": "interaction-design/pages/00-auth-school-select.md#错误处理"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "submitting"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

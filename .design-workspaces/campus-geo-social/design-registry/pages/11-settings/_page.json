@@ -1,0 +1,18 @@
+{
+  "id": "11-settings",
+  "type": "page",
+  "name": "设置主菜单",
+  "product": {
+    "summary": "设置中心：账号与安全 / 隐私设置 / 通知设置 / 通用 / 关于 五大入口",
+    "ref": "product-analysis/modules/M11-settings-privacy.md#b1-设置主菜单结构",
+    "fromModules": ["M11"],
+    "rules": [
+      "卡片化分组，每个组独立浅色背景",
+      "顶部直接展示当前账号信息卡（头像 + 昵称 + 主校园）",
+      "底部固定'退出登录'按钮（红色但克制）",
+      "设置项变更后立即生效（除主题外，主题需软重启）",
+      "搜索框（V1.x），方便用户快速找到具体设置项"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

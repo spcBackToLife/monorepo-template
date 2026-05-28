@@ -1,0 +1,32 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "人物卡片",
+  "interaction": {
+    "summary": "含头像/简介/动态预览/共同好友；支持四方向手势+点击 flip 详情",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:2-8",
+    "trigger": "gesture",
+    "flows": {
+      "success": {
+        "summary": "右滑→push greet-compose；左滑→记 30 天黑名单；上滑→加收藏",
+        "ref": "操作清单:2-6"
+      },
+      "boundary": {
+        "summary": "阈值不够→回弹；收藏满→Toast 视为无视",
+        "ref": "操作清单:7"
+      }
+    },
+    "states": [
+      "idle",
+      "swiping:right",
+      "swiping:left",
+      "swiping:up",
+      "decided",
+      "flipped"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

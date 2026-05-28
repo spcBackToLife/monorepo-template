@@ -1,0 +1,28 @@
+{
+  "id": "share-btn",
+  "type": "element",
+  "name": "分享",
+  "interaction": {
+    "summary": "click→ActionSheet（好友/复制/微信/QQ）",
+    "ref": "interaction-design/pages/01-moment-detail.md#操作清单:11",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "ActionSheet 弹起",
+        "ref": "interaction-design/pages/01-moment-detail.md#操作清单:11"
+      },
+      "boundary": {
+        "summary": "漫游模式仅复制链接可用",
+        "ref": "interaction-design/pages/01-moment-detail.md#操作清单:11"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

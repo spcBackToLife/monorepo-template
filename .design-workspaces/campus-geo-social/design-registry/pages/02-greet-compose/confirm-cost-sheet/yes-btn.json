@@ -1,0 +1,28 @@
+{
+  "id": "yes-btn",
+  "type": "element",
+  "name": "确认消耗",
+  "interaction": {
+    "summary": "click→扣钻石并发送",
+    "ref": "interaction-design/pages/02-greet-compose.md#操作清单:8",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "扣钻石→submitting",
+        "ref": "操作清单:8"
+      },
+      "error": {
+        "summary": "钻石不足→insufficient-diamonds-sheet",
+        "ref": "操作清单:8"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

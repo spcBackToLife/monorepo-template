@@ -1,0 +1,24 @@
+{
+  "id": "text",
+  "type": "element",
+  "name": "ICP 备案文本",
+  "interaction": {
+    "summary": "click→复制到剪贴板 + Toast",
+    "ref": "interaction-design/pages/11-about.md#操作清单:10",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "Toast「ICP备案号已复制」+ 触觉 light",
+        "ref": "interaction-design/pages/11-about.md#操作清单:10"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "phone-input",
+  "type": "element",
+  "name": "手机号输入",
+  "interaction": {
+    "summary": "input→实时校验",
+    "ref": "interaction-design/pages/00-forgot-password.md#操作清单:1",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "激活获取验证码按钮",
+        "ref": "interaction-design/pages/00-forgot-password.md#操作清单:1"
+      },
+      "error": {
+        "summary": "未注册→L4 Modal「是否去注册?」",
+        "ref": "interaction-design/pages/00-forgot-password.md#错误处理"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "valid",
+      "invalid"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

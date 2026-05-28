@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "block",
+  "name": "顶部导航",
+  "interaction": {
+    "summary": "标题「修改密码」+ 返回",
+    "ref": "interaction-design/pages/11-change-password.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "discard-btn",
+  "type": "element",
+  "name": "丢弃",
+  "interaction": {
+    "summary": "click→不保存 pop",
+    "ref": "interaction-design/pages/01-publish-edit.md#操作清单:12",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop",
+        "ref": "interaction-design/pages/01-publish-edit.md#操作清单:12"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

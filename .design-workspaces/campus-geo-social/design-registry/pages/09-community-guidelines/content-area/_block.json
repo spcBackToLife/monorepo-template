@@ -1,0 +1,18 @@
+{
+  "id": "content-area",
+  "type": "block",
+  "name": "内容区",
+  "interaction": {
+    "summary": "Markdown 渲染容器，包含 loading/reading/error 三态",
+    "ref": "interaction-design/pages/09-community-guidelines.md",
+    "states": [
+      "loading",
+      "reading",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

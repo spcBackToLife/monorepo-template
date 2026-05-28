@@ -1,0 +1,24 @@
+{
+  "id": "target-info",
+  "type": "element",
+  "name": "目标用户信息",
+  "interaction": {
+    "summary": "迷你头像+昵称；click→push 02-person-card（受隐私限制）",
+    "ref": "interaction-design/pages/02-greet-compose.md#节点骨架",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push 02-person-card",
+        "ref": "02-greet-compose.md#节点骨架"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

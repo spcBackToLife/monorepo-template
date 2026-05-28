@@ -1,0 +1,33 @@
+{
+  "id": "markers",
+  "type": "element",
+  "name": "动态点位 marker",
+  "interaction": {
+    "summary": "click→push 01-moment-detail",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:8",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "marker scale + 触觉 light + push 01-moment-detail",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:8"
+      },
+      "error": {
+        "summary": "已被删除/下架→Toast「该动态已不可见」",
+        "ref": "interaction-design/pages/01-home-map.md#错误处理"
+      },
+      "boundary": {
+        "summary": "漫游模式仅可点不可互动",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:8"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "unavailable"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

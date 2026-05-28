@@ -1,0 +1,24 @@
+{
+  "id": "faq-option",
+  "type": "element",
+  "name": "常见问题",
+  "interaction": {
+    "summary": "click→push WebView (FAQ)",
+    "ref": "interaction-design/pages/11-about.md#操作清单:7",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "sheet 退出 + push FAQ WebView",
+        "ref": "interaction-design/pages/11-about.md#操作清单:7"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

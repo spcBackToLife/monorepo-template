@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "block",
+  "name": "顶部导航",
+  "interaction": {
+    "summary": "返回+发布按钮",
+    "ref": "interaction-design/pages/01-publish-edit.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "capture-btn",
+  "type": "element",
+  "name": "拍照按钮",
+  "interaction": {
+    "summary": "click→进 capturing 或 permission-asking",
+    "ref": "interaction-design/pages/00-auth-id-card.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "快门动画+触觉 medium+进 cropping",
+        "ref": "interaction-design/pages/00-auth-id-card.md#状态机"
+      },
+      "error": {
+        "summary": "权限拒绝→permission-denied",
+        "ref": "interaction-design/pages/00-auth-id-card.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "permission-denied"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

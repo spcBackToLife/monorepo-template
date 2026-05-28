@@ -1,0 +1,24 @@
+{
+  "id": "tag-row",
+  "type": "element",
+  "name": "标签气泡组",
+  "interaction": {
+    "summary": "click(tag)→跳标签聚合页（V1.x）",
+    "ref": "interaction-design/pages/01-moment-detail.md",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "V1.x push tag-aggregation",
+        "ref": "interaction-design/pages/01-moment-detail.md"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

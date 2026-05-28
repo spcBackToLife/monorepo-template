@@ -1,0 +1,29 @@
+{
+  "id": "remove-btn",
+  "type": "element",
+  "name": "移除",
+  "interaction": {
+    "summary": "click→L3 Toast Confirm + 5s Undo；项 fade out",
+    "ref": "interaction-design/pages/02-fishing-collections.md#操作清单:6",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "乐观更新+Toast Undo",
+        "ref": "操作清单:6"
+      },
+      "error": {
+        "summary": "network→静默重试 1 次后回滚",
+        "ref": "操作清单:6"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "removing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "id": "00-auth-school-select",
+  "type": "page",
+  "name": "选择学校",
+  "product": {
+    "summary": "从全国高校字典中选择本人所在学校与校区作为认证目标",
+    "ref": "product-analysis/modules/M5-user-auth.md#b1-注册主线-happy-path",
+    "fromModules": [
+      "M5"
+    ],
+    "rules": [
+      "支持拼音/简称/全称模糊搜索，结果按热度+地理近度排序",
+      "顶部展示热门高校（用户所在地区为主）",
+      "未在列表的需提供'找不到我的学校'入口提交申诉表",
+      "选定后必须再选具体校区（多校区学校）",
+      "选定的学校决定后续学信网授权 + GPS 主校园归属"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "高校搜索（拼音/简称/全称）+ 热门列表 + 校区选择器 + 找不到学校申诉表",
+    "ref": "interaction-design/pages/00-auth-school-select.md",
+    "states": [
+      "idle:default",
+      "searching",
+      "results-shown",
+      "empty",
+      "campus-pick",
+      "submitting",
+      "success",
+      "not-found-submitting"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "输入搜索",
+        "triggerNodePath": "search-input"
+      },
+      {
+        "op": "点击热门学校",
+        "triggerNodePath": "hot-list/items"
+      },
+      {
+        "op": "点击搜索结果",
+        "triggerNodePath": "result-list/items"
+      },
+      {
+        "op": "选择校区",
+        "triggerNodePath": "campus-sheet/items"
+      },
+      {
+        "op": "校区 sheet 确认",
+        "triggerNodePath": "campus-sheet/confirm-btn"
+      },
+      {
+        "op": "关闭校区 sheet",
+        "triggerNodePath": "campus-sheet/mask"
+      },
+      {
+        "op": "点击找不到我的学校",
+        "triggerNodePath": "not-found-link"
+      },
+      {
+        "op": "提交申诉表",
+        "triggerNodePath": "appeal-sheet/submit-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:05:04.080Z"
+}

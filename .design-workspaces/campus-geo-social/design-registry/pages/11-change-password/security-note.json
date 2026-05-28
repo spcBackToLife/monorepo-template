@@ -1,0 +1,16 @@
+{
+  "id": "security-note",
+  "type": "element",
+  "name": "安全提示",
+  "interaction": {
+    "summary": "展示「修改后所有设备需重新登录」，纯展示",
+    "ref": "interaction-design/pages/11-change-password.md",
+    "states": [
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

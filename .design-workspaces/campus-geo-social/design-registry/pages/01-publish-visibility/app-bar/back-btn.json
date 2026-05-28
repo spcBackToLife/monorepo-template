@@ -1,0 +1,28 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→有变更弹 unsaved-warn",
+    "ref": "interaction-design/pages/01-publish-visibility.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop",
+        "ref": "interaction-design/pages/01-publish-visibility.md#操作清单:1"
+      },
+      "boundary": {
+        "summary": "有变更→unsaved-warn Modal",
+        "ref": "interaction-design/pages/01-publish-visibility.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

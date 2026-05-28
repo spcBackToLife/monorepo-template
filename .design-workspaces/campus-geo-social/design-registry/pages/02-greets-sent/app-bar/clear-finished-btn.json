@@ -1,0 +1,34 @@
+{
+  "id": "clear-finished-btn",
+  "type": "element",
+  "name": "清空已结束",
+  "interaction": {
+    "summary": "click→L4 Confirm 清除拒绝/过期/已撤回记录",
+    "ref": "interaction-design/pages/02-greets-sent.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "clearing-finished→项 fade out",
+        "ref": "操作清单:3"
+      },
+      "error": {
+        "summary": "network→Toast retry",
+        "ref": "操作清单:3"
+      },
+      "boundary": {
+        "summary": "无已结束项时禁用",
+        "ref": "操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "disabled",
+      "pressing",
+      "clearing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

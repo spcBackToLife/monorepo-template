@@ -1,0 +1,36 @@
+{
+  "id": "send-btn",
+  "type": "element",
+  "name": "发送",
+  "interaction": {
+    "summary": "click→提交评论",
+    "ref": "interaction-design/pages/01-comments.md#操作清单:8",
+    "trigger": "click",
+    "condition": "{{ textNonEmpty }}",
+    "flows": {
+      "success": {
+        "summary": "列表头部插入+ fade+触觉 light",
+        "ref": "interaction-design/pages/01-comments.md#状态机"
+      },
+      "error": {
+        "summary": "违规→Modal 撤回；网络→inline 重试",
+        "ref": "interaction-design/pages/01-comments.md#错误处理"
+      },
+      "boundary": {
+        "summary": "800ms 防抖",
+        "ref": "interaction-design/pages/01-comments.md#操作清单:8"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "submitting",
+      "success",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

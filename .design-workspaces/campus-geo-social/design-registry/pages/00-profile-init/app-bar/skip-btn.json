@@ -1,0 +1,30 @@
+{
+  "id": "skip-btn",
+  "type": "element",
+  "name": "跳过",
+  "interaction": {
+    "summary": "click→Confirm「跳过将无奖励」→ success:partial",
+    "ref": "interaction-design/pages/00-profile-init.md#操作清单:6",
+    "trigger": "click",
+    "condition": "{{ avatarUploaded && nicknameValid }}",
+    "flows": {
+      "success": {
+        "summary": "确认→success:partial→跳 01-home-map",
+        "ref": "interaction-design/pages/00-profile-init.md#状态机"
+      },
+      "boundary": {
+        "summary": "必填项未填→按钮置灰",
+        "ref": "interaction-design/pages/00-profile-init.md#操作清单:6"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

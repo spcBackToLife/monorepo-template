@@ -1,0 +1,16 @@
+{
+  "id": "app-name",
+  "type": "element",
+  "name": "应用名",
+  "interaction": {
+    "summary": "展示\"校园地理社交\"",
+    "ref": "interaction-design/pages/11-about.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

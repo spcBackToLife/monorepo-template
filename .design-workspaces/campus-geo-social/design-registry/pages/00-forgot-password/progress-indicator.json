@@ -1,0 +1,17 @@
+{
+  "id": "progress-indicator",
+  "type": "element",
+  "name": "步骤指示 1/2",
+  "interaction": {
+    "summary": "顶部进度指示 1/2 → 2/2",
+    "ref": "interaction-design/pages/00-forgot-password.md#状态机",
+    "states": [
+      "step:phone",
+      "step:new-password"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

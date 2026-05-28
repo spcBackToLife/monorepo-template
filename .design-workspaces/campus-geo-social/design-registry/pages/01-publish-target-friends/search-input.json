@@ -1,0 +1,26 @@
+{
+  "id": "search-input",
+  "type": "element",
+  "name": "搜索框",
+  "interaction": {
+    "summary": "input→200ms debounce 过滤",
+    "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:2",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "本地过滤+备注名服务端",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:2"
+      }
+    },
+    "states": [
+      "empty",
+      "searching",
+      "has-results",
+      "no-results"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

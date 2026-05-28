@@ -1,0 +1,31 @@
+{
+  "id": "follow-btn",
+  "type": "element",
+  "name": "关注按钮",
+  "interaction": {
+    "summary": "click→toggle 关注（乐观更新）",
+    "ref": "interaction-design/pages/01-moment-detail.md#操作清单:6",
+    "trigger": "click",
+    "condition": "{{ !isInRoamingMode }}",
+    "flows": {
+      "success": {
+        "summary": "toggle 状态+触觉 light",
+        "ref": "interaction-design/pages/01-moment-detail.md#操作清单:6"
+      },
+      "error": {
+        "summary": "失败→回滚",
+        "ref": "interaction-design/pages/01-moment-detail.md#操作清单:6"
+      }
+    },
+    "states": [
+      "unfollow",
+      "following",
+      "pending",
+      "disabled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "guide-frame",
+  "type": "element",
+  "name": "椭圆引导框",
+  "interaction": {
+    "summary": "实时跟踪人脸位置，纯展示",
+    "ref": "interaction-design/pages/00-auth-face.md",
+    "states": [
+      "aligned",
+      "misaligned"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

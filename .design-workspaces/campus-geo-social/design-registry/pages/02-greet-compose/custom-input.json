@@ -1,0 +1,26 @@
+{
+  "id": "custom-input",
+  "type": "element",
+  "name": "自定义输入框",
+  "interaction": {
+    "summary": "最长 50 字符，含 1 个 emoji 上限；字符计数实时显示",
+    "ref": "interaction-design/pages/02-greet-compose.md#操作清单:3",
+    "trigger": "input",
+    "flows": {
+      "boundary": {
+        "summary": ">50 字符拒绝输入",
+        "ref": "操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "focused",
+      "filled",
+      "overflow"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

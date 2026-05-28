@@ -1,0 +1,18 @@
+{
+  "id": "radius-overlay",
+  "type": "element",
+  "name": "半径圈圈",
+  "interaction": {
+    "summary": "半径切换时缩放动画",
+    "ref": "interaction-design/pages/01-publish-pick-location.md",
+    "states": [
+      "50m",
+      "200m",
+      "500m"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

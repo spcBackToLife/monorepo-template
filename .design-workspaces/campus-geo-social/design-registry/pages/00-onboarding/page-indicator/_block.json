@@ -1,0 +1,16 @@
+{
+  "id": "page-indicator",
+  "type": "block",
+  "name": "页指示器容器",
+  "interaction": {
+    "summary": "4 个 dot 跟随 swiper 实时插值",
+    "ref": "interaction-design/pages/00-onboarding.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

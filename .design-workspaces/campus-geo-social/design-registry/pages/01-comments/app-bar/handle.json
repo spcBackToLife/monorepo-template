@@ -1,0 +1,24 @@
+{
+  "id": "handle",
+  "type": "element",
+  "name": "拖手柄",
+  "interaction": {
+    "summary": "下拉手势→关 sheet",
+    "ref": "interaction-design/pages/01-comments.md",
+    "trigger": "swipe",
+    "flows": {
+      "success": {
+        "summary": "sheet 下滑",
+        "ref": "interaction-design/pages/01-comments.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "dragging"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

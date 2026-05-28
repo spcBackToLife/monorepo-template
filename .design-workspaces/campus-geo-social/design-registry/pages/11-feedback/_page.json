@@ -1,0 +1,18 @@
+{
+  "id": "11-feedback",
+  "type": "page",
+  "name": "意见反馈",
+  "product": {
+    "summary": "用户提交反馈/Bug 报告/功能建议，可附截图，关联在线客服",
+    "ref": "product-analysis/modules/M11-settings-privacy.md#涉及接口",
+    "fromModules": ["M11"],
+    "rules": [
+      "分类：Bug / 功能建议 / 体验问题 / 其他",
+      "文字 ≤500 字 + 可附 ≤3 张截图",
+      "提交时自动附带客户端版本/设备信息（脱敏后）便于排查",
+      "可选'希望客服联系我'，留下联系方式",
+      "提交后展示反馈编号 + 跟踪入口"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

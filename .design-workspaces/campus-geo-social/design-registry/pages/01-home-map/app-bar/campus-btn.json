@@ -1,0 +1,29 @@
+{
+  "id": "campus-btn",
+  "type": "element",
+  "name": "校园切换",
+  "interaction": {
+    "summary": "click→push 04-campus-switch；显示当前校园名",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push 04-campus-switch",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:3"
+      },
+      "boundary": {
+        "summary": "漫游中显示当前所在校",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "roaming",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

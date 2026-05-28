@@ -1,0 +1,28 @@
+{
+  "id": "expand-radius-btn",
+  "type": "element",
+  "name": "扩大半径",
+  "interaction": {
+    "summary": "click→半径升一档重新拉数据",
+    "ref": "interaction-design/pages/01-home-feed.md#操作清单:11",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "半径升档→刷新",
+        "ref": "interaction-design/pages/01-home-feed.md#操作清单:11"
+      },
+      "boundary": {
+        "summary": "已 500m→切到「去广场」",
+        "ref": "interaction-design/pages/01-home-feed.md#操作清单:11"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

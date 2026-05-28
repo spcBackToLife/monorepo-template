@@ -1,0 +1,18 @@
+{
+  "id": "03-capsule-riddle",
+  "type": "page",
+  "name": "解锁谜题",
+  "product": {
+    "summary": "胶囊有谜题时，开启前的答题页（复古打字机风格 UI）",
+    "ref": "product-analysis/modules/M3-time-capsule.md#b2-解胶囊主线",
+    "fromModules": ["M3"],
+    "rules": [
+      "答案不区分大小写，前后空格自动 trim 后哈希比对",
+      "3 次错误锁定 24h，期间无法再答题",
+      "可选'放弃此胶囊'（永久不可再开），适合彻底忘记答案的情况",
+      "通过谜题后跳转 03-capsule-open",
+      "仅胶囊的作者本人 + 到达地点 + 已到解锁时间 三条件齐备才允许进入此页"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

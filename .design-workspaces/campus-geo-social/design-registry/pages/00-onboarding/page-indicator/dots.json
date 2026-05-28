@@ -1,0 +1,31 @@
+{
+  "id": "dots",
+  "type": "element",
+  "name": "圆点指示器组合",
+  "interaction": {
+    "summary": "click(dot N)→跳到对应屏",
+    "ref": "interaction-design/pages/00-onboarding.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "swiper 滑动 300ms 切到 N + 当前 dot 高亮",
+        "ref": "interaction-design/pages/00-onboarding.md#状态机"
+      },
+      "boundary": {
+        "summary": "重复点当前 dot 忽略",
+        "ref": "interaction-design/pages/00-onboarding.md#操作清单:2"
+      }
+    },
+    "states": [
+      "idle",
+      "page-1-active",
+      "page-2-active",
+      "page-3-active",
+      "page-4-active"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

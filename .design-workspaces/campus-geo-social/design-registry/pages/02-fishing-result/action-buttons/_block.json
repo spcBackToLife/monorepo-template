@@ -1,0 +1,17 @@
+{
+  "id": "action-buttons",
+  "type": "block",
+  "name": "底部操作按钮",
+  "interaction": {
+    "summary": "左中右三按钮：无视/打招呼/收藏（对应卡片三种手势）",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:3,5,7",
+    "states": [
+      "idle",
+      "disabled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

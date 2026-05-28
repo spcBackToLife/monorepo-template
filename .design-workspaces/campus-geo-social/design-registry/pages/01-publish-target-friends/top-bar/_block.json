@@ -1,0 +1,17 @@
+{
+  "id": "top-bar",
+  "type": "block",
+  "name": "副 bar",
+  "interaction": {
+    "summary": "search 之下，含全选按钮",
+    "ref": "interaction-design/pages/01-publish-target-friends.md",
+    "states": [
+      "idle",
+      "searching"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

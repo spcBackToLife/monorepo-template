@@ -1,0 +1,30 @@
+{
+  "id": "logo",
+  "type": "element",
+  "name": "主 Logo",
+  "interaction": {
+    "summary": "longPress(7次)→开启 debug 模式（仅 dev 构建）",
+    "ref": "interaction-design/pages/00-splash.md#操作清单:4",
+    "trigger": "longPress",
+    "condition": "{{ buildType in [\"dev\",\"beta\"] }}",
+    "flows": {
+      "success": {
+        "summary": "触觉 medium + logo 旋转一周，进入 debug 模式",
+        "ref": "interaction-design/pages/00-splash.md#状态机:debug-mode"
+      },
+      "boundary": {
+        "summary": "非 dev 构建忽略",
+        "ref": "interaction-design/pages/00-splash.md#操作清单:4"
+      }
+    },
+    "states": [
+      "idle",
+      "longPressing",
+      "activated"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

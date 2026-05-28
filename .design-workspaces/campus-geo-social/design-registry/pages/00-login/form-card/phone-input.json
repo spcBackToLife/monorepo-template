@@ -1,0 +1,67 @@
+{
+  "id": "phone-input",
+  "type": "element",
+  "name": "手机号输入框",
+  "interaction": {
+    "summary": "input→11 位实时格式校验；onBlur 校验已注册状态",
+    "ref": "interaction-design/pages/00-login.md#操作清单:2",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "格式校验通过 → 解锁验证码/登录按钮",
+        "ref": "interaction-design/pages/00-login.md#操作清单:2"
+      },
+      "error": {
+        "summary": "格式错→inline 红字「请输入正确的手机号」",
+        "ref": "interaction-design/pages/00-login.md#错误处理"
+      },
+      "boundary": {
+        "summary": "自动 +86 前缀，支持 iOS 短信预填",
+        "ref": "interaction-design/pages/00-login.md#边界情况"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "valid",
+      "invalid",
+      "disabled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "手机号输入框：48px 高 + radius-md + 1px border + focus 双层 ring（2px primary + 4px 10%）",
+    "ref": "design-plan/pages/00-login/index.md#§4.3-phone-input",
+    "visualRef": "design-plan/pages/00-login/visual.md#§6-input-样式表",
+    "visualStates": {
+      "default": {
+        "summary": "border: 1px borderLight, label 居中默认位"
+      },
+      "focused": {
+        "summary": "border: 2px primary + box-shadow 0 0 0 4px rgba(255,111,145,0.1), label translateY(-22px) scale(0.85) 色变 primary"
+      },
+      "has-value": {
+        "summary": "label 保持上浮位（同 focused 的 label 状态，但 border 回到默认）"
+      },
+      "error": {
+        "summary": "border: 2px error + label 色变 error + 字段下方 inline 红字 caption"
+      },
+      "disabled": {
+        "summary": "opacity 0.45, pointer-events:none（submitting 时）"
+      }
+    },
+    "interactionStates": {
+      "focus": {
+        "summary": "焦点光圈 200ms ease-out 展开"
+      }
+    }
+  },
+  "content": {
+    "type": "text",
+    "value": "手机号"
+  },
+  "_updatedAt": "2026-05-28T06:25:45.225Z"
+}

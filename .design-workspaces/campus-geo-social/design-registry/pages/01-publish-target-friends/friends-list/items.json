@@ -1,0 +1,29 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "好友行",
+  "interaction": {
+    "summary": "click→toggle 选中",
+    "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:4",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "复选框 toggle+触觉 light",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:4"
+      },
+      "boundary": {
+        "summary": "单击不导航",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:4"
+      }
+    },
+    "states": [
+      "idle",
+      "selected",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→L4 Modal「退出将重走完整流程」",
+    "ref": "interaction-design/pages/00-auth-face.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "确认→pop 回 xuexin",
+        "ref": "interaction-design/pages/00-auth-face.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

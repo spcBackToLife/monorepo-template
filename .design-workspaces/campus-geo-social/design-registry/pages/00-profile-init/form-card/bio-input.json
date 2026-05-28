@@ -1,0 +1,30 @@
+{
+  "id": "bio-input",
+  "type": "element",
+  "name": "简介输入（textarea）",
+  "interaction": {
+    "summary": "input→字符计数 N/100",
+    "ref": "interaction-design/pages/00-profile-init.md#操作清单:5",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "<100 字内正常输入",
+        "ref": "interaction-design/pages/00-profile-init.md#操作清单:5"
+      },
+      "error": {
+        "summary": ">100 字→拒绝输入",
+        "ref": "interaction-design/pages/00-profile-init.md#错误处理"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "filled",
+      "limit-reached"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

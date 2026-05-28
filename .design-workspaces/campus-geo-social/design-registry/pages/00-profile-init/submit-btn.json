@@ -1,0 +1,35 @@
+{
+  "id": "submit-btn",
+  "type": "element",
+  "name": "完成按钮",
+  "interaction": {
+    "summary": "click→提交资料",
+    "ref": "interaction-design/pages/00-profile-init.md#操作清单:7",
+    "trigger": "click",
+    "condition": "{{ avatarUploaded && nicknameValid }}",
+    "flows": {
+      "success": {
+        "summary": "全部填→success:full +50 积分动画；仅必填→success:partial 直接跳",
+        "ref": "interaction-design/pages/00-profile-init.md#状态机"
+      },
+      "error": {
+        "summary": "校验失败→inline+聚焦",
+        "ref": "interaction-design/pages/00-profile-init.md#错误处理"
+      },
+      "boundary": {
+        "summary": "800ms 防抖；等头像上传完",
+        "ref": "interaction-design/pages/00-profile-init.md#边界情况"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "submitting",
+      "success"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

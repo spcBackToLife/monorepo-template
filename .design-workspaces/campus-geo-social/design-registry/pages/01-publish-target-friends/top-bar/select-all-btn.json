@@ -1,0 +1,30 @@
+{
+  "id": "select-all-btn",
+  "type": "element",
+  "name": "全选当前可见",
+  "interaction": {
+    "summary": "click→全选当前过滤结果",
+    "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:7",
+    "trigger": "click",
+    "condition": "{{ pageState == \"searching\" }}",
+    "flows": {
+      "success": {
+        "summary": "全选",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:7"
+      },
+      "boundary": {
+        "summary": "上限 50 人",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:7"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "字母项",
+  "interaction": {
+    "summary": "tap+drag→scroll-to-letter",
+    "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "触觉 light+scroll",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "active"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

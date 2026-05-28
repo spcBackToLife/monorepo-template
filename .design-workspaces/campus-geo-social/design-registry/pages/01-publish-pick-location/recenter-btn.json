@@ -1,0 +1,29 @@
+{
+  "id": "recenter-btn",
+  "type": "element",
+  "name": "回到当前位置",
+  "interaction": {
+    "summary": "click→地图平移到 GPS 中心",
+    "ref": "interaction-design/pages/01-publish-pick-location.md#操作清单:6",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "平移",
+        "ref": "interaction-design/pages/01-publish-pick-location.md#操作清单:6"
+      },
+      "error": {
+        "summary": "无定位→Toast",
+        "ref": "interaction-design/pages/01-publish-pick-location.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "disabled",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

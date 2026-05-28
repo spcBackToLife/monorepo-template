@@ -1,0 +1,18 @@
+{
+  "id": "06-friend-requests",
+  "type": "page",
+  "name": "好友请求",
+  "product": {
+    "summary": "我收到的好友请求列表，可同意/拒绝；以及我发出的请求状态查询",
+    "ref": "product-analysis/modules/M6-social-graph.md#b1-好友请求主线",
+    "fromModules": ["M6"],
+    "rules": [
+      "请求附带验证留言 ≥5 字，避免空请求",
+      "同意 → 双向好友 + 自动建立永久会话",
+      "拒绝 → 我方收到'未通过'，但不告知拒绝详情",
+      "7 天未操作的请求自动过期",
+      "同一对用户 30 天内最多发 3 次请求；待处理请求 ≥100 条时阻塞新请求"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

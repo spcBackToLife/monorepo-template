@@ -1,0 +1,34 @@
+{
+  "id": "avatar-picker",
+  "type": "element",
+  "name": "头像选择器",
+  "interaction": {
+    "summary": "click→唤起 MediaPicker→上传",
+    "ref": "interaction-design/pages/00-profile-init.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "上传成功→头像展示+激活完成按钮",
+        "ref": "interaction-design/pages/00-profile-init.md#状态机"
+      },
+      "error": {
+        "summary": "上传失败→Toast；审核失败→Toast「请更换」",
+        "ref": "interaction-design/pages/00-profile-init.md#错误处理"
+      },
+      "boundary": {
+        "summary": "无相册权限→默认 6 个治愈风头像",
+        "ref": "interaction-design/pages/00-profile-init.md#边界情况"
+      }
+    },
+    "states": [
+      "empty",
+      "uploading",
+      "uploaded",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

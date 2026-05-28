@@ -1,0 +1,23 @@
+{
+  "id": "top-area",
+  "type": "block",
+  "name": "品牌头部",
+  "interaction": {
+    "summary": "展示 logo + slogan（纯展示，无 trigger）",
+    "ref": "interaction-design/pages/00-login.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "品牌头部容器：64px 顶部 padding + 16px 横边距 + flex 居中 + 48px 元素间距",
+    "ref": "design-plan/pages/00-login/index.md#§4.1-top-area",
+    "visualRef": "design-plan/pages/00-login/visual.md#§8-top-area-_block",
+    "layoutHint": "flow"
+  },
+  "_updatedAt": "2026-05-28T06:25:45.223Z"
+}

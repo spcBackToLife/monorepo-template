@@ -1,0 +1,24 @@
+{
+  "id": "login-link",
+  "type": "element",
+  "name": "已有账号登录链接",
+  "interaction": {
+    "summary": "click→pop 回 00-login（带手机号）",
+    "ref": "interaction-design/pages/00-register.md#操作清单:8",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop / push 00-login?phone={{phoneInput}}",
+        "ref": "interaction-design/pages/00-register.md#操作清单:8"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

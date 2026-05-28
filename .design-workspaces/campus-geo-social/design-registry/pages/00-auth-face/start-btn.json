@@ -1,0 +1,29 @@
+{
+  "id": "start-btn",
+  "type": "element",
+  "name": "开始检测",
+  "interaction": {
+    "summary": "click→申请相机权限→initializing",
+    "ref": "interaction-design/pages/00-auth-face.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "授权→初始化相机→action:eye-blink",
+        "ref": "interaction-design/pages/00-auth-face.md#状态机"
+      },
+      "error": {
+        "summary": "拒绝→permission-denied",
+        "ref": "interaction-design/pages/00-auth-face.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "permission-denied"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

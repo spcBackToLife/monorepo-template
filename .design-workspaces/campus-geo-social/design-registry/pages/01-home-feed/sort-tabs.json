@@ -1,0 +1,30 @@
+{
+  "id": "sort-tabs",
+  "type": "element",
+  "name": "排序 Tab（距离/最新/最热）",
+  "interaction": {
+    "summary": "click→切换排序+列表重渲染+滚到顶",
+    "ref": "interaction-design/pages/01-home-feed.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "tab 滑块+列表 fade",
+        "ref": "interaction-design/pages/01-home-feed.md#操作清单:2"
+      },
+      "error": {
+        "summary": "接口失败→Toast+保留旧",
+        "ref": "interaction-design/pages/01-home-feed.md#错误处理"
+      }
+    },
+    "states": [
+      "distance",
+      "newest",
+      "hottest",
+      "switching"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

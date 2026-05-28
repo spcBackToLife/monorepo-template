@@ -1,0 +1,20 @@
+{
+  "id": "map-canvas",
+  "type": "component",
+  "name": "地图本体",
+  "interaction": {
+    "summary": "承载 markers/clusters/平移缩放/下拉刷新",
+    "ref": "interaction-design/pages/01-home-map.md",
+    "states": [
+      "bootstrapping",
+      "visible",
+      "empty",
+      "refreshing",
+      "cluster-open"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

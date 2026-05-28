@@ -1,0 +1,29 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "热门学校项",
+  "interaction": {
+    "summary": "click(item)→选定学校→单/多校区分流",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "单校区→submitting；多校区→campus-pick sheet",
+        "ref": "interaction-design/pages/00-auth-school-select.md#状态机"
+      },
+      "boundary": {
+        "summary": "防止重复点击多个项",
+        "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "selected"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

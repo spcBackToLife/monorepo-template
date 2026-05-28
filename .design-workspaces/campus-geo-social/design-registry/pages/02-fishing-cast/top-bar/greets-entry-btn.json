@@ -1,0 +1,25 @@
+{
+  "id": "greets-entry-btn",
+  "type": "element",
+  "name": "招呼入口",
+  "interaction": {
+    "summary": "click→push 02-greets-received；徽章显示未读",
+    "ref": "interaction-design/pages/02-fishing-cast.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push 02-greets-received",
+        "ref": "操作清单:2"
+      }
+    },
+    "states": [
+      "idle",
+      "has-unread",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "11-notification-prefs",
+  "type": "page",
+  "name": "通知设置",
+  "product": {
+    "summary": "按通知类型细粒度开关 + 免打扰时段 + 角标显示设置",
+    "ref": "product-analysis/modules/M8-notification.md#c1-通知分类",
+    "fromModules": ["M11", "M8"],
+    "rules": [
+      "分大类组织：互动 / 关系 / 招呼 / 私聊 / 胶囊 / 任务经济 / 安全（强制不可关）/ 运营",
+      "强制类通知（异地登录/认证/处罚/申诉/大额充值）显示锁图标 + tooltip 解释为何不可关",
+      "免打扰时段（默认 23:00-07:00）滑块/时间选择器配置；强制类即使在免打扰也送达",
+      "角标显示开关（影响 App 图标小红点是否显示数字）",
+      "偏好以服务端为准，多端同步"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

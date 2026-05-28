@@ -1,0 +1,30 @@
+{
+  "id": "fab",
+  "type": "element",
+  "name": "发布浮动按钮",
+  "interaction": {
+    "summary": "click→sheet 上滑 01-publish-entry",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:12",
+    "trigger": "click",
+    "condition": "{{ verificationStatus == \"approved\" && !isInRoamingMode }}",
+    "flows": {
+      "success": {
+        "summary": "sheet 上滑 publish-entry",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:12"
+      },
+      "boundary": {
+        "summary": "未认证/漫游→tooltip+触觉 error",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:12"
+      }
+    },
+    "states": [
+      "idle",
+      "disabled",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

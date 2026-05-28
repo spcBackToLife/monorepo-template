@@ -1,0 +1,67 @@
+{
+  "id": "02-greets-received",
+  "type": "page",
+  "name": "收到的招呼",
+  "product": {
+    "summary": "收到的招呼请求列表，对每条可三选一：回复（建立临时会话）/ 加好友 / 拒绝",
+    "ref": "product-analysis/modules/M2-fishing-net.md#b2-被捞到--收到招呼流程",
+    "fromModules": [
+      "M2",
+      "M6"
+    ],
+    "rules": [
+      "收到招呼后才知道有人捞到自己，未收到招呼前完全静默",
+      "卡片含发起人信息 + 留言 + 来源（'X 校园 Y 楼下的捞网'）",
+      "回复 → 建立临时会话进入 06-conversation；加好友 → 走 06-add-friend 流程；拒绝 → 对方仅看到'对方暂未回复'不告知拒绝",
+      "未读招呼 ≥3 条时合并通知一次，避免轰炸",
+      "招呼 7 天未操作自动归档为'已过期'"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "收到的招呼列表，回复/加好友/拒绝三选一+实时推送插入",
+    "ref": "interaction-design/pages/02-greets-received.md",
+    "states": [
+      "loading:initial",
+      "loading:more",
+      "loading:refresh",
+      "visible",
+      "empty",
+      "replying",
+      "adding-friend",
+      "declining",
+      "decline-success",
+      "error:network"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "切到发出的",
+        "triggerNodePath": "top-tabs/sent-tab"
+      },
+      {
+        "op": "展开列表项",
+        "triggerNodePath": "greets-list/items"
+      },
+      {
+        "op": "回复",
+        "triggerNodePath": "greets-list/actions/reply-btn"
+      },
+      {
+        "op": "加好友",
+        "triggerNodePath": "greets-list/actions/add-friend-btn"
+      },
+      {
+        "op": "拒绝",
+        "triggerNodePath": "greets-list/actions/decline-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T06:05:49.644Z"
+}

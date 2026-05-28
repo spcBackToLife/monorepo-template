@@ -1,0 +1,30 @@
+{
+  "id": "upload-video-btn",
+  "type": "element",
+  "name": "上传手持视频",
+  "interaction": {
+    "summary": "click→唤起视频拍摄/相册",
+    "ref": "interaction-design/pages/00-auth-face.md#操作清单:5",
+    "trigger": "click",
+    "condition": "{{ pageState in [\"error:max-retries\",\"error:no-match\"] }}",
+    "flows": {
+      "success": {
+        "summary": "提交视频→转人工审核",
+        "ref": "interaction-design/pages/00-auth-face.md#操作清单:5"
+      },
+      "error": {
+        "summary": "视频 <5s 或 >50MB→Toast",
+        "ref": "interaction-design/pages/00-auth-face.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "uploading"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

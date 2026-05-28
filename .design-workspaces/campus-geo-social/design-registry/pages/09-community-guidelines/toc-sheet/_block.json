@@ -1,0 +1,17 @@
+{
+  "id": "toc-sheet",
+  "type": "component",
+  "name": "目录抽屉",
+  "interaction": {
+    "summary": "右滑入侧抽屉 + 蒙层；含目录列表",
+    "ref": "interaction-design/pages/09-community-guidelines.md",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

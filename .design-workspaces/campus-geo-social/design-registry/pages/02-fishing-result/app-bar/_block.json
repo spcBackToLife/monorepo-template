@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "block",
+  "name": "顶部栏",
+  "interaction": {
+    "summary": "透明背景，含返回按钮",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:1",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

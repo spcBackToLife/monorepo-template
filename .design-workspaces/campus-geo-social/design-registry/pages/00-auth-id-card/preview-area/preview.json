@@ -1,0 +1,26 @@
+{
+  "id": "preview",
+  "type": "element",
+  "name": "实时预览/已拍图",
+  "interaction": {
+    "summary": "capturing 态实时边缘检测",
+    "ref": "interaction-design/pages/00-auth-id-card.md",
+    "trigger": "onFrame",
+    "flows": {
+      "success": {
+        "summary": "自动框定边缘",
+        "ref": "interaction-design/pages/00-auth-id-card.md#状态机"
+      }
+    },
+    "states": [
+      "camera-live",
+      "captured",
+      "cropping",
+      "display"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

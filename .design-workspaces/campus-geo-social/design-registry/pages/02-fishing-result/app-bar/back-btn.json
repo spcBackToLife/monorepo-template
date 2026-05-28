@@ -1,0 +1,28 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→L4 Confirm 已决策卡片不可撤销 → pop",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop 回 02-fishing-cast",
+        "ref": "操作清单:1"
+      },
+      "boundary": {
+        "summary": "系统返回手势同效",
+        "ref": "操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

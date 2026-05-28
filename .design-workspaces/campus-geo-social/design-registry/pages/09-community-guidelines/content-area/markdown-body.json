@@ -1,0 +1,29 @@
+{
+  "id": "markdown-body",
+  "type": "element",
+  "name": "Markdown 主体",
+  "interaction": {
+    "summary": "scroll→自动同步 toc 高亮；滚到底激活 register-mode-ready",
+    "ref": "interaction-design/pages/09-community-guidelines.md#操作清单:2",
+    "trigger": "scroll",
+    "flows": {
+      "success": {
+        "summary": "章节高亮跟随 + 滚到底切到 register-mode-ready",
+        "ref": "interaction-design/pages/09-community-guidelines.md#状态机"
+      },
+      "boundary": {
+        "summary": "register-mode-ready 一旦触发不回退",
+        "ref": "interaction-design/pages/09-community-guidelines.md#边界情况"
+      }
+    },
+    "states": [
+      "loading",
+      "reading",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

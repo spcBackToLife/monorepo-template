@@ -1,0 +1,26 @@
+{
+  "id": "reply-cancel-btn",
+  "type": "element",
+  "name": "取消回复",
+  "interaction": {
+    "summary": "click→取消 replying",
+    "ref": "interaction-design/pages/01-comments.md#操作清单:10",
+    "trigger": "click",
+    "condition": "{{ pageState == \"replying\" }}",
+    "flows": {
+      "success": {
+        "summary": "inline 关闭",
+        "ref": "interaction-design/pages/01-comments.md#操作清单:10"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

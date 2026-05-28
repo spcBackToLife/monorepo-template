@@ -1,0 +1,18 @@
+{
+  "id": "06-add-friend",
+  "type": "page",
+  "name": "加好友",
+  "product": {
+    "summary": "对某用户发起好友请求时填写验证留言的 sheet 页",
+    "ref": "product-analysis/modules/M6-social-graph.md#b1-好友请求主线",
+    "fromModules": ["M6"],
+    "rules": [
+      "验证留言必填 ≥5 字，建议附来源（如'X 校园 Y 楼下捞网认识'）",
+      "对方设置'仅熟人可加'时禁止发送并提示原因",
+      "对方已是我的好友 / 已发请求未处理 / 已被对方拉黑 → 阻断且提示",
+      "提交后回到入口页（个人主页/会话/搜索结果），状态变为'请求中'",
+      "请求成功的 source_context 记录加好友来源，便于运营分析与防滥用"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

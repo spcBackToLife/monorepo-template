@@ -1,0 +1,29 @@
+{
+  "id": "form-fields",
+  "type": "element",
+  "name": "申诉表字段组",
+  "interaction": {
+    "summary": "含学校名/省市/院系/补充材料字段",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:8",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "全部填完激活 submit",
+        "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:9"
+      },
+      "error": {
+        "summary": "必填项空→inline",
+        "ref": "interaction-design/pages/00-auth-school-select.md#错误处理"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "valid"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

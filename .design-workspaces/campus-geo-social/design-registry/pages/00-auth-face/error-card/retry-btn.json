@@ -1,0 +1,29 @@
+{
+  "id": "retry-btn",
+  "type": "element",
+  "name": "再试一次",
+  "interaction": {
+    "summary": "click→回当前 action 阶段",
+    "ref": "interaction-design/pages/00-auth-face.md#操作清单:4",
+    "trigger": "click",
+    "condition": "{{ pageState == \"error:liveness\" }}",
+    "flows": {
+      "success": {
+        "summary": "重启活体检测",
+        "ref": "interaction-design/pages/00-auth-face.md#操作清单:4"
+      },
+      "boundary": {
+        "summary": "3 次失败后切到 max-retries 隐藏此按钮",
+        "ref": "interaction-design/pages/00-auth-face.md#状态机"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

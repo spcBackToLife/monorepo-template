@@ -1,0 +1,68 @@
+{
+  "id": "code-input",
+  "type": "element",
+  "name": "验证码输入（6 格）",
+  "interaction": {
+    "summary": "input→自动跳格；最后一位填完自动 trigger submit",
+    "ref": "interaction-design/pages/00-login.md#操作清单:4",
+    "trigger": "input",
+    "condition": "{{ mode == \"code-mode\" }}",
+    "flows": {
+      "success": {
+        "summary": "6 位填完 → 自动激活 submit-btn",
+        "ref": "interaction-design/pages/00-login.md#操作清单:4"
+      },
+      "error": {
+        "summary": "非数字字符→拒绝输入；错次数 ≥3 → error:locked",
+        "ref": "interaction-design/pages/00-login.md#错误处理"
+      },
+      "boundary": {
+        "summary": "iOS 短信预填一键填充",
+        "ref": "interaction-design/pages/00-login.md#边界情况"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "filled",
+      "error",
+      "disabled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "6 格验证码输入：6 个 48×48 方格 segmented + 焦点格 primary border + caret 跟随",
+    "ref": "design-plan/pages/00-login/index.md#§4.3-code-input",
+    "visualRef": "design-plan/pages/00-login/visual.md#§6-input-样式表",
+    "visualStates": {
+      "default": {
+        "summary": "6 格 border 1px borderLight，字段下方空白"
+      },
+      "focused": {
+        "summary": "当前激活格 border 2px primary + 焦点光圈，前面已填格显示数字（h3 22px 600）"
+      },
+      "has-value": {
+        "summary": "已填格显示数字 textPrimary"
+      },
+      "error": {
+        "summary": "所有 6 格 border 变 error 色 + 表单 shake + 自动清空 + 聚焦第 1 格"
+      },
+      "disabled": {
+        "summary": "opacity 0.45（submitting 时）"
+      }
+    },
+    "interactionStates": {
+      "focus": {
+        "summary": "激活格 200ms ease-out 高亮"
+      }
+    }
+  },
+  "content": {
+    "type": "text",
+    "value": "6 位验证码"
+  },
+  "_updatedAt": "2026-05-28T06:25:45.225Z"
+}

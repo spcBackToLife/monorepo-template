@@ -1,0 +1,37 @@
+{
+  "id": "form-card",
+  "type": "block",
+  "name": "登录表单卡",
+  "interaction": {
+    "summary": "承载手机号/验证码或密码/获取按钮",
+    "ref": "interaction-design/pages/00-login.md",
+    "states": [
+      "code-mode",
+      "password-mode",
+      "submitting",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "L1 表单卡片：surface 底 + radius-lg + shadow-sm + padding 24px + margin 16px",
+    "ref": "design-plan/pages/00-login/index.md#§4.3-form-card",
+    "visualRef": "design-plan/pages/00-login/visual.md#§8-form-card-_block",
+    "visualStates": {
+      "idle": {
+        "summary": "静态卡片"
+      },
+      "submitting-disabled": {
+        "summary": "内部所有 input pointer-events:none + opacity 0.7"
+      },
+      "shake-on-error": {
+        "summary": "表单整体 shake 动效（translateX 序列 400ms ease-out）"
+      }
+    },
+    "layoutHint": "flow"
+  },
+  "_updatedAt": "2026-05-28T06:25:45.225Z"
+}

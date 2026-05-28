@@ -1,0 +1,25 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "可见性卡片项",
+  "interaction": {
+    "summary": "click→选定+下方动态显示对应详情区",
+    "ref": "interaction-design/pages/01-publish-visibility.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "卡片高亮+触觉 light；capsule 直接跳走",
+        "ref": "interaction-design/pages/01-publish-visibility.md#状态机"
+      }
+    },
+    "states": [
+      "idle",
+      "selected",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

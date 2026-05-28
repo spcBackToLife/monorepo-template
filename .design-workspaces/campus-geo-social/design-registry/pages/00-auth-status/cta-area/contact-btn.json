@@ -1,0 +1,26 @@
+{
+  "id": "contact-btn",
+  "type": "element",
+  "name": "联系客服",
+  "interaction": {
+    "summary": "click→push 11-feedback?source=auth-status",
+    "ref": "interaction-design/pages/00-auth-status.md#操作清单:3",
+    "trigger": "click",
+    "condition": "{{ reviewingElapsed >24h || fallbackElapsed >48h }}",
+    "flows": {
+      "success": {
+        "summary": "push 11-feedback",
+        "ref": "interaction-design/pages/00-auth-status.md#操作清单:3"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "top-area",
+  "type": "block",
+  "name": "品牌头部",
+  "interaction": {
+    "summary": "标题+slogan，纯展示",
+    "ref": "interaction-design/pages/00-register.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

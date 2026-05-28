@@ -1,0 +1,18 @@
+{
+  "id": "ceremony-animation",
+  "type": "element",
+  "name": "撒网仪式动画",
+  "interaction": {
+    "summary": "全屏渔网+海面波纹 lottie，2-3s 后切到 presenting",
+    "ref": "interaction-design/pages/02-fishing-result.md#effects",
+    "trigger": "onFrame",
+    "states": [
+      "playing",
+      "done"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

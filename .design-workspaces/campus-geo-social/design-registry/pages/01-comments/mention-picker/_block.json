@@ -1,0 +1,18 @@
+{
+  "id": "mention-picker",
+  "type": "component",
+  "name": "@ 好友选择器",
+  "interaction": {
+    "summary": "@触发时弹起，列出互为好友",
+    "ref": "interaction-design/pages/01-comments.md",
+    "states": [
+      "hidden",
+      "visible",
+      "searching"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

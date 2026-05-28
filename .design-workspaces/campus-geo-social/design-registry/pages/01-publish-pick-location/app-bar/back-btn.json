@@ -1,0 +1,24 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→pop（不保存）",
+    "ref": "interaction-design/pages/01-publish-pick-location.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop",
+        "ref": "interaction-design/pages/01-publish-pick-location.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

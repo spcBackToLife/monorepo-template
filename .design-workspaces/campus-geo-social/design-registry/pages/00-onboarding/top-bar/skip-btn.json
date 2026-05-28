@@ -1,0 +1,28 @@
+{
+  "id": "skip-btn",
+  "type": "element",
+  "name": "跳过按钮",
+  "interaction": {
+    "summary": "click→写 onboarding_completed flag + 跳 00-login",
+    "ref": "interaction-design/pages/00-onboarding.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "finishing 态 + 跳 00-login (fade)",
+        "ref": "interaction-design/pages/00-onboarding.md#状态机"
+      },
+      "error": {
+        "summary": "写 flag 失败仍跳转（容错）",
+        "ref": "interaction-design/pages/00-onboarding.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

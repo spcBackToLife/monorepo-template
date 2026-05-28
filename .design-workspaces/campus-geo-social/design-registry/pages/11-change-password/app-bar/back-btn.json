@@ -1,0 +1,28 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→L2 Confirm 内容未保存",
+    "ref": "interaction-design/pages/11-change-password.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop",
+        "ref": "interaction-design/pages/11-change-password.md#操作清单:1"
+      },
+      "boundary": {
+        "summary": "有未保存→Confirm",
+        "ref": "interaction-design/pages/11-change-password.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

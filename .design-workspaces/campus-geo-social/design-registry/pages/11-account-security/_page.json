@@ -1,0 +1,18 @@
+{
+  "id": "11-account-security",
+  "type": "page",
+  "name": "账号与安全",
+  "product": {
+    "summary": "账号管理子菜单：手机号管理 / 修改密码 / 认证管理 / 设备管理 / 注销账号",
+    "ref": "product-analysis/modules/M11-settings-privacy.md#b1-设置主菜单结构",
+    "fromModules": ["M11", "M5"],
+    "rules": [
+      "敏感操作（改手机/改密码/注销）需双重校验（旧密码或验证码 + 高风险时人脸）",
+      "认证管理可重新走学信网授权（学籍续期）",
+      "设备管理子页（→ 11-devices）展示所有已登录设备",
+      "注销账号入口克制不显眼，但确实可达（合规要求）",
+      "操作记录入登录设备 / 安全日志，便于异常追溯"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

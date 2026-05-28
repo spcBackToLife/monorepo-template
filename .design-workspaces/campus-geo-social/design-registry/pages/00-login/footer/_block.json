@@ -1,0 +1,23 @@
+{
+  "id": "footer",
+  "type": "block",
+  "name": "页脚链接区",
+  "interaction": {
+    "summary": "承载注册和忘记密码链接",
+    "ref": "interaction-design/pages/00-login.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "底部链接区：flex 居中 + gap 16px + padding 24px 16px",
+    "ref": "design-plan/pages/00-login/index.md#§4.5-footer",
+    "visualRef": "design-plan/pages/00-login/visual.md#§8-footer-_block",
+    "layoutHint": "flow"
+  },
+  "_updatedAt": "2026-05-28T06:25:45.226Z"
+}

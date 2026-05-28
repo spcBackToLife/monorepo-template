@@ -1,0 +1,28 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→pop（L4 Modal 确认丢失认证进度）",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "确认后 pop",
+        "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:1"
+      },
+      "boundary": {
+        "summary": "已认证用户改主校园需特殊确认",
+        "ref": "interaction-design/pages/00-auth-school-select.md#边界情况"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

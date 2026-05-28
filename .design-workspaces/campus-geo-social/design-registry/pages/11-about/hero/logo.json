@@ -1,0 +1,16 @@
+{
+  "id": "logo",
+  "type": "element",
+  "name": "应用 Logo",
+  "interaction": {
+    "summary": "静态展示",
+    "ref": "interaction-design/pages/11-about.md",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

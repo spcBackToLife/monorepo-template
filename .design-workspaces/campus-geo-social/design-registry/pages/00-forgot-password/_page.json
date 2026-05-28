@@ -1,0 +1,65 @@
+{
+  "id": "00-forgot-password",
+  "type": "page",
+  "name": "忘记密码",
+  "product": {
+    "summary": "通过手机验证码重置密码并自动登录",
+    "ref": "product-analysis/modules/M5-user-auth.md#b4-找回密码流程",
+    "fromModules": [
+      "M5"
+    ],
+    "rules": [
+      "未注册手机号需引导注册而非走重置",
+      "24 小时内同一账号最多重置 3 次，超过触发风控走人工申诉",
+      "新密码不能与旧密码相同",
+      "重置成功后自动登录并跳主页",
+      "重置过程不应展示原密码相关任何信息"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "两步重置密码（手机号+验证码 → 新密码+确认）；重置成功自动登录跳主页",
+    "ref": "interaction-design/pages/00-forgot-password.md",
+    "states": [
+      "step:phone",
+      "step:new-password",
+      "code-sending",
+      "submitting",
+      "success",
+      "error:not-registered",
+      "error:code",
+      "error:same-password",
+      "error:risk-control"
+    ],
+    "operations": [
+      {
+        "op": "输入手机号",
+        "triggerNodePath": "form-card/phone-input"
+      },
+      {
+        "op": "获取验证码",
+        "triggerNodePath": "form-card/send-code-btn"
+      },
+      {
+        "op": "输入验证码",
+        "triggerNodePath": "form-card/code-input"
+      },
+      {
+        "op": "输入新密码",
+        "triggerNodePath": "form-card/new-password-input"
+      },
+      {
+        "op": "输入确认密码",
+        "triggerNodePath": "form-card/confirm-password-input"
+      },
+      {
+        "op": "点击重置",
+        "triggerNodePath": "submit-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:05:01.185Z"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "continue-btn",
+  "type": "element",
+  "name": "继续编辑",
+  "interaction": {
+    "summary": "click→加载草稿",
+    "ref": "interaction-design/pages/01-publish-edit.md#操作清单:14",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "草稿回填→editing",
+        "ref": "interaction-design/pages/01-publish-edit.md#操作清单:14"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "search-input",
+  "type": "element",
+  "name": "学校搜索输入框",
+  "interaction": {
+    "summary": "input→300ms debounce→拼音/简称/全称搜索",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:2",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "results-shown / empty",
+        "ref": "interaction-design/pages/00-auth-school-select.md#状态机"
+      },
+      "error": {
+        "summary": "接口失败→Toast+列表保留",
+        "ref": "interaction-design/pages/00-auth-school-select.md#错误处理"
+      },
+      "boundary": {
+        "summary": "输入变化丢弃过期请求",
+        "ref": "interaction-design/pages/00-auth-school-select.md#边界情况"
+      }
+    },
+    "states": [
+      "empty",
+      "searching",
+      "has-results",
+      "no-results"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

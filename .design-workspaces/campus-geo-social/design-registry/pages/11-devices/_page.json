@@ -1,0 +1,18 @@
+{
+  "id": "11-devices",
+  "type": "page",
+  "name": "设备管理",
+  "product": {
+    "summary": "查看当前账号已登录的全部设备，对可疑设备一键下线",
+    "ref": "product-analysis/modules/M5-user-auth.md#c2-业务规则",
+    "fromModules": ["M11", "M5"],
+    "rules": [
+      "单账号最多同时登录 3 台设备，超过则顶替最老设备",
+      "每个设备展示型号 + 平台 + 最近登录 IP + 城市 + 最后活跃时间",
+      "'当前设备'清晰标注，不可下线（避免误操作把自己踢出）",
+      "下线远程设备需密码二次确认",
+      "异常登录（异地/新设备）通过强制类通知告警"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

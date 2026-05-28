@@ -1,0 +1,24 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "校区项列表",
+  "interaction": {
+    "summary": "click(item)→单选",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:5",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "item 高亮+触觉 light+激活确认按钮",
+        "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:5"
+      }
+    },
+    "states": [
+      "idle",
+      "selected"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "mask",
+  "type": "element",
+  "name": "sheet 蒙层",
+  "interaction": {
+    "summary": "click→关闭 sheet",
+    "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:7",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "sheet 下滑出 250ms",
+        "ref": "interaction-design/pages/00-auth-school-select.md#操作清单:7"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

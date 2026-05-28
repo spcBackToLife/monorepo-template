@@ -1,0 +1,116 @@
+{
+  "id": "00-login",
+  "type": "page",
+  "name": "登录页",
+  "product": {
+    "summary": "手机号 + 密码 / 验证码免密 双登录方式入口，含跳转注册与找回密码",
+    "ref": "product-analysis/modules/M5-user-auth.md#b3-登录流程",
+    "fromModules": [
+      "M5"
+    ],
+    "rules": [
+      "默认验证码免密登录方式（友好），可切到密码登录",
+      "密码错误 ≥5 次锁定账号 30 分钟",
+      "异地登录需主登录设备二次确认",
+      "登录页必须可点跳转注册和忘记密码",
+      "若账号已被封禁/注销中，登录后立刻引导对应处理页"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "双登录方式（验证码默认/密码）+ 错误状态机（锁定/封禁/注销缓冲/异地登录）；跳注册与忘记密码",
+    "ref": "interaction-design/pages/00-login.md",
+    "states": [
+      "idle:code-mode",
+      "idle:password-mode",
+      "inputting",
+      "code-sending",
+      "submitting",
+      "success",
+      "error:credential",
+      "error:locked",
+      "error:banned",
+      "error:logging-off",
+      "error:remote-login"
+    ],
+    "operations": [
+      {
+        "op": "切换登录方式",
+        "triggerNodePath": "mode-toggle"
+      },
+      {
+        "op": "输入手机号",
+        "triggerNodePath": "form-card/phone-input"
+      },
+      {
+        "op": "获取验证码",
+        "triggerNodePath": "form-card/send-code-btn"
+      },
+      {
+        "op": "输入验证码",
+        "triggerNodePath": "form-card/code-input"
+      },
+      {
+        "op": "输入密码",
+        "triggerNodePath": "form-card/password-input"
+      },
+      {
+        "op": "点击登录",
+        "triggerNodePath": "submit-btn"
+      },
+      {
+        "op": "点击注册",
+        "triggerNodePath": "footer/register-link"
+      },
+      {
+        "op": "点击忘记密码",
+        "triggerNodePath": "footer/forgot-link"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T06:34:39.207Z",
+  "design": {
+    "summary": "登录页设计：奶油白底 + 顶部温暖光晕 + Logo + mode-toggle + form-card(48px input) + 主 CTA 草莓粉 full 圆角 + footer 链接 + 3 装饰",
+    "ref": "design-plan/pages/00-login/index.md",
+    "visualRef": "design-plan/pages/00-login/visual.md",
+    "visualStates": {
+      "idle:code-mode": {
+        "summary": "默认验证码登录模式，mode-toggle 滑块在左，code-input 显示"
+      },
+      "idle:password-mode": {
+        "summary": "密码登录模式，mode-toggle 滑块在右，password-input 显示"
+      },
+      "inputting": {
+        "summary": "任一 input 获得焦点，label 上浮 + 焦点光圈"
+      },
+      "code-sending": {
+        "summary": "send-code-btn 显示倒计时 60s + disabled"
+      },
+      "submitting": {
+        "summary": "form-card 半透禁用 + submit-btn spinner"
+      },
+      "success": {
+        "summary": "submit-btn 变 success 绿 + I-04 checkmark + glow-success + 0.5s fade 跳转"
+      },
+      "error:credential": {
+        "summary": "form-card shake + 字段下 caption 红字"
+      },
+      "error:locked": {
+        "summary": "ConfirmDialog warning + 忘记密码按钮"
+      },
+      "error:banned": {
+        "summary": "ConfirmDialog error + 申诉按钮"
+      },
+      "error:logging-off": {
+        "summary": "ConfirmDialog info + 撤回/继续注销双按钮"
+      },
+      "error:remote-login": {
+        "summary": "Toast + submit-btn 显示等待主设备 + 轮询"
+      }
+    },
+    "layoutHint": "single-screen"
+  }
+}

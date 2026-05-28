@@ -1,0 +1,25 @@
+{
+  "id": "emoji-trigger",
+  "type": "element",
+  "name": "表情按钮",
+  "interaction": {
+    "summary": "click→打开 emoji-picker 面板",
+    "ref": "interaction-design/pages/02-greet-compose.md#操作清单:4",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "打开 emoji-picker",
+        "ref": "操作清单:4"
+      }
+    },
+    "states": [
+      "idle",
+      "active",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

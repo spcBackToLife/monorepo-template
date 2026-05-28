@@ -1,0 +1,66 @@
+{
+  "id": "02-greets-sent",
+  "type": "page",
+  "name": "发出的招呼",
+  "product": {
+    "summary": "我已发出的招呼列表，可看状态（pending/replied/declined/expired/withdrawn）",
+    "ref": "product-analysis/modules/M2-fishing-net.md#b2-被捞到--收到招呼流程",
+    "fromModules": [
+      "M2"
+    ],
+    "rules": [
+      "默认按时间倒序展示，状态徽章清晰可见",
+      "pending 状态 1h 内可撤回（对方未读）",
+      "replied 状态可点击进入对应会话",
+      "declined / expired 不暴露具体原因，仅展示状态",
+      "可一键清空已结束的（declined/expired/withdrawn）"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "发出的招呼列表，pending 1h 内可撤回；replied 可进入会话；可清空已结束",
+    "ref": "interaction-design/pages/02-greets-sent.md",
+    "states": [
+      "loading:initial",
+      "loading:more",
+      "loading:refresh",
+      "visible",
+      "empty",
+      "withdrawing",
+      "withdraw-success",
+      "withdraw-failed:already-read",
+      "clearing-finished",
+      "error:network"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "清空已结束",
+        "triggerNodePath": "app-bar/clear-finished-btn"
+      },
+      {
+        "op": "切到收到的",
+        "triggerNodePath": "top-tabs/received-tab"
+      },
+      {
+        "op": "展开列表项",
+        "triggerNodePath": "greets-list/items"
+      },
+      {
+        "op": "撤回",
+        "triggerNodePath": "greets-list/actions/withdraw-btn"
+      },
+      {
+        "op": "进入会话",
+        "triggerNodePath": "greets-list/actions/open-conversation-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T06:05:49.943Z"
+}

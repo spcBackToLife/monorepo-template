@@ -1,0 +1,48 @@
+{
+  "id": "register-link",
+  "type": "element",
+  "name": "注册链接",
+  "interaction": {
+    "summary": "click→push 00-register（带当前手机号）",
+    "ref": "interaction-design/pages/00-login.md#操作清单:7",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push 00-register?phone={{phoneInput}}",
+        "ref": "interaction-design/pages/00-login.md#操作清单:7"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "注册链接：text-only primary 色 body 14px + hover underline",
+    "ref": "design-plan/pages/00-login/index.md#§4.5-register-link",
+    "visualRef": "design-plan/pages/00-login/visual.md#§6-footer-link",
+    "visualStates": {
+      "default": {
+        "summary": "color primary + 无下划线"
+      },
+      "hover": {
+        "summary": "color primaryHover + text-decoration underline"
+      },
+      "active": {
+        "summary": "color primaryActive + scale(0.98)"
+      },
+      "focused": {
+        "summary": "outline 2px primary（键盘聚焦）"
+      }
+    }
+  },
+  "content": {
+    "type": "text",
+    "value": "注册"
+  },
+  "_updatedAt": "2026-05-28T06:25:45.226Z"
+}

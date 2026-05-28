@@ -1,0 +1,25 @@
+{
+  "id": "notify-btn",
+  "type": "element",
+  "name": "通知中心",
+  "interaction": {
+    "summary": "click→push 08-notification-list；含未读红点",
+    "ref": "interaction-design/pages/01-home-feed.md#操作清单:5",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push 08-notification-list",
+        "ref": "interaction-design/pages/01-home-feed.md#操作清单:5"
+      }
+    },
+    "states": [
+      "idle",
+      "badge",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

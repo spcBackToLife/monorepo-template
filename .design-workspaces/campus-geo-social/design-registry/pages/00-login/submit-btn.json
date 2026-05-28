@@ -1,0 +1,95 @@
+{
+  "id": "submit-btn",
+  "type": "element",
+  "name": "登录按钮",
+  "interaction": {
+    "summary": "click→提交登录请求；处理 11 种状态",
+    "ref": "interaction-design/pages/00-login.md#操作清单:6",
+    "trigger": "click",
+    "condition": "{{ formValid && state != \"submitting\" }}",
+    "flows": {
+      "success": {
+        "summary": "✓ 触觉 + 0.5s 跳目标页（home / auth-status）",
+        "ref": "interaction-design/pages/00-login.md#状态机"
+      },
+      "error": {
+        "summary": "按错误类型路由：credential/locked/banned/logging-off/remote-login",
+        "ref": "interaction-design/pages/00-login.md#错误处理"
+      },
+      "timeout": {
+        "summary": "15s 超时恢复 + Toast「网络异常」",
+        "ref": "interaction-design/pages/00-login.md#错误处理"
+      },
+      "boundary": {
+        "summary": "800ms 防抖防重复",
+        "ref": "interaction-design/pages/00-login.md#操作清单:6"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "submitting",
+      "success",
+      "error"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "design": {
+    "summary": "主 CTA：49px 高 + radius-full + primary 实色 + shadow-sm + h5 字号 + 全状态机",
+    "ref": "design-plan/pages/00-login/index.md#§4.4-submit-btn",
+    "visualRef": "design-plan/pages/00-login/visual.md#§9-submit-btn-状态视觉对照",
+    "visualStates": {
+      "default": {
+        "summary": "bg primary + textInverse + shadow-sm + text \"登录\" h5 16px 600"
+      },
+      "hover": {
+        "summary": "scale(1.03) + shadow-md（仅桌面端）"
+      },
+      "pressed": {
+        "summary": "scale(0.97) + shadow-sm 收缩"
+      },
+      "focused": {
+        "summary": "outline 2px primary + 2px offset（键盘 Tab 聚焦时）"
+      },
+      "disabled": {
+        "summary": "opacity 0.45 + cursor not-allowed + 不变灰度（手机号或验证码/密码未填）"
+      },
+      "loading": {
+        "summary": "文字 opacity 0 + spinner 20×20 居中 + 表单同步禁用"
+      },
+      "success": {
+        "summary": "bg success(#3FCC93) + box-shadow glow-success(0 0 16px rgba(63,204,147,0.30)) + I-04 checkmark 取代 spinner，0.5s 后整体 fade 进入跳转"
+      },
+      "credential-error-shake": {
+        "summary": "表单整体 shake 动效（translateX 0→-4→4→-4→4→0, 400ms ease-out），按钮本体回到 default"
+      }
+    },
+    "interactionStates": {
+      "hover": {
+        "summary": "同 visualStates.hover"
+      },
+      "active": {
+        "summary": "同 visualStates.pressed"
+      },
+      "focus": {
+        "summary": "同 visualStates.focused"
+      }
+    }
+  },
+  "content": {
+    "type": "text",
+    "value": "登录"
+  },
+  "materials": [
+    {
+      "id": "I-04",
+      "summary": "成功 checkmark 图标（success 态显示）",
+      "ref": "design-plan/pages/00-login/materials/I-04-checkmark-success.md",
+      "condition": "{{state.view.submitState === \"success\"}}"
+    }
+  ],
+  "_updatedAt": "2026-05-28T06:25:45.226Z"
+}

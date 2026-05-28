@@ -1,0 +1,26 @@
+{
+  "id": "appeal-progress-btn",
+  "type": "element",
+  "name": "查看申诉进度",
+  "interaction": {
+    "summary": "click→push 09-appeal/<id>",
+    "ref": "interaction-design/pages/00-auth-status.md#操作清单:6",
+    "trigger": "click",
+    "condition": "{{ pageState == \"appealing\" }}",
+    "flows": {
+      "success": {
+        "summary": "push 09-appeal/<appealId>",
+        "ref": "interaction-design/pages/00-auth-status.md#操作清单:6"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

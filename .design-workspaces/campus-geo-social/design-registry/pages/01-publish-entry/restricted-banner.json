@@ -1,0 +1,26 @@
+{
+  "id": "restricted-banner",
+  "type": "element",
+  "name": "受限提示 banner",
+  "interaction": {
+    "summary": "restricted:unverified→click→跳认证状态；roaming→提示回主校园",
+    "ref": "interaction-design/pages/01-publish-entry.md#操作清单:4",
+    "trigger": "click",
+    "condition": "{{ pageState in [\"restricted:unverified\",\"restricted:roaming\"] }}",
+    "flows": {
+      "success": {
+        "summary": "unverified→push 00-auth-status；roaming→无跳转",
+        "ref": "interaction-design/pages/01-publish-entry.md#操作清单:4"
+      }
+    },
+    "states": [
+      "hidden",
+      "unverified",
+      "roaming"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

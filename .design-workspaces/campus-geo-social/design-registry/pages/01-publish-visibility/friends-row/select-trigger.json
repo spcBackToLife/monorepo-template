@@ -1,0 +1,24 @@
+{
+  "id": "select-trigger",
+  "type": "element",
+  "name": "选择投递好友",
+  "interaction": {
+    "summary": "click→push 01-publish-target-friends",
+    "ref": "interaction-design/pages/01-publish-visibility.md#操作清单:4",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push target-friends",
+        "ref": "interaction-design/pages/01-publish-visibility.md#操作清单:4"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

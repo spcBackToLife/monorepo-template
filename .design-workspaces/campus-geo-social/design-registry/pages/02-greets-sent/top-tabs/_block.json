@@ -1,0 +1,16 @@
+{
+  "id": "top-tabs",
+  "type": "block",
+  "name": "Tab 切换",
+  "interaction": {
+    "summary": "received | sent",
+    "ref": "interaction-design/pages/02-greets-sent.md#操作清单:2",
+    "states": [
+      "sent-active"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

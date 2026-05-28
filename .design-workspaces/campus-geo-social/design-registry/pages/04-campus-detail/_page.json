@@ -1,0 +1,18 @@
+{
+  "id": "04-campus-detail",
+  "type": "page",
+  "name": "校园介绍页",
+  "product": {
+    "summary": "展示外校的代表性照片轮播 + 简介 + 趣味标签 + 标志地点列表，提供进入广场的入口",
+    "ref": "product-analysis/modules/M4-cross-campus.md#b2-外校广场浏览主线",
+    "fromModules": ["M4"],
+    "rules": [
+      "顶部 hero 区：学校照片轮播（樱花/红墙/校门等运营素材）",
+      "简介区：建校时间、学校简介、学生数（虚化展示）、所在城市",
+      "趣味标签：运营撰写文案（'以樱花闻名'等），增强代入感",
+      "标志地点列表：5-8 个 POI 卡片，点击进入该地点动态合集",
+      "底部 CTA：进入广场（→ 04-campus-plaza）/ 收藏校园 / 退出漫游"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

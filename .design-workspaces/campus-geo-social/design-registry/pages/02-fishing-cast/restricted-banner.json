@@ -1,0 +1,19 @@
+{
+  "id": "restricted-banner",
+  "type": "element",
+  "name": "门禁横幅",
+  "interaction": {
+    "summary": "未认证/漫游/冷却时显示对应文案+对应 CTA",
+    "ref": "interaction-design/pages/02-fishing-cast.md#错误处理",
+    "states": [
+      "hidden",
+      "restricted:unverified",
+      "restricted:roaming",
+      "restricted:cooldown"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

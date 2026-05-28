@@ -1,0 +1,26 @@
+{
+  "id": "roaming-banner",
+  "type": "element",
+  "name": "跨校漫游 banner",
+  "interaction": {
+    "summary": "漫游模式顶部 banner，含退出按钮",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:15",
+    "trigger": "click",
+    "condition": "{{ isInRoamingMode }}",
+    "flows": {
+      "success": {
+        "summary": "调 M4 退出漫游→回主校园",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:15"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

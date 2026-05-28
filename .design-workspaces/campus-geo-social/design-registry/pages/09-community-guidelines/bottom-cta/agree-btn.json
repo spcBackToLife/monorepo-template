@@ -1,0 +1,35 @@
+{
+  "id": "agree-btn",
+  "type": "element",
+  "name": "同意并继续按钮",
+  "interaction": {
+    "summary": "click→上传 acceptedVersion + pop 回注册流",
+    "ref": "interaction-design/pages/09-community-guidelines.md#操作清单:8",
+    "trigger": "click",
+    "condition": "{{ source == \"register\" && pageState == \"register-mode-ready\" }}",
+    "flows": {
+      "success": {
+        "summary": "触觉 medium + 上传 → pop + registerStore.agreedGuidelines = true",
+        "ref": "interaction-design/pages/09-community-guidelines.md#操作清单:8"
+      },
+      "error": {
+        "summary": "Toast「提交失败，请重试」+ 按钮恢复 + 保留 scrollY",
+        "ref": "interaction-design/pages/09-community-guidelines.md#错误处理"
+      },
+      "timeout": {
+        "summary": "15s 超时→恢复 + Toast",
+        "ref": "interaction-design/pages/09-community-guidelines.md#边界情况"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "pressing",
+      "loading"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

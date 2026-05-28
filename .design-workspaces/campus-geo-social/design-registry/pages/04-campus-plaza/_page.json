@@ -1,0 +1,19 @@
+{
+  "id": "04-campus-plaza",
+  "type": "page",
+  "name": "校园广场（外校）",
+  "product": {
+    "summary": "外校漫游模式下的内容主页：仅 Feed 流（无地图模式），分热门/最新/标志地点 三 Tab",
+    "ref": "product-analysis/modules/M4-cross-campus.md#b2-外校广场浏览主线",
+    "fromModules": ["M4", "M1"],
+    "rules": [
+      "顶部漫游 Banner（浅紫渐变）'漫游中：xxx 大学' + 一键回家按钮",
+      "Feed 卡片不展示具体用户身份，仅显示'此校园的某位同学'+ 性别/年级（按对方隐私）",
+      "进入详情页（01-moment-detail）后所有互动按钮置灰，仅可浏览 + 举报",
+      "广场内容池规则：M.visibility=public + status=active + campus_id=X + 作者未关闭 plaza_share + 作者不在校园拉黑名单",
+      "缓存 5 分钟刷新，分页加载",
+      "不计 visit（外校漫游不算到达点位）"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

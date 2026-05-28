@@ -1,0 +1,18 @@
+{
+  "id": "10-footprints",
+  "type": "page",
+  "name": "我的足迹",
+  "product": {
+    "summary": "我在校园发布过/路过的所有点位的聚合地图（金色光点），仅本人可见",
+    "ref": "product-analysis/modules/M10-profile.md#step-e-交互要点",
+    "fromModules": ["M10", "M1"],
+    "rules": [
+      "仅本人可见，不暴露给好友（隐私优先）",
+      "点位区分：自己发的动态（金色）/ 自己路过看到的（银色）/ 自己埋的胶囊（紫色）",
+      "聚合气泡：邻近点位合并（≥3 显示 X+），点击展开列表",
+      "时间轴模式：可切换查看某个时间段的足迹（按周/月/学期）",
+      "可分享一张'足迹卡片'到外站（隐去具体位置坐标，仅展示统计数）"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

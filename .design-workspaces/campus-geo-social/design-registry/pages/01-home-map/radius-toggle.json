@@ -1,0 +1,30 @@
+{
+  "id": "radius-toggle",
+  "type": "element",
+  "name": "半径切换 50/200/500m",
+  "interaction": {
+    "summary": "click→切换可见半径+重新拉数据",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "半径圈圈缩放动画+数据刷新",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:2"
+      },
+      "error": {
+        "summary": "接口失败→Toast+保留旧",
+        "ref": "interaction-design/pages/01-home-map.md#错误处理"
+      }
+    },
+    "states": [
+      "50m",
+      "200m",
+      "500m",
+      "switching"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "skip-btn",
+  "type": "element",
+  "name": "跳过",
+  "interaction": {
+    "summary": "click→L4 Confirm 跳过后不可再查看 → pop",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop",
+        "ref": "操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

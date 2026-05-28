@@ -1,0 +1,28 @@
+{
+  "id": "user-agreement-row",
+  "type": "element",
+  "name": "用户协议行",
+  "interaction": {
+    "summary": "click→push WebView (?version=current)",
+    "ref": "interaction-design/pages/11-about.md#操作清单:4",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push WebView 展示用户协议",
+        "ref": "interaction-design/pages/11-about.md#操作清单:4"
+      },
+      "error": {
+        "summary": "WebView 加载失败→Toast",
+        "ref": "interaction-design/pages/11-about.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

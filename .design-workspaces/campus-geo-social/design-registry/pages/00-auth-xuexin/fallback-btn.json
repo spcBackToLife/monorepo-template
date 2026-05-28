@@ -1,0 +1,30 @@
+{
+  "id": "fallback-btn",
+  "type": "element",
+  "name": "走人工审核（降级）",
+  "interaction": {
+    "summary": "click→fallback-confirming 二次确认",
+    "ref": "interaction-design/pages/00-auth-xuexin.md#操作清单:7",
+    "trigger": "click",
+    "condition": "{{ pageState in [\"callback-rejected\",\"callback-error\",\"idle\"] && hasRejectedBefore }}",
+    "flows": {
+      "success": {
+        "summary": "二次确认后提交 fallback 标记 → push auth-face",
+        "ref": "interaction-design/pages/00-auth-xuexin.md#状态机"
+      },
+      "boundary": {
+        "summary": "48h 反馈",
+        "ref": "interaction-design/pages/00-auth-xuexin.md#操作清单:7"
+      }
+    },
+    "states": [
+      "hidden",
+      "visible",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

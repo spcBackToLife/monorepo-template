@@ -1,0 +1,24 @@
+{
+  "id": "sent-tab",
+  "type": "element",
+  "name": "发出 Tab",
+  "interaction": {
+    "summary": "当前激活",
+    "ref": "interaction-design/pages/02-greets-sent.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "保持当前页",
+        "ref": "操作清单:2"
+      }
+    },
+    "states": [
+      "active",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

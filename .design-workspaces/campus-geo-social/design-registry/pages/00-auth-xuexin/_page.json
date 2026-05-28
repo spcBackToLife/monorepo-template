@@ -1,0 +1,62 @@
+{
+  "id": "00-auth-xuexin",
+  "type": "page",
+  "name": "学信网授权",
+  "product": {
+    "summary": "通过学信网 OAuth 拉取在校学籍状态，作为身份认证的官方依据",
+    "ref": "product-analysis/modules/M5-user-auth.md#b1-注册主线-happy-path",
+    "fromModules": [
+      "M5"
+    ],
+    "rules": [
+      "授权 = 跳转到学信网官方页面（WebView 或外部浏览器），不在 App 内伪造任何官方页面",
+      "授权拒绝 → 降级为'仅学生证 + 人工审核'路径，48h 内反馈",
+      "学信网信息必须与学生证 OCR 一致才允许通过",
+      "授权 token 仅服务端存储，客户端不持有",
+      "授权完成后跳转人脸核身页"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "跳学信网 OAuth 授权（外部 WebView）+ 回调处理（成功/不一致/拒绝/失败）+ 降级人工审核 48h",
+    "ref": "interaction-design/pages/00-auth-xuexin.md",
+    "states": [
+      "idle",
+      "redirecting",
+      "awaiting-callback",
+      "callback-success",
+      "callback-mismatch",
+      "callback-rejected",
+      "callback-error",
+      "submitting",
+      "success",
+      "fallback-confirming"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "展开为什么需要",
+        "triggerNodePath": "info-card/help-btn"
+      },
+      {
+        "op": "开始授权",
+        "triggerNodePath": "start-auth-btn"
+      },
+      {
+        "op": "取消等待回调",
+        "triggerNodePath": "awaiting-card/cancel-btn"
+      },
+      {
+        "op": "走人工审核（降级）",
+        "triggerNodePath": "fallback-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:05:09.894Z"
+}

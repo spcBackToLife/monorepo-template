@@ -1,0 +1,18 @@
+{
+  "id": "action-icon",
+  "type": "element",
+  "name": "动作图标",
+  "interaction": {
+    "summary": "跟随当前阶段切换动画（眨眼/张嘴/摇头）",
+    "ref": "interaction-design/pages/00-auth-face.md",
+    "states": [
+      "eye-blink",
+      "mouth-open",
+      "shake-head"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

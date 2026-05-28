@@ -1,0 +1,19 @@
+{
+  "id": "desc",
+  "type": "element",
+  "name": "状态描述+预计时长",
+  "interaction": {
+    "summary": "展示预计时长（24h/48h/1.5s 倒计时）",
+    "ref": "interaction-design/pages/00-auth-status.md",
+    "states": [
+      "reviewing",
+      "approved",
+      "rejected",
+      "appealing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

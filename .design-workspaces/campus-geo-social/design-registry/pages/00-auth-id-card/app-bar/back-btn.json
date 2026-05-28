@@ -1,0 +1,24 @@
+{
+  "id": "back-btn",
+  "type": "element",
+  "name": "返回",
+  "interaction": {
+    "summary": "click→L4 Modal 确认丢失进度",
+    "ref": "interaction-design/pages/00-auth-id-card.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "确认→pop 回 school-select",
+        "ref": "interaction-design/pages/00-auth-id-card.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

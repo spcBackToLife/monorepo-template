@@ -1,0 +1,638 @@
+{
+  "$schema": "design-registry/v5",
+  "project": {
+    "name": "校园地理社交",
+    "codeName": "campus-geo-social",
+    "platform": "mobile",
+    "viewport": {
+      "width": 393,
+      "height": 852
+    },
+    "targetUser": {
+      "summary": "在校大学生为主（18-24 岁），辅以校友、跨校观察者、新生预热",
+      "ref": "product-analysis/overview.md#二目标用户与核心场景"
+    },
+    "coreScenarios": [
+      {
+        "id": "S1",
+        "summary": "碎片时间刷'附近发了什么'",
+        "ref": "product-analysis/overview.md#23-核心使用场景5-个高频场景"
+      },
+      {
+        "id": "S2",
+        "summary": "暧昧期定时定点投递给好友（视频/图文）",
+        "ref": "product-analysis/overview.md#23-核心使用场景5-个高频场景"
+      },
+      {
+        "id": "S3",
+        "summary": "在宿舍楼下捞同楼/同院系认识新朋友",
+        "ref": "product-analysis/overview.md#23-核心使用场景5-个高频场景"
+      },
+      {
+        "id": "S4",
+        "summary": "毕业 N 年后回校解锁当年的胶囊",
+        "ref": "product-analysis/overview.md#23-核心使用场景5-个高频场景"
+      },
+      {
+        "id": "S5",
+        "summary": "切到其他校园广场观察氛围",
+        "ref": "product-analysis/overview.md#23-核心使用场景5-个高频场景"
+      }
+    ],
+    "styleDirection": {
+      "summary": "青春治愈风：明亮配色（奶油黄/草莓粉/薄荷绿）+ 圆角 + 手绘插画风图标 + 柔和有机微动效",
+      "ref": "product-analysis/analysis/key-decisions.md#d6-青春治愈的连锁影响"
+    },
+    "constraints": {
+      "decisions": [
+        {
+          "id": "D1",
+          "summary": "投递必须好友",
+          "ref": "product-analysis/analysis/key-decisions.md"
+        },
+        {
+          "id": "D2",
+          "summary": "学生强认证（学信网+学生证+人脸）",
+          "ref": "product-analysis/analysis/key-decisions.md"
+        },
+        {
+          "id": "D3",
+          "summary": "混合经济：任务赚币+付费补充",
+          "ref": "product-analysis/analysis/key-decisions.md"
+        },
+        {
+          "id": "D4",
+          "summary": "跨校只看广场不见具体人",
+          "ref": "product-analysis/analysis/key-decisions.md"
+        },
+        {
+          "id": "D5",
+          "summary": "胶囊仅发布者本人解锁",
+          "ref": "product-analysis/analysis/key-decisions.md"
+        },
+        {
+          "id": "D6",
+          "summary": "青春治愈视觉",
+          "ref": "product-analysis/analysis/key-decisions.md"
+        }
+      ]
+    }
+  },
+  "navigation": {
+    "ref": "product-analysis/analysis/info-architecture.md#一导航总览",
+    "tabBar": [
+      "01-home-map",
+      "02-fishing-cast",
+      "06-conversation-list",
+      "10-profile-self"
+    ],
+    "flows": [
+      {
+        "from": "00-splash",
+        "to": "00-onboarding",
+        "trigger": "首次启动",
+        "transition": "fade"
+      },
+      {
+        "from": "00-onboarding",
+        "to": "00-login",
+        "trigger": "完成引导",
+        "transition": "push"
+      },
+      {
+        "from": "00-login",
+        "to": "00-register",
+        "trigger": "点击注册",
+        "transition": "push"
+      },
+      {
+        "from": "00-register",
+        "to": "00-auth-school-select",
+        "trigger": "验证码通过",
+        "transition": "push"
+      },
+      {
+        "from": "00-auth-school-select",
+        "to": "00-auth-id-card",
+        "trigger": "选定学校",
+        "transition": "push"
+      },
+      {
+        "from": "00-auth-id-card",
+        "to": "00-auth-xuexin",
+        "trigger": "OCR 通过",
+        "transition": "push"
+      },
+      {
+        "from": "00-auth-xuexin",
+        "to": "00-auth-face",
+        "trigger": "学信网授权完成",
+        "transition": "push"
+      },
+      {
+        "from": "00-auth-face",
+        "to": "00-auth-status",
+        "trigger": "活体核身完成",
+        "transition": "push"
+      },
+      {
+        "from": "00-auth-status",
+        "to": "00-profile-init",
+        "trigger": "审核通过",
+        "transition": "push"
+      },
+      {
+        "from": "00-profile-init",
+        "to": "01-home-map",
+        "trigger": "完善基础资料",
+        "transition": "fade"
+      },
+      {
+        "from": "01-home-map",
+        "to": "01-publish-entry",
+        "trigger": "点击 + 浮动按钮",
+        "transition": "modalUp"
+      },
+      {
+        "from": "01-publish-entry",
+        "to": "01-publish-edit",
+        "trigger": "选择动态类型",
+        "transition": "push"
+      },
+      {
+        "from": "01-publish-entry",
+        "to": "03-capsule-bury",
+        "trigger": "选择埋胶囊",
+        "transition": "push"
+      },
+      {
+        "from": "01-publish-edit",
+        "to": "01-publish-pick-location",
+        "trigger": "点击地点",
+        "transition": "push"
+      },
+      {
+        "from": "01-publish-edit",
+        "to": "01-publish-visibility",
+        "trigger": "点击可见性",
+        "transition": "push"
+      },
+      {
+        "from": "01-publish-visibility",
+        "to": "01-publish-target-friends",
+        "trigger": "选'给好友'",
+        "transition": "push"
+      },
+      {
+        "from": "01-home-map",
+        "to": "01-moment-detail",
+        "trigger": "点击动态点位/卡片",
+        "transition": "push"
+      },
+      {
+        "from": "01-home-map",
+        "to": "04-campus-switch",
+        "trigger": "顶部校园切换",
+        "transition": "modalUp"
+      },
+      {
+        "from": "04-campus-switch",
+        "to": "04-campus-plaza",
+        "trigger": "选定外校",
+        "transition": "fade"
+      },
+      {
+        "from": "04-campus-plaza",
+        "to": "04-campus-detail",
+        "trigger": "校徽卡片点击",
+        "transition": "push"
+      },
+      {
+        "from": "02-fishing-cast",
+        "to": "02-fishing-result",
+        "trigger": "确认开网",
+        "transition": "fade"
+      },
+      {
+        "from": "02-fishing-result",
+        "to": "02-greet-compose",
+        "trigger": "卡片点击打招呼",
+        "transition": "modalUp"
+      },
+      {
+        "from": "02-greet-compose",
+        "to": "06-conversation",
+        "trigger": "对方回复",
+        "transition": "push"
+      },
+      {
+        "from": "06-conversation",
+        "to": "06-add-friend",
+        "trigger": "点击加好友",
+        "transition": "modalUp"
+      },
+      {
+        "from": "06-conversation-list",
+        "to": "06-conversation",
+        "trigger": "点击会话",
+        "transition": "push"
+      },
+      {
+        "from": "10-profile-self",
+        "to": "07-wallet",
+        "trigger": "宫格-我的钱包",
+        "transition": "push"
+      },
+      {
+        "from": "10-profile-self",
+        "to": "03-capsule-list",
+        "trigger": "宫格-我的胶囊",
+        "transition": "push"
+      },
+      {
+        "from": "10-profile-self",
+        "to": "11-settings",
+        "trigger": "宫格-设置",
+        "transition": "push"
+      },
+      {
+        "from": "07-wallet",
+        "to": "07-recharge",
+        "trigger": "充值入口",
+        "transition": "modalUp"
+      },
+      {
+        "from": "07-recharge",
+        "to": "07-recharge-result",
+        "trigger": "支付成功",
+        "transition": "fade"
+      },
+      {
+        "from": "11-settings",
+        "to": "11-privacy",
+        "trigger": "隐私设置",
+        "transition": "push"
+      },
+      {
+        "from": "08-notification-center",
+        "to": "03-capsule-open",
+        "trigger": "胶囊解锁通知点击",
+        "transition": "fade"
+      },
+      {
+        "from": "00-login",
+        "to": "00-forgot-password",
+        "trigger": "点击'忘记密码'",
+        "transition": "push"
+      },
+      {
+        "from": "00-login",
+        "to": "00-register",
+        "trigger": "点击'注册'",
+        "transition": "push"
+      },
+      {
+        "from": "01-home-map",
+        "to": "01-home-feed",
+        "trigger": "顶部模式切换到列表",
+        "transition": "fade"
+      },
+      {
+        "from": "01-home-feed",
+        "to": "01-home-map",
+        "trigger": "顶部模式切换到地图",
+        "transition": "fade"
+      },
+      {
+        "from": "01-home-map",
+        "to": "08-notification-center",
+        "trigger": "右上铃铛",
+        "transition": "push"
+      },
+      {
+        "from": "01-home-map",
+        "to": "12-search",
+        "trigger": "顶部搜索",
+        "transition": "modalUp"
+      },
+      {
+        "from": "11-settings",
+        "to": "11-account-security",
+        "trigger": "账号与安全",
+        "transition": "push"
+      },
+      {
+        "from": "11-settings",
+        "to": "11-notification-prefs",
+        "trigger": "通知设置",
+        "transition": "push"
+      },
+      {
+        "from": "11-settings",
+        "to": "11-feedback",
+        "trigger": "意见反馈",
+        "transition": "push"
+      },
+      {
+        "from": "11-settings",
+        "to": "11-about",
+        "trigger": "关于",
+        "transition": "push"
+      },
+      {
+        "from": "11-account-security",
+        "to": "11-change-password",
+        "trigger": "修改密码",
+        "transition": "push"
+      },
+      {
+        "from": "11-account-security",
+        "to": "11-devices",
+        "trigger": "设备管理",
+        "transition": "push"
+      },
+      {
+        "from": "11-account-security",
+        "to": "11-logout-account",
+        "trigger": "注销账号",
+        "transition": "push"
+      },
+      {
+        "from": "11-privacy",
+        "to": "11-blocks",
+        "trigger": "黑名单",
+        "transition": "push"
+      },
+      {
+        "from": "10-profile-self",
+        "to": "10-profile-edit",
+        "trigger": "编辑资料",
+        "transition": "push"
+      },
+      {
+        "from": "10-profile-self",
+        "to": "10-footprints",
+        "trigger": "我的足迹",
+        "transition": "push"
+      },
+      {
+        "from": "10-profile-self",
+        "to": "06-friends-list",
+        "trigger": "我的好友",
+        "transition": "push"
+      },
+      {
+        "from": "06-conversation-list",
+        "to": "06-friend-requests",
+        "trigger": "顶部好友请求",
+        "transition": "push"
+      },
+      {
+        "from": "07-wallet",
+        "to": "07-tasks",
+        "trigger": "任务中心入口",
+        "transition": "push"
+      },
+      {
+        "from": "07-wallet",
+        "to": "07-shop",
+        "trigger": "道具商店入口",
+        "transition": "push"
+      },
+      {
+        "from": "07-wallet",
+        "to": "07-coin-history",
+        "trigger": "积分流水",
+        "transition": "push"
+      },
+      {
+        "from": "07-wallet",
+        "to": "07-gem-history",
+        "trigger": "钻石流水",
+        "transition": "push"
+      },
+      {
+        "from": "07-shop",
+        "to": "07-recharge",
+        "trigger": "钻石不足→充值",
+        "transition": "modalUp"
+      },
+      {
+        "from": "02-greets-received",
+        "to": "06-conversation",
+        "trigger": "回复→建立临时会话",
+        "transition": "push"
+      },
+      {
+        "from": "02-greets-received",
+        "to": "06-add-friend",
+        "trigger": "加为好友",
+        "transition": "modalUp"
+      },
+      {
+        "from": "03-capsule-list",
+        "to": "03-capsule-riddle",
+        "trigger": "解锁条件满足且有谜题",
+        "transition": "push"
+      },
+      {
+        "from": "03-capsule-list",
+        "to": "03-capsule-open",
+        "trigger": "解锁条件满足且无谜题",
+        "transition": "fade"
+      },
+      {
+        "from": "02-fishing-cast",
+        "to": "02-greets-received",
+        "trigger": "顶部'收到的招呼'",
+        "transition": "push"
+      },
+      {
+        "from": "02-fishing-cast",
+        "to": "02-greets-sent",
+        "trigger": "顶部'我发出的招呼'",
+        "transition": "push"
+      },
+      {
+        "from": "02-fishing-cast",
+        "to": "02-fishing-collections",
+        "trigger": "顶部'我的捞捕收藏'",
+        "transition": "push"
+      },
+      {
+        "from": "01-moment-detail",
+        "to": "01-comments",
+        "trigger": "评论按钮",
+        "transition": "modalUp"
+      },
+      {
+        "from": "01-moment-detail",
+        "to": "09-report",
+        "trigger": "更多→举报",
+        "transition": "modalUp"
+      },
+      {
+        "from": "01-moment-detail",
+        "to": "10-profile-other",
+        "trigger": "点击作者头像",
+        "transition": "push"
+      },
+      {
+        "from": "06-conversation",
+        "to": "10-profile-other",
+        "trigger": "点击对方头像",
+        "transition": "push"
+      },
+      {
+        "from": "11-about",
+        "to": "09-community-guidelines",
+        "trigger": "社区公约链接",
+        "transition": "push"
+      },
+      {
+        "from": "00-register",
+        "to": "09-community-guidelines",
+        "trigger": "查看社区公约（注册时强制阅读）",
+        "transition": "modalUp"
+      },
+      {
+        "from": "11-settings",
+        "to": "09-appeal",
+        "trigger": "我的申诉记录",
+        "transition": "push"
+      },
+      {
+        "from": "08-notification-center",
+        "to": "09-appeal",
+        "trigger": "处罚通知点击",
+        "transition": "push"
+      }
+    ]
+  },
+  "globalState": {
+    "ref": "product-analysis/PRD.md#四数据架构概要",
+    "variables": [
+      {
+        "key": "currentUser",
+        "type": "User",
+        "purpose": "全局用户身份"
+      },
+      {
+        "key": "primaryCampusId",
+        "type": "bigint",
+        "purpose": "主校园 ID（决定 M1 默认归属/M4 主校园）"
+      },
+      {
+        "key": "viewingCampusId",
+        "type": "bigint",
+        "purpose": "当前漫游中的校园 ID（=primary 或外校）"
+      },
+      {
+        "key": "isInRoamingMode",
+        "type": "bool",
+        "purpose": "是否在跨校漫游模式（影响互动按钮置灰）"
+      },
+      {
+        "key": "wallet",
+        "type": "{ coin: int, gem: int }",
+        "purpose": "钱包余额，常驻顶层（影响所有付费交互）"
+      },
+      {
+        "key": "deviceLocation",
+        "type": "{ lat, lng, accuracy }",
+        "purpose": "当前 GPS（用于触发判定，不上报历史）"
+      },
+      {
+        "key": "verificationStatus",
+        "type": "enum",
+        "purpose": "认证状态：影响功能权限"
+      },
+      {
+        "key": "privacyMode",
+        "type": "bool",
+        "purpose": "全局隐私模式开关"
+      },
+      {
+        "key": "unreadCounts",
+        "type": "{ messages, greets, notifications, friendRequests }",
+        "purpose": "Tab 红点数据"
+      }
+    ]
+  },
+  "modules": {
+    "M1": {
+      "name": "位置动态系统",
+      "ref": "product-analysis/modules/M1-location-moment.md",
+      "priority": "P0",
+      "summary": "在地点发图文/视频，按 GPS+时间窗口决定可见性"
+    },
+    "M2": {
+      "name": "捞网交友系统",
+      "ref": "product-analysis/modules/M2-fishing-net.md",
+      "priority": "P0",
+      "summary": "在某地撒网捞出附近活跃用户，游戏化破冰"
+    },
+    "M3": {
+      "name": "时空胶囊系统",
+      "ref": "product-analysis/modules/M3-time-capsule.md",
+      "priority": "P0",
+      "summary": "给未来的自己埋信，多年后回到此地解锁"
+    },
+    "M4": {
+      "name": "跨校漫游系统",
+      "ref": "product-analysis/modules/M4-cross-campus.md",
+      "priority": "P0",
+      "summary": "切换观察其他校园，仅看广场聚合"
+    },
+    "M5": {
+      "name": "用户与认证体系",
+      "ref": "product-analysis/modules/M5-user-auth.md",
+      "priority": "P0",
+      "summary": "强认证（学信网+学生证+人脸）+ 完整账号生命周期"
+    },
+    "M6": {
+      "name": "社交关系链",
+      "ref": "product-analysis/modules/M6-social-graph.md",
+      "priority": "P0",
+      "summary": "好友 + 临时会话 + 1v1 私聊"
+    },
+    "M7": {
+      "name": "积分与道具经济",
+      "ref": "product-analysis/modules/M7-economy.md",
+      "priority": "P0",
+      "summary": "双账本：积分(任务) + 钻石(付费)，道具体系"
+    },
+    "M8": {
+      "name": "通知与触达",
+      "ref": "product-analysis/modules/M8-notification.md",
+      "priority": "P0",
+      "summary": "多通道触达 + 偏好控制 + 强制类保护"
+    },
+    "M9": {
+      "name": "内容审核与安全",
+      "ref": "product-analysis/modules/M9-content-safety.md",
+      "priority": "P0",
+      "summary": "三层审核 + 举报申诉 + 隐私数据保护"
+    },
+    "M10": {
+      "name": "个人主页与内容管理",
+      "ref": "product-analysis/modules/M10-profile.md",
+      "priority": "P1",
+      "summary": "整合所有'我的xx'出口 + 足迹墙"
+    },
+    "M11": {
+      "name": "设置与隐私",
+      "ref": "product-analysis/modules/M11-settings-privacy.md",
+      "priority": "P1",
+      "summary": "隐私偏好 + 一键隐私模式"
+    },
+    "M12": {
+      "name": "搜索与发现",
+      "ref": "product-analysis/modules/M12-search.md",
+      "priority": "P2",
+      "summary": "用户/校园/地点搜索（MVP 弱化）"
+    }
+  },
+  "interactionSystemRef": "interaction-design/overview.md",
+  "_updatedAt": "2026-05-28T04:37:20.544Z"
+}

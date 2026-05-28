@@ -1,0 +1,25 @@
+{
+  "id": "clusters",
+  "type": "element",
+  "name": "聚合气泡",
+  "interaction": {
+    "summary": "click→sheet 弹出该位置动态列表",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:9",
+    "trigger": "click",
+    "condition": "{{ pointCount >= 3 }}",
+    "flows": {
+      "success": {
+        "summary": "bubble scale + 触觉 light + cluster-sheet 上滑",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:9"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

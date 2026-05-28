@@ -1,0 +1,18 @@
+{
+  "id": "07-shop",
+  "type": "page",
+  "name": "道具商店",
+  "product": {
+    "summary": "购买/兑换道具（网/招呼/补网/炸弹/隐身券等），区分积分价与钻石价",
+    "ref": "product-analysis/modules/M7-economy.md#c2-道具清单mvp",
+    "fromModules": ["M7"],
+    "rules": [
+      "道具卡片明确标注积分价 + 钻石价（部分道具仅钻石）",
+      "余额不足时引导购买积分（任务）或充值钻石",
+      "炸弹（小/大）和时光戳仅钻石购买；隐身券双货币可买",
+      "购买事务性扣款 + 道具入账，失败回滚",
+      "支持赠送好友（仅部分道具，需对方接受）"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

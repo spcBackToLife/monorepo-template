@@ -1,0 +1,76 @@
+{
+  "id": "11-about",
+  "type": "page",
+  "name": "关于",
+  "product": {
+    "summary": "App 信息：版本号 + 检查更新 + 用户协议 + 隐私政策 + 社区公约 + 关于我们 + 联系客服",
+    "ref": "product-analysis/modules/M11-settings-privacy.md#b1-设置主菜单结构",
+    "fromModules": [],
+    "rules": [
+      "版本号显示 + 一键检查更新（强制更新走应用商店）",
+      "协议链接全部使用 WebView 内嵌展示，必带版本号",
+      "底部展示 ICP 备案 + 公司信息（合规要求）",
+      "联系客服入口同时提供常见问题 + 在线客服 + 工单提交",
+      "Q 版插画装饰，体现产品调性"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "App 信息聚合：版本/检查更新/协议/隐私/公约/客服/评分 + ICP 备案 + 长按版本号 7 次开启 debug 彩蛋",
+    "ref": "interaction-design/pages/11-about.md",
+    "states": [
+      "idle",
+      "checking-update",
+      "up-to-date",
+      "has-update",
+      "updating",
+      "debug-mode"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "检查更新",
+        "triggerNodePath": "menu/check-update-row"
+      },
+      {
+        "op": "用户协议",
+        "triggerNodePath": "menu/user-agreement-row"
+      },
+      {
+        "op": "隐私政策",
+        "triggerNodePath": "menu/privacy-policy-row"
+      },
+      {
+        "op": "社区公约入口",
+        "triggerNodePath": "menu/community-guidelines-row"
+      },
+      {
+        "op": "关于我们",
+        "triggerNodePath": "menu/about-us-row"
+      },
+      {
+        "op": "联系客服",
+        "triggerNodePath": "menu/contact-row"
+      },
+      {
+        "op": "长按版本号 7 次（彩蛋）",
+        "triggerNodePath": "hero/version-text"
+      },
+      {
+        "op": "复制 ICP 备案",
+        "triggerNodePath": "icp-footer/text"
+      },
+      {
+        "op": "去评分（彩蛋）",
+        "triggerNodePath": "rating-banner"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T04:45:49.068Z"
+}

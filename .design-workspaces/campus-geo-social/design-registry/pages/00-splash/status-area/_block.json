@@ -1,0 +1,17 @@
+{
+  "id": "status-area",
+  "type": "block",
+  "name": "状态区",
+  "interaction": {
+    "summary": "展示隐式 loading 进度或超时后的重试按钮",
+    "ref": "interaction-design/pages/00-splash.md#状态机",
+    "states": [
+      "bootstrapping",
+      "timeout"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

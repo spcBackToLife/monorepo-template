@@ -1,0 +1,28 @@
+{
+  "id": "cast-again-btn",
+  "type": "element",
+  "name": "再撒一网",
+  "interaction": {
+    "summary": "click→pop 回 fishing-cast 并自动 trigger 撒网",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:9",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop + 自动撒网",
+        "ref": "操作清单:9"
+      },
+      "boundary": {
+        "summary": "cooldown→Toast",
+        "ref": "操作清单:9"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

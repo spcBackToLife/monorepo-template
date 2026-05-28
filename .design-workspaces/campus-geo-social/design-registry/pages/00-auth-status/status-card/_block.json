@@ -1,0 +1,19 @@
+{
+  "id": "status-card",
+  "type": "block",
+  "name": "状态主卡",
+  "interaction": {
+    "summary": "4 个状态的统一卡片",
+    "ref": "interaction-design/pages/00-auth-status.md",
+    "states": [
+      "reviewing",
+      "approved",
+      "rejected",
+      "appealing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

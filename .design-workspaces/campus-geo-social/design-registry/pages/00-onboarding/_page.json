@@ -1,0 +1,52 @@
+{
+  "id": "00-onboarding",
+  "type": "page",
+  "name": "新用户引导",
+  "product": {
+    "summary": "首次启动展示 3-4 屏价值传递（地理动态/捞网/胶囊/跨校），引导完成登录或注册",
+    "ref": "product-analysis/modules/M5-user-auth.md#step-b-核心流程",
+    "fromModules": [],
+    "rules": [
+      "仅首次启动展示，本地标记后不再触发",
+      "每屏一句话核心 + 一张大插画（D6 治愈风），左右滑切换",
+      "可点击右上角'跳过'直接到登录页",
+      "底部 CTA 在最后一屏从'下一页'变成'立即体验'",
+      "完成后写入本地 onboarding_completed=true"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "首次启动 4 屏价值传递（地理动态/捞网/胶囊/跨校），左右滑切换 + dot + 跳过 + 立即体验 CTA；完成后写本地 flag 不再触发",
+    "ref": "interaction-design/pages/00-onboarding.md",
+    "states": [
+      "idle:page-1",
+      "idle:page-2",
+      "idle:page-3",
+      "idle:page-4",
+      "switching",
+      "finishing"
+    ],
+    "operations": [
+      {
+        "op": "左右滑切换屏",
+        "triggerNodePath": "swiper/_block"
+      },
+      {
+        "op": "点击 dot 跳页",
+        "triggerNodePath": "page-indicator/dots"
+      },
+      {
+        "op": "点击跳过",
+        "triggerNodePath": "top-bar/skip-btn"
+      },
+      {
+        "op": "点击下一页/立即体验",
+        "triggerNodePath": "bottom-cta-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T04:43:10.461Z"
+}

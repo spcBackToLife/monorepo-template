@@ -1,0 +1,16 @@
+{
+  "id": "app-bar",
+  "type": "block",
+  "name": "顶部栏",
+  "interaction": {
+    "summary": "左返回，标题\"我的收藏 N/100\"，右清理过期",
+    "ref": "interaction-design/pages/02-fishing-collections.md#操作清单:1-2",
+    "states": [
+      "idle"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

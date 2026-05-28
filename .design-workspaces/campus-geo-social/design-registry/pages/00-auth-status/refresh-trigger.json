@@ -1,0 +1,28 @@
+{
+  "id": "refresh-trigger",
+  "type": "element",
+  "name": "轮询触发器",
+  "interaction": {
+    "summary": "timer 30s→拉取最新状态",
+    "ref": "interaction-design/pages/00-auth-status.md#操作清单:7",
+    "trigger": "timer",
+    "flows": {
+      "success": {
+        "summary": "静默更新状态",
+        "ref": "interaction-design/pages/00-auth-status.md#状态机"
+      },
+      "error": {
+        "summary": "接口失败→静默忽略",
+        "ref": "interaction-design/pages/00-auth-status.md#错误处理"
+      }
+    },
+    "states": [
+      "polling",
+      "paused"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

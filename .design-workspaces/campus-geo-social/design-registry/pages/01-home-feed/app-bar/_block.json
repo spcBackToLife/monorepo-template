@@ -1,0 +1,17 @@
+{
+  "id": "app-bar",
+  "type": "block",
+  "name": "顶部导航",
+  "interaction": {
+    "summary": "校园切换+搜索+通知（与 home-map 共享语义）",
+    "ref": "interaction-design/pages/01-home-feed.md",
+    "states": [
+      "idle",
+      "roaming"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

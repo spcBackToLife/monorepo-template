@@ -1,0 +1,24 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "POI 结果项",
+  "interaction": {
+    "summary": "click→地图平移到该 POI",
+    "ref": "interaction-design/pages/01-publish-pick-location.md#操作清单:4",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "地图平移+pin-settled+关 dropdown",
+        "ref": "interaction-design/pages/01-publish-pick-location.md#操作清单:4"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

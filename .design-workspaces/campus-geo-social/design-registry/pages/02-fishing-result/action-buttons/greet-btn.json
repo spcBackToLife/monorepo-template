@@ -1,0 +1,24 @@
+{
+  "id": "greet-btn",
+  "type": "element",
+  "name": "打招呼按钮",
+  "interaction": {
+    "summary": "click→当前卡片右飞→push 02-greet-compose",
+    "ref": "interaction-design/pages/02-fishing-result.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "等同右滑",
+        "ref": "操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "04-campus-switch",
+  "type": "page",
+  "name": "校园切换",
+  "product": {
+    "summary": "底部 sheet 形式的校园选择器：我的主校园 / 收藏 / 附近 / 热门 / 搜索",
+    "ref": "product-analysis/modules/M4-cross-campus.md#b1-切换校园主线",
+    "fromModules": ["M4"],
+    "rules": [
+      "顶部主校园高亮，下方按收藏 / 附近邻校 / 热门 Top 10 / 历史浏览 分组",
+      "支持搜索（拼音/简称/全名），结果按热度+地理近度排序",
+      "选定外校进入'漫游模式'：主页地图被 04-campus-plaza 替换",
+      "无法切换到不存在或被运营下架的校园（提示并回主校园）",
+      "切换主校园需重新认证（M5 学籍校验），不在本页直接处理"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

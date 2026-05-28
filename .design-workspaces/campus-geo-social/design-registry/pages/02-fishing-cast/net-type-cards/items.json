@@ -1,0 +1,29 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "网卡片",
+  "interaction": {
+    "summary": "click 选择该类型网；高亮+触觉+地图半径圆变化",
+    "ref": "interaction-design/pages/02-fishing-cast.md#操作清单:3",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "选中该网→重置 cast-btn 文案/价格",
+        "ref": "操作清单:3"
+      },
+      "boundary": {
+        "summary": "余额不足→insufficient-balance",
+        "ref": "操作清单:3"
+      }
+    },
+    "states": [
+      "idle",
+      "selected",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

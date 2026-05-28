@@ -1,0 +1,19 @@
+{
+  "id": "animation",
+  "type": "element",
+  "name": "状态动画",
+  "interaction": {
+    "summary": "按 state 切动画：沙漏/烟花/失落小人/信件",
+    "ref": "interaction-design/pages/00-auth-status.md",
+    "states": [
+      "reviewing-loop",
+      "approved-burst",
+      "rejected-static",
+      "appealing-loop"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

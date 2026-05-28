@@ -1,0 +1,26 @@
+{
+  "id": "avatar",
+  "type": "element",
+  "name": "作者头像",
+  "interaction": {
+    "summary": "click→push 05-user-profile",
+    "ref": "interaction-design/pages/01-moment-detail.md#操作清单:5",
+    "trigger": "click",
+    "condition": "{{ !isInRoamingMode }}",
+    "flows": {
+      "success": {
+        "summary": "push 05-user-profile?userId={{author.id}}",
+        "ref": "interaction-design/pages/01-moment-detail.md#操作清单:5"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing",
+      "disabled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

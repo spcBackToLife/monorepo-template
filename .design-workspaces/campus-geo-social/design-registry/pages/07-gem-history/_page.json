@@ -1,0 +1,18 @@
+{
+  "id": "07-gem-history",
+  "type": "page",
+  "name": "钻石流水",
+  "product": {
+    "summary": "查询钻石获取/消耗的全部明细，含充值订单与道具消费",
+    "ref": "product-analysis/modules/M7-economy.md#涉及实体",
+    "fromModules": ["M7"],
+    "rules": [
+      "每条展示：来源（recharge/exchange/gift/refund）+ 关联订单或道具 + 数额 + 余额",
+      "充值类型可点击查看完整订单详情（含支付方式/外部订单号）",
+      "支持时间筛选 + 来源类型筛选",
+      "退款记录单独高亮，含申请时间与处理时间",
+      "保留至少 12 个月，合规审计可导出"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

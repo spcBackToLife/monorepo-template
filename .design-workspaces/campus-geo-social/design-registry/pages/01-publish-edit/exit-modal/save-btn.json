@@ -1,0 +1,28 @@
+{
+  "id": "save-btn",
+  "type": "element",
+  "name": "存草稿",
+  "interaction": {
+    "summary": "click→本地保存+pop",
+    "ref": "interaction-design/pages/01-publish-edit.md#操作清单:11",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "本地保存→pop+Toast",
+        "ref": "interaction-design/pages/01-publish-edit.md#操作清单:11"
+      },
+      "boundary": {
+        "summary": "30 天后清理",
+        "ref": "interaction-design/pages/01-publish-edit.md#操作清单:11"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

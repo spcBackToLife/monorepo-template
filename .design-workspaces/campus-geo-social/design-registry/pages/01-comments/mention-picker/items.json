@@ -1,0 +1,24 @@
+{
+  "id": "items",
+  "type": "element",
+  "name": "@ 选项",
+  "interaction": {
+    "summary": "click(item)→插入「@昵称」",
+    "ref": "interaction-design/pages/01-comments.md#操作清单:6",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "text-input 插入蓝字+关 picker",
+        "ref": "interaction-design/pages/01-comments.md#操作清单:6"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

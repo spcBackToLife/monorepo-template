@@ -1,0 +1,24 @@
+{
+  "id": "cancel-btn",
+  "type": "element",
+  "name": "取消",
+  "interaction": {
+    "summary": "click→pop（已选不保存）",
+    "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "pop",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:1"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

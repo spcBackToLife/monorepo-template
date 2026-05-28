@@ -1,0 +1,25 @@
+{
+  "id": "sort-tabs",
+  "type": "element",
+  "name": "排序 Tab",
+  "interaction": {
+    "summary": "click→最新/最热切换",
+    "ref": "interaction-design/pages/01-comments.md#操作清单:2",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "tab 滑块+列表重渲染+滚到顶",
+        "ref": "interaction-design/pages/01-comments.md#操作清单:2"
+      }
+    },
+    "states": [
+      "newest",
+      "hottest",
+      "switching"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

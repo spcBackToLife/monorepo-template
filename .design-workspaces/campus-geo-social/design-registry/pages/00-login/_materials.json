@@ -1,0 +1,77 @@
+{
+  "id": "_materials",
+  "type": "page",
+  "name": "00-login 素材索引",
+  "materials": {
+    "B-01": {
+      "name": "brand-logo",
+      "type": "Brand",
+      "ref": "design-plan/pages/00-login/materials/B-01-brand-logo.md",
+      "boundNodes": [
+        "pages/00-login/top-area/logo"
+      ],
+      "size": "64x64",
+      "priority": "P0",
+      "status": "pending"
+    },
+    "I-01": {
+      "name": "eye-open",
+      "type": "Icon",
+      "ref": "design-plan/pages/00-login/materials/I-01-eye-open.md",
+      "boundNodes": [
+        "pages/00-login/form-card/password-input"
+      ],
+      "size": "20x20",
+      "priority": "P0",
+      "status": "pending"
+    },
+    "I-02": {
+      "name": "eye-closed",
+      "type": "Icon",
+      "ref": "design-plan/pages/00-login/materials/I-02-eye-closed.md",
+      "boundNodes": [
+        "pages/00-login/form-card/password-input"
+      ],
+      "size": "20x20",
+      "priority": "P0",
+      "status": "pending"
+    },
+    "I-04": {
+      "name": "checkmark-success",
+      "type": "Icon",
+      "ref": "design-plan/pages/00-login/materials/I-04-checkmark-success.md",
+      "boundNodes": [
+        "pages/00-login/submit-btn"
+      ],
+      "size": "20x20",
+      "priority": "P1",
+      "status": "pending"
+    },
+    "D-02": {
+      "name": "pink-circle",
+      "type": "Decoration",
+      "ref": "design-plan/pages/00-login/materials/D-02-pink-circle.md",
+      "boundNodes": [
+        "pages/00-login/_page"
+      ],
+      "size": "80x80",
+      "priority": "P2",
+      "status": "pending"
+    },
+    "D-03": {
+      "name": "mint-leaf",
+      "type": "Decoration",
+      "ref": "design-plan/pages/00-login/materials/D-03-mint-leaf.md",
+      "boundNodes": [
+        "pages/00-login/_page"
+      ],
+      "size": "60x40",
+      "priority": "P2",
+      "status": "pending"
+    }
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

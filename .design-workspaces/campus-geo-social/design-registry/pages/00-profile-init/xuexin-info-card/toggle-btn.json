@@ -1,0 +1,24 @@
+{
+  "id": "toggle-btn",
+  "type": "element",
+  "name": "展开/收起",
+  "interaction": {
+    "summary": "click→toggle",
+    "ref": "interaction-design/pages/00-profile-init.md#操作清单:8",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "高度动画",
+        "ref": "interaction-design/pages/00-profile-init.md#操作清单:8"
+      }
+    },
+    "states": [
+      "collapsed",
+      "expanded"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

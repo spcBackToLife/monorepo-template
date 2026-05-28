@@ -1,0 +1,24 @@
+{
+  "id": "more-btn",
+  "type": "element",
+  "name": "更多",
+  "interaction": {
+    "summary": "click→ActionSheet（举报/复制/屏蔽/删除编辑）",
+    "ref": "interaction-design/pages/01-moment-detail.md#操作清单:12",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "打开 more-menu",
+        "ref": "interaction-design/pages/01-moment-detail.md#操作清单:12"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

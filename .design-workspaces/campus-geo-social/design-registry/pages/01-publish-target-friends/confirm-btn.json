@@ -1,0 +1,30 @@
+{
+  "id": "confirm-btn",
+  "type": "element",
+  "name": "完成",
+  "interaction": {
+    "summary": "click→pop 回 visibility（带 friends[]）",
+    "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:6",
+    "trigger": "click",
+    "condition": "{{ selectedCount >= 1 }}",
+    "flows": {
+      "success": {
+        "summary": "pop 携带 friends[]",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:6"
+      },
+      "boundary": {
+        "summary": "0 选→置灰",
+        "ref": "interaction-design/pages/01-publish-target-friends.md#操作清单:6"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "submitting"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

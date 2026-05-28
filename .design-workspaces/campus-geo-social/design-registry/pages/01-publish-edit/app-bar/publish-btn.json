@@ -1,0 +1,35 @@
+{
+  "id": "publish-btn",
+  "type": "element",
+  "name": "发布按钮",
+  "interaction": {
+    "summary": "click→提交",
+    "ref": "interaction-design/pages/01-publish-edit.md#操作清单:2",
+    "trigger": "click",
+    "condition": "{{ formValid && mediaAllUploaded }}",
+    "flows": {
+      "success": {
+        "summary": "submitting→success:review-pending→Toast+pop",
+        "ref": "interaction-design/pages/01-publish-edit.md#状态机"
+      },
+      "error": {
+        "summary": "按业务码：size/nsfw/network",
+        "ref": "interaction-design/pages/01-publish-edit.md#错误处理"
+      },
+      "boundary": {
+        "summary": "800ms 防抖；地点未选→inline",
+        "ref": "interaction-design/pages/01-publish-edit.md#操作清单:2"
+      }
+    },
+    "states": [
+      "disabled",
+      "enabled",
+      "submitting",
+      "success"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "form-card",
+  "type": "block",
+  "name": "密码表单",
+  "interaction": {
+    "summary": "三字段：旧/新/确认",
+    "ref": "interaction-design/pages/11-change-password.md",
+    "states": [
+      "idle",
+      "inputting",
+      "submitting"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

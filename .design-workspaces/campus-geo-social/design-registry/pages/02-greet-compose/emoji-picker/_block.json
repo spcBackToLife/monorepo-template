@@ -1,0 +1,17 @@
+{
+  "id": "emoji-picker",
+  "type": "component",
+  "name": "表情面板",
+  "interaction": {
+    "summary": "底部上滑表情选择器，覆盖键盘高度",
+    "ref": "interaction-design/pages/02-greet-compose.md#操作清单:5-6",
+    "states": [
+      "hidden",
+      "visible"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "00-profile-init",
+  "type": "page",
+  "name": "完善基础资料",
+  "product": {
+    "summary": "认证通过后引导用户设置头像、昵称、性别、一句话简介，完成则赠送新手积分",
+    "ref": "product-analysis/modules/M5-user-auth.md#b1-注册主线-happy-path",
+    "fromModules": [
+      "M5",
+      "M10"
+    ],
+    "rules": [
+      "头像必须设置；昵称必须填且全局唯一；其他字段可跳过",
+      "可跳过资料完善但 24 小时后会通过通知提醒",
+      "全部完成 → 赠送 50 积分 + '完善资料'新手任务标记达成",
+      "院系/年级来自学信网，本页只做展示与确认（不允许编辑）",
+      "完成后进入 01-home-map 主页面"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "头像+昵称+性别+简介 4 字段填写；全部完成 +50 积分；可跳过但 24h 后通知提醒",
+    "ref": "interaction-design/pages/00-profile-init.md",
+    "states": [
+      "idle",
+      "uploading-avatar",
+      "nickname-checking",
+      "nickname-conflict",
+      "submitting",
+      "success:full",
+      "success:partial",
+      "error"
+    ],
+    "operations": [
+      {
+        "op": "跳过",
+        "triggerNodePath": "app-bar/skip-btn"
+      },
+      {
+        "op": "选头像",
+        "triggerNodePath": "avatar-picker"
+      },
+      {
+        "op": "输入昵称",
+        "triggerNodePath": "form-card/nickname-input"
+      },
+      {
+        "op": "选建议昵称",
+        "triggerNodePath": "form-card/nickname-suggestion"
+      },
+      {
+        "op": "选择性别",
+        "triggerNodePath": "form-card/gender-picker"
+      },
+      {
+        "op": "输入简介",
+        "triggerNodePath": "form-card/bio-input"
+      },
+      {
+        "op": "展开学信网信息",
+        "triggerNodePath": "xuexin-info-card/toggle-btn"
+      },
+      {
+        "op": "点击完成",
+        "triggerNodePath": "submit-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:05:18.491Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "friends-row",
+  "type": "block",
+  "name": "投递好友行",
+  "interaction": {
+    "summary": "visible:friends 时显示",
+    "ref": "interaction-design/pages/01-publish-visibility.md",
+    "states": [
+      "hidden",
+      "empty",
+      "filled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

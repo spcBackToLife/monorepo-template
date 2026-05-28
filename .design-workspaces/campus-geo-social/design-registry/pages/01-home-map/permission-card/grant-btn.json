@@ -1,0 +1,28 @@
+{
+  "id": "grant-btn",
+  "type": "element",
+  "name": "开启定位",
+  "interaction": {
+    "summary": "click→弹系统授权框",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:13",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "授权后回 bootstrapping",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:13"
+      },
+      "error": {
+        "summary": "拒绝→保留 permission-denied",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:13"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

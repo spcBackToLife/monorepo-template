@@ -1,0 +1,28 @@
+{
+  "id": "privacy-policy-row",
+  "type": "element",
+  "name": "隐私政策行",
+  "interaction": {
+    "summary": "click→push WebView (?version=current)",
+    "ref": "interaction-design/pages/11-about.md#操作清单:5",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "push WebView 展示隐私政策",
+        "ref": "interaction-design/pages/11-about.md#操作清单:5"
+      },
+      "error": {
+        "summary": "加载失败→Toast",
+        "ref": "interaction-design/pages/11-about.md#错误处理"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

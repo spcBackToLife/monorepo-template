@@ -1,0 +1,90 @@
+{
+  "id": "01-moment-detail",
+  "type": "page",
+  "name": "动态详情",
+  "product": {
+    "summary": "查看单条动态全文，含媒体轮播、文字、地点迷你地图、互动操作（点赞/评论/分享）和路过统计",
+    "ref": "product-analysis/modules/M1-location-moment.md#b2-浏览动态主线",
+    "fromModules": [
+      "M1"
+    ],
+    "rules": [
+      "顶部沉浸式媒体（图片轮播或视频自动播放）",
+      "下方区域展示作者卡片 + 文字 + 标签 + 地点迷你地图 + 路过统计（不显示具体路人身份）",
+      "底部固定互动栏：点赞/评论/分享/更多，跨校漫游模式下置灰",
+      "评论按时间倒序，二级评论缩进；用户可删除自己的评论，发布者可删任意评论",
+      "外校漫游模式下顶部明显标'外校内容，仅可浏览'",
+      "动态被作者删除/审核下架时展示'该动态已不可见'并自动返回上一页",
+      "更多菜单含举报、复制链接、屏蔽该作者等"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "动态详情：媒体轮播+作者+文字+地点+互动栏；漫游模式置灰；删除/下架自动 pop",
+    "ref": "interaction-design/pages/01-moment-detail.md",
+    "states": [
+      "loading",
+      "visible",
+      "liking",
+      "comments-open",
+      "more-open",
+      "deleted",
+      "roaming-mode",
+      "error:not-found"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "媒体轮播切换",
+        "triggerNodePath": "media-carousel/slides"
+      },
+      {
+        "op": "点击作者",
+        "triggerNodePath": "author-card/avatar"
+      },
+      {
+        "op": "关注/取关",
+        "triggerNodePath": "author-card/follow-btn"
+      },
+      {
+        "op": "点击地点",
+        "triggerNodePath": "location-card/view-detail-btn"
+      },
+      {
+        "op": "点击路过统计",
+        "triggerNodePath": "passers-stat-btn"
+      },
+      {
+        "op": "点赞",
+        "triggerNodePath": "action-bar/like-btn"
+      },
+      {
+        "op": "评论",
+        "triggerNodePath": "action-bar/comment-btn"
+      },
+      {
+        "op": "分享",
+        "triggerNodePath": "action-bar/share-btn"
+      },
+      {
+        "op": "更多菜单",
+        "triggerNodePath": "action-bar/more-btn"
+      },
+      {
+        "op": "more-menu 选项",
+        "triggerNodePath": "more-menu/items"
+      },
+      {
+        "op": "顶部快捷分享",
+        "triggerNodePath": "app-bar/share-shortcut-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:38:51.585Z"
+}

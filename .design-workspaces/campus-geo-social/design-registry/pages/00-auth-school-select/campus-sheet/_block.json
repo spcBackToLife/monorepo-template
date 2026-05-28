@@ -1,0 +1,18 @@
+{
+  "id": "campus-sheet",
+  "type": "component",
+  "name": "校区选择 sheet",
+  "interaction": {
+    "summary": "多校区时弹起，选定确认",
+    "ref": "interaction-design/pages/00-auth-school-select.md",
+    "states": [
+      "hidden",
+      "visible",
+      "selected"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

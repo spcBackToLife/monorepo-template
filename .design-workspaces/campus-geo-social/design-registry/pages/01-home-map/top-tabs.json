@@ -1,0 +1,24 @@
+{
+  "id": "top-tabs",
+  "type": "element",
+  "name": "Map/Feed 切换",
+  "interaction": {
+    "summary": "click→切到 01-home-feed (replace)",
+    "ref": "interaction-design/pages/01-home-map.md#操作清单:1",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "replace 路由，状态/筛选保留",
+        "ref": "interaction-design/pages/01-home-map.md#操作清单:1"
+      }
+    },
+    "states": [
+      "map-active",
+      "feed-active"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

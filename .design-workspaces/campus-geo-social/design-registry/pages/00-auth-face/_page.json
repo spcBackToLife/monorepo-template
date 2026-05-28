@@ -1,0 +1,75 @@
+{
+  "id": "00-auth-face",
+  "type": "page",
+  "name": "人脸核身",
+  "product": {
+    "summary": "活体检测 + 与学信网/身份证人脸比对，完成最终身份核验",
+    "ref": "product-analysis/modules/M5-user-auth.md#b1-注册主线-happy-path",
+    "fromModules": [
+      "M5"
+    ],
+    "rules": [
+      "活体检测必须有动作指令（眨眼/张嘴/摇头），不允许静态照片通过",
+      "失败 ≥3 次自动转人工审核，提示用户上传手持证件视频",
+      "光线/角度异常时实时给提示，不让用户盲操",
+      "原始人脸照片仅核身使用，6 个月后自动删除，仅保留特征向量",
+      "此页不允许暂存退出（实时性要求高），用户中途退出需重走"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  },
+  "interaction": {
+    "summary": "活体检测（眨眼/张嘴/摇头）+ 人脸比对；实时光线/角度提示；3 次失败转人工审核（手持视频）",
+    "ref": "interaction-design/pages/00-auth-face.md",
+    "states": [
+      "idle",
+      "permission-asking",
+      "permission-denied",
+      "initializing",
+      "action:eye-blink",
+      "action:mouth-open",
+      "action:shake-head",
+      "comparing",
+      "success",
+      "error:lighting",
+      "error:angle",
+      "error:multiple-faces",
+      "error:liveness",
+      "error:no-match",
+      "error:max-retries"
+    ],
+    "operations": [
+      {
+        "op": "返回",
+        "triggerNodePath": "app-bar/back-btn"
+      },
+      {
+        "op": "展开为什么需要",
+        "triggerNodePath": "info-card/help-btn"
+      },
+      {
+        "op": "开始检测",
+        "triggerNodePath": "start-btn"
+      },
+      {
+        "op": "实时帧检测（活体）",
+        "triggerNodePath": "face-camera/preview"
+      },
+      {
+        "op": "再试一次",
+        "triggerNodePath": "error-card/retry-btn"
+      },
+      {
+        "op": "上传手持视频（人工审核）",
+        "triggerNodePath": "error-card/upload-video-btn"
+      },
+      {
+        "op": "去系统设置",
+        "triggerNodePath": "permission-denied-card/settings-btn"
+      }
+    ]
+  },
+  "_updatedAt": "2026-05-28T05:05:12.716Z"
+}

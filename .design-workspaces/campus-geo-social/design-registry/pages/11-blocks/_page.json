@@ -1,0 +1,18 @@
+{
+  "id": "11-blocks",
+  "type": "page",
+  "name": "黑名单",
+  "product": {
+    "summary": "查看我已拉黑的用户列表，可解除拉黑（24h 冷却防误操作）",
+    "ref": "product-analysis/modules/M9-content-safety.md#b4-拉黑与解除",
+    "fromModules": ["M11", "M9"],
+    "rules": [
+      "列表展示对方头像 + 昵称 + 拉黑时间 + 解除按钮",
+      "解除拉黑后 24h 内不可再加好友（防反复）",
+      "拉黑双向不可见生效全方位：私聊/捞网/动态/评论/主页",
+      "拉黑会自动解除已建立的好友关系",
+      "用户可主动从他人主页 / 会话设置 / 动态详情 等多入口拉黑"
+    ]
+  },
+  "implementation": { "nodeId": null, "status": "pending" }
+}

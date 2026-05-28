@@ -1,0 +1,24 @@
+{
+  "id": "settings-btn",
+  "type": "element",
+  "name": "去系统设置",
+  "interaction": {
+    "summary": "click→跳系统设置",
+    "ref": "interaction-design/pages/00-auth-id-card.md#操作清单:10",
+    "trigger": "click",
+    "flows": {
+      "success": {
+        "summary": "跳系统设置，回来重新检测",
+        "ref": "interaction-design/pages/00-auth-id-card.md#操作清单:10"
+      }
+    },
+    "states": [
+      "idle",
+      "pressing"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}

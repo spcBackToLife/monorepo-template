@@ -1,0 +1,31 @@
+{
+  "id": "code-input",
+  "type": "element",
+  "name": "验证码输入（6 格）",
+  "interaction": {
+    "summary": "6 格自动跳焦+短信预填",
+    "ref": "interaction-design/pages/00-register.md#操作清单:3",
+    "trigger": "input",
+    "flows": {
+      "success": {
+        "summary": "6 位填完激活 submit",
+        "ref": "interaction-design/pages/00-register.md#操作清单:3"
+      },
+      "error": {
+        "summary": "错 ≥3 次→锁 1min 重新获取",
+        "ref": "interaction-design/pages/00-register.md#错误处理"
+      }
+    },
+    "states": [
+      "empty",
+      "inputting",
+      "filled",
+      "error",
+      "disabled"
+    ]
+  },
+  "implementation": {
+    "nodeId": null,
+    "status": "pending"
+  }
+}
