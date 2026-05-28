@@ -363,26 +363,36 @@ interface EvalContext {
 
 ## 5. ENTRY POINTS FOR TIMER & CONDITIONAL ACTIONS
 
-### 5.1 Missing Condition Evaluation ⚠️
+### 5.1 Event Condition Evaluation ✅ IMPLEMENTED
 
-Currently: Event conditions are defined in schema but **never evaluated** in PreviewRenderer!
+**Status:** Completed in PreviewRenderer - Both node-level events and lifecycle events now evaluate conditions before firing!
 
-**Where to add:**
+**Implementation Details:**
+
+Both node-level events and lifecycle events now check conditions before firing:
+
 ```typescript
-// PreviewRenderer.tsx, line ~439-445
-for (const event of effectiveNode.events ?? []) {
-  if (event.disabled) continue;
-  
-  // ← ADD HERE: Evaluate event.condition?.when
-  if (event.condition) {
-    const condFn = compileExpression(event.condition.when as string);
-    if (!condFn(dataContext)) continue;  // Skip this event
+// Helper for node events (line 458-471)
+const shouldFireEvent = (event: typeof effectiveNode.events[0]) => {
+  if (event.condition?.when) {
+    try {
+      const conditionFn = compileExpression(event.condition.when);
+      const result = conditionFn(dataContext);
+      return result !== false && result !== 0 && result !== '' && result !== null && result !== undefined;
+    } catch (err) {
+      console.warn('[PreviewRenderer] event condition evaluation failed:', err, event);
+      return true;
+    }
   }
-  
-  if (event.trigger === 'click') {
-    // ...
-  }
+  return true;
+};
+
+// Usage: wrap dispatcher.run with condition check
+if (shouldFireEvent(event)) {
+  dispatcher.run(event.actions as Action[]);
 }
+
+// For lifecycle events: integrated into fireLifecycleEvents() function
 ```
 
 ### 5.2 Timer Action Integration Point
