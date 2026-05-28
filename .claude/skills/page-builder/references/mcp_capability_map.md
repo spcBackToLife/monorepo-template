@@ -442,3 +442,121 @@ visual_state / add → {
   transition: "all 0.2s ease"
 }
 ```
+
+---
+
+## 12. Timer Actions — Deferred Execution ⏱️
+
+**用途**: 延迟执行、循环计时、倒计时等时间驱动交互
+
+### action: ui.startTimer
+```
+必需参数:
+  - timerId: string         — 计时器唯一标识
+  - duration: number        — 持续时间（毫秒）
+  
+可选参数:
+  - interval?: number       — 重复间隔（毫秒，若设置则每 interval 触发一次）
+  - onTick?: Action[]       — 每个 tick 执行的动作
+  - onComplete?: Action[]   — 计时完成时执行的动作
+  - autoCancel?: boolean    — 若已存在同 ID 计时器，是否自动停止
+
+用途:
+  - 延迟跳转: { duration: 3000, onComplete: [{ type: 'nav.go', ... }] }
+  - 倒计时: { interval: 1000, onTick: [...], duration: 10000 }
+  - 自动保存: { interval: 5000, onTick: [{ type: 'effect.fetch', ... }] }
+  
+⚠️ 注意:
+  - timerId 必须唯一（同一节点的同一事件内）
+  - 若不传 onTick，则只在 duration 后触发 onComplete
+  - 若传 interval，则 onTick 会循环执行直到 duration 超时
+```
+
+### action: ui.stopTimer
+```
+必需参数:
+  - timerId: string         — 要停止的计时器 ID
+  
+用途: 主动停止一个运行中的计时器（如用户关闭模态框）
+```
+
+### action: ui.resetTimer
+```
+必需参数:
+  - timerId: string         — 要重置的计时器 ID
+  
+用途: 停止并重新启动相同 ID 的计时器（刷新倒计时）
+```
+
+---
+
+## Capability Constraints & Limitations
+
+### Input 元素默认样式
+- `<input>` 元素会应用 HTML 原生样式（如 border、padding）
+- 建议使用 `style/update` 显式设置 border、background 等覆盖默认值
+- 某些属性（如 outline）在预览器中可能表现与编辑器不同
+
+### export_and_apply 行为
+- 素材导出目前不支持导出嵌套素材或动态绑定的内容
+- 应用素材时，所有 {{data.xxx}} 表达式会被替换为静态值
+- 如需动态素材，建议使用 `asset/instantiate` + 逐个设置属性
+
+### 条件可见性 (set_visible_when)
+- 条件基于当前屏幕的 state 变量（data 和 view）
+- 表达式在每次 state 更新时重新计算
+- 建议使用简单的比较表达式以确保性能
+
+### 事件条件执行 (condition?.when)
+- 事件条件在触发前求值
+- 若条件表达式求值失败，默认行为是执行事件（fail-safe）
+- 条件支持复杂表达式，如 `{{ state.data.items.length > 0 && state.view.tab === 'list' }}`
+
+### 数据源自动加载 (autoFetchOnEnter)
+- 仅在屏幕 screenEnter 生命周期触发
+- 不支持条件性自动加载
+- 若需条件加载，使用 `event/add_event` 监听 screenEnter 后手动 fetch
+
+### 视觉状态 (visual_state)
+- hover/focus 状态在编辑器中需通过 `set_active` 预览
+- 若节点具有 disabled 状态，其他状态（如 hover）可能被禁用
+- 状态转换动画需通过 transition 属性配置
+
+### 组件属性绑定 (update_props)
+- textContent 用于设置文本，不能用 children
+- 数据表达式（{{...}}）仅在 textContent/attributes 中支持
+- 属性值必须是 JSON-serializable（不支持 function）
+
+### 嵌套布局建议
+```
+常用模式：上下固定 + 中间滚动
+  容器: display: flex / flex-direction: column / height: 100%
+  顶部: position: sticky / top: 0 / (layoutHint: sticky-header)
+  底部: position: sticky / bottom: 0 / (layoutHint: sticky-footer)
+  中间: flex: 1 / overflow: auto / (layoutHint: scroll-child)
+```
+
+---
+
+## 常见错误与排查
+
+### "event condition evaluation failed" 警告
+- 通常是表达式语法错误或引用不存在的变量
+- 检查 state 定义是否包含所需变量
+- 简化表达式进行测试
+
+### 元素不显示但无报错
+- 检查元素的 display 属性是否为 none
+- 验证条件可见性 (set_visible_when) 是否返回 false
+- 检查层级顺序 (z-index) 和遮挡情况
+
+### 样式未应用
+- 检查 CSS 属性名是否正确（驼峰式，如 backgroundColor）
+- 部分简写属性（如 background）可能覆盖其他属性，避免使用
+- 验证节点是否被其他更高优先级样式覆盖
+
+### 数据绑定不更新
+- 确认数据源已正确创建并初始化
+- 验证绑定表达式的路径是否与数据结构匹配
+- 检查 state.set/merge 是否正确更新了数据
+
