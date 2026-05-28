@@ -46,23 +46,6 @@
 | label-text | loading=false | 传达操作含义 | flex:1, 居中 |
 | loading-spinner | loading=true | 反馈进行中状态 | 替代label位置 |
 
-### 子元素内部属性（固定值，不由外部 Props 控制）
-
-> ★ executor 实现时直接消费此表。这些属性是组件内部硬编码的，使用者不传。
-
-| 子元素 | HTML tag | 固定属性 | 说明 |
-|--------|---------|---------|------|
-| (如 phone-input) | input | `type="tel"` `maxLength="11"` `placeholder="请输入手机号"` `inputMode="numeric"` | 手机号专用属性 |
-| (如 code-input) | input | `type="text"` `maxLength="6"` `placeholder="6位验证码"` `inputMode="numeric"` `autoComplete="one-time-code"` | 验证码专用 |
-| (如 password-input) | input | `type="password"` `placeholder="请输入密码"` `autoComplete="current-password"` | 密码专用 |
-| (如 send-code-btn) | button | `type="button"` | 不触发表单提交 |
-| (如 eye-toggle) | button | `type="button"` `aria-label="切换密码可见性"` | 无障碍标签 |
-
-**填写规则**：
-- 每个叶子节点必须列出其 HTML tag + 所有固定属性
-- `placeholder` / `aria-label` 等文案在此处明确写死（executor 直接取用）
-- 与外部 Props 绑定的值不写在此表（如 `value` 由 bind 控制）
-
 ### 与外部布局的关系
 
 - 默认: inline-flex，宽度由内容撑开
