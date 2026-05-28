@@ -45,6 +45,9 @@ export type {
   UiShowToastAction,
   UiOpenUrlAction,
   UiDelayAction,
+  LogicIfAction,
+  LogicSwitchCaseBranch,
+  LogicSwitchAction,
   CustomAction,
   // 联合
   Action,

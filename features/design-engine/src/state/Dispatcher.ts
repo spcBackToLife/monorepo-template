@@ -27,6 +27,8 @@ import type {
   StateRemoveAction,
   StateMergeAction,
   StateToggleAction,
+  LogicIfAction,
+  LogicSwitchAction,
 } from '@globallink/design-schema';
 import { reduceStateAction } from './Reducer';
 import type { Store } from './Store';
@@ -128,6 +130,12 @@ export class Dispatcher {
         await delay(action.duration);
         return;
 
+      case 'logic.if':
+        return this.runLogicIf(action as Extract<Action, { type: 'logic.if' }>, extraCtx);
+      
+      case 'logic.switch':
+        return this.runLogicSwitch(action as Extract<Action, { type: 'logic.switch' }>, extraCtx);
+
       case 'custom':
         this.deps.host?.onCustomAction?.(action.handler, action.payload);
         return;
@@ -224,6 +232,50 @@ export class Dispatcher {
       ...s,
       effects: { ...s.effects, [dataSourceId]: status },
     }));
+  }
+
+  // ===== 逻辑控制 =====
+
+  private async runLogicIf(
+    action: Extract<Action, { type: 'logic.if' }>,
+    extraCtx: Partial<EvalContext>,
+  ): Promise<void> {
+    const ctx = this.buildCtx(extraCtx);
+    const conditionResult = evaluateExpression(action.when, ctx);
+    
+    // 将 false、0、''、null、undefined 视为条件不满足
+    const isTrue = conditionResult !== false 
+      && conditionResult !== 0 
+      && conditionResult !== '' 
+      && conditionResult !== null 
+      && conditionResult !== undefined;
+    
+    const branchToExecute = isTrue ? action.then : action.else;
+    if (branchToExecute && branchToExecute.length > 0) {
+      await this.run(branchToExecute, extraCtx);
+    }
+  }
+
+  private async runLogicSwitch(
+    action: Extract<Action, { type: 'logic.switch' }>,
+    extraCtx: Partial<EvalContext>,
+  ): Promise<void> {
+    const ctx = this.buildCtx(extraCtx);
+    const switchValue = evaluateExpression(action.value, ctx);
+    
+    // 按顺序检查每个 case，第一个匹配的执行
+    for (const caseBranch of action.cases) {
+      const matchValue = evaluateExpression(caseBranch.match, ctx);
+      if (switchValue === matchValue) {
+        await this.run(caseBranch.actions, extraCtx);
+        return;
+      }
+    }
+    
+    // 都不匹配则执行 default（如果存在）
+    if (action.default && action.default.length > 0) {
+      await this.run(action.default, extraCtx);
+    }
   }
 
   // ===== 表达式 ctx =====

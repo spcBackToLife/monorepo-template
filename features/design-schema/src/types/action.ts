@@ -133,6 +133,42 @@ export interface CustomAction {
   payload?: Record<string, unknown>;
 }
 
+// ===== 逻辑控制动词 =====
+
+/**
+ * logic.if — 条件分支：when 为真执行 then，否则执行 else（可选）
+ */
+export interface LogicIfAction {
+  type: 'logic.if';
+  /** 条件表达式 */
+  when: Expression<boolean>;
+  /** 条件为真时执行的动作链 */
+  then: Action[];
+  /** 条件为假时执行的动作链（可选） */
+  else?: Action[];
+}
+
+/**
+ * logic.switch — 多分支：按 value 匹配 cases，找到 match 的执行其 actions；
+ * 都不匹配则执行 default（可选）
+ */
+export interface LogicSwitchCaseBranch {
+  /** 要匹配的值（与 value 通过 === 比较）*/
+  match: Expression | unknown;
+  /** 匹配时执行的动作链 */
+  actions: Action[];
+}
+
+export interface LogicSwitchAction {
+  type: 'logic.switch';
+  /** 要判断的值 */
+  value: Expression | unknown;
+  /** 各分支（按顺序检查，第一个匹配的执行） */
+  cases: LogicSwitchCaseBranch[];
+  /** 都不匹配时执行的动作链（可选） */
+  default?: Action[];
+}
+
 // ===== 动词联合 =====
 
 export type Action =
@@ -149,6 +185,8 @@ export type Action =
   | UiShowToastAction
   | UiOpenUrlAction
   | UiDelayAction
+  | LogicIfAction
+  | LogicSwitchAction
   | CustomAction;
 
 export type ActionType = Action['type'];

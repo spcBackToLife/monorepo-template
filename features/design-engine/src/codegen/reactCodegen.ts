@@ -269,6 +269,12 @@ function generateEventHandlerBody(evt: ComponentEvent, stateNodes: Map<string, s
       case 'custom':
         parts.push(`/* custom: ${action.handler} */`);
         break;
+      case 'logic.if':
+        parts.push(`/* logic.if: then/else actions */`);
+        break;
+      case 'logic.switch':
+        parts.push(`/* logic.switch: multiple cases */`);
+        break;
       default: {
         const _exhaustive: never = action;
         void _exhaustive;
