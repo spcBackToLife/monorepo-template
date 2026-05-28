@@ -30,14 +30,24 @@
     ]
   },
   "implementation": {
-    "nodeId": null,
-    "status": "pending"
+    "nodeId": "nd_5f428b5cf00f400292208",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": true,
+      "visualStates": true,
+      "interactionStates": true,
+      "dataBinding": true,
+      "extremeCases": true
+    }
   },
   "content": {
     "type": "text",
     "value": "6 位验证码"
   },
-  "_updatedAt": "2026-05-28T08:01:38.968Z",
+  "_updatedAt": "2026-05-28T15:30:40.387Z",
   "design": {
     "summary": "6格验证码输入，每格w:36 h:48 radius:md border center，auto-advance",
     "keyStyles": {

@@ -14,8 +14,18 @@
     "value": "B-01 brand-logo 素材"
   },
   "implementation": {
-    "nodeId": null,
-    "status": "pending"
+    "nodeId": "nd_db54b33d4b7443599024c",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": true,
+      "visualStates": true,
+      "interactionStates": true,
+      "dataBinding": true,
+      "extremeCases": true
+    }
   },
   "materials": [
     {
@@ -24,7 +34,7 @@
       "ref": "design-plan/pages/00-login/materials/B-01-brand-logo.md"
     }
   ],
-  "_updatedAt": "2026-05-28T07:59:52.581Z",
+  "_updatedAt": "2026-05-28T15:33:58.846Z",
   "design": {
     "summary": "品牌Logo图标 64×64, src=B-01 brand-logo",
     "keyStyles": {

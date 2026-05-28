@@ -22,14 +22,24 @@
     ]
   },
   "implementation": {
-    "nodeId": null,
-    "status": "pending"
+    "nodeId": "nd_7269543433e443e083520",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": true,
+      "visualStates": true,
+      "interactionStates": true,
+      "dataBinding": true,
+      "extremeCases": true
+    }
   },
   "content": {
     "type": "text",
     "value": "验证码 / 密码"
   },
-  "_updatedAt": "2026-05-28T08:00:47.722Z",
+  "_updatedAt": "2026-05-28T15:30:25.151Z",
   "design": {
     "summary": "登录方式切换胶囊 bg:#F5EDE6 radius:full h:32，active tab bg:primary color:white spring 200ms",
     "keyStyles": {

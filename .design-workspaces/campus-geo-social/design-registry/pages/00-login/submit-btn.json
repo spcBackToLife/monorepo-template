@@ -34,8 +34,18 @@
     ]
   },
   "implementation": {
-    "nodeId": null,
-    "status": "pending"
+    "nodeId": "nd_5c593e0a4c26442d95eaf",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": true,
+      "visualStates": true,
+      "interactionStates": true,
+      "dataBinding": true,
+      "extremeCases": true
+    }
   },
   "content": {
     "type": "text",
@@ -49,7 +59,7 @@
       "condition": "{{state.view.submitState === \"success\"}}"
     }
   ],
-  "_updatedAt": "2026-05-28T08:00:44.890Z",
+  "_updatedAt": "2026-05-28T15:34:04.950Z",
   "design": {
     "summary": "登录主按钮 h:48 w:100% bg:primary color:white radius:full shadow-sm，5态(disabled/enabled/hover/pressed/loading/success)",
     "visualRef": "design-plan/pages/00-login/visual.md#登录按钮",

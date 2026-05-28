@@ -29,14 +29,24 @@
     ]
   },
   "implementation": {
-    "nodeId": null,
-    "status": "pending"
+    "nodeId": "nd_4e3610148b1a4565a42d1",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": true,
+      "visualStates": true,
+      "interactionStates": true,
+      "dataBinding": true,
+      "extremeCases": true
+    }
   },
   "content": {
     "type": "text",
     "value": "手机号"
   },
-  "_updatedAt": "2026-05-28T08:00:12.523Z",
+  "_updatedAt": "2026-05-28T15:30:37.511Z",
   "design": {
     "summary": "手机号输入框 h:48 radius:md border:1px#FFE0E8 focus:2px#FF6F91+ring font:body-lg",
     "keyStyles": {
