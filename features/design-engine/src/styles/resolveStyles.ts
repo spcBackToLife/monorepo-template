@@ -2,6 +2,7 @@ import type { CSSProperties, ComponentNode, ExpressionStyles, ThemeConfig } from
 import type { DataContext } from '../data/dataContext';
 import { hasExpression, resolveExpression } from '../data/dataContext';
 import { resolveTokensInStyles } from './resolveTokens';
+import { buildAnimationCSSValue, PRESET_ANIMATION_NAMES } from './presetAnimations';
 
 /**
  * Convert design-schema CSSProperties to React.CSSProperties.
@@ -169,6 +170,42 @@ export function resolveNodeStyles(
     }
     if (interactionStateObj?.styles) {
       merged = { ...merged, ...(interactionStateObj.styles as ExpressionStyles) };
+    }
+    // Layer 3.5: 动画注入（当 visualState 定义了 animation 时）
+    if (interactionStateObj?.animation) {
+      const anim = interactionStateObj.animation;
+      const animName = PRESET_ANIMATION_NAMES.has(anim.name) ? anim.name : anim.name;
+      merged = {
+        ...merged,
+        animation: buildAnimationCSSValue(
+          animName,
+          anim.duration ?? 300,
+          anim.easing ?? 'ease',
+          anim.iterationCount ?? 1,
+          anim.direction ?? 'normal',
+          anim.fillMode ?? 'forwards',
+        ),
+      };
+    }
+  }
+
+  // 也检查 business state 的 animation
+  if (!interactionState && effectiveStateName !== 'default') {
+    const activeState = node.states?.find((s) => s.name === effectiveStateName);
+    if (activeState?.animation) {
+      const anim = activeState.animation;
+      const animName = PRESET_ANIMATION_NAMES.has(anim.name) ? anim.name : anim.name;
+      merged = {
+        ...merged,
+        animation: buildAnimationCSSValue(
+          animName,
+          anim.duration ?? 300,
+          anim.easing ?? 'ease',
+          anim.iterationCount ?? 1,
+          anim.direction ?? 'normal',
+          anim.fillMode ?? 'forwards',
+        ),
+      };
     }
   }
 

@@ -149,8 +149,10 @@ function main() {
     const product = data['product'] as Record<string, unknown> | undefined;
 
     if (forSkill === 'executor') {
-      // 找 status=pending 且有 design 层的节点
-      if (implementation?.['status'] === 'pending' && design) {
+      // 找未完成(pending 或无 implementation 层)且有 design 层的节点
+      const implStatus = implementation?.['status'] as string | undefined;
+      const isNotDone = !implStatus || implStatus === 'pending';
+      if (isNotDone && design) {
         const nodeMaterials = data['materials'] as unknown[] | undefined;
         tasks.push({
           path: relPath,

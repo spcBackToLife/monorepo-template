@@ -9,20 +9,6 @@
       "idle"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_f75ae430b23f4de6a6c42",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "_updatedAt": "2026-05-28T15:34:30.501Z",
   "design": {
     "summary": "品牌头部：Logo 64×64 + Slogan h3，flex column center，pt:80px pb:32px",

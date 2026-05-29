@@ -16,20 +16,6 @@
       "若账号已被封禁/注销中，登录后立刻引导对应处理页"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_ab23ad28cd1246cf884cf",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "interaction": {
     "summary": "双登录方式（验证码默认/密码）+ 错误状态机（锁定/封禁/注销缓冲/异地登录）；跳注册与忘记密码",
     "ref": "interaction-design/pages/00-login.md",

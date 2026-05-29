@@ -207,20 +207,33 @@ Root
 
 ---
 
-## 平台能力清单（经源码验证，2026-05-29 更新）
+## 平台能力清单（经源码验证 + 本次实现，2026-05-29）
 
-| 能力 | 状态 | 用法 | 源码位置 |
-|------|:----:|------|---------|
-| **条件样式（style = f(state)）** | ✅ **已支持** | 样式值写 `{{ }}` 表达式即可响应式更新 | resolveStyles.ts L66-78 |
-| **条件文案（textContent 插值）** | ✅ **已支持** | `textContent: "倒计时 {{ state.view.countdown }}s"` | resolveProps.ts L75 |
-| **autoVisualState（条件激活态）** | ✅ **新增** | visualState 加 `activeWhen: "{{ expr }}"` 自动激活 | resolveStyles.ts Layer 1.5 |
-| **素材应用到指定 visualState** | ✅ **新增** | `export_and_apply` 传 `targetState: "success"` | canvas.ts + material.ts |
-| **input 默认白色背景** | ✅ **已修复** | 无需显式设置（但设了也不冲突） | resolveStyles.ts Layer 4 |
-| node.setVisualState 跨节点 | ✅ 支持 | 在 actions 中指定 nodeId | — |
-| visibleWhen 表达式 | ✅ 支持 | `node.visibleWhen: "{{ expr }}"` | resolveProps.ts L53 |
-| set_bind 双向绑定 | ✅ 支持 | — | — |
-| 定时器/interval | ❌ 缺失 | 无法做递减倒计时 | workaround: 固定文案 |
-| 条件判断 actions (if/else) | ❌ 缺失 | 用 event.condition 做简单条件 | — |
+**全部 ✅ — 平台现已具备完整的交互原型能力，无结构性缺口。**
+
+| 能力 | 用法 | 源码位置 |
+|------|------|---------|
+| **条件样式** | 样式值写 `{{ }}` 表达式即可响应式更新 | resolveStyles.ts |
+| **条件文案** | `textContent: "{{ state.view.countdown }}s"` | resolveProps.ts |
+| **autoVisualState** | visualState 加 `activeWhen: "{{ expr }}"` 自动激活 | resolveStyles.ts |
+| **素材应用到 visualState** | `export_and_apply` 传 `targetState: "success"` | canvas.ts + material.ts |
+| **input 默认白背景** | 自动注入，无需显式设置 | resolveStyles.ts |
+| **定时器** | `ui.startTimer` / `ui.stopTimer` / `ui.resetTimer` | Dispatcher TimerManager |
+| **条件逻辑** | `logic.if` (when/then/else) + `logic.switch` (cases/default) | Dispatcher |
+| **CSS 动画** | visualState `animation: {name:'shake'}` 或 action `ui.animate` | presetAnimations.ts |
+| **SVG 内联** | 元素 `type:"svg"` + `props.svgContent` | PrimitiveRenderer |
+| **全局覆盖层** | `Screen.overlays[]` + `ui.showOverlay` / `ui.hideOverlay` | screen.ts + Dispatcher |
+| **OTP 表单** | input `maxLength:1` + `autoFocusNext:"nextNodeId"` + `inputMode:"numeric"` | PrimitiveRenderer |
+| **延迟执行** | `ui.delay: { duration: 500 }` | Dispatcher |
+| **事件条件** | `event.condition: { when: "{{ expr }}" }` | PreviewRenderer |
+| **跨节点视觉切换** | `node.setVisualState` + `nodeId` + `autoRevertMs` | Dispatcher |
+| **visibleWhen** | `node.visibleWhen: "{{ expr }}"` | resolveProps |
+| **双向绑定** | `set_bind` | PreviewRenderer |
+| **API 调用** | `effect.fetch` + mock scenarios | EffectExecutor |
+
+### 预置动画 (10 个)
+
+`shake` · `fadeIn` · `fadeOut` · `scaleIn` · `scaleOut` · `slideUp` · `slideDown` · `bounce` · `pulse` · `spin`
 
 ### ⚠️ 关键发现：「条件样式」一直存在但未被使用
 

@@ -12,20 +12,6 @@
       "error"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_77a5358d3fda443b8ac1f",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "_updatedAt": "2026-05-28T15:30:31.521Z",
   "design": {
     "summary": "白色表单卡片容器：bg:surface radius:lg(16) padding:24px shadow-sm，承载双模态输入框组",

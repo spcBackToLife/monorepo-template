@@ -21,20 +21,6 @@
       "password-mode"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_7269543433e443e083520",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "content": {
     "type": "text",
     "value": "验证码 / 密码"

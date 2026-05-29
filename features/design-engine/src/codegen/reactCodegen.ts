@@ -275,6 +275,15 @@ function generateEventHandlerBody(evt: ComponentEvent, stateNodes: Map<string, s
       case 'ui.resetTimer':
         parts.push(`/* ui.resetTimer: ${action.timerId} */`);
         break;
+      case 'ui.animate':
+        parts.push(`/* ui.animate: ${action.animation}${action.nodeId ? ` on ${action.nodeId}` : ''} */`);
+        break;
+      case 'ui.showOverlay':
+        parts.push(`/* ui.showOverlay: ${action.overlayId} */`);
+        break;
+      case 'ui.hideOverlay':
+        parts.push(`/* ui.hideOverlay: ${action.overlayId ?? 'all'} */`);
+        break;
       case 'custom':
         parts.push(`/* custom: ${action.handler} */`);
         break;
@@ -327,6 +336,12 @@ function actionSummary(a: Action): string {
       return `ui.stopTimer:${a.timerId}`;
     case 'ui.resetTimer':
       return `ui.resetTimer:${a.timerId}`;
+    case 'ui.animate':
+      return `ui.animate:${a.animation}`;
+    case 'ui.showOverlay':
+      return `ui.showOverlay:${a.overlayId}`;
+    case 'ui.hideOverlay':
+      return `ui.hideOverlay:${a.overlayId ?? 'all'}`;
     case 'custom':
       return `custom:${a.handler}`;
     default:

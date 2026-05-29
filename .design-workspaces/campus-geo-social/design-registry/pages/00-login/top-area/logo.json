@@ -13,20 +13,6 @@
     "type": "css-decoration",
     "value": "B-01 brand-logo 素材"
   },
-  "implementation": {
-    "nodeId": "nd_db54b33d4b7443599024c",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "materials": [
     {
       "id": "B-01",

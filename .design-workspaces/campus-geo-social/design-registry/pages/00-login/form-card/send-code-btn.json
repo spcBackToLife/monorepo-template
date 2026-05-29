@@ -29,20 +29,6 @@
       "retry"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_851345f360c643d88a13b",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "content": {
     "type": "text",
     "value": "获取验证码"

@@ -17,20 +17,6 @@
       "pressing"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_ad7c9d8b2d3643e2aa593",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "content": {
     "type": "text",
     "value": "忘记密码"

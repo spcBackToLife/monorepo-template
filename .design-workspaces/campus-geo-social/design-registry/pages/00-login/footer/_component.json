@@ -9,20 +9,6 @@
       "idle"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_db762d85abac4bc08fb7c",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "_updatedAt": "2026-05-28T15:31:06.961Z",
   "design": {
     "summary": "底部辅助链接区 flex row center gap:16 mt:24，两个primary色文字链接+竖线分隔",

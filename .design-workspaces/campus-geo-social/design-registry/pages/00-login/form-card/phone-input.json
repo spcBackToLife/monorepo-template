@@ -28,20 +28,6 @@
       "disabled"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_4e3610148b1a4565a42d1",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "content": {
     "type": "text",
     "value": "手机号"

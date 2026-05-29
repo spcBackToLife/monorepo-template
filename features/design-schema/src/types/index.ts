@@ -21,7 +21,7 @@ export type {
 } from './state';
 
 // ===== Visual State (节点视觉态) =====
-export type { VisualState } from './visualState';
+export type { VisualState, AnimationDef, PresetAnimation } from './visualState';
 
 // ===== Action (v2 动词联合) =====
 export type {
@@ -48,6 +48,9 @@ export type {
   UiStartTimerAction,
   UiStopTimerAction,
   UiResetTimerAction,
+  UiAnimateAction,
+  UiShowOverlayAction,
+  UiHideOverlayAction,
   LogicIfAction,
   LogicSwitchCaseBranch,
   LogicSwitchAction,
@@ -87,7 +90,7 @@ export type {
   ExpressionStyles,
   RepeatBinding,
 } from './node';
-export type { Screen } from './screen';
+export type { Screen, OverlayNode, OverlayType, OverlayAnimation } from './screen';
 export type { DesignProject } from './project';
 
 // ===== Template / Props =====

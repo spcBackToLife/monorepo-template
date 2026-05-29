@@ -17,20 +17,6 @@
       "pressing"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_f69f5231ae204a148e9fb",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "content": {
     "type": "text",
     "value": "注册"

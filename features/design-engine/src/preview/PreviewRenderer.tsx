@@ -11,6 +11,7 @@ import type {
 import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
+import { generatePresetKeyframesCSS } from '../styles/presetAnimations';
 import { resolveNodeProps, resolvePropsForRender } from '../styles/resolveProps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContextProvider';
@@ -318,6 +319,8 @@ function PreviewInteractiveShell({
   return (
     <StaticAssetOriginProvider origin={staticAssetOrigin}>
       <DataContextProvider value={previewDataContext}>
+        {/* 预置 CSS 动画 keyframes 注入 */}
+        <style dangerouslySetInnerHTML={{ __html: generatePresetKeyframesCSS() }} />
         <div
           data-preview-root
           style={{

@@ -8,6 +8,7 @@ import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
 import { resolveNodeProps, resolvePropsForRender } from '../styles/resolveProps';
+import { generatePresetKeyframesCSS } from '../styles/presetAnimations';
 import { mergeStateMaps } from '../styles/mergeStateMaps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContextProvider';
@@ -147,6 +148,8 @@ export function SchemaRenderer({
     <StaticAssetOriginProvider origin={staticAssetOrigin}>
       <DataContextProvider value={activeDataContext}>
         <SchemaVirtualizeContext.Provider value={virtualizeCtx}>
+          {/* 预置 CSS 动画 keyframes 注入 */}
+          <style dangerouslySetInnerHTML={{ __html: generatePresetKeyframesCSS() }} />
           <div
             data-screen-id={screen.id}
             style={{

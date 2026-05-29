@@ -54,6 +54,12 @@ export interface HostAdapters {
   }) => void;
   onOpenUrl?: (url: string, openInNewTab?: boolean) => void;
   onSetVisualState?: (nodeId: string | undefined, state: string, autoRevertMs?: number) => void;
+  /** CSS 动画触发 — 宿主负责给目标节点注入 animation 样式 */
+  onAnimate?: (nodeId: string | undefined, animation: string, duration: number, easing: string) => void;
+  /** 显示全局覆盖层 */
+  onShowOverlay?: (overlayId: string) => void;
+  /** 隐藏全局覆盖层 */
+  onHideOverlay?: (overlayId: string | undefined) => void;
   /** 业务扩展 */
   onCustomAction?: (handler: string, payload: Record<string, unknown> | undefined) => void;
 }
@@ -239,6 +245,37 @@ export class Dispatcher {
       case 'ui.resetTimer':
         this.timerManager.reset((action as Extract<Action, { type: 'ui.resetTimer' }>).timerId);
         return;
+
+      case 'ui.animate': {
+        // 委托给宿主实现动画触发（通过 DOM 操作添加 animation class/style）
+        const animAction = action as Extract<Action, { type: 'ui.animate' }>;
+        this.deps.host?.onAnimate?.(
+          animAction.nodeId,
+          animAction.animation,
+          animAction.duration ?? 300,
+          animAction.easing ?? 'ease',
+        );
+        // 如果有 onComplete，延迟执行
+        if (animAction.onComplete?.length) {
+          const duration = animAction.duration ?? 300;
+          setTimeout(() => {
+            this.run(animAction.onComplete!, extraCtx).catch(() => {});
+          }, duration);
+        }
+        return;
+      }
+
+      case 'ui.showOverlay': {
+        const overlayAction = action as Extract<Action, { type: 'ui.showOverlay' }>;
+        this.deps.host?.onShowOverlay?.(overlayAction.overlayId);
+        return;
+      }
+
+      case 'ui.hideOverlay': {
+        const overlayAction = action as Extract<Action, { type: 'ui.hideOverlay' }>;
+        this.deps.host?.onHideOverlay?.(overlayAction.overlayId);
+        return;
+      }
 
       case 'logic.if':
         return this.runLogicIf(action as Extract<Action, { type: 'logic.if' }>, extraCtx);

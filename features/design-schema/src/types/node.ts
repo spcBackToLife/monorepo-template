@@ -56,6 +56,7 @@ export type PrimitiveNodeType =
   | 'textarea'
   | 'select'
   | 'img'
+  | 'svg'
   | 'a'
   | 'ul'
   | 'ol'

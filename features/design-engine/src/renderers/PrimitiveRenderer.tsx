@@ -99,9 +99,40 @@ export function PrimitiveRenderer({
         />
       );
 
+    case 'svg':
+      return (
+        <div
+          {...commonProps}
+          style={{
+            ...style,
+            display: style.display ?? 'flex',
+            alignItems: (style as Record<string, unknown>).alignItems as string ?? 'center',
+            justifyContent: (style as Record<string, unknown>).justifyContent as string ?? 'center',
+          }}
+          dangerouslySetInnerHTML={{
+            __html: (resolvedProps.svgContent as string) ?? '',
+          }}
+        />
+      );
+
     case 'input': {
       const inputType = (resolvedProps.type as string) ?? 'text';
       const isCheckbox = inputType === 'checkbox' || inputType === 'radio';
+      const maxLength = resolvedProps.maxLength as number | undefined;
+      const inputMode = resolvedProps.inputMode as string | undefined;
+      const pattern = resolvedProps.pattern as string | undefined;
+      const autoFocusNext = resolvedProps.autoFocusNext as string | undefined;
+
+      // autoFocusNext: 输入满 maxLength 后自动聚焦下一个节点
+      const handleAutoAdvance = autoFocusNext && maxLength
+        ? (e: React.ChangeEvent<HTMLInputElement>) => {
+            if (e.target.value.length >= maxLength) {
+              const next = document.querySelector(`[data-node-id="${autoFocusNext}"] input, [data-node-id="${autoFocusNext}"]`) as HTMLElement | null;
+              next?.focus();
+            }
+          }
+        : undefined;
+
       if (interactive) {
         return isCheckbox ? (
           <input
@@ -117,6 +148,14 @@ export function PrimitiveRenderer({
             type={inputType}
             defaultValue={resolvedProps.value as string}
             disabled={resolvedProps.disabled as boolean}
+            maxLength={maxLength}
+            inputMode={inputMode as React.HTMLAttributes<HTMLInputElement>['inputMode']}
+            pattern={pattern}
+            onChange={(e) => {
+              const onChangeFn = (domHandlers as Record<string, unknown>).onChange as ((e: React.SyntheticEvent) => void) | undefined;
+              onChangeFn?.(e);
+              handleAutoAdvance?.(e);
+            }}
           />
         );
       }
@@ -127,6 +166,9 @@ export function PrimitiveRenderer({
           type={inputType}
           value={resolvedProps.value as string ?? ''}
           disabled={resolvedProps.disabled as boolean}
+          maxLength={maxLength}
+          inputMode={inputMode as React.HTMLAttributes<HTMLInputElement>['inputMode']}
+          pattern={pattern}
           readOnly
           onChange={() => {}}
         />

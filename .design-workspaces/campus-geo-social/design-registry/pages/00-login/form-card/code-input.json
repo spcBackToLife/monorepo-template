@@ -29,20 +29,6 @@
       "disabled"
     ]
   },
-  "implementation": {
-    "nodeId": "nd_5f428b5cf00f400292208",
-    "status": "completed",
-    "checklist": {
-      "structure": true,
-      "styles": true,
-      "events": true,
-      "materials": true,
-      "visualStates": true,
-      "interactionStates": true,
-      "dataBinding": true,
-      "extremeCases": true
-    }
-  },
   "content": {
     "type": "text",
     "value": "6 位验证码"

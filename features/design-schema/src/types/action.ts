@@ -154,6 +154,35 @@ export interface UiResetTimerAction {
 
 // ===== 自定义扩展 =====
 
+/** ui.animate — 触发节点 CSS 动画（shake/fadeIn/bounce 等） */
+export interface UiAnimateAction {
+  type: 'ui.animate';
+  /** 目标节点 id（不传则为触发事件的节点自身） */
+  nodeId?: string;
+  /** 预置动画名 或 自定义 keyframes CSS */
+  animation: string;
+  /** ms，默认 300 */
+  duration?: number;
+  /** 默认 'ease' */
+  easing?: string;
+  /** 动画结束后执行的动作链 */
+  onComplete?: Action[];
+}
+
+/** ui.showOverlay — 显示全局覆盖层（Modal/Sheet/Drawer） */
+export interface UiShowOverlayAction {
+  type: 'ui.showOverlay';
+  /** 目标 overlay 的 id（对应 Screen.overlays[].id） */
+  overlayId: string;
+}
+
+/** ui.hideOverlay — 隐藏全局覆盖层 */
+export interface UiHideOverlayAction {
+  type: 'ui.hideOverlay';
+  /** 目标 overlay 的 id；不传则隐藏所有覆盖层 */
+  overlayId?: string;
+}
+
 export interface CustomAction {
   type: 'custom';
   /** 业务方实现：宿主侧注册的 handler 名 */
@@ -217,6 +246,9 @@ export type Action =
   | UiStartTimerAction
   | UiStopTimerAction
   | UiResetTimerAction
+  | UiAnimateAction
+  | UiShowOverlayAction
+  | UiHideOverlayAction
   | LogicIfAction
   | LogicSwitchAction
   | CustomAction;
