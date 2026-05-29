@@ -29,12 +29,9 @@ const PRIMITIVES: PrimitiveDescriptor[] = [
     type: 'div',
     label: 'Container',
     category: 'layout',
-    defaultStyles: {
-      display: 'flex',
-      flexDirection: 'column',
-      minHeight: '40px',
-      minWidth: '40px',
-    },
+    // 不注入任何默认样式：div 是最通用容器，应尊重调用方传入的 styles 原样。
+    // 编辑器画布对空容器的占位提示由渲染层（PrimitiveRenderer）按需叠加，不进 schema。
+    defaultStyles: {},
     allowedProps: [],
     description: 'Generic flex container',
   },

@@ -257,6 +257,8 @@ export class ProjectsService {
       if (!node.id) {
         node.id = generateNodeId();
         repaired = true;
+        // ⚠️ 新流程下不应触发：ID 唯一在创建时由 ensureDeterministicIds 生成
+        console.warn(`[repairMissingNodeIds] 节点缺失 ID (name=${node.name ?? '?'}, type=${node.type})，已修复。如频繁出现请排查创建流程。`);
       }
       if (node.children) {
         for (const child of node.children) {

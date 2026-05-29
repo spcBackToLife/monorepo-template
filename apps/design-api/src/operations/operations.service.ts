@@ -66,6 +66,18 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
   switch (operation.type) {
     case 'element.add': {
       if (!p.elementId) {
+        // 幂等检查: 同 parentId 下已有同名节点 → 复用已有 ID（防止重试重复创建）
+        if (p.name && p.parentId) {
+          const parent = findNodeInProjectApi(project, p.parentId as string);
+          if (parent?.children) {
+            const existing = parent.children.find(c => c.name === p.name);
+            if (existing) {
+              p.elementId = existing.id;
+              p._skippedDuplicate = true;
+              break;
+            }
+          }
+        }
         p.elementId = generateNodeId();
       }
       break;
@@ -73,8 +85,7 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
 
     case 'element.insertSubtree': {
       // subtree 中所有缺少 id 的节点都需要预生成确定性 ID。
-      // MCP 直接调用 element/insert_subtree 时会在 handler 里 walkTree 赋值，
-      // 但通过 execute_operations_batch 调用时不经过 MCP handler，需要在此兜底。
+      // 这是节点 ID 生成的唯一合法入口（仅对缺失 ID 的节点生效）。
       const subtree = p.subtree as ComponentNode | undefined;
       if (subtree) {
         walkTreeApi(subtree, (node) => {
@@ -198,6 +209,18 @@ export class OperationsService {
     // （包括 instantiateTemplate / duplicateElement 的子节点 ID 序列），
     // 确保 DB 中的 operation 日志包含完整信息，重放时天然一致
     ensureDeterministicIds(operation, project);
+
+    // 幂等检查: 如果 ensureDeterministicIds 标记了 _skippedDuplicate，
+    // 说明同名节点已存在，直接返回已有节点 ID（跳过实际创建）
+    const opParams = (operation.params ?? {}) as Record<string, unknown>;
+    if (opParams._skippedDuplicate) {
+      const existingId = opParams.elementId as string;
+      delete opParams._skippedDuplicate; // 清理内部标记
+      return {
+        seq: current_version, // 不递增版本号
+        result: { success: true, description: `Node already exists (idempotent)`, affectedNodeIds: [existingId] },
+      };
+    }
 
     const executor = new OperationExecutor(project);
     const result = executor.execute(operation);

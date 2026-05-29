@@ -9,8 +9,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.js';
-import { generateNodeId } from '@globallink/design-schema';
-import { walkTree } from '@globallink/design-operations';
 import type { ComponentNode, PrimitiveNodeType } from '@globallink/design-schema';
 import { apiClient } from '../../api-client.js';
 
@@ -40,7 +38,8 @@ export function registerElementTools(server: McpServer): void {
           .describe('标记此节点为组件边界。codegen 会将其拆为独立组件。对 Header/Footer/Card/Modal/Form 等语义容器建议标记为 true'),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, elementId: generateNodeId(), styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint, name: p.name, componentBoundary: p.componentBoundary } });
+        // ID 由 API 层 ensureDeterministicIds 统一生成（创建时唯一入口），MCP 层不生成
+        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint, name: p.name, componentBoundary: p.componentBoundary } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -83,7 +82,7 @@ export function registerElementTools(server: McpServer): void {
       schema: z.object({ projectId: z.string(), parentId: z.string(), subtree: z.record(z.string(), z.unknown()), position: z.number().optional() }),
       handler: async (p) => {
         const tree = p.subtree as unknown as ComponentNode;
-        walkTree(tree, (n: ComponentNode) => { n.id = generateNodeId(); });
+        // ID 由 API 层 ensureDeterministicIds 对缺失 ID 的节点兜底生成，MCP 层不覆盖
         const result = await apiClient.executeOperation(p.projectId, { type: 'element.insertSubtree', params: { parentId: p.parentId, subtree: tree, position: p.position } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },

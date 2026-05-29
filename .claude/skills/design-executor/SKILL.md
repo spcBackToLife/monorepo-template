@@ -250,7 +250,14 @@ read_file: design-registry/pages/<path>/<node>.json
 每项 checklist 必须有验证动作支撑（详细标准见 `references/checklist-standards.md`）：
 - structure: query/screen_schema 确认 nodeId 存在 + type 正确
 - styles: 对照 keyStyles 逐属性检查
-- events: 确认事件数量 + trigger 类型 + node.setVisualState 联动
+- **events（强制从 schema 验证）**:
+  1. 调用 `query/screen_schema` 获取目标节点的**实际** `events` 数组
+  2. 如果节点 JSON 的 `interaction.trigger` 存在（非空/非 null）:
+     - `events.length` 必须 ≥ 1，否则 ❌ 不通过
+     - 至少有一个 event 的 trigger 类型匹配 interaction.trigger
+  3. 对每个 event 中的 `state.set` action:
+     - 确认 stateInit.view 中存在对应 key
+  4. ⛔ **禁止仅凭"写了条件样式表达式"就标 events:true** — 条件样式是响应，不是触发！
 - materials: 对照 condition 确认应用位置正确
 - visualStates: 确认 states 数组长度匹配 design.visualStates
 
