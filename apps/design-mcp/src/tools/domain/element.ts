@@ -26,6 +26,7 @@ export function registerElementTools(server: McpServer): void {
       schema: z.object({
         projectId: z.string(), parentId: z.string(),
         name: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/, 'Must be PascalCase: start with uppercase letter, followed by alphanumeric characters, no spaces or special chars (e.g. "HeaderContainer", "LoginButton", "UserAvatar")').describe('Required node name in PascalCase (e.g. "MainContainer", "SubmitButton", "ProfileImage"). Must start with an uppercase letter and contain only English alphanumeric characters.'),
+        label: z.string().optional().describe('节点展示名（中文或任意文本，如 "验证码输入组"）。在节点树面板中优先于 name 显示。不传则自动使用 name。'),
         tag: z.string().describe('div/span/p/h1-h3/button/input/textarea/select/img/a/ul/ol/li/nav/header/footer/section/main'),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
         props: z
@@ -39,7 +40,7 @@ export function registerElementTools(server: McpServer): void {
       }),
       handler: async (p) => {
         // ID 由 API 层 ensureDeterministicIds 统一生成（创建时唯一入口），MCP 层不生成
-        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint, name: p.name, componentBoundary: p.componentBoundary } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'element.add', params: { parentId: p.parentId, tag: p.tag as PrimitiveNodeType, styles: p.styles, props: p.props, position: p.position, layoutHint: p.layoutHint, name: p.name, label: p.label, componentBoundary: p.componentBoundary } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -68,10 +69,14 @@ export function registerElementTools(server: McpServer): void {
       },
     }),
     rename: defineAction({
-      description: '重命名节点的显示名称',
-      schema: z.object({ projectId: z.string(), nodeId: z.string(), name: z.string() }),
+      description: '重命名节点。field=name 修改代码标识名（PascalCase），field=label 修改展示名（任意文本）。默认 field=name（向后兼容）。',
+      schema: z.object({
+        projectId: z.string(), nodeId: z.string(), name: z.string(),
+        field: z.enum(['name', 'label']).optional().describe('要修改的字段，默认 name'),
+      }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'element.rename', params: { nodeId: p.nodeId, name: p.name } });
+        const field = p.field ?? 'name';
+        const result = await apiClient.executeOperation(p.projectId, { type: 'element.rename', params: { nodeId: p.nodeId, [field]: p.name } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

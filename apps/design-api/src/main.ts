@@ -26,6 +26,13 @@ async function bootstrap() {
   }
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
+  // Serve screenshot snapshots statically
+  const snapshotsDir = join(process.cwd(), 'snapshots');
+  if (!existsSync(snapshotsDir)) {
+    mkdirSync(snapshotsDir, { recursive: true });
+  }
+  app.useStaticAssets(snapshotsDir, { prefix: '/snapshots' });
+
   const config = app.get(ConfigService);
   const port = parseInt(config.get<string>('PORT') ?? '3001', 10);
   const host = config.get<string>('HOST') ?? '0.0.0.0';

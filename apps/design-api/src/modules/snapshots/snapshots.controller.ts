@@ -15,10 +15,10 @@ interface GenerateSnapshotsBody {
 }
 
 /**
- * Task 4.6.2 — Snapshots Controller
+ * Snapshots Controller
  *
  * Endpoints for generating and retrieving screenshot snapshots.
- * For MVP, returns stub responses with placeholder URLs.
+ * Screenshots are served from /snapshots/ static path (configured in main.ts).
  */
 @Controller('api/projects/:projectId/snapshots')
 export class SnapshotsController {
@@ -26,7 +26,7 @@ export class SnapshotsController {
 
   /** POST /api/projects/:projectId/snapshots/generate */
   @Post('generate')
-  generate(
+  async generate(
     @Param('projectId') projectId: string,
     @Body() body: GenerateSnapshotsBody,
   ) {

@@ -167,6 +167,14 @@ function createNode(
     delete mergedDefaults.flex;
   }
 
+  // Text-only nodes (textContent set, no children containers expected) should not get
+  // flex:1 default — they are leaf display elements, not layout containers.
+  const hasTextContent = props?.textContent !== undefined || props?.children !== undefined;
+  const isLeafTextNode = hasTextContent && tag === 'div' && !layoutHint;
+  if (isLeafTextNode) {
+    delete mergedDefaults.flex;
+  }
+
   return {
     id: explicitId ?? generateNodeId(),
     type: tag as ComponentNode['type'],
@@ -244,6 +252,9 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
   const newNode = createNode(params.tag, params.styles, params.props, params.elementId, parent, params.layoutHint);
   if (params.name) {
     newNode.name = params.name;
+  }
+  if (params.label) {
+    newNode.label = params.label;
   }
   if (params.componentBoundary) {
     newNode.componentBoundary = true;
@@ -530,20 +541,30 @@ export function executeRenameNode(project: DesignProject, params: ElementRenameO
   }
 
   const oldName = node.name ?? '';
-  const nextName = params.name.trim();
-  node.name = nextName.length > 0 ? nextName : undefined;
+  const oldLabel = node.label ?? '';
+
+  // Support both name and label fields
+  if (params.name !== undefined) {
+    const nextName = params.name.trim();
+    node.name = nextName.length > 0 ? nextName : undefined;
+  }
+  if (params.label !== undefined) {
+    const nextLabel = params.label.trim();
+    node.label = nextLabel.length > 0 ? nextLabel : undefined;
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
     project: newProject,
     result: {
       success: true,
-      description: `Renamed node ${params.nodeId} to "${node.name ?? '未命名'}"`,
+      description: `Renamed node ${params.nodeId} to "${node.label ?? node.name ?? '未命名'}"`,
       affectedNodeIds: [params.nodeId],
     },
     inverse: {
       type: 'element.rename',
-      params: { nodeId: params.nodeId, name: oldName },
+      params: { nodeId: params.nodeId, name: oldName, label: oldLabel },
     },
   };
 }

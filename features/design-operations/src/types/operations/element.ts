@@ -36,8 +36,10 @@ export interface ElementAddOp {
     position?: number;
     /** Layout hint for intelligent default styling */
     layoutHint?: LayoutHint;
-    /** Display name for the node (PascalCase). Required at MCP layer, optional for programmatic use. */
+    /** Code-friendly identifier (PascalCase). Required at MCP layer, optional for programmatic use. */
     name?: string;
+    /** Display label for the node tree panel (any text, e.g. "验证码输入组"). Priority: label > name > type */
+    label?: string;
     /** 组件边界标记。codegen 引擎会将标记节点及其子树作为独立组件输出。 */
     componentBoundary?: boolean;
   };
@@ -83,7 +85,10 @@ export interface ElementRenameOp {
   type: 'element.rename';
   params: {
     nodeId: string;
-    name: string;
+    /** Code-friendly name (PascalCase) */
+    name?: string;
+    /** Display label (任意文本) */
+    label?: string;
   };
 }
 

@@ -154,8 +154,10 @@ export interface ComponentNode {
   id: string;
   /** Element type — primitive HTML tag or component reference */
   type: NodeType;
-  /** Human-readable name given by the designer */
+  /** Code-friendly identifier (PascalCase, e.g. "CodeInputGroup") — used for codegen */
   name?: string;
+  /** Display label for the UI panel (e.g. "验证码输入组") — shown in node tree; priority: label > name > type */
+  label?: string;
 
   /**
    * CSS 样式：每个值都可以是 Expression，如
