@@ -9,7 +9,7 @@
       "idle"
     ]
   },
-  "_updatedAt": "2026-05-28T15:31:06.961Z",
+  "_updatedAt": "2026-05-29T08:32:51.207Z",
   "design": {
     "summary": "底部辅助链接区 flex row center gap:16 mt:24，两个primary色文字链接+竖线分隔",
     "visualRef": "design-plan/pages/00-login/components/footer/footer.visual.md",
@@ -19,6 +19,17 @@
       "justifyContent": "center",
       "gap": "16px",
       "marginTop": "24px"
+    }
+  },
+  "implementation": {
+    "nodeId": "nd_da990b0530bf44a895cad",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": false,
+      "materials": false,
+      "visualStates": false
     }
   }
 }

@@ -32,7 +32,7 @@
     "type": "text",
     "value": "手机号"
   },
-  "_updatedAt": "2026-05-28T15:30:37.511Z",
+  "_updatedAt": "2026-05-29T08:19:47.953Z",
   "design": {
     "summary": "手机号输入框 h:48 radius:md border:1px#FFE0E8 focus:2px#FF6F91+ring font:body-lg",
     "keyStyles": {
@@ -52,5 +52,17 @@
         "boxShadow": "0 0 0 3px rgba(237,90,90,0.1)"
       }
     }
+  },
+  "implementation": {
+    "nodeId": "nd_c58d825bdac84494a9fd3",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": false,
+      "visualStates": true
+    },
+    "notes": "input type=tel maxLength:11 inputMode:numeric, bind view.phone, focus/error visualStates 已加。校验逻辑由后续节点（submit-btn）触发 errors 状态。"
   }
 }

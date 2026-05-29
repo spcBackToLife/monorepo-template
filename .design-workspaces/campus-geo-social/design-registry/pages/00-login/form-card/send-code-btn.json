@@ -33,7 +33,7 @@
     "type": "text",
     "value": "获取验证码"
   },
-  "_updatedAt": "2026-05-28T15:31:01.364Z",
+  "_updatedAt": "2026-05-29T08:26:06.064Z",
   "design": {
     "summary": "获取验证码文字按钮 color:primary font:body/500，disabled时textTertiary+倒计时文案",
     "keyStyles": {
@@ -46,5 +46,17 @@
         "color": "rgba(45,36,56,0.42)"
       }
     }
+  },
+  "implementation": {
+    "nodeId": "nd_a85e63659e0e49bf8f92f",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": false,
+      "visualStates": false
+    },
+    "notes": "条件文案+条件颜色实现倒计时+disabled联动；ui.startTimer 1000ms*60 递减 codeCountdown。事件 condition 阻止重复点击。"
   }
 }

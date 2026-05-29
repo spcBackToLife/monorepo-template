@@ -67,7 +67,7 @@
       }
     ]
   },
-  "_updatedAt": "2026-05-28T15:34:07.929Z",
+  "_updatedAt": "2026-05-29T08:02:21.387Z",
   "design": {
     "summary": "暖白底+顶部粉色渐变+角落装饰+居中品牌+表单卡+药丸CTA的青春治愈登录页",
     "visualRef": "design-plan/pages/00-login/visual.md",
@@ -84,5 +84,18 @@
       "overflow": "hidden",
       "position": "relative"
     }
+  },
+  "implementation": {
+    "nodeId": "nd_d29dbf7bf351487987d97",
+    "screenId": "sc_9959dd47da55426384fdf",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": false,
+      "visualStates": true
+    },
+    "notes": "Root 容器样式已应用（background gradient + position:relative + overflow:visible）。装饰素材层将在 D-02/D-03 任务时通过 absolute 子节点添加。"
   }
 }

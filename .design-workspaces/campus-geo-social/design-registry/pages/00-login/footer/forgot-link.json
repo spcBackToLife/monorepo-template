@@ -21,7 +21,7 @@
     "type": "text",
     "value": "忘记密码"
   },
-  "_updatedAt": "2026-05-28T15:31:12.617Z",
+  "_updatedAt": "2026-05-29T08:33:45.223Z",
   "design": {
     "summary": "忘记密码链接 body 14px color:primary，active时primaryActive+scale(0.98)",
     "keyStyles": {
@@ -34,5 +34,17 @@
         "transform": "scale(0.98)"
       }
     }
+  },
+  "implementation": {
+    "nodeId": "nd_2b6736da060d4727961ac",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": false,
+      "visualStates": true
+    },
+    "notes": "button + nav.go(00-forgot-password) + active visualState"
   }
 }

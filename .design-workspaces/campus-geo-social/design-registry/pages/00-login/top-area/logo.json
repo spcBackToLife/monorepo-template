@@ -20,7 +20,7 @@
       "ref": "design-plan/pages/00-login/materials/B-01-brand-logo.md"
     }
   ],
-  "_updatedAt": "2026-05-28T15:33:58.846Z",
+  "_updatedAt": "2026-05-29T08:06:41.200Z",
   "design": {
     "summary": "品牌Logo图标 64×64, src=B-01 brand-logo",
     "keyStyles": {
@@ -28,5 +28,17 @@
       "height": "64px",
       "marginBottom": "16px"
     }
+  },
+  "implementation": {
+    "nodeId": "nd_ee4d17ac7c1247cbb2ff0",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": false,
+      "materials": false,
+      "visualStates": false
+    },
+    "notes": "Logo 容器(64×64)已创建并 reorder 到 slogan 之前。等待 Task#27 material-painter 绘制 B-01 并 export_and_apply。"
   }
 }

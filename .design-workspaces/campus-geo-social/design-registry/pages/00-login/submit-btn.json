@@ -45,7 +45,7 @@
       "condition": "{{state.view.submitState === \"success\"}}"
     }
   ],
-  "_updatedAt": "2026-05-28T15:34:04.950Z",
+  "_updatedAt": "2026-05-29T08:32:23.790Z",
   "design": {
     "summary": "登录主按钮 h:48 w:100% bg:primary color:white radius:full shadow-sm，5态(disabled/enabled/hover/pressed/loading/success)",
     "visualRef": "design-plan/pages/00-login/visual.md#登录按钮",
@@ -81,5 +81,17 @@
         "content": "I-04 checkmark"
       }
     }
+  },
+  "implementation": {
+    "nodeId": "nd_de8ceefe05ca4904bcf94",
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": false,
+      "visualStates": true
+    },
+    "notes": "主按钮已建+5态(hover/pressed/disabled/submitting/success)。click 事件含校验 condition + state.submitState 状态机；I-04 checkmark 在素材 task#37 时通过条件应用注入到 success visualState 的 backgroundImage。"
   }
 }

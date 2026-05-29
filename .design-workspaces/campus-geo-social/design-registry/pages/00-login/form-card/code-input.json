@@ -33,7 +33,7 @@
     "type": "text",
     "value": "6 位验证码"
   },
-  "_updatedAt": "2026-05-28T15:30:40.387Z",
+  "_updatedAt": "2026-05-29T08:25:26.396Z",
   "design": {
     "summary": "6格验证码输入，每格w:36 h:48 radius:md border center，auto-advance",
     "keyStyles": {
@@ -48,5 +48,26 @@
         "allCellsBorder": "2px solid #ED5A5A"
       }
     }
+  },
+  "implementation": {
+    "groupNodeId": "nd_b73b738c6b154a0a8a0f8",
+    "cellsBoxId": "nd_5cd36beecd44405589f9e",
+    "cellIds": [
+      "nd_6a6d9e156a694933b4057",
+      "nd_979b6e7775f04f4eba2a8",
+      "nd_7abf915ead05460392c11",
+      "nd_a2ebc8ed0158419080fbe",
+      "nd_e58764e5d19046c99f6c0",
+      "nd_c6287b2b08804eb78b960"
+    ],
+    "status": "completed",
+    "checklist": {
+      "structure": true,
+      "styles": true,
+      "events": true,
+      "materials": false,
+      "visualStates": false
+    },
+    "notes": "6格 OTP input + autoFocusNext 链路, visibleWhen=loginMode==code"
   }
 }
