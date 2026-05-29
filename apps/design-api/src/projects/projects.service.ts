@@ -22,7 +22,6 @@ import {
   OperationExecutor,
   type Operation,
 } from '@globallink/design-operations';
-import { migrateV1toV2 } from '../migrations/v1-to-v2-state-model';
 
 // ===== DB row types =====
 
@@ -148,15 +147,11 @@ export class ProjectsService {
   }
 
   /**
-   * 核心：快照 + 重放 → 返回完整 DesignProject（v2）
+   * 核心：快照 + 重放 → 返回完整 DesignProject。
    *
-   * 关键路径上接入 **v1 → v2 迁移层**（RFC §4.1）：
-   * 1. 查最新快照
-   * 2. 先跑 `migrateV1toV2(snapshot.schema)` —— DB 未升级时得到正确 v2 形态
-   * 3. 重放快照之后的 op（executor 一律按 v2 协议）
-   * 4. 规范化节点
-   *
-   * 迁移层在 F.2 阶段删除（全库永久升级完毕后）。
+   * 1. 查最新快照（已是 v2 形态）
+   * 2. 重放快照之后的 op
+   * 3. 规范化节点
    */
   async findOne(id: string): Promise<DesignProject> {
     const pool = this.db.getPool();
@@ -189,8 +184,8 @@ export class ProjectsService {
       [id, snapshot.version],
     );
 
-    // 关键：先迁移为 v2，再喂给 v2 executor
-    let project: DesignProject = migrateV1toV2(snapshot.schema);
+    // 快照已是 v2 形态，直接使用
+    let project: DesignProject = snapshot.schema as DesignProject;
 
     if (opsResult.rows.length > 0) {
       const executor = new OperationExecutor(project);

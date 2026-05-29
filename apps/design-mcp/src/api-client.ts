@@ -49,6 +49,15 @@ export async function getProject(projectId: string): Promise<DesignProject> {
   return request<DesignProject>(`/api/projects/${projectId}`);
 }
 
+/** 完成度对账（Schema-First） */
+export async function getProjectIntegrity(
+  projectId: string,
+  screenId?: string,
+): Promise<unknown> {
+  const qs = screenId ? `?screenId=${encodeURIComponent(screenId)}` : '';
+  return request<unknown>(`/api/projects/${projectId}/integrity${qs}`);
+}
+
 export async function createProject(data: { name: string; platform?: string }): Promise<unknown> {
   return request('/api/projects', {
     method: 'POST',
@@ -696,7 +705,7 @@ export async function updateTheme(
 
 // Default export for compatibility with dynamic import().default patterns used in domain tools
 const apiClient = {
-  getProject, createProject, listProjects, deleteProject,
+  getProject, getProjectIntegrity, createProject, listProjects, deleteProject,
   executeOperation, executeBatch, getOperationsSince, undo,
   listAssets, createAsset, updateAsset, deleteAsset,
   listDataSources, getDataSource, uploadFile,

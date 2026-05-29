@@ -82,6 +82,13 @@ export type {
   RepeatBinding,
   Screen,
   DesignProject,
+  // Meta (Schema-First — 设计意图 / 溯源 / 完成度)
+  DesignPhase,
+  NodeStatus,
+  ExtremeCase,
+  NodeMeta,
+  ScreenMeta,
+  ProjectMeta,
   // Template / Props
   TemplateScope,
   TemplateKind,
@@ -228,6 +235,18 @@ export {
 } from './validators/state';
 
 export { OperationEnvelopeSchema } from './validators/envelope';
+
+// ===== Integrity Checker (Schema-First 完成度对账) =====
+export type {
+  IntegritySeverity,
+  IntegrityIssue,
+  IntegrityReport,
+} from './integrity';
+export {
+  checkProjectIntegrity,
+  checkScreenIntegrity,
+  checkNodeIntegrity,
+} from './integrity';
 
 // ===== Asset Utilities =====
 export {

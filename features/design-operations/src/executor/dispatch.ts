@@ -103,6 +103,12 @@ import {
   executeUpdateGlobalViewVariable,
   executeSetGlobalViewPreview,
 } from '../operations/global-state';
+import {
+  executeSetNodeMeta,
+  executeSetNodeStatus,
+  executeSetScreenMeta,
+  executeSetProjectMeta,
+} from '../operations/meta';
 
 export type DispatchResult = {
   project: DesignProject;
@@ -207,6 +213,12 @@ export function dispatchOperation(project: DesignProject, op: Operation): Dispat
     case 'globalState.removeViewVariable': return executeRemoveGlobalViewVariable(project, op.params);
     case 'globalState.updateViewVariable': return executeUpdateGlobalViewVariable(project, op.params);
     case 'globalState.setViewPreview': return executeSetGlobalViewPreview(project, op.params);
+
+    // ===== Meta (设计意图 / 溯源 / 完成度 — Schema-First) =====
+    case 'meta.setNode': return executeSetNodeMeta(project, op.params);
+    case 'meta.setNodeStatus': return executeSetNodeStatus(project, op.params);
+    case 'meta.setScreen': return executeSetScreenMeta(project, op.params);
+    case 'meta.setProject': return executeSetProjectMeta(project, op.params);
 
     default: {
       const _exhaustive: never = op;

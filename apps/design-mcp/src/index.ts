@@ -29,6 +29,9 @@ import { registerCanvasTools } from './tools/domain/canvas.js';
 // ── 主题工具 ──
 import { registerThemeTools } from './tools/domain/theme.js';
 
+// ── Meta 工具（Schema-First：设计意图/溯源/完成度） ──
+import { registerMetaTools } from './tools/domain/meta.js';
+
 // ── 保留的快捷工具（不合并，高频使用）──────────
 import { registerSnapshotTools } from './tools/snapshot-tools.js';
 import { registerBatchTool } from './tools/batch.js';
@@ -90,6 +93,7 @@ registerMaterialProjectTools(server);          // material_project
 registerMaterialSlotTools(server);             // material_slot
 registerCanvasTools(server);                   // canvas
 registerThemeTools(server);                    // theme
+registerMetaTools(server);                     // meta（Schema-First 设计意图/溯源/完成度）
 
 // ===== Shortcut / Recipe tools =====
 registerSnapshotTools(server);                 // generate_snapshots

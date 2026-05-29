@@ -1,6 +1,7 @@
 import type { ComponentNode } from './node';
 import type { DataSource } from './dataSource';
 import type { ScreenStateInit } from './state';
+import type { ScreenMeta } from './meta';
 
 /** 全局覆盖层类型 */
 export type OverlayType = 'modal' | 'bottomSheet' | 'drawer' | 'toast' | 'custom';
@@ -63,5 +64,11 @@ export interface Screen {
    * 通过 ui.showOverlay / ui.hideOverlay 或 showWhen 表达式控制显隐。
    */
   overlays?: OverlayNode[];
+
+  /**
+   * 屏幕级设计意图 / 溯源 / 完成度（B 类，渲染契约不读）。
+   * 取代旧 design-registry _page.json。详见 SCHEMA-FIRST-REFACTOR.md §4。
+   */
+  meta?: ScreenMeta;
 }
 

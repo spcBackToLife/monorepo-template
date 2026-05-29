@@ -140,10 +140,17 @@ export function registerEventTools(server: McpServer): void {
 export function registerScreenTools(server: McpServer): void {
   registerDomainTool(server, 'screen', '屏幕（页面）的增删改查与排列', {
     add: defineAction({
-      description: '添加一个新的空白屏幕（页面）',
-      schema: z.object({ projectId: z.string(), name: z.string().describe('如"登录页"、"首页"') }),
+      description: '添加一个新的空白屏幕（页面）。可选传入 screenId 指定可读 ID（如 "00-login"）；不传则自动生成。',
+      schema: z.object({
+        projectId: z.string(),
+        name: z.string().describe('如"登录页"、"首页"'),
+        screenId: z.string().optional().describe('可选可读 ID，如 "00-login" / "01-home-map"。不传则自动生成。'),
+      }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'screen.add', params: { name: p.name } });
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'screen.add',
+          params: { name: p.name, screenId: p.screenId },
+        });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

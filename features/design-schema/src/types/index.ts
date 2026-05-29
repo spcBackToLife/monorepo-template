@@ -93,6 +93,16 @@ export type {
 export type { Screen, OverlayNode, OverlayType, OverlayAnimation } from './screen';
 export type { DesignProject } from './project';
 
+// ===== Meta (设计意图 / 溯源 / 完成度 — Schema-First) =====
+export type {
+  DesignPhase,
+  NodeStatus,
+  ExtremeCase,
+  NodeMeta,
+  ScreenMeta,
+  ProjectMeta,
+} from './meta';
+
 // ===== Template / Props =====
 export type { TemplateScope, TemplateKind, ComponentTemplate } from './template';
 export type { PropType, ComponentPropDefinition, PropBinding } from './props';

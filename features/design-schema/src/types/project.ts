@@ -3,6 +3,7 @@ import type { Viewport } from './viewport';
 import type { ComponentTemplate } from './template';
 import type { GlobalStateInit } from './state';
 import type { ThemeConfig } from './theme';
+import type { ProjectMeta } from './meta';
 
 /** Top-level design project — aggregates all screens, viewports, and assets（v2） */
 export interface DesignProject {
@@ -26,6 +27,11 @@ export interface DesignProject {
   globalStateInit?: GlobalStateInit;
   /** 主题风格配置（项目级唯一） */
   themeConfig?: ThemeConfig;
+  /**
+   * 项目级设计意图 / 溯源（B 类，渲染契约不读）。
+   * 取代旧 design-registry _index.json。详见 SCHEMA-FIRST-REFACTOR.md §4。
+   */
+  meta?: ProjectMeta;
   /** ISO timestamp */
   createdAt: string;
   /** ISO timestamp */

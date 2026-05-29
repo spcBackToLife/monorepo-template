@@ -56,5 +56,21 @@ export function registerQueryTools(server: McpServer): void {
         return { content: [{ type:'text', text: JSON.stringify(prj.screens.map(s=>({id:s.id,name:s.name})), null, 2) }] };
       },
     }),
+    integrity: defineAction({
+      description:
+        '完成度对账（Schema-First）：基于真实 schema 检查"声明 vs 产物"是否一致。' +
+        '规则：R-EVENTS-01（节点声明了交互意图但 events 缺 interactive trigger）、' +
+        'R-EVENTS-02（event 没 actions）、R-STATUS-01（ready.events=true 但事件空—假完成）、' +
+        'R-PHASE-01（phase=verified 但 ready 仍有 false）等。' +
+        '不指定 screenId 则校验整个项目。',
+      schema: z.object({
+        projectId: z.string(),
+        screenId: z.string().optional().describe('可选：仅校验此屏'),
+      }),
+      handler: async (p) => {
+        const result = await apiClient.getProjectIntegrity(p.projectId, p.screenId);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
   });
 }

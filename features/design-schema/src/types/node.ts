@@ -2,6 +2,7 @@ import type { CSSProperties } from './css';
 import type { VisualState } from './visualState';
 import type { ComponentEvent } from './action';
 import type { Expression } from './expression';
+import type { NodeMeta } from './meta';
 
 // ===== Animation Config =====
 
@@ -228,6 +229,13 @@ export interface ComponentNode {
 
   // ----- 编辑器 metadata（不参与渲染） -----
   editorMetadata?: NodeEditorMetadata;
+
+  /**
+   * 设计意图 / 溯源 / 完成度（B 类，渲染契约不读）。
+   * 取代旧 design-registry 节点 JSON 的 product/interaction/design/implementation 层。
+   * 详见 SCHEMA-FIRST-REFACTOR.md §4。
+   */
+  meta?: NodeMeta;
 
   // ----- Codegen 辅助 -----
 

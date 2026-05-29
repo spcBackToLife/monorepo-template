@@ -56,7 +56,7 @@ function normalizeEvents(events: ComponentEvent[] | undefined): void {
  *   - events[].condition.when
  *   - actions[].predicate（state.remove）
  *
- * 这样所有写入路径（前端 initProject、后端 migrateV1toV2、screen/template 反序列化）
+ * 这样所有写入路径（前端 initProject、screen/template 反序列化）
  * 都能在落地前自动得到合法的表达式形态，避免 ListRenderer / Evaluator 把裸字符串
  * 误判为字面量、导致 `repeat.expression: "state.data.messages"` 这类静默失败。
  */

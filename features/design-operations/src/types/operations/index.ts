@@ -20,6 +20,7 @@ import type {
 import type { DataSourceOperation } from './data-source';
 import type { ScreenStateOperation } from './screen-state';
 import type { GlobalStateOperation } from './global-state';
+import type { MetaOperation } from './meta';
 
 // ===== Operation 联合 =====
 
@@ -37,7 +38,8 @@ export type Operation =
   | MaterialOperation
   | DataSourceOperation
   | ScreenStateOperation
-  | GlobalStateOperation;
+  | GlobalStateOperation
+  | MetaOperation;
 
 export type OperationType = Operation['type'];
 
@@ -83,3 +85,4 @@ export type * from './misc';
 export type * from './data-source';
 export type * from './screen-state';
 export type * from './global-state';
+export type * from './meta';
