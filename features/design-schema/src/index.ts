@@ -86,6 +86,7 @@ export type {
   DesignPhase,
   NodeStatus,
   ExtremeCase,
+  PlanTask,
   NodeMeta,
   ScreenMeta,
   ProjectMeta,

@@ -10,6 +10,26 @@
  *   - 取代旧的 design-registry 三层（_index / _page / 节点 JSON 的 product/interaction/design 层）。
  */
 
+/** 单条任务（计划单元） */
+export interface PlanTask {
+  /** 任务 ID（如 "T1" / "P0-001"） */
+  id: string;
+  /** 任务标题（人话） */
+  title: string;
+  /** 哪个阶段产生（product/interaction/design/executor） */
+  stage: 'product' | 'interaction' | 'design' | 'executor';
+  /** 任务状态 */
+  status: 'pending' | 'doing' | 'done' | 'blocked' | 'skipped';
+  /** 阻塞原因（status = blocked 时填） */
+  blockedReason?: string;
+  /** 关联的产物（如 schema 路径 / 节点 ID / module ID） */
+  refs?: string[];
+  /** 子任务（递归，用于"模块 → 屏 → 组件"层级拆解） */
+  subtasks?: PlanTask[];
+  /** 任务备注（思考过程 / 决策记录） */
+  notes?: string;
+}
+
 /** 节点/屏幕的实现完成度阶段 */
 export type DesignPhase =
   | 'analyzed'              // 产品分析完成
@@ -93,6 +113,12 @@ export interface ScreenMeta {
     palette?: string[];
     ref?: string;
   };
+  /**
+   * 屏幕级任务清单（精细化追踪本屏每个阶段的待办）。
+   * 由各阶段 SKILL 在分析时填写，做完一项标 done，AI 每轮可读出"还剩什么"。
+   * 取代旧的 PLAN.md 文件，作为本屏进度的真理之源。
+   */
+  plan?: PlanTask[];
   status?: NodeStatus;
 }
 
@@ -116,4 +142,11 @@ export interface ProjectMeta {
     tabBar: string[];
     flows: { from: string; to: string; trigger: string; transition: string }[];
   };
+  /**
+   * 项目级任务清单（跨屏 / 跨模块的整体计划）。
+   * - product 阶段：列出"分析哪些模块、规划哪些屏"
+   * - design 阶段：列出"建立 ThemeConfig、抽通用组件模板"等项目级任务
+   * 单屏内的细化任务挂在 ScreenMeta.plan，本字段只放跨屏粒度的事项。
+   */
+  plan?: PlanTask[];
 }

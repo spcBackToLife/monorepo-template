@@ -108,6 +108,8 @@ import {
   executeSetNodeStatus,
   executeSetScreenMeta,
   executeSetProjectMeta,
+  executeAddPlanTasks,
+  executeUpdatePlanTask,
 } from '../operations/meta';
 
 export type DispatchResult = {
@@ -219,6 +221,8 @@ export function dispatchOperation(project: DesignProject, op: Operation): Dispat
     case 'meta.setNodeStatus': return executeSetNodeStatus(project, op.params);
     case 'meta.setScreen': return executeSetScreenMeta(project, op.params);
     case 'meta.setProject': return executeSetProjectMeta(project, op.params);
+    case 'meta.addPlanTasks': return executeAddPlanTasks(project, op.params);
+    case 'meta.updatePlanTask': return executeUpdatePlanTask(project, op.params);
 
     default: {
       const _exhaustive: never = op;

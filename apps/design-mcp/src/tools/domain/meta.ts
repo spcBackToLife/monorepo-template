@@ -89,7 +89,7 @@ export function registerMetaTools(server: McpServer): void {
       set_project: defineAction({
         description:
           '更新项目级 meta（ProjectMeta：targetUser/coreScenarios/styleDirection/' +
-          'constraints/modules/navigation）。取代旧 design-registry _index.json。',
+          'constraints/modules/navigation/plan）。取代旧 design-registry _index.json。',
         schema: z.object({
           projectId: z.string(),
           patch: z.record(z.string(), z.unknown()).nullable(),
@@ -99,6 +99,64 @@ export function registerMetaTools(server: McpServer): void {
           const result = await apiClient.executeOperation(p.projectId, {
             type: 'meta.setProject',
             params: { patch: p.patch as never, mode: p.mode },
+          });
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        },
+      }),
+      add_plan_tasks: defineAction({
+        description:
+          '向计划清单追加任务（不会覆盖已有任务）。' +
+          'scope=project 写入 project.meta.plan；scope=screen 写入指定 screen 的 meta.plan。' +
+          '每个任务必须含 id（如 T1）/ title / stage / status。可挂 subtasks 实现层级拆解。' +
+          '⚠️ 任务 ID 必须唯一；若与已有任务 ID 冲突会拒绝写入。',
+        schema: z.object({
+          projectId: z.string(),
+          scope: z.enum(['project', 'screen']),
+          screenId: z.string().optional().describe('scope=screen 时必填'),
+          tasks: z.array(z.object({
+            id: z.string(),
+            title: z.string(),
+            stage: z.enum(['product', 'interaction', 'design', 'executor']),
+            status: z.enum(['pending', 'doing', 'done', 'blocked', 'skipped']),
+            blockedReason: z.string().optional(),
+            refs: z.array(z.string()).optional(),
+            subtasks: z.array(z.unknown()).optional(),
+            notes: z.string().optional(),
+          })).describe('任务列表，每条 PlanTask 结构'),
+        }),
+        handler: async (p) => {
+          const result = await apiClient.executeOperation(p.projectId, {
+            type: 'meta.addPlanTasks',
+            params: {
+              scope: p.scope,
+              screenId: p.screenId,
+              tasks: p.tasks as never,
+            },
+          });
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        },
+      }),
+      update_plan_task: defineAction({
+        description:
+          '更新单条任务（按 taskId 定位，支持嵌套 subtasks 内的任务）。' +
+          '常用：标 done（patch={status:"done"}）、标 blocked（patch={status:"blocked",blockedReason:"..."}）、' +
+          '加备注（patch={notes:"..."}）、追加子任务（patch={subtasks:[...]}）。',
+        schema: z.object({
+          projectId: z.string(),
+          scope: z.enum(['project', 'screen']),
+          screenId: z.string().optional().describe('scope=screen 时必填'),
+          taskId: z.string(),
+          patch: z.record(z.string(), z.unknown()).describe('部分字段更新；id 不可变'),
+        }),
+        handler: async (p) => {
+          const result = await apiClient.executeOperation(p.projectId, {
+            type: 'meta.updatePlanTask',
+            params: {
+              scope: p.scope,
+              screenId: p.screenId,
+              taskId: p.taskId,
+              patch: p.patch as never,
+            },
           });
           return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
         },

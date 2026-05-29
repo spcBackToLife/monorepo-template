@@ -72,5 +72,140 @@ export function registerQueryTools(server: McpServer): void {
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       },
     }),
+    plan: defineAction({
+      description:
+        '查看任务清单（meta.plan）。scope=project 看项目级总清单；scope=screen 看屏级清单。' +
+        '可按 status 过滤（pending/doing/done/blocked/skipped），filter 不传则返回全部。' +
+        '返回的任务列表是 schema 内 PlanTask[] 的当前快照，是 AI 推进任务的真理之源。',
+      schema: z.object({
+        projectId: z.string(),
+        scope: z.enum(['project', 'screen']),
+        screenId: z.string().optional().describe('scope=screen 时必填'),
+        filter: z.enum(['pending', 'doing', 'done', 'blocked', 'skipped', 'all']).optional()
+          .describe('按状态过滤；默认 all'),
+      }),
+      handler: async (p) => {
+        const prj = await apiClient.getProject(p.projectId);
+        let plan: unknown[] = [];
+        if (p.scope === 'project') {
+          plan = prj.meta?.plan ?? [];
+        } else {
+          const scr = prj.screens.find(s => s.id === p.screenId);
+          if (!scr) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({
+              status: 'error',
+              error: { code: 'NOT_FOUND', message: `屏幕 ${p.screenId} 不存在`, toolName: 'query', action: 'plan' },
+            }, null, 2) }], isError: false };
+          }
+          plan = scr.meta?.plan ?? [];
+        }
+        // 过滤
+        const filtered = (p.filter && p.filter !== 'all')
+          ? filterTasksByStatus(plan as Array<Record<string, unknown>>, p.filter)
+          : plan;
+        return { content: [{ type: 'text', text: JSON.stringify({
+          scope: p.scope,
+          screenId: p.screenId,
+          total: countTasks(plan as Array<Record<string, unknown>>),
+          filtered: countTasks(filtered as Array<Record<string, unknown>>),
+          tasks: filtered,
+        }, null, 2) }] };
+      },
+    }),
+    next_pending_task: defineAction({
+      description:
+        '获取下一个待办任务（status=pending 且未被 blocked）。' +
+        '深度优先遍历：优先返回最深层未完成的子任务，确保按"由细到粗"推进。' +
+        'scope=project 优先项目级；scope=screen 仅看指定屏；不传 scope 时按 project → 各 screen 顺序找第一个。',
+      schema: z.object({
+        projectId: z.string(),
+        scope: z.enum(['project', 'screen', 'auto']).optional().default('auto'),
+        screenId: z.string().optional(),
+      }),
+      handler: async (p) => {
+        const prj = await apiClient.getProject(p.projectId);
+        const scope = p.scope ?? 'auto';
+
+        const findFirst = (tasks: Array<Record<string, unknown>> | undefined): Record<string, unknown> | null => {
+          if (!tasks || tasks.length === 0) return null;
+          for (const t of tasks) {
+            if (t['status'] === 'pending') return t;
+            const sub = t['subtasks'] as Array<Record<string, unknown>> | undefined;
+            if (sub && sub.length > 0) {
+              const found = findFirst(sub);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        if (scope === 'screen') {
+          const scr = prj.screens.find(s => s.id === p.screenId);
+          if (!scr) {
+            return { content: [{ type: 'text' as const, text: JSON.stringify({
+              status: 'error', error: { code: 'NOT_FOUND', message: `屏幕 ${p.screenId} 不存在` },
+            }, null, 2) }], isError: false };
+          }
+          const next = findFirst(scr.meta?.plan as Array<Record<string, unknown>> | undefined);
+          return { content: [{ type: 'text', text: JSON.stringify({
+            scope: 'screen', screenId: p.screenId, next: next ?? null,
+          }, null, 2) }] };
+        }
+
+        if (scope === 'project') {
+          const next = findFirst(prj.meta?.plan as Array<Record<string, unknown>> | undefined);
+          return { content: [{ type: 'text', text: JSON.stringify({
+            scope: 'project', next: next ?? null,
+          }, null, 2) }] };
+        }
+
+        // auto: 先项目级，再各屏
+        const projectNext = findFirst(prj.meta?.plan as Array<Record<string, unknown>> | undefined);
+        if (projectNext) {
+          return { content: [{ type: 'text', text: JSON.stringify({
+            scope: 'project', next: projectNext,
+          }, null, 2) }] };
+        }
+        for (const scr of prj.screens) {
+          const screenNext = findFirst(scr.meta?.plan as Array<Record<string, unknown>> | undefined);
+          if (screenNext) {
+            return { content: [{ type: 'text', text: JSON.stringify({
+              scope: 'screen', screenId: scr.id, screenName: scr.name, next: screenNext,
+            }, null, 2) }] };
+          }
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({
+          scope: 'auto', next: null, message: '所有任务均已完成或无可执行的 pending 任务',
+        }, null, 2) }] };
+      },
+    }),
   });
+}
+
+// ===== 内部辅助函数 =====
+
+function filterTasksByStatus(
+  tasks: Array<Record<string, unknown>>,
+  status: string,
+): Array<Record<string, unknown>> {
+  const result: Array<Record<string, unknown>> = [];
+  for (const t of tasks) {
+    const matched = t['status'] === status;
+    const sub = t['subtasks'] as Array<Record<string, unknown>> | undefined;
+    const filteredSub = sub && sub.length > 0 ? filterTasksByStatus(sub, status) : [];
+    if (matched || filteredSub.length > 0) {
+      result.push({ ...t, subtasks: filteredSub.length > 0 ? filteredSub : undefined });
+    }
+  }
+  return result;
+}
+
+function countTasks(tasks: Array<Record<string, unknown>>): number {
+  let count = 0;
+  for (const t of tasks) {
+    count += 1;
+    const sub = t['subtasks'] as Array<Record<string, unknown>> | undefined;
+    if (sub && sub.length > 0) count += countTasks(sub);
+  }
+  return count;
 }

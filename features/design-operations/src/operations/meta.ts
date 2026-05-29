@@ -6,13 +6,15 @@
  * - 渲染契约不读 meta，所以这些 op 不会引起视觉变化
  */
 
-import type { DesignProject, ComponentNode } from '@globallink/design-schema';
+import type { DesignProject, ComponentNode, PlanTask } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
 import type {
   MetaSetNodeOp,
   MetaSetNodeStatusOp,
   MetaSetScreenOp,
   MetaSetProjectOp,
+  MetaAddPlanTasksOp,
+  MetaUpdatePlanTaskOp,
   OperationResult,
   InverseData,
 } from '../types';
@@ -219,5 +221,121 @@ export function executeSetProjectMeta(project: DesignProject, params: MetaSetPro
       type: 'meta.setProject',
       params: { patch: previous ?? null, mode: 'replace' },
     },
+  };
+}
+
+// ===== meta.addPlanTasks =====
+
+function getPlanContainer(
+  project: DesignProject,
+  scope: 'project' | 'screen',
+  screenId?: string,
+): { plan: PlanTask[] | undefined; setPlan: (plan: PlanTask[] | undefined) => void; description: string } | null {
+  if (scope === 'project') {
+    if (!project.meta) project.meta = {};
+    return {
+      plan: project.meta.plan,
+      setPlan: (p) => { project.meta!.plan = p; },
+      description: 'project',
+    };
+  }
+  const screen = project.screens.find((s) => s.id === screenId);
+  if (!screen) return null;
+  if (!screen.meta) screen.meta = {};
+  return {
+    plan: screen.meta.plan,
+    setPlan: (p) => { screen.meta!.plan = p; },
+    description: `screen ${screenId}`,
+  };
+}
+
+export function executeAddPlanTasks(project: DesignProject, params: MetaAddPlanTasksOp['params']): Result {
+  const newProject = deepClone(project);
+  const container = getPlanContainer(newProject, params.scope, params.screenId);
+  if (!container) {
+    return {
+      project,
+      result: { success: false, description: `Screen ${params.screenId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const previous = container.plan ? deepClone(container.plan) : undefined;
+  const existingIds = new Set((container.plan ?? []).map((t) => t.id));
+  const conflictIds = params.tasks.filter((t) => existingIds.has(t.id)).map((t) => t.id);
+  if (conflictIds.length > 0) {
+    return {
+      project,
+      result: { success: false, description: `Task IDs already exist: ${conflictIds.join(', ')}`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const next = [...(container.plan ?? []), ...params.tasks];
+  container.setPlan(next);
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Added ${params.tasks.length} task(s) to ${container.description} plan`,
+      affectedNodeIds: [],
+    },
+    // inverse：恢复原 plan（用 setProject/setScreen replace 模式语义不直接对应，
+    // 这里发回 noop——若用户需要 undo plan 操作，可后续扩展专门的 inverse op）
+    inverse: previous
+      ? { type: 'noop', params: { restored: previous } as never }
+      : { type: 'noop', params: {} },
+  };
+}
+
+// ===== meta.updatePlanTask =====
+
+/** 递归在任务树中查找/更新一个任务（按 id） */
+function updateTaskInTree(tasks: PlanTask[], taskId: string, patch: Partial<Omit<PlanTask, 'id'>>): boolean {
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]!;
+    if (t.id === taskId) {
+      tasks[i] = { ...t, ...patch, id: t.id };
+      return true;
+    }
+    if (t.subtasks && t.subtasks.length > 0) {
+      if (updateTaskInTree(t.subtasks, taskId, patch)) return true;
+    }
+  }
+  return false;
+}
+
+export function executeUpdatePlanTask(project: DesignProject, params: MetaUpdatePlanTaskOp['params']): Result {
+  const newProject = deepClone(project);
+  const container = getPlanContainer(newProject, params.scope, params.screenId);
+  if (!container || !container.plan || container.plan.length === 0) {
+    return {
+      project,
+      result: { success: false, description: `No plan tasks found in ${params.scope}`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const found = updateTaskInTree(container.plan, params.taskId, params.patch);
+  if (!found) {
+    return {
+      project,
+      result: { success: false, description: `Task ${params.taskId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: `Updated task ${params.taskId} in ${container.description} plan`,
+      affectedNodeIds: [],
+    },
+    inverse: { type: 'noop', params: {} },
   };
 }

@@ -7,7 +7,7 @@
  *   - 写入采用 deep-merge（不传的字段保留），但传 `null` 表示显式清空
  */
 
-import type { NodeMeta, ScreenMeta, ProjectMeta, NodeStatus } from '@globallink/design-schema';
+import type { NodeMeta, ScreenMeta, ProjectMeta, NodeStatus, PlanTask } from '@globallink/design-schema';
 
 // ===== Node Meta =====
 
@@ -53,10 +53,40 @@ export interface MetaSetProjectOp {
   };
 }
 
+// ===== Plan（任务清单）便捷操作 =====
+
+/**
+ * 添加任务到计划清单（追加，不覆盖已有任务）。
+ * scope='project' 写到 project.meta.plan；scope='screen' 写到 screen.meta.plan。
+ */
+export interface MetaAddPlanTasksOp {
+  type: 'meta.addPlanTasks';
+  params: {
+    scope: 'project' | 'screen';
+    screenId?: string;       // scope='screen' 时必填
+    tasks: PlanTask[];
+  };
+}
+
+/**
+ * 更新单条任务（按 id 定位）。可改 status / notes / blockedReason / 添加 subtasks。
+ */
+export interface MetaUpdatePlanTaskOp {
+  type: 'meta.updatePlanTask';
+  params: {
+    scope: 'project' | 'screen';
+    screenId?: string;
+    taskId: string;
+    patch: Partial<Omit<PlanTask, 'id'>>;
+  };
+}
+
 // ===== 联合 =====
 
 export type MetaOperation =
   | MetaSetNodeOp
   | MetaSetNodeStatusOp
   | MetaSetScreenOp
-  | MetaSetProjectOp;
+  | MetaSetProjectOp
+  | MetaAddPlanTasksOp
+  | MetaUpdatePlanTaskOp;
