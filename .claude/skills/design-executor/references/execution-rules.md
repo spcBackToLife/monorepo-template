@@ -42,16 +42,19 @@ node.materials[] 存在？
       │         1. 委托 material-painter 绘制 + export_and_apply
       │         2. material-painter 内部会处理透明背景和 Step 7 清理
       │
-      └── 素材类型判断:
-            ├── type=Decoration 且形状简单（纯色圆/矩形+opacity）
-            │   → 考虑用 CSS 实现（backgroundColor + borderRadius + opacity）
-            │   → 优点: 省一个素材工程，渲染更快
-            │   → 缺点: 无法表达复杂渐变/路径
-            │
-            └── 其他 → 走 material-painter 素材工程
+      └── ⚠️ 不论素材复杂度，一律走 material-painter:
+            ❌ 禁止: "这个圆形够简单，用 CSS backgroundColor 代替"
+            ❌ 禁止: "这个叶子形状用 borderRadius 近似就行"
+            ✅ 必须: 所有 _materials.json 中的素材 → Skill("material-painter")
+            理由: 
+              - 确保 slot 绑定关系被建立（编辑器可识别/可替换/可批量更新）
+              - material-painter 内部会根据复杂度选择最优实现方式
+              - Executor 无权做"跳过素材"的裁量
 ```
 
 **关键教训**: 上次测试中 I-04 checkmark 的 condition 是 `"{{state.view.submitState === 'success'}}"`，但 executor 直接 export_and_apply 到按钮默认态，覆盖了按钮的背景色和文字，导致登录按钮完全消失。
+
+**关键教训 2**: Executor 将 D-02 pink-circle 用 CSS div+backgroundColor+borderRadius 替代，跳过了 material-painter。后果：无 slot 绑定→编辑器不识别为素材→无法后续统一替换。即使视觉上"看起来一样"，slot 关系的缺失是结构性缺陷。
 
 ---
 
