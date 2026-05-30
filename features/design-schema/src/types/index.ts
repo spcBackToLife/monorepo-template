@@ -125,11 +125,11 @@ export type {
   ColorTokenGroup,
   DesignTokenSet,
   TokenOverrides,
-  ThemeVariant,
   ColorScheme,
   ThemeDefinition,
   BackgroundRule,
   DecorationRules,
+  IconSpec,
   ComponentStateSpec,
   ThemeConfig,
 } from './theme';

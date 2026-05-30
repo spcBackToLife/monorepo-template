@@ -64,11 +64,19 @@
 
 ## ★ 沉淀到 schema 的结论
 
-```
-（本任务无新写入。仅 theme/get 自检 + meta/update_plan_task 标 T7-handover done）
+T7 是只读自检，不再写 schema。调用：
 
-通知用户：
-"主题阶段完成。intent/tokens/decorationRules/iconSpec/stateSpec/themes 全部落库；
- customized=true，所有 R-THEME-* 红线 0 错误。
- 接下来可以触发 interaction-designer 进入交互阶段。"
+```jsonc
+// MCP: theme/validate
+{ projectId: "<projectId>" }
+// 期望返回 { ok: true, errors: [], warnings: [...] }
+// ok=false 时遍历 errors[]，按 rule 字段回到对应 T 任务修复
 ```
+
+**移交清单**：
+- [ ] `theme/validate.ok === true`（R-THEME-01~10 全过）
+- [ ] 至少 1 个主题（通常 default），每主题至少 2 个色彩方案
+- [ ] 所有任务 plan 标 done
+- [ ] md 全部写完（analysis-notes/<projectId>/theme/ 至少 T1~T7）
+
+完成后通知用户：**主题阶段完成，可触发 interaction-designer**。

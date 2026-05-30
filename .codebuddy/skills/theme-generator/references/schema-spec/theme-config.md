@@ -1,293 +1,271 @@
-# ThemeConfig 完整字段规范（project.themeConfig）
+# ThemeConfig 完整字段规范（V1.0）
 
-## 字段总览
+> 真理之源：`features/design-schema/src/types/theme.ts`。
+> 本文档与 schema 类型 1:1 对齐，**所有 MCP 调用样例都已用真实 inputSchema 验证**。
+
+## §0. 心智模型（必读）
+
+```
+ThemeConfig
+├─ schemaVersion: "1.0"
+├─ themes: ThemeDefinition[]                ← 多主题（品牌/节日/营销）
+│   └─ ThemeDefinition
+│       ├─ intent / tokens                  ← 主题级
+│       ├─ decorationRules / iconSpec       ← 主题级
+│       ├─ stateSpec                        ← 主题级
+│       └─ colorSchemes[]                   ← 色彩方案（明暗/可访问性，变体级）
+├─ activeThemeId
+└─ customized
+```
+
+**两个维度正交**：主题（theme）= 风格切换；色彩方案（scheme）= 明暗切换。
+
+## §1. ThemeConfig 顶层
 
 ```jsonc
-project.themeConfig = {
-  customized: true,                  // ★ 必须显式置真（出场门禁，R-THEME-01）
-  intent:     IntentSpec,            // §1 风格意图（7 维度）
-  tokens:     TokenSet,              // §2 完整 Token（colors/typography/spacing/radii/shadows/durations/easings）
-  decorationRules: DecorationRules,  // §3 装饰规则（6 类）
-  iconSpec:   IconSpec,              // §4 图标规格
-  stateSpec:  StateSpec,             // §5 组件状态规范
-  themes:     ThemeVariant[],        // §6 主题变体（≥ 2 套）
-  activeThemeId: "default"
+{
+  schemaVersion: "1.0",                     // 必填，迁移识别用
+  themes: ThemeDefinition[],                // ≥ 1 套
+  activeThemeId: "default",                 // 必须命中 themes[].id（R-THEME-08）
+  customized: true                          // R-THEME-01
 }
 ```
 
-## §1. intent（风格意图）
+## §2. ThemeDefinition（一套完整主题）
+
+```jsonc
+{
+  id:          "default",
+  name:        "品牌默认",
+  description: "...",
+  createdAt, updatedAt,
+
+  intent:           IntentSpec,             // §3
+  tokens:           DesignTokenSet,         // §4（base tokens）
+  decorationRules:  DecorationRules,        // §5
+  iconSpec:         IconSpec,                // §6
+  stateSpec:        ComponentStateSpec,      // §7
+  colorSchemes:     ColorScheme[],           // §8（至少 2 套）
+  activeColorSchemeId: "light"               // 必须命中 colorSchemes[].id
+}
+```
+
+## §3. intent（风格意图）
 
 ```jsonc
 intent: {
   summary:          "≤30 字一句话定性",
-  aesthetics:       string[],        // 1~3 个标签，取自 8 类
+  aesthetics:       string[],               // 1~3 个标签
   decoration:       "minimal" | "moderate" | "rich",
   colorTemperature: "warm" | "neutral" | "cool",
   brightness:       "light" | "dark" | "both",
-  seedColors:       string[],        // 1~2 个 hex 种子色
-  references:       string[]          // 用户给的参考品牌，可空数组
+  seedColors:       string[],               // 1~2 个 hex 种子色
+  audience?:        string,                 // 可选
+  scenario?:        string,                 // 可选
+  references?:      string[]                 // 可选
 }
 ```
 
-**MCP**：`theme/set_intent { projectId, intent }`（自动 customized=true）
+**MCP**：`theme/set_theme_intent { projectId, summary?, aesthetics?, decoration?, colorTemperature?, brightness?, seedColors?, ... }`（深合并；不传 themeId = active）
 
-## §2. tokens（完整 Token 集）
+## §4. tokens（base tokens 集）
 
-### §2.colors（17+ 必备）★
+### §4.1 colors（14+ 必备）
 
 ```jsonc
 tokens.colors = {
-  // 语义色（7）
-  primary, secondary, accent, success, warning, error, info,
-  // 表面色（3）
-  bgPage, bgCard, bgElevated,
-  // 文字色（4）
-  textPrimary, textSecondary, textTertiary, textInverse,
-  // 状态色（3）
+  // 语义色（14 必备）
+  primary, secondary, success, warning, error, info,
+  background, surface,
+  textPrimary, textSecondary, textTertiary,
+  border, borderLight, borderFocus,
+  // 状态色（推荐）
   primaryHover, primaryActive, primaryLight,
-  // 边界色（4）
-  borderDefault, borderStrong, divider, overlay,
-  // 中性灰阶（10）
-  gray100, gray200, gray300, gray400, gray500,
-  gray600, gray700, gray800, gray900,
-  gray50?    // 可选：极浅
+  secondaryHover, secondaryActive,
+  // 表面 / 文字（推荐）
+  surfaceElevated, overlay, textInverse,
+  // 中性灰阶（可选）
+  gray100, gray200, ..., gray900
 }
 ```
 
-**红线**：
-- R-THEME-02：缺以下任一即失败：primary/secondary/success/warning/error/info/bgPage/bgCard/textPrimary/textSecondary/textTertiary/borderDefault/divider
-- R-THEME-03：textPrimary on bgPage 的 APCA Lc 必须 ≥ 75；textSecondary on bgCard ≥ 60
+每个 token 的形态：`{ value: string, description?: string }`
 
-### §2.typography
+**MCP 写入**：`theme/set_theme_tokens { projectId, kind:"colors", values:{ primary:"#5B6CFF", ... } }`
 
-```jsonc
-tokens.typography = {
-  fontFamily:     string,                       // 主字体栈
-  fontFamilyMono: string,                        // 等宽字体栈（数字/计时器用）
-  fontSize: {
-    caption: 12, body: 14, bodyLg: 16,
-    h5: 18, h4: 20, h3: 24, h2: 28, h1: 36,
-    display: 48
-  },
-  fontWeight: {
-    regular:  400,
-    medium:   500,
-    semibold: 600,
-    bold:     700
-  },
-  lineHeight: {
-    tight:   1.2,
-    normal:  1.5,
-    relaxed: 1.7
-  }
-}
-```
+- 别名自动映射（bgPage→background 等，见 token-naming.md）
+- 裸字符串自动包装成 `{ value }`
+- 深合并，不传不删
 
-**红线 R-THEME-05**：fontSize 偏离 modular scale 1.25 超过 ±5% → 失败。
-
-### §2.spacing（8px 网格）
+### §4.2 spacing（8px 网格，R-THEME-04）
 
 ```jsonc
 tokens.spacing = {
-  "2xs": 2, "xs": 4, "sm": 8, "md": 16,
-  "lg": 24, "xl": 32, "2xl": 48, "3xl": 64
+  "2xs": { value:"2px",  px:2 },
+  "xs":  { value:"4px",  px:4 },
+  "sm":  { value:"8px",  px:8 },
+  "md":  { value:"16px", px:16 },
+  "lg":  { value:"24px", px:24 },
+  "xl":  { value:"32px", px:32 },
+  "2xl": { value:"48px", px:48 },
+  "3xl": { value:"64px", px:64 }
 }
 ```
 
-**红线 R-THEME-04**：所有 spacing 值必须是 4 的倍数（一般 8 倍数）→ 否则失败。
+**MCP**：`theme/set_theme_tokens { kind:"spacing", values:{ md:16, lg:24 } }`（数值自动转 `{value:"16px", px:16}`）
 
-### §2.radii
+### §4.3 radius
 
 ```jsonc
-tokens.radii = {
-  none: 0,
-  sm:   4 | 2 | 8,                  // 由 cornerStyle 决定（见 04-decoration-rules）
-  md:   8 | 4 | 16,
-  lg:   12 | 6 | 24,
-  xl:   16 | 8 | 32,
-  full: 9999
+tokens.radius = {
+  none: { value:"0" },
+  sm:   { value:"4px" },
+  md:   { value:"8px" },
+  lg:   { value:"12px" },
+  xl:   { value:"16px" },
+  full: { value:"9999px" }
 }
 ```
 
-### §2.shadows
+阶梯由 `decorationRules.cornerStyle` 决定（sharp/rounded/pill）。
+
+**MCP**：`theme/set_theme_tokens { kind:"radius", values:{ md:"8px", lg:"12px" } }`
+
+### §4.4 typography（modular scale 1.25，R-THEME-05）
+
+```jsonc
+tokens.typography = {
+  caption: { fontFamily, fontSize:"12px", lineHeight:"1.4", fontWeight:"400" },
+  body:    { ..., fontSize:"14px" },
+  "body-lg":{ ..., fontSize:"16px" },
+  h5:      { ..., fontSize:"18px" },
+  h4:      { ..., fontSize:"20px" },
+  h3:      { ..., fontSize:"24px" },
+  h2:      { ..., fontSize:"28px" },
+  h1:      { ..., fontSize:"36px" },
+  display: { ..., fontSize:"48px" }
+}
+```
+
+**MCP**：`theme/set_theme_tokens { kind:"typography", values:{ body:{ fontFamily:"...", fontSize:"14px", lineHeight:"1.5", fontWeight:"400" } } }`
+
+注意：传 `bodyLg` 自动映射到 `body-lg`。
+
+### §4.5 shadows
 
 ```jsonc
 tokens.shadows = {
-  sm: string,                       // CSS box-shadow 字符串
-  md: string,
-  lg: string,
-  xl: string,
-  glow?: string                     // luxury / futuristic / glassmorphism 用
+  sm: { value:"0 2px 4px rgba(0,0,0,0.06)" },
+  md, lg, xl
 }
 ```
 
-具体配方按 shadow strategy 选（见 03-typography-spacing.md §四）。
+**MCP**：`theme/set_theme_tokens { kind:"shadows", values:{ sm:"0 1px 3px rgba(0,0,0,0.04)" } }`
 
-### §2.durations + easings
+### §4.6 transitions
 
 ```jsonc
-tokens.durations = {
-  instant: 100, fast: 200, medium: 300, slow: 500
-}
-tokens.easings = {
-  ease:      "cubic-bezier(0.4, 0, 0.2, 1)",
-  easeIn:    "cubic-bezier(0.4, 0, 1, 1)",
-  easeOut:   "cubic-bezier(0, 0, 0.2, 1)",
-  easeInOut: "cubic-bezier(0.4, 0, 0.6, 1)",
-  spring:    "cubic-bezier(0.34, 1.56, 0.64, 1)"
+tokens.transitions = {
+  fast:   { value:"all 150ms ease",     durationMs:150 },
+  normal: { value:"all 300ms ease",     durationMs:300 },
+  slow:   { value:"all 500ms ease-out", durationMs:500 }
 }
 ```
 
-**MCP**：
-- 增量：`theme/update_tokens { projectId, tokens: { colors: { primary: "..." } } }`（仅传需要改的，深合并）
-- 全量：`theme/update { projectId, themeConfig: {...} }`（覆盖整个 ThemeConfig）
+**MCP**：`theme/set_theme_tokens { kind:"transitions", values:{ fast:"all 150ms ease" } }`（自动解析 durationMs）
 
-## §3. decorationRules
+## §5. decorationRules
 
 ```jsonc
 decorationRules = {
-  background: {
-    strategy: "solid" | "gradient" | "glassmorphism",
-    gradientAngle?: number,
-    gradientStops?: [{ color, offset }],
-    blur?: number,
-    opacity?: number
-  },
-  border: {
-    strategy: "none" | "subtle" | "accent" | "glow",
-    width:    "1px" | "2px" | "3px",
-    color:    "$token:borderDefault" | "$token:primary" | string
-  },
-  shadow: {
-    strategy: "soft" | "hard" | "glow" | "none"
-  },
-  motion: {
-    strategy: "minimal" | "smooth" | "spring" | "dramatic"
-  },
-  cornerStyle: "sharp" | "rounded" | "pill",
-  iconStyle:   "geometric" | "organic"
+  background:  { strategy:"solid"|"gradient"|"glassmorphism", gradient?, glassmorphism? },
+  border:      { strategy:"none"|"subtle"|"accent"|"glow", width?:"1px" },
+  shadow:      { strategy:"none"|"soft"|"hard"|"glow"|"layered" },
+  motion:      { strategy:"minimal"|"smooth"|"spring"|"dramatic", easing? },
+  iconStyle:   "outline"|"solid"|"duotone"|"colorful",
+  cornerStyle: "sharp"|"rounded"|"pill"|"mixed"
 }
 ```
 
-**MCP**：`theme/set_decoration { projectId, decorationRules }`（自动 customized=true）
+**MCP**：`theme/set_theme_decoration { projectId, decorationRules:{...} }`（深合并）
 
-**红线 R-THEME-07**：decorationRules 任一字段为空对象 → 失败。
-
-## §4. iconSpec
+## §6. iconSpec
 
 ```jsonc
 iconSpec = {
-  style:        "outline" | "solid" | "duotone" | "glyph",
-  strokeWidth:  number,                   // outline 用
-  linecap:      "round" | "butt" | "square",
-  linejoin:     "round" | "miter" | "bevel",
-  cornerRadius: number,
-  complexity:   "simple" | "medium" | "detailed",
-  geometric:    boolean,
-  colors: {
-    default:   string,                   // 一般 $token:textSecondary
-    active:    string,                   // 一般 $token:primary
-    inactive:  string,
-    secondary: string                    // duotone 第二层
-  },
-  sizing: {
-    containerRatio: number,              // 0.5~0.6
-    minPadding:     number               // px
-  },
-  variants: {
-    inactive: { opacity },
-    active:   { opacity, strokeWidth? },
-    hover:    { opacity },
-    disabled: { opacity, grayscale }
-  }
+  style:        "outline"|"solid"|"duotone"|"glyph"|"two-tone",
+  stroke:       { width, linecap, linejoin, cornerRadius },
+  colors:       { default, active, inactive, secondary?, palette? },
+  sizing:       { containerRatio, minPadding, strokeCompensation },
+  variants:     { inactive, active, hover?, disabled? },
+  consistency:  { targetComplexity, uniformStrokeWidth, geometricOnly }
 }
 ```
 
-**MCP**：通过 `theme/update` 全量写或 `theme/update_tokens` 扩展支持（实际调用前查 v2-actions-cheatsheet）
+**MCP**：`theme/set_theme_icon_spec { projectId, iconSpec:{...} }`
 
-**红线 R-THEME-07**：iconSpec 为空对象 → 失败。
-
-## §5. stateSpec
+## §7. stateSpec（ComponentStateSpec）
 
 ```jsonc
 stateSpec = {
-  hover: {
-    scale:           number,               // 0=不缩放，1.02=放大 2%
-    lightnessChange: string,               // "+6%"
-    shadowChange:    "up" | "same" | "glow"
-  },
-  pressed: {
-    scale:           number,               // 一般 0.98
-    lightnessChange: string                // 一般 "-8%"
-  },
-  focus: {
-    ringWidth:   string,                   // "2px"
-    ringColor:   string,                   // "$token:primary"
-    ringOpacity: number,                   // 0~1
-    ringOffset?: string                    // "2px"
-  },
-  disabled: {
-    opacity:   number,                     // 一般 0.4
-    grayscale: boolean
-  }
+  hover:    { backgroundLightnessShift, shadowLevel, scale, transition },
+  active:   { backgroundLightnessShift, shadowLevel, scale, transition },
+  focus:    { ringColor, ringWidth, ringOffset, animated },
+  disabled: { opacity, removeShadow, cursor, grayscale },
+  loading:  { opacity, spinnerColor, skeleton }
 }
 ```
 
-**MCP**：通过 `theme/update` 全量写。
+**MCP**：`theme/set_theme_state_spec { projectId, stateSpec:{...} }`
 
-**红线 R-THEME-07**：stateSpec 为空对象 → 失败。
-
-## §6. themes（变体数组，≥ 2 套）
+## §8. colorSchemes（明暗变体，≥ 2 套，R-THEME-06）
 
 ```jsonc
-themes = [
-  {
-    id:             "default",
-    name:           "亮色",
-    colorScheme:    "light",
-    tokenOverrides: {}                     // base 不 override
-  },
-  {
-    id:             "dark",
-    name:           "暗色",
-    colorScheme:    "dark",
-    tokenOverrides: {
-      colors:  { /* 仅差异字段 */ },
-      shadows: { /* dark 配方 */ }
-    }
-  }
+colorSchemes = [
+  { id:"light", name:"light", label:"浅色模式", overrides:{} },
+  { id:"dark",  name:"dark",  label:"深色模式", overrides:{
+      colors: {
+        background:"#0F1218",
+        surface:"#181B22",
+        textPrimary:"rgba(255,255,255,0.92)",
+        ...   // 只写差异，不写完整 token 集
+      },
+      shadows: { sm:"0 2px 4px rgba(0,0,0,0.4)", ... }
+  }}
 ]
-activeThemeId = "default"
+activeColorSchemeId = "light"
 ```
 
-**红线 R-THEME-06**：themes.length < 2 → 失败。
+**MCP**：
+- 添加：`theme/add_color_scheme { projectId, schemeId:"dark", kind:"dark" }`（kind=dark 自动派生 overrides 骨架，AI 再细化）
+- 更新：`theme/update_color_scheme_overrides { projectId, schemeId:"dark", kind:"colors", values:{ background:"#0F1218" } }`
+- 切换：`theme/switch_color_scheme { projectId, schemeId:"dark" }`
 
-**MCP 切换变体（编辑期预览）**：`theme/switch_variant { projectId, themeId }`
+## §9. MCP Action 完整速查表（v1.0）
 
-## §7. customized 标记
+| Action | 写入位置 | 用途 |
+|--------|--------|------|
+| `theme/check { projectId }` | 只读 | 入场门禁查 customized |
+| `theme/get { projectId }` | 只读 | 取完整 ThemeConfig |
+| `theme/validate { projectId }` | 只读 | 跑 R-THEME-01~10，出场门禁 |
+| `theme/scaffold_theme { projectId, themeId, name, copyFrom?, activate? }` | themes[].push | T0 创建新主题（节日红/品牌切换）|
+| `theme/delete_theme { projectId, themeId }` | themes[].splice | 删除非 active 主题 |
+| `theme/switch_theme { projectId, themeId }` | activeThemeId | 切换主题（多主题切换）|
+| `theme/set_theme_intent { projectId, summary?, ..., themeId? }` | themes[active].intent | T1 |
+| `theme/set_theme_tokens { projectId, kind, values, themeId? }` | themes[active].tokens.<kind> | T2 / T3 |
+| `theme/set_theme_decoration { projectId, decorationRules, themeId? }` | themes[active].decorationRules | T4 |
+| `theme/set_theme_icon_spec { projectId, iconSpec, themeId? }` | themes[active].iconSpec | T5 |
+| `theme/set_theme_state_spec { projectId, stateSpec, themeId? }` | themes[active].stateSpec | T5 |
+| `theme/add_color_scheme { projectId, schemeId, kind, overrides?, themeId? }` | themes[active].colorSchemes.push | T6 |
+| `theme/update_color_scheme_overrides { projectId, schemeId, kind, values, themeId? }` | colorSchemes[i].overrides.<kind> | T6 |
+| `theme/switch_color_scheme { projectId, schemeId, themeId? }` | activeColorSchemeId | 切明暗 |
+| `theme/remove_color_scheme { projectId, schemeId, themeId? }` | colorSchemes[].splice | 删变体（≥2 套硬约束）|
 
-```jsonc
-themeConfig.customized: boolean
-```
+## §10. 字段命名一致性
 
-- 默认 false（项目刚创建时）
-- 任一 set_intent / update / update_tokens / set_decoration 都会自动置 true
-- 下游所有 stage 把 customized=true 作为入场门禁
+所有 token 名都按 `features/design-schema/src/types/theme.ts` 的 `ColorTokenGroup` 走。
+认知友好的别名（bgPage/bgCard/borderDefault/divider/accent/bodyLg）由 MCP 自动映射，详见 `token-naming.md`。
 
-**MCP 检查**：`theme/check { projectId }` → `{ customized: boolean, summary }`
+## §11. R-THEME-* 红线对账
 
-**红线 R-THEME-01**：出场时 customized 不为 true → 失败。
-
-## MCP Action 速查
-
-| Action | 用途 | 写入字段 |
-|--------|------|---------|
-| `theme/check { projectId }` | 入场门禁查 | 只读 customized + summary |
-| `theme/get { projectId }` | 取完整 ThemeConfig | 只读 |
-| `theme/set_intent { projectId, intent }` | 写 intent（T1）| intent + 自动 customized=true |
-| `theme/update { projectId, themeConfig }` | 全量替换 | 整个 themeConfig |
-| `theme/update_tokens { projectId, tokens }` | 增量改 token | tokens.* 深合并 |
-| `theme/set_decoration { projectId, decorationRules }` | 写装饰（T4）| decorationRules + 自动 customized=true |
-| `theme/switch_variant { projectId, themeId }` | 切换预览 | activeThemeId |
-
-详情见 `../../common/references/v2-actions-cheatsheet.md`。
+参见 `STAGE-CONTRACT.md §2.10` 完整 10 条红线。validate action 全部覆盖。

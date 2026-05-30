@@ -6,6 +6,14 @@ import type {
   Screen,
   Viewport,
   ViewVariableDef,
+  ThemeConfig,
+  ThemeOp,
+  TokenKind,
+  StyleIntent,
+  DecorationRules,
+  IconSpec,
+  ComponentStateSpec,
+  TokenOverrides,
 } from '@globallink/design-schema';
 import { generateNodeId, normalizeNode } from '@globallink/design-schema';
 import type { Operation, OperationResult } from '@globallink/design-operations';
@@ -558,30 +566,97 @@ export class EditorStore {
   }
 
   // ===== Theme Management =====
+  //
+  // 所有主题写入走后端的 POST /theme/op 端点（与 MCP theme/* 工具同源），
+  // 后端用 schema 包的 applyThemeOp reducer 统一处理，保证落库结构一致。
+
+  /** 通用入口：应用一个主题操作 */
+  private async applyThemeOp(op: ThemeOp): Promise<void> {
+    if (!this.projectState?.id || !this.projectState.themeConfig) return;
+    try {
+      const resp = await apiJson<{ themeConfig: ThemeConfig; changed: string[] }>(
+        `/projects/${this.projectState.id}/theme/op`,
+        { method: 'POST', body: JSON.stringify({ op }), token: authStore.token },
+      );
+      runInAction(() => {
+        this.projectState!.themeConfig = resp.themeConfig;
+      });
+    } catch (err) {
+      console.error('[editor] applyThemeOp failed:', err);
+      throw err;
+    }
+  }
 
   /** 切换当前激活的主题 */
-  switchTheme(themeId: string): void {
-    if (!this.projectState?.themeConfig) return;
-    runInAction(() => {
-      this.projectState!.themeConfig!.activeThemeId = themeId;
-    });
-    this.persistThemeConfig();
+  switchTheme(themeId: string): Promise<void> {
+    return this.applyThemeOp({ type: 'switch_theme', themeId });
   }
 
-  /** 切换当前主题内的色彩方案（light/dark） */
-  switchColorScheme(schemeId: string): void {
-    if (!this.projectState?.themeConfig) return;
-    const theme = this.projectState.themeConfig.themes.find(
-      t => t.id === this.projectState!.themeConfig!.activeThemeId,
+  /** 切换当前主题内的色彩方案 */
+  switchColorScheme(schemeId: string, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'switch_color_scheme', schemeId, themeId });
+  }
+
+  /** 创建一个新主题 */
+  scaffoldTheme(args: { themeId: string; name: string; description?: string; copyFrom?: string; activate?: boolean }): Promise<void> {
+    return this.applyThemeOp({ type: 'scaffold_theme', ...args });
+  }
+
+  /** 删除一个主题 */
+  deleteTheme(themeId: string): Promise<void> {
+    return this.applyThemeOp({ type: 'delete_theme', themeId });
+  }
+
+  /** 更新主题风格意图（深合并） */
+  setThemeIntent(intent: Partial<StyleIntent>, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'set_theme_intent', intent, themeId });
+  }
+
+  /** 更新主题 base tokens（深合并；别名/包装自动） */
+  setThemeTokens(kind: TokenKind, values: Record<string, unknown>, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'set_theme_tokens', kind, values, themeId });
+  }
+
+  /** 更新装饰规则 */
+  setThemeDecoration(decorationRules: Partial<DecorationRules>, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'set_theme_decoration', decorationRules, themeId });
+  }
+
+  /** 更新图标规格 */
+  setThemeIconSpec(iconSpec: Partial<IconSpec>, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'set_theme_icon_spec', iconSpec, themeId });
+  }
+
+  /** 更新组件状态规范 */
+  setThemeStateSpec(stateSpec: Partial<ComponentStateSpec>, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'set_theme_state_spec', stateSpec, themeId });
+  }
+
+  /** 添加色彩方案 */
+  addColorScheme(args: { schemeId: string; name?: string; label?: string; kind?: 'dark' | 'light' | 'high-contrast' | 'custom'; overrides?: TokenOverrides; themeId?: string }): Promise<void> {
+    return this.applyThemeOp({ type: 'add_color_scheme', ...args });
+  }
+
+  /** 更新色彩方案 overrides（深合并；别名自动） */
+  updateColorSchemeOverrides(schemeId: string, kind: TokenKind, values: Record<string, unknown>, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'update_color_scheme_overrides', schemeId, kind, values, themeId });
+  }
+
+  /** 删除色彩方案 */
+  removeColorScheme(schemeId: string, themeId?: string): Promise<void> {
+    return this.applyThemeOp({ type: 'remove_color_scheme', schemeId, themeId });
+  }
+
+  /** 校验当前主题配置（R-THEME-01~10 红线） */
+  async validateTheme(): Promise<{ ok: boolean; errors: unknown[]; warnings: unknown[] }> {
+    if (!this.projectState?.id) return { ok: false, errors: [], warnings: [] };
+    return apiJson(
+      `/projects/${this.projectState.id}/theme/validate`,
+      { method: 'POST', token: authStore.token },
     );
-    if (!theme) return;
-    runInAction(() => {
-      theme.activeColorSchemeId = schemeId;
-    });
-    this.persistThemeConfig();
   }
 
-  /** 持久化 themeConfig 到后端（不走 operation 流程） */
+  /** 持久化整个 themeConfig（仅迁移/导入场景；常规写入请用 applyThemeOp 系列方法） */
   private async persistThemeConfig(): Promise<void> {
     if (!this.projectState?.id || !this.projectState.themeConfig) return;
     try {

@@ -27,7 +27,7 @@ import { registerMaterialSlotTools } from './tools/domain/material-slot.js';
 import { registerCanvasTools } from './tools/domain/canvas.js';
 
 // ── 主题工具 ──
-import { registerThemeTools } from './tools/domain/theme.js';
+import { registerThemeTools } from './tools/domain/theme/index.js';
 
 // ── Meta 工具（Schema-First：设计意图/溯源/完成度） ──
 import { registerMetaTools } from './tools/domain/meta.js';

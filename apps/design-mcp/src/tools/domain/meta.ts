@@ -116,7 +116,7 @@ export function registerMetaTools(server: McpServer): void {
           tasks: z.array(z.object({
             id: z.string(),
             title: z.string(),
-            stage: z.enum(['product', 'interaction', 'design', 'executor']),
+            stage: z.enum(['product', 'theme', 'interaction', 'design', 'executor']),
             status: z.enum(['pending', 'doing', 'done', 'blocked', 'skipped']),
             blockedReason: z.string().optional(),
             refs: z.array(z.string()).optional(),

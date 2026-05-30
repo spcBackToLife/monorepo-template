@@ -1,5 +1,30 @@
 # 15 - 设计主题风格系统 (Design Token & Theme System)
 
+> ⚠️ **v1.0 升级公告（2026-05-30）** ⚠️
+>
+> 本文档是 v0.x 设计思考的历史留档，部分章节（如 §3.4 ThemeVariant / §6.x 顶层 themeConfig.tokens / "themes = { light, dark }" 一维结构）已**不再是真理之源**。
+>
+> **当前真理之源（v1.0）**：
+> - **schema 类型**：`features/design-schema/src/types/theme.ts`（ThemeDefinition × ColorScheme 二维模型）
+> - **完整方案**：`THEME-SYSTEM-PROPOSAL.md`（项目根，含背景 + 决策 + 落地清单）
+> - **契约规范**：`STAGE-CONTRACT.md §2` + R-THEME-01~10 红线
+> - **AI 技能落 schema 速查**：`.codebuddy/skills/theme-generator/references/schema-spec/theme-config.md`
+> - **MCP 工具**：`apps/design-mcp/src/tools/domain/theme/`（13 个 action，废弃 4 个旧的）
+>
+> **v0 → v1.0 关键差异**：
+>
+> | 维度 | v0（本文旧版）| v1.0（真理） |
+> |------|------|------|
+> | 模型 | `themeConfig.tokens` 顶层 + `themes: ThemeVariant[]` 一维明暗 | `themes: ThemeDefinition[]` × `colorSchemes[]` 二维 |
+> | 主题级 vs 变体级 | 混在一起 | 明确分离（主题级 = 完整风格切换；变体级 = 明暗/可访问性）|
+> | 多主题（节日/品牌）| 不支持 | 一等公民 |
+> | MCP action | `update_tokens / set_intent / set_decoration / switch_variant`（已删）| `set_theme_*`（写 themes[active] 内）+ `add_color_scheme / update_color_scheme_overrides`（写明暗 overrides）|
+> | ThemeVariant 类型 | 有 | 已删除（孤儿类型）|
+>
+> 本文以下内容**仅作为产品思考过程留档**，新开发请直接看真理源。
+
+---
+
 > **根本问题：如何让一个项目的所有设计在视觉上保持科学一致，并让 AI 自动遵循？**
 >
 > ← [返回总纲](../README.md)

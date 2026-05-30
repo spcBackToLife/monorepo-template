@@ -17,7 +17,11 @@ import {
   generateNodeId,
   normalizeNode,
   DEFAULT_THEME_CONFIG,
+  applyThemeOp as applyThemeOpReducer,
+  type ThemeConfig,
+  type ThemeOp,
 } from '@globallink/design-schema';
+import { migrateThemeConfigInPlace } from './theme-migration';
 import {
   OperationExecutor,
   type Operation,
@@ -227,6 +231,15 @@ export class ProjectsService {
       project.themeConfig = DEFAULT_THEME_CONFIG;
     }
 
+    // 迁移：themeConfig 数据归一化（保证所有字段在 themes[active] 内部）
+    // 单次执行；执行后 schemaVersion='1.0'，后续 findOne 立即跳过。
+    if (migrateThemeConfigInPlace(project.themeConfig)) {
+      // 持久化迁移结果；失败不阻塞读取（迁移幂等，下次 findOne 会再试）
+      this.persistThemeConfigAfterMigration(id, project.themeConfig).catch(err => {
+        console.warn(`[projects] theme migration persistence failed for ${id}:`, err);
+      });
+    }
+
     return project;
   }
 
@@ -293,6 +306,27 @@ export class ProjectsService {
   async getTheme(id: string): Promise<unknown> {
     const project = await this.findOne(id);
     return project.themeConfig ?? null;
+  }
+
+  /** 内部用：迁移后异步回写持久化层，幂等，失败可忽略（下次 findOne 会再试） */
+  private async persistThemeConfigAfterMigration(id: string, themeConfig: unknown): Promise<void> {
+    await this.updateTheme(id, themeConfig);
+  }
+
+  /**
+   * 应用单个主题操作（推荐前端使用）。
+   *
+   * 走 schema 包的 applyThemeOp reducer，与 MCP 工具调用同源。
+   * 返回新的 themeConfig + 受影响字段路径（前端可用于增量渲染）。
+   */
+  async applyThemeOp(id: string, op: ThemeOp): Promise<{ themeConfig: ThemeConfig; changed: string[] }> {
+    const cfg = (await this.getTheme(id)) as ThemeConfig | null;
+    if (!cfg) {
+      throw new NotFoundException(`项目 ${id} 无 themeConfig`);
+    }
+    const { next, changed } = applyThemeOpReducer(cfg, op);
+    await this.updateTheme(id, next);
+    return { themeConfig: next, changed };
   }
 
   /**

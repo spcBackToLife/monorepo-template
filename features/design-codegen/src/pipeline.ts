@@ -11,7 +11,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync, readFileSync, writeFileSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import * as ejs from 'ejs';
-import type { DesignProject, Screen } from '@globallink/design-schema';
+import type { DesignProject, Screen, ThemeConfig, TokenOverrides } from '@globallink/design-schema';
 import type { SplitPlan, PageIR, ActionStepIR, SplitStrategy } from './core/types';
 import type { FrameworkAdapter } from './adapter/interface';
 import type { GenerateInput, GenerateOutput, ResolvedTemplate } from './config/types';
@@ -60,14 +60,11 @@ export async function generate(input: GenerateInput): Promise<GenerateOutput> {
   ensureDir(outputDir);
   copyScaffold(template.scaffoldDir, outputDir, { projectName });
 
-  // 4b. Infer theme from schema and override variables.less if needed
-  const detectedTheme = detectThemeFromSchema(schema);
-  if (detectedTheme === 'dark') {
+  // 4b. Generate variables.less from project's themeConfig (multi-theme + color schemes)
+  if (schema.themeConfig) {
     const variablesPath = join(outputDir, 'src/styles/variables.less');
-    if (existsSync(variablesPath)) {
-      const darkVariables = generateDarkThemeVariables();
-      writeFileSafe(variablesPath, darkVariables);
-    }
+    const content = emitVariablesLess(schema.themeConfig);
+    writeFileSafe(variablesPath, content);
   }
 
   // 5. Compile each screen
@@ -444,134 +441,122 @@ function buildScreenPathMap(screens: Screen[]): Map<string, string> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Theme Detection
+// Theme → variables.less Emission（多主题 × 多色彩方案）
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Detect whether the design schema uses a dark or light theme
- * by analyzing root node background colors across all screens.
+ * 把项目 themeConfig 序列化为 variables.less。
  *
- * Heuristic: parse the backgroundColor of each screen's root node.
- * If the majority of screens have a dark background (luminance < 0.5),
- * the project is dark-themed.
+ * 产物结构：
+ *   :root {                                   // base = default 主题的 base tokens
+ *     --color-primary: #5B6CFF;
+ *     ...
+ *   }
+ *   [data-theme="default"][data-scheme="light"] { ...overrides... }
+ *   [data-theme="default"][data-scheme="dark"]  { ...overrides... }
+ *   [data-theme="spring-festival"][data-scheme="light"] { ... }
+ *   ...
+ *
+ * 运行时切换：document.documentElement.dataset.theme/scheme
  */
-function detectThemeFromSchema(schema: DesignProject): 'dark' | 'light' {
-  let darkCount = 0;
-  let lightCount = 0;
+function emitVariablesLess(themeConfig: ThemeConfig): string {
+  const lines: string[] = [
+    '// Auto-generated from themeConfig (DO NOT EDIT BY HAND)',
+    `// schemaVersion: ${themeConfig.schemaVersion ?? '1.0'}`,
+    '',
+  ];
 
-  for (const screen of schema.screens) {
-    const rootStyles = screen.rootNode?.styles;
-    if (!rootStyles) continue;
+  const activeTheme = themeConfig.themes.find(t => t.id === themeConfig.activeThemeId) ?? themeConfig.themes[0];
+  if (!activeTheme) {
+    return lines.join('\n');
+  }
 
-    const bg = rootStyles.backgroundColor || rootStyles.background;
-    if (typeof bg !== 'string') continue;
+  // :root block — active 主题的 base
+  lines.push(':root {');
+  lines.push(...emitTokensAsLess(activeTheme.tokens));
+  lines.push('}', '');
 
-    const luminance = estimateLuminance(bg);
-    if (luminance !== null) {
-      if (luminance < 0.4) darkCount++;
-      else lightCount++;
+  // 每个主题 × 每个色彩方案的 overrides
+  for (const theme of themeConfig.themes) {
+    for (const scheme of theme.colorSchemes ?? []) {
+      const selector = `[data-theme="${theme.id}"][data-scheme="${scheme.id}"]`;
+      const overrideLines = emitOverridesAsLess(scheme.overrides ?? {}, theme === activeTheme && scheme.id === theme.activeColorSchemeId ? theme.tokens : undefined);
+      if (overrideLines.length > 0) {
+        lines.push(`${selector} {`);
+        lines.push(...overrideLines);
+        lines.push('}', '');
+      }
     }
   }
 
-  return darkCount > lightCount ? 'dark' : 'light';
+  return lines.join('\n');
 }
 
-/**
- * Estimate luminance from a CSS color string.
- * Supports: #hex (3/6/8 digits), rgb(), rgba().
- * Returns 0-1 scale (0 = black, 1 = white) or null if unparseable.
- */
-function estimateLuminance(color: string): number | null {
-  const trimmed = color.trim().toLowerCase();
+function emitTokensAsLess(tokens: ThemeConfig['themes'][number]['tokens']): string[] {
+  const out: string[] = [];
+  // colors
+  for (const [k, v] of Object.entries(tokens.colors ?? {})) {
+    if (v?.value !== undefined) out.push(`  --color-${camelToKebab(k)}: ${v.value};`);
+  }
+  // spacing
+  for (const [k, v] of Object.entries(tokens.spacing ?? {})) {
+    if (v?.value !== undefined) out.push(`  --spacing-${k}: ${v.value};`);
+  }
+  // radius
+  for (const [k, v] of Object.entries(tokens.radius ?? {})) {
+    if (v?.value !== undefined) out.push(`  --radius-${k}: ${v.value};`);
+  }
+  // shadows
+  for (const [k, v] of Object.entries(tokens.shadows ?? {})) {
+    if (v?.value !== undefined) out.push(`  --shadow-${k}: ${v.value};`);
+  }
+  // transitions
+  for (const [k, v] of Object.entries(tokens.transitions ?? {})) {
+    if (v?.value !== undefined) out.push(`  --transition-${k}: ${v.value};`);
+  }
+  // typography（子属性平铺）
+  for (const [k, v] of Object.entries(tokens.typography ?? {})) {
+    if (!v) continue;
+    if (v.fontSize) out.push(`  --font-${k}-fontSize: ${v.fontSize};`);
+    if (v.lineHeight) out.push(`  --font-${k}-lineHeight: ${v.lineHeight};`);
+    if (v.fontWeight) out.push(`  --font-${k}-fontWeight: ${v.fontWeight};`);
+    if (v.fontFamily) out.push(`  --font-${k}-fontFamily: ${v.fontFamily};`);
+    if (v.letterSpacing) out.push(`  --font-${k}-letterSpacing: ${v.letterSpacing};`);
+  }
+  return out;
+}
 
-  // #hex
-  const hexMatch = trimmed.match(/^#([0-9a-f]{3,8})$/);
-  if (hexMatch) {
-    let hex = hexMatch[1];
-    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-    if (hex.length >= 6) {
-      const r = parseInt(hex.slice(0, 2), 16) / 255;
-      const g = parseInt(hex.slice(2, 4), 16) / 255;
-      const b = parseInt(hex.slice(4, 6), 16) / 255;
-      // Relative luminance (WCAG formula simplified)
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+function emitOverridesAsLess(
+  overrides: TokenOverrides,
+  _baseTokens?: ThemeConfig['themes'][number]['tokens'],
+): string[] {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(overrides.colors ?? {})) {
+    if (v !== undefined) out.push(`  --color-${camelToKebab(k)}: ${v};`);
+  }
+  for (const [k, v] of Object.entries(overrides.spacing ?? {})) {
+    if (v !== undefined) out.push(`  --spacing-${k}: ${v};`);
+  }
+  for (const [k, v] of Object.entries(overrides.radius ?? {})) {
+    if (v !== undefined) out.push(`  --radius-${k}: ${v};`);
+  }
+  for (const [k, v] of Object.entries(overrides.shadows ?? {})) {
+    if (v !== undefined) out.push(`  --shadow-${k}: ${v};`);
+  }
+  for (const [k, v] of Object.entries(overrides.transitions ?? {})) {
+    if (v !== undefined) out.push(`  --transition-${k}: ${v};`);
+  }
+  for (const [k, typo] of Object.entries(overrides.typography ?? {})) {
+    if (!typo) continue;
+    for (const [sub, sv] of Object.entries(typo)) {
+      if (sv !== undefined) out.push(`  --font-${k}-${sub}: ${sv};`);
     }
   }
-
-  // rgb() / rgba()
-  const rgbMatch = trimmed.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-  if (rgbMatch) {
-    const r = parseInt(rgbMatch[1]) / 255;
-    const g = parseInt(rgbMatch[2]) / 255;
-    const b = parseInt(rgbMatch[3]) / 255;
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-
-  return null;
+  return out;
 }
 
-/**
- * Generate dark theme variables.less content.
- */
-function generateDarkThemeVariables(): string {
-  return `// Colors
-@color-primary: #1677ff;
-@color-primary-hover: #4096ff;
-@color-primary-active: #0958d9;
-@color-success: #52c41a;
-@color-warning: #faad14;
-@color-error: #ff4d4f;
-
-// Text colors (dark theme)
-@color-text: #ffffff;
-@color-text-secondary: rgba(255, 255, 255, 0.65);
-@color-text-tertiary: rgba(255, 255, 255, 0.45);
-@color-text-disabled: rgba(255, 255, 255, 0.25);
-
-// Background colors (dark theme)
-@color-bg: #121212;
-@color-bg-secondary: #1a1a22;
-@color-bg-tertiary: #242430;
-
-// Border
-@color-border: rgba(255, 255, 255, 0.12);
-@color-border-secondary: rgba(255, 255, 255, 0.06);
-@border-radius-sm: 4px;
-@border-radius-base: 6px;
-@border-radius-lg: 8px;
-
-// Font
-@font-size-sm: 12px;
-@font-size-base: 14px;
-@font-size-lg: 16px;
-@font-size-xl: 20px;
-@font-size-xxl: 24px;
-
-// Spacing
-@spacing-xs: 4px;
-@spacing-sm: 8px;
-@spacing-md: 12px;
-@spacing-base: 16px;
-@spacing-lg: 24px;
-@spacing-xl: 32px;
-
-// Shadows (dark theme — brighter borders instead of dark shadows)
-@shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2), 0 1px 6px -1px rgba(0, 0, 0, 0.15);
-@shadow-base: 0 2px 8px 0 rgba(0, 0, 0, 0.3), 0 1px 4px -1px rgba(0, 0, 0, 0.2);
-@shadow-lg: 0 6px 16px 0 rgba(0, 0, 0, 0.4), 0 3px 6px -4px rgba(0, 0, 0, 0.3);
-
-// Transitions
-@transition-duration: 0.2s;
-@transition-timing: cubic-bezier(0.645, 0.045, 0.355, 1);
-
-// Breakpoints
-@screen-xs: 480px;
-@screen-sm: 576px;
-@screen-md: 768px;
-@screen-lg: 992px;
-@screen-xl: 1200px;
-@screen-xxl: 1600px;
-`;
+function camelToKebab(s: string): string {
+  return s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
 

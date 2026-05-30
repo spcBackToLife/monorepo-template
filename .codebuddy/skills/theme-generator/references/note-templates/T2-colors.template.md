@@ -117,42 +117,40 @@
 ## ★ 沉淀到 schema 的结论
 
 ```jsonc
-// MCP: theme/update_tokens（colors 子树深合并）
+// MCP: theme/set_theme_tokens（kind="colors"，写当前 active 主题的 base tokens.colors）
+// 别名（bgPage/bgCard/borderDefault/divider）自动映射到真理名
+// 裸字符串自动包装成 { value }，无需手动包
 {
   projectId: "<projectId>",
-  tokens: {
-    colors: {
-      // 语义色
-      primary:        "#FF6F91",
-      secondary:      "#6FFFAA",
-      accent:         "#FFB077",
-      success:        "#2DCC75",
-      warning:        "#FBBE2E",
-      error:          "#DD4747",
-      info:           "#2D7DD2",
-      // 表面色
-      bgPage:         "#FFFFFF",
-      bgCard:         "#F8F9FB",
-      bgElevated:     "#FFFFFF",
-      // 文字色
-      textPrimary:    "rgba(0, 0, 0, 0.88)",
-      textSecondary:  "rgba(0, 0, 0, 0.65)",
-      textTertiary:   "rgba(0, 0, 0, 0.45)",
-      textInverse:    "#FFFFFF",
-      // 状态色
-      primaryHover:   "#FF8FA8",
-      primaryActive:  "#FF4F77",
-      primaryLight:   "#FFF0F4",
-      // 边界色
-      borderDefault:  "#E2E5EA",
-      borderStrong:   "#B8BDC4",
-      divider:        "#EEF0F3",
-      overlay:        "rgba(0, 0, 0, 0.45)",
-      // 中性灰阶
-      gray100: "#F2F3F5", gray200: "#D9DCDF", gray300: "#BFC3C7",
-      gray400: "#9CA1A6", gray500: "#7E848B", gray600: "#646A70",
-      gray700: "#4A4F54", gray800: "#2F3236", gray900: "#15181A"
-    }
+  kind: "colors",
+  values: {
+    // 语义色（14 必备）
+    primary:        "#FF6F91",
+    secondary:      "#6FFFAA",
+    success:        "#2DCC75",
+    warning:        "#FBBE2E",
+    error:          "#DD4747",
+    info:           "#2D7DD2",
+    background:     "#FFFFFF",
+    surface:        "#F8F9FB",
+    textPrimary:    "rgba(0, 0, 0, 0.88)",
+    textSecondary:  "rgba(0, 0, 0, 0.65)",
+    textTertiary:   "rgba(0, 0, 0, 0.45)",
+    border:         "#E2E5EA",
+    borderLight:    "#EEF0F3",
+    borderFocus:    "#FF6F91",
+    // 状态色（推荐）
+    primaryHover:   "#FF8FA8",
+    primaryActive:  "#FF4F77",
+    primaryLight:   "#FFF0F4",
+    // 表面 / 文字（推荐）
+    surfaceElevated:"#FFFFFF",
+    overlay:        "rgba(0, 0, 0, 0.45)",
+    textInverse:    "#FFFFFF",
+    // 中性灰阶（可选）
+    gray100: "#F2F3F5", gray200: "#D9DCDF", gray300: "#BFC3C7",
+    gray400: "#9CA1A6", gray500: "#7E848B", gray600: "#646A70",
+    gray700: "#4A4F54", gray800: "#2F3236", gray900: "#15181A"
   }
 }
 ```

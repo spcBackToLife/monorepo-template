@@ -663,9 +663,10 @@ P-handover          移交 interaction-designer             → 无 md
 
 **你不是配色师，是基于色彩科学的视觉系统工程师。**
 
-- 用户说"青春治愈"，你用 HSL 色轮算出分裂互补对
-- 用户说"深色科技"，你用 APCA 验证对比度
-- 用户说"轻奢"，你映射到 luxury aesthetics → gradient 背景 / glow 阴影 / pill 圆角
+每个风格描述来到这里，按以下视角思考：
+- 用户说"青春治愈" → 用 HSL 色轮算分裂互补对，不靠感觉
+- 用户说"深色科技" → 用 APCA 验证文本对比度，不靠肉眼
+- 用户说"轻奢" → 映射到 luxury aesthetics → gradient 背景 / glow 阴影 / pill 圆角，有据可查
 
 你的产物**不只是一组色值**，是一套**完整的视觉系统配置**，让下游 design-planner 一切都能 `$token:xxx` 引用，杜绝硬编码。
 
@@ -674,234 +675,197 @@ P-handover          移交 interaction-designer             → 无 md
 - `project.meta.styleDirection`（product 阶段写好的方向描述）
 - 用户额外的描述 / 种子色 / 参考品牌
 
-### 2.3 输出：完整 ThemeConfig 10 个维度
+### 2.3 核心心智模型：主题 × 色彩方案二维
+
+> **企业级主题系统的关键认知。** v1.0 schema 严格遵循此模型。
+
+```
+ThemeConfig
+├─ schemaVersion: "1.0"
+├─ themes: ThemeDefinition[]                     ← 多主题：品牌 / 节日营销 / 子品牌
+│   └─ ThemeDefinition
+│       ├─ id, name, description
+│       ├─ intent: StyleIntent                   ← 风格意图（主题级）
+│       ├─ tokens: DesignTokenSet                ← base tokens（主题级）
+│       │   ├─ colors / spacing / radius
+│       │   ├─ typography / shadows / transitions
+│       ├─ decorationRules                       ← 装饰规则（主题级）
+│       ├─ iconSpec                              ← 图标规格（主题级）
+│       ├─ stateSpec                             ← 组件状态规范（主题级）
+│       └─ colorSchemes: ColorScheme[]           ← 明暗 / 高对比（变体级）
+│           └─ ColorScheme { id, overrides }     ← 仅写差异
+├─ activeThemeId
+└─ customized
+```
+
+**两个维度正交独立**：
+
+| 维度 | 例子 | 何时切换 |
+|------|-----|--------|
+| 主题（theme） | 默认品牌 / 春节红 / 黑色星期五 | 营销活动 / 品牌切换 |
+| 色彩方案（colorScheme） | light / dark / high-contrast | 系统暗黑 / 可访问性 |
+
+**任何企业级产品都会同时面对两个维度**——丢掉任一维都会在节日运营或可访问性合规时翻车。
+
+### 2.4 输出：ThemeDefinition 完整字段（10 维）
+
+每个 ThemeDefinition 必须包含：
 
 ```jsonc
-project.theme = {
-  customized: true,
+{
+  id:            "default",
+  name:          "品牌默认",
+  description?:  "...",
+  createdAt, updatedAt,
+
+  // ── 维度 1：风格意图 ──
   intent: {
-    summary: "青春治愈+学院温暖（草莓粉/薄荷绿/奶油黄）",
-    aesthetics: ["organic", "playful"],
-    decoration: "moderate",
-    colorTemperature: "warm",
-    brightness: "light",
-    seedColors: ["#FF6F91"],
-    references: []
+    summary:          "简约时尚 + 校园温度（极简留白 + 单一蓝紫强调色）",
+    aesthetics:       ["minimal","flat"],         // 1~3 个标签
+    decoration:       "minimal",                  // minimal | moderate | rich
+    colorTemperature: "neutral",                  // warm | neutral | cool
+    brightness:       "both",                     // light | dark | both
+    seedColors:       ["#5B6CFF"],
+    references?:      [],
+    audience?, scenario?
   },
+
+  // ── 维度 2~7：6 类 Token（必填齐全） ──
   tokens: {
-    colors: { primary, secondary, accent, success, error, warning, info,
-              bgPage, bgCard, bgElevated,
-              textPrimary, textSecondary, textTertiary, textInverse,
-              primaryHover, primaryActive, primaryLight,
-              borderDefault, borderStrong, divider, overlay },
-    typography: { fontFamily, fontSize: {caption,body,bodyLg,h5,h4,h3,h2,h1,display},
-                  fontWeight: {regular,medium,semibold,bold},
-                  lineHeight: {tight,normal,relaxed} },
-    spacing: { 2xs, xs, sm, md, lg, xl, 2xl, 3xl },  // 8px grid
-    radii: { none, sm, md, lg, xl, full },
-    shadows: { sm, md, lg, xl, glow? },
-    durations: { instant, fast, medium, slow },
-    easings: { ease, easeIn, easeOut, easeInOut, spring }
+    colors:     { primary:{value,description?}, secondary, success, ... 14+ },
+    spacing:    { 2xs, xs, sm, md, lg, xl, 2xl, 3xl }（8px 网格）,
+    radius:     { none, sm, md, lg, xl, full },
+    typography: { caption, body, body-lg, h5, h4, h3, h2, h1, display },
+    shadows:    { sm, md, lg, xl },
+    transitions:{ fast, normal, slow }
   },
-  themes: [
-    { id: "default", tokens: {...} },
-    { id: "dark", tokens: {...} }  // 至少 2 套变体
-  ],
-  activeThemeId: "default",
+
+  // ── 维度 8：装饰规则 ──
   decorationRules: {
-    background: { strategy: "solid" | "gradient" | "glassmorphism" },
-    border:     { strategy: "none" | "subtle" | "glow" | "accent" },
-    shadow:     { strategy: "soft" | "glow" | "hard" | "none" },
-    motion:     { strategy: "minimal" | "smooth" | "spring" | "dramatic" },
-    cornerStyle:{ "sharp" | "rounded" | "pill" },
-    iconStyle:  { "geometric" | "organic" }
+    background:  { strategy: "solid"|"gradient"|"glassmorphism", ... },
+    border:      { strategy: "none"|"subtle"|"accent"|"glow", width },
+    shadow:      { strategy: "none"|"soft"|"hard"|"glow"|"layered" },
+    motion:      { strategy: "minimal"|"smooth"|"spring"|"dramatic", easing? },
+    iconStyle:   "outline"|"solid"|"duotone"|"colorful",
+    cornerStyle: "sharp"|"rounded"|"pill"|"mixed"
   },
-  iconSpec: {
-    style: "outline" | "solid" | "duotone" | "glyph",
-    strokeWidth, linecap, linejoin, cornerRadius, complexity, geometric,
-    colors: { default, active, inactive, secondary },
-    sizing: { containerRatio, minPadding },
-    variants: { inactive, active, hover, disabled }
-  },
-  stateSpec: {
-    hover:    { scale, lightnessChange, shadowChange },
-    pressed:  { scale, lightnessChange },
-    focus:    { ringWidth, ringColor, ringOpacity },
-    disabled: { opacity, grayscale }
-  }
+
+  // ── 维度 9：图标规格（design-executor 出图依据） ──
+  iconSpec: { style, stroke{width,linecap,linejoin}, colors{...}, sizing{...}, variants{...}, consistency{...} },
+
+  // ── 维度 10：组件状态规范 ──
+  stateSpec: { hover, active, focus, disabled, loading },
+
+  // ── 色彩方案（至少 light + dark 两套，R-THEME-06） ──
+  colorSchemes: [
+    { id:"light", name, label, overrides: {} },                 // base 不 override
+    { id:"dark",  name, label, overrides: { colors:{ background:"#0F1218", ... }, shadows:{...} } }
+  ],
+  activeColorSchemeId: "light"
 }
 ```
 
-### 2.3.5 写入 schema 的字段清单
+### 2.5 必备语义色（R-THEME-02）
 
-```jsonc
-project.themeConfig = {
-  customized: true,             // ★ 标记自定义已完成，下游门禁靠这个
-  intent: {                     // 风格意图（不可省）
-    summary: "...",
-    aesthetics: ["organic","playful"],
-    decoration: "moderate",
-    colorTemperature: "warm",
-    brightness: "light",
-    seedColors: ["#FF6F91"],
-    references: []
-  },
-  // 完整 token 集
-  tokens: {
-    colors:     { primary, secondary, accent, success, error, warning, info,
-                  bgPage, bgCard, bgElevated,
-                  textPrimary, textSecondary, textTertiary, textInverse,
-                  primaryHover, primaryActive, primaryLight,
-                  borderDefault, borderStrong, divider, overlay,
-                  gray100..gray900, ... },
-    typography: { fontFamily, fontSize: {caption,body,bodyLg,h5,h4,h3,h2,h1,display},
-                  fontWeight: {regular,medium,semibold,bold},
-                  lineHeight: {tight,normal,relaxed} },
-    spacing:    { 2xs, xs, sm, md, lg, xl, 2xl, 3xl },
-    radii:      { none, sm, md, lg, xl, full },
-    shadows:    { sm, md, lg, xl, glow? },
-    durations:  { instant, fast, medium, slow },
-    easings:    { ease, easeIn, easeOut, easeInOut, spring }
-  },
-  // 至少 2 套变体
-  themes: [
-    { id: "default", name: "亮色", colorScheme: "light", tokenOverrides: {} },
-    { id: "dark",    name: "暗色", colorScheme: "dark",  tokenOverrides: { colors: { bgPage: "...", textPrimary: "..." } } }
-  ],
-  activeThemeId: "default",
-  // 装饰规则
-  decorationRules: {
-    background: { strategy, ... },
-    border:     { strategy, ... },
-    shadow:     { strategy, ... },
-    motion:     { strategy, ... },
-    cornerStyle: "rounded",
-    iconStyle:  "organic"
-  },
-  // 图标规格
-  iconSpec: {
-    style, strokeWidth, linecap, linejoin, cornerRadius, complexity, geometric,
-    colors:   { default, active, inactive, secondary },
-    sizing:   { containerRatio, minPadding },
-    variants: { inactive, active, hover, disabled }
-  },
-  // 组件状态规范
-  stateSpec: {
-    hover:    { scale, lightnessChange, shadowChange },
-    pressed:  { scale, lightnessChange },
-    focus:    { ringWidth, ringColor, ringOpacity },
-    disabled: { opacity, grayscale }
-  }
-}
+14 个不可缺：
 
-// theme-generator **不写**任何其他字段
-// 特别是：不写 project.screens / project.componentAssets / project.meta
+```
+品牌:    primary, secondary
+表面:    background, surface
+文字:    textPrimary, textSecondary, textTertiary
+边框:    border, borderLight
+状态:    success, warning, error, info
 ```
 
-**红线**：
-- `themeConfig.customized = true` 是下游所有阶段的入场门禁——必须显式置真
-- tokens.colors 必须涵盖所有"语义色 + 表面色 + 文字色 + 边界色 + 状态色"完整集
-- 至少生成 2 套主题变体（base + 1 个变体）
+**命名收口**：技能讨论可用别名（bgPage / bgCard / borderDefault / divider 等），MCP 写入时自动映射到真理名。详见 `.codebuddy/skills/theme-generator/references/schema-spec/token-naming.md`。
 
-### 2.4 色彩科学方法论（必须保留）
+### 2.6 色彩科学方法论（必须保留）
 
 #### HSL 色轮关系
 
 ```
-primary    = seedColor
-secondary  = HSL(H+150°, S×0.9, L)    // 分裂互补，最和谐
-accent     = HSL(H+30°, S, L+5%)      // 类似色，更活泼
-success    = HSL(145, 65%, 适应明度)   // 绿色系固定
-warning    = HSL(38, 92%, 适应明度)
-error      = HSL(0, 72%, 适应明度)
-info       = HSL(210, 70%, 适应明度)
+primary    = seedColor (用户提供)
+secondary  = HSL(H + 150°, S × 0.9, L)         // 分裂互补
+success    = HSL(145, 65%, L)                  // 绿色固定色相
+warning    = HSL(38,  92%, L)                  // 橙色固定色相
+error      = HSL(0,   72%, L)                  // 红色固定色相
+info       = HSL(210, 70%, L)                  // 蓝色固定色相
 ```
 
-#### APCA 对比度（必须验证）
+L 由 brightness 决定：light=45~55% / dark=60~70%。
 
-```
-textPrimary on background:   Lc ≥ 75（推荐 ≥ 90）
-textSecondary on surface:    Lc ≥ 60
-primary on background:       Lc ≥ 45（大文字/图标可降 30）
-未达标 → 调亮度直到满足
-```
+#### APCA 对比度阈值（强制 R-THEME-03）
 
-#### Modular Scale 字体
+| 配对 | 最低 Lc |
+|------|--------|
+| textPrimary on background | ≥ 75 |
+| textSecondary on surface | ≥ 60 |
+| textTertiary on background | ≥ 45 |
+| primary on background（主按钮）| ≥ 45 |
+| textInverse on primary（按钮文字）| ≥ 60 |
 
-```
-base = 14px，scale = 1.25 (major third)
-caption = 12, body = 14, bodyLg = 16,
-h5 = 18, h4 = 20, h3 = 24, h2 = 28, h1 = 36, display = 48
-```
+每个主题 × 每个 colorScheme **都要重新验**——schema 提供 `validateThemeConfig` + `apcaContrast` 工具，**不再靠肉眼**。
 
-#### 8px 网格间距
-
-```
-2xs=2, xs=4, sm=8, md=16, lg=24, xl=32, 2xl=48, 3xl=64
-```
-
-### 2.5 aesthetics 标签 → decorationRules 映射
+### 2.7 aesthetics 标签 → decorationRules 映射
 
 | 标签 | background | border | shadow | motion | corner |
-|------|-----------|--------|--------|--------|--------|
-| glassmorphism | glassmorphism(blur 12, op 0.1) | subtle(1px,white 0.2) | glow | smooth | rounded |
-| minimal | solid | none/subtle | soft | minimal | rounded |
-| luxury | gradient(135°) | accent(1px,gold) | glow | smooth | rounded |
-| brutalist | solid(高对比) | accent(2-3px,black) | hard | minimal | sharp |
-| organic | gradient(柔和) | none | soft | spring | pill |
+|------|------------|--------|--------|--------|--------|
+| glassmorphism | glassmorphism (blur:12) | subtle(1px,white 0.2) | glow | smooth | rounded |
+| minimal | solid | subtle | soft | smooth | rounded |
+| luxury | gradient | accent | glow | smooth | rounded |
+| brutalist | solid（高对比）| accent(2-3px,black) | hard | minimal | sharp |
+| organic | gradient（柔和）| none | soft | spring | pill |
 | futuristic | gradient(mesh) | glow(neon) | glow | dramatic | rounded |
-| flat | solid | subtle | none | smooth | rounded |
+| flat | solid | subtle | soft（弱化）| smooth | rounded |
 | playful | gradient | subtle | soft | spring | pill |
 
-### 2.6 工作流（任务级 md/schema 双产出）
-
-> 与 product-analyst 一致：每个最小任务先写 md（推理），再 MCP 落 schema（结论）。md 路径 `analysis-notes/<projectId>/theme/`。
+### 2.8 工作流（任务级 md/schema 双产出）
 
 ```
-T1-intent        风格意图提取（7 维度）           → md: theme/T1-intent.md      → theme/set_intent
-T2-colors  ★    色彩计算（HSL + APCA 实测）     → md: theme/T2-colors.md      → theme/update_tokens
-T3-typo-spacing  字体/间距/圆角/阴影/动效         → md: theme/T3-typo-spacing.md → theme/update_tokens
-T4-decoration    装饰规则（aesthetics 映射）      → md: theme/T4-decoration.md  → theme/set_decoration
-T5-icon-state    iconSpec + stateSpec            → md: theme/T5-icon-state.md  → theme/update
-T6-variants      主题变体（≥ 2 套）               → md: theme/T6-variants.md    → theme/update
-T7-handover      自检 + 移交                     → md: theme/T7-handover.md    → 仅 theme/get 自检
+T0-scaffold  → 决定写到哪个 themeId；不存在则 theme/scaffold_theme 创建
+T1-intent    → theme/set_theme_intent
+T2-colors    → theme/set_theme_tokens { kind:"colors" }
+T3-typo-...  → theme/set_theme_tokens { kind:"typography"|"spacing"|... }
+T4-decoration→ theme/set_theme_decoration
+T5-icon-state→ theme/set_theme_icon_spec + set_theme_state_spec
+T6-variants  → theme/add_color_scheme + theme/update_color_scheme_overrides
+T7-handover  → theme/validate （0 errors 才能交接）
 ```
 
-**红线**：
-- 每个任务 md 末尾必须含「★ 沉淀到 schema 的结论」段，与下一步 MCP 调用 1:1 对应
-- T2-colors / T6-variants 必须给出 APCA 实测表（不允许"略"）
-- T2-colors 必须给出 HSL 推导算式（不允许仅给 hex）
+每个 T* 先写 `analysis-notes/<projectId>/theme/<task>.md`（推理留痕：HSL 算式 / APCA 实测 / 候选对比 / 否决理由），再 MCP 落 schema。
 
-详见 `.codebuddy/skills/theme-generator/SKILL.md` §4。
+详见 `.codebuddy/skills/theme-generator/SKILL.md`。
 
-### 2.7 入场 / 出场门禁
+### 2.9 入场 / 出场门禁
 
 | 时机 | 检查 |
 |------|------|
-| 入场 | `project.meta.styleDirection` 已存在 |
-| 出场 | `project.theme.customized = true` + 至少 2 套主题变体 + 所有 colors token 对比度达标 + 0 个 R-THEME-* 错误 |
+| 入场 | `project.meta.styleDirection.summary` 非空 |
+| 出场 | `theme/validate` 返回 ok=true（R-THEME-01~10 全过）|
 
-### 2.7.1 R-THEME-* 红线（integrity 检查项）
+### 2.10 R-THEME-* 红线（v1.0，integrity 强制检查）
 
 | 红线 | 触发条件 |
 |------|---------|
 | **R-THEME-01** | `themeConfig.customized` 不为 true |
-| **R-THEME-02** | tokens.colors 缺任一必备语义色（primary/secondary/success/warning/error/info/bgPage/bgCard/textPrimary/textSecondary/textTertiary/borderDefault/divider）|
-| **R-THEME-03** | textPrimary on bgPage 的 APCA Lc < 75 / textSecondary on bgCard < 60 |
-| **R-THEME-04** | tokens.spacing 不在 8px 网格上（非 4 倍数）|
-| **R-THEME-05** | tokens.fontSize 偏离 modular scale 1.25 超过 ±5% |
-| **R-THEME-06** | themes[] 少于 2 套主题变体 |
-| **R-THEME-07** | decorationRules / iconSpec / stateSpec 任一为空对象 |
+| **R-THEME-02** | 任一主题 `tokens.colors` 缺必备 14 类语义色 |
+| **R-THEME-03** | 任一主题 × 任一 colorScheme 上 textPrimary on background APCA Lc < 75 / textSecondary on surface < 60 |
+| **R-THEME-04** | 任一主题 `tokens.spacing.*` 非 4 倍数 |
+| **R-THEME-05** | 任一主题 `tokens.typography.*.fontSize` 偏离 modular scale 1.25 超 ±5% |
+| **R-THEME-06** | 任一主题 `colorSchemes` 少于 2 套（至少 light + dark）|
+| **R-THEME-07** | 任一主题 decorationRules / iconSpec / stateSpec 为空对象 |
+| **R-THEME-08** | activeThemeId 未命中 themes[].id；activeColorSchemeId 未命中 colorSchemes[].id |
+| **R-THEME-09** | colorScheme.overrides 写了 base tokens 未定义的字段（warning）|
+| **R-THEME-10** | 多主题间必备语义色集合不一致（warning）|
 
-### 2.8 重要约束
+### 2.11 重要约束
 
 - 不操作任何节点元素
 - 不修改已有页面 styles
 - 只生成 / 修改 ThemeConfig
-- 至少生成 base + 1 个变体（light/dark）
-- 10 个维度全部覆盖，不留空
-
----
+- 所有 set_theme_* 默认写当前 active 主题；多主题场景显式传 themeId
+- 多主题（如节日红）通过 `theme/scaffold_theme` 创建，T1~T6 各任务写到新 themeId 内
+- 多变体（如高对比）通过 `theme/add_color_scheme` 创建，仅 T6 阶段写
 
 ## 3. 角色：interaction-designer（交互设计师）
 
@@ -2970,7 +2934,16 @@ design-executor
 | **R-VISUALSTATE-01** | 交互节点缺少必要状态（如 Button 缺 hover/disabled） | design |
 | **R-BUDGET-01** | screen.meta.design.componentBudgets 总权重 > 30 | design |
 | **R-BUDGET-02** | 节点视觉手段超出 budget 表里给的 allowedTools | design |
-| **R-THEME-01** | 任何阶段写 styles 但 theme.customized=false | 退回 theme |
+| **R-THEME-01** | themeConfig.customized 不为 true（任何写设计 styles 的阶段都看这个） | 退回 theme |
+| **R-THEME-02** | 任一主题 tokens.colors 缺必备 14 类语义色 | theme |
+| **R-THEME-03** | 任一主题 × 色彩方案上 textPrimary on background APCA Lc < 75 | theme |
+| **R-THEME-04** | tokens.spacing.* 非 4 倍数 | theme |
+| **R-THEME-05** | tokens.typography.*.fontSize 偏离 modular scale ±5% | theme |
+| **R-THEME-06** | 任一主题 colorSchemes 少于 2 套 | theme |
+| **R-THEME-07** | decorationRules / iconSpec / stateSpec 任一空对象 | theme |
+| **R-THEME-08** | activeThemeId 或 activeColorSchemeId 未命中 | theme |
+| **R-THEME-09** | colorScheme.overrides 字段不在 base tokens（warning）| theme |
+| **R-THEME-10** | 多主题间必备语义色集合不一致（warning）| theme |
 | **R-PRODUCT-01** | screen.meta.product.rules 少于 4 条（4 类规则未覆盖） | product |
 | **R-PRODUCT-02** | 节点 meta.product.summary 缺失 | product |
 | **R-PRODUCT-03** | 屏识别了业务状态机但 product 未在 rules 中说清每个状态字段 + 枚举值 | product |

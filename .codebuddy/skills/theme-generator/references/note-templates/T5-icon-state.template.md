@@ -82,40 +82,40 @@ aesthetics = `<...>` → 命中行：
 ## ★ 沉淀到 schema 的结论
 
 ```jsonc
-// MCP: theme/update（iconSpec/stateSpec 是 ThemeConfig 根级字段，需全量 update 写入）
-// ⚠️ 实际调用前 read schema-spec/theme-config.md §4+§5 + v2-actions-cheatsheet 验证 MCP 字段
+// MCP 调两次：先 iconSpec 再 stateSpec（都是深合并）
+
+// 1) theme/set_theme_icon_spec
 {
   projectId: "<projectId>",
-  themeConfig: {
-    // ... 已有 intent/tokens/decorationRules 保留（先 theme/get 取完整再 merge）
-    iconSpec: {
-      style: "duotone",
-      strokeWidth: 1.5,
-      linecap: "round",
-      linejoin: "round",
-      cornerRadius: 1,
-      complexity: "medium",
-      geometric: false,
-      colors: {
-        default:   "$token:textSecondary",
-        active:    "$token:primary",
-        inactive:  "$token:textTertiary",
-        secondary: "$token:primaryLight"
-      },
-      sizing: { containerRatio: 0.55, minPadding: 6 },
-      variants: {
-        inactive: { opacity: 0.5 },
-        active:   { opacity: 1.0, strokeWidth: 1.8 },
-        hover:    { opacity: 0.85 },
-        disabled: { opacity: 0.3, grayscale: true }
-      }
+  iconSpec: {
+    style: "outline",
+    stroke: { width: 1.5, linecap: "round", linejoin: "round", cornerRadius: 0 },
+    colors: {
+      default:   "$token:textSecondary",
+      active:    "$token:primary",
+      inactive:  "$token:textTertiary",
+      secondary: "$token:primaryLight"
     },
-    stateSpec: {
-      hover:    { scale: 1.05, lightnessChange: "+8%", shadowChange: "up" },
-      pressed:  { scale: 0.98, lightnessChange: "-8%" },
-      focus:    { ringWidth: "2px", ringColor: "$token:primary", ringOpacity: 0.4, ringOffset: "2px" },
-      disabled: { opacity: 0.4, grayscale: true }
-    }
+    sizing: { containerRatio: 0.55, minPadding: 6, strokeCompensation: true },
+    variants: {
+      inactive: { opacity: 0.6, color: "$token:textTertiary" },
+      active:   { opacity: 1.0, strokeWidth: 1.8, color: "$token:primary" },
+      hover:    { opacity: 0.85 },
+      disabled: { opacity: 0.35, grayscale: true }
+    },
+    consistency: { targetComplexity: "simple", uniformStrokeWidth: true, geometricOnly: true }
+  }
+}
+
+// 2) theme/set_theme_state_spec
+{
+  projectId: "<projectId>",
+  stateSpec: {
+    hover:    { backgroundLightnessShift: 6,  shadowLevel: "up",   scale: 1.02, transition: "$token:transition-fast" },
+    active:   { backgroundLightnessShift: -8, shadowLevel: "down", scale: 0.98, transition: "$token:transition-fast" },
+    focus:    { ringColor: "$token:primary", ringWidth: "2px", ringOffset: "2px", animated: false },
+    disabled: { opacity: 0.4, removeShadow: true, cursor: "not-allowed", grayscale: true },
+    loading:  { opacity: 0.8, spinnerColor: "$token:primary", skeleton: false }
   }
 }
 ```

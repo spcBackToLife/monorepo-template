@@ -2,7 +2,8 @@ import type { ThemeConfig, ThemeDefinition, TypographyToken, TokenOverrides, Des
 
 /**
  * Token 引用前缀。样式值以此开头表示引用项目 Token。
- * 例如: "$token:primary" → ThemeConfig.tokens.colors.primary.value
+ * 例如: "$token:primary" → ThemeConfig.themes[active].tokens.colors.primary.value
+ *      （查找顺序：先 active colorScheme.overrides，回退 active theme.tokens）
  */
 const TOKEN_PREFIX = '$token:';
 

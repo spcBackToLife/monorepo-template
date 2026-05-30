@@ -106,55 +106,46 @@ stateSpec                                                → 保留 base
 ## ★ 沉淀到 schema 的结论
 
 ```jsonc
-// MCP: theme/update（追加 themes[] 字段）
-// ⚠️ 先 theme/get 拿完整 themeConfig，再追加 themes 数组，避免覆盖其他字段
+// v1.0：色彩方案在主题内部，不是 themes 顶层！
+// 步骤：1) add_color_scheme 建骨架  2) update_color_scheme_overrides 填差异
+
+// === Step 1: 添加 dark 色彩方案 ===
+// MCP: theme/add_color_scheme
 {
   projectId: "<projectId>",
-  themeConfig: {
-    // ... 已有字段保留
-    themes: [
-      {
-        id: "default",
-        name: "亮色",
-        colorScheme: "light",
-        tokenOverrides: {}
-      },
-      {
-        id: "dark",
-        name: "暗色",
-        colorScheme: "dark",
-        tokenOverrides: {
-          colors: {
-            bgPage:        "#1A0F12",
-            bgCard:        "#21181B",
-            bgElevated:    "#2A2125",
-            textPrimary:   "#F7F7F7",
-            textSecondary: "#A89095",
-            textTertiary:  "#7A6E72",
-            textInverse:   "#1A0F12",
-            borderDefault: "#3C2D32",
-            borderStrong:  "#5A444B",
-            divider:       "#2D2125",
-            overlay:       "rgba(0, 0, 0, 0.6)",
-            primary:       "#FF8FA8",
-            primaryHover:  "#FFAAC0",
-            primaryActive: "#E66F89",
-            primaryLight:  "#4D1F2D",
-            success:       "#5FE099",
-            warning:       "#FFD466",
-            error:         "#F07878",
-            info:          "#5FA8E5"
-          },
-          shadows: {
-            sm: "0 2px 4px rgba(0,0,0,0.30)",
-            md: "0 4px 12px rgba(0,0,0,0.40)",
-            lg: "0 8px 24px rgba(0,0,0,0.50)",
-            xl: "0 12px 48px rgba(0,0,0,0.60)"
-          }
-        }
-      }
-    ],
-    activeThemeId: "default"
-  }
+  schemeId:  "dark",
+  name:      "dark",
+  label:     "深色模式",
+  kind:      "dark"
+  // 不传 overrides → 自动派生骨架
 }
+
+// === Step 2: 细化 dark overrides ===
+// MCP: theme/update_color_scheme_overrides（按 kind 分类）
+{ projectId, schemeId: "dark", kind: "colors", values: {
+  background:     "#0F1218",
+  surface:        "#181B22",
+  surfaceElevated:"#21252D",
+  overlay:        "rgba(0, 0, 0, 0.65)",
+  textPrimary:    "rgba(255, 255, 255, 0.92)",
+  textSecondary:  "rgba(255, 255, 255, 0.65)",
+  textTertiary:   "rgba(255, 255, 255, 0.45)",
+  textInverse:    "#0F1218",
+  border:         "#2A2F3A",
+  borderLight:    "#1F232C",
+  success:        "#5DE095",
+  warning:        "#FFD466",
+  error:          "#FF6B6B",
+  info:           "#5DA8E8",
+  primaryLight:   "#1F2333"
+}}
+
+{ projectId, schemeId: "dark", kind: "shadows", values: {
+  sm: "0 2px 4px rgba(0, 0, 0, 0.40)",
+  md: "0 4px 12px rgba(0, 0, 0, 0.50)",
+  lg: "0 8px 24px rgba(0, 0, 0, 0.60)",
+  xl: "0 12px 48px rgba(0, 0, 0, 0.70)"
+}}
 ```
+
+**APCA 重验**：每个 colorScheme 都要跑 textPrimary on background ≥ 75 / textSecondary on surface ≥ 60。schema 的 `validateThemeConfig` 自动验。

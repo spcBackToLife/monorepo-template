@@ -156,7 +156,7 @@ export interface DesignTokenSet {
 
 // ===== 主题变体 =====
 
-/** Token 覆盖：只写与 base 不同的值 */
+/** Token 覆盖：色彩方案（明暗 / 高对比）只写与 base 不同的值。深合并到 base tokens 上。 */
 export interface TokenOverrides {
   colors?: Partial<Record<string, string>>;
   spacing?: Partial<Record<string, string>>;
@@ -165,14 +165,6 @@ export interface TokenOverrides {
   shadows?: Partial<Record<string, string>>;
   transitions?: Partial<Record<string, string>>;
   custom?: Partial<Record<string, string>>;
-}
-
-/** 主题变体 */
-export interface ThemeVariant {
-  id: string;
-  name: string;
-  label: string;
-  overrides: TokenOverrides;
 }
 
 // ===== 装饰规则 =====
@@ -381,6 +373,8 @@ export interface ColorScheme {
 
 /** 项目级主题管理配置 */
 export interface ThemeConfig {
+  /** Schema 版本号，用于迁移识别。当前 "1.0"。 */
+  schemaVersion?: string;
   /**
    * 项目下的所有主题列表（至少一个）。
    * 支持多套完全不同的风格共存（品牌/活动/节日等），用户可按场景切换。

@@ -16,8 +16,8 @@ export interface PlanTask {
   id: string;
   /** 任务标题（人话） */
   title: string;
-  /** 哪个阶段产生（product/interaction/design/executor） */
-  stage: 'product' | 'interaction' | 'design' | 'executor';
+  /** 哪个阶段产生（product/theme/interaction/design/executor） */
+  stage: 'product' | 'theme' | 'interaction' | 'design' | 'executor';
   /** 任务状态 */
   status: 'pending' | 'doing' | 'done' | 'blocked' | 'skipped';
   /** 阻塞原因（status = blocked 时填） */

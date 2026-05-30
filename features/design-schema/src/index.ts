@@ -112,11 +112,11 @@ export type {
   ColorTokenGroup,
   DesignTokenSet,
   TokenOverrides,
-  ThemeVariant,
   ColorScheme,
   ThemeDefinition,
   BackgroundRule,
   DecorationRules,
+  IconSpec,
   ComponentStateSpec,
   ThemeConfig,
 } from './types';
@@ -124,8 +124,33 @@ export type {
 // Expression 运行期工具（既是类型也是 runtime）
 export { expr, isExpression, normalizeExpression } from './types';
 
-// ===== Theme Defaults =====
+// ===== Theme =====
 export { DEFAULT_THEME_CONFIG } from './presets/theme-defaults';
+export {
+  createEmptyThemeConfig,
+  createDefaultTheme,
+  deriveThemeFromBase,
+  createColorScheme,
+  deriveDarkSchemeOverrides,
+} from './theme/factories';
+export {
+  validateThemeConfig,
+  apcaContrast,
+  type ThemeValidationReport,
+  type ThemeViolation,
+} from './theme/validation';
+export {
+  applyThemeOp,
+  findTheme,
+  findScheme,
+  normalizeColorKey,
+  normalizeTypographyKey,
+  COLOR_NAME_ALIAS,
+  TYPOGRAPHY_NAME_ALIAS,
+  type ThemeOp,
+  type TokenKind,
+  type ApplyThemeOpResult,
+} from './theme/operations';
 
 // ===== Viewport Presets =====
 export {

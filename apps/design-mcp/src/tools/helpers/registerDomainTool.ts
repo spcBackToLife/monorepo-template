@@ -145,7 +145,7 @@ function coerceStringifiedObjects(
  *   1. handler(params) 拥有精确字段类型
  *   2. registerDomainTool 内部可安全访问 schema.shape 构造 discriminatedUnion
  */
-interface ActionDef<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
+export interface ActionDef<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
   description: string;
   schema: S;
   handler: (params: z.infer<S>) => ToolResult | Promise<ToolResult>;

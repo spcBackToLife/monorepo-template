@@ -71,29 +71,21 @@ decoration = `moderate` → 按表格映射原值，不升不降。
 ## ★ 沉淀到 schema 的结论
 
 ```jsonc
-// MCP: theme/set_decoration（自动 customized=true）
+// MCP: theme/set_theme_decoration（深合并；写当前 active 主题）
 {
   projectId: "<projectId>",
   decorationRules: {
     background: {
       strategy: "gradient",
-      gradientAngle: 135,
-      gradientStops: [
-        { color: "$token:primaryLight", offset: 0 },
-        { color: "$token:bgCard",        offset: 1 }
-      ]
+      gradient: { direction: "135deg", type: "linear" }
     },
-    border: {
-      strategy: "subtle",
-      width:    "1px",
-      color:    "$token:borderDefault"
-    },
-    shadow:     { strategy: "soft" },
-    motion:     { strategy: "spring" },
+    border:      { strategy: "subtle", width: "1px" },
+    shadow:      { strategy: "soft" },
+    motion:      { strategy: "spring", easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" },
     cornerStyle: "pill",
-    iconStyle:   "organic"
+    iconStyle:   "outline"
   }
 }
 ```
 
-**调用后必须回头检查 T3-typo-spacing 的 radii 阶梯是否匹配 cornerStyle=pill**——若不匹配，update_tokens 修正 radii。
+**回头一致性 check**：调用前后跑一遍 T3 的 radii 阶梯，确保和 cornerStyle 匹配（pill→大圆角阶梯）。

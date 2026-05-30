@@ -13,6 +13,8 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import {
   checkProjectIntegrity,
   checkScreenIntegrity,
+  validateThemeConfig,
+  type ThemeOp,
 } from '@globallink/design-schema';
 
 @Controller('api/projects')
@@ -53,13 +55,34 @@ export class ProjectsController {
     return this.projects.getTheme(id);
   }
 
-  /** PUT /api/projects/:id/theme — 更新项目主题配置（全量替换） */
+  /** PUT /api/projects/:id/theme — 全量替换主题配置（仅迁移脚本/导入场景用）*/
   @Put(':id/theme')
   updateTheme(
     @Param('id') id: string,
     @Body() body: { themeConfig: unknown },
   ) {
     return this.projects.updateTheme(id, body.themeConfig);
+  }
+
+  /**
+   * POST /api/projects/:id/theme/op — 应用单个主题操作（推荐前端使用）
+   *
+   * 与 MCP theme/* 工具调用同源（共用 schema 包的 applyThemeOp reducer），
+   * 保证"无论从哪个入口改主题，最终落库结构一致"。
+   */
+  @Post(':id/theme/op')
+  async applyThemeOp(
+    @Param('id') id: string,
+    @Body() body: { op: ThemeOp },
+  ) {
+    return this.projects.applyThemeOp(id, body.op);
+  }
+
+  /** POST /api/projects/:id/theme/validate — 跑 R-THEME-01~10 红线 */
+  @Post(':id/theme/validate')
+  async validateTheme(@Param('id') id: string) {
+    const cfg = await this.projects.getTheme(id);
+    return validateThemeConfig(cfg as never);
   }
 
   // ===== Integrity API (Schema-First 完成度对账) =====

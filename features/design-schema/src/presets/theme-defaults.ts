@@ -215,6 +215,7 @@ const DEFAULT_THEME_DEFINITION: ThemeDefinition = {
  * 内含 Light + Dark 两个色彩方案。customized=false 表示用户尚未定制。
  */
 export const DEFAULT_THEME_CONFIG: ThemeConfig = {
+  schemaVersion: '1.0',
   themes: [DEFAULT_THEME_DEFINITION],
   activeThemeId: 'default',
   customized: false,

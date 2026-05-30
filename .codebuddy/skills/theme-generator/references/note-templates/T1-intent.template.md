@@ -86,19 +86,17 @@
 ## ★ 沉淀到 schema 的结论
 
 ```jsonc
-// MCP: theme/set_intent
+// MCP: theme/set_theme_intent（写到当前 active 主题；多主题场景显式传 themeId）
 {
   projectId: "<projectId>",
-  intent: {
-    summary:          "青春治愈+学院温暖（草莓粉/薄荷绿/奶油黄）",
-    aesthetics:       ["organic", "playful"],
-    decoration:       "moderate",
-    colorTemperature: "warm",
-    brightness:       "light",
-    seedColors:       ["#FF6F91"],
-    references:       []
-  }
+  summary:          "青春治愈+学院温暖（草莓粉/薄荷绿/奶油黄）",
+  aesthetics:       ["organic", "playful"],
+  decoration:       "moderate",
+  colorTemperature: "warm",
+  brightness:       "light",
+  seedColors:       ["#FF6F91"],
+  references:       []
 }
 ```
 
-**调用后 customized 自动置 true**。
+**调用后 customized 自动置 true**。所有字段都是可选的，深合并不传不删。

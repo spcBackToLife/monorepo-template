@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
-import { App as AntdApp, Button, Card, ColorPicker, Divider, Dropdown, Input, Modal, Segmented, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
-import { ArrowLeftOutlined, CopyOutlined, DeleteOutlined, EditOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons';
+import { App as AntdApp, Button, Card, ColorPicker, Divider, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Spin, Tag, Tooltip, Typography } from 'antd';
+import { ArrowLeftOutlined, CheckCircleOutlined, CopyOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, SyncOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { editorStore } from '@/stores/editor';
-import type { ThemeConfig, ThemeDefinition, ColorScheme } from '@globallink/design-schema';
+import type { ColorScheme, ThemeConfig, ThemeDefinition, TokenKind } from '@globallink/design-schema';
 
 const { Title, Text } = Typography;
 
@@ -17,10 +17,14 @@ const { Title, Text } = Typography;
 export const ThemeCenterPage = observer(function ThemeCenterPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { message } = AntdApp.useApp();
+  const { message, modal } = AntdApp.useApp();
   const [activeSection, setActiveSection] = useState<string>('overview');
   const [addThemeVisible, setAddThemeVisible] = useState(false);
   const [newThemeName, setNewThemeName] = useState('');
+  const [newThemeId, setNewThemeId] = useState('');
+  const [newThemeDescription, setNewThemeDescription] = useState('');
+  const [copyFromCurrent, setCopyFromCurrent] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const themeConfig = editorStore.project?.themeConfig as ThemeConfig | undefined;
 
@@ -40,6 +44,104 @@ export const ThemeCenterPage = observer(function ThemeCenterPage() {
 
   // 获取当前色彩方案
   const activeScheme = activeTheme.colorSchemes.find(s => s.id === activeTheme.activeColorSchemeId) ?? activeTheme.colorSchemes[0];
+
+  const handleCreateTheme = async () => {
+    if (!newThemeId.trim() || !newThemeName.trim()) {
+      message.error('主题 ID 与名称必填');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await editorStore.scaffoldTheme({
+        themeId: newThemeId.trim(),
+        name: newThemeName.trim(),
+        description: newThemeDescription.trim() || undefined,
+        copyFrom: copyFromCurrent ? activeTheme.id : undefined,
+        activate: true,
+      });
+      message.success(`主题 "${newThemeName}" 创建成功`);
+      setAddThemeVisible(false);
+      setNewThemeId('');
+      setNewThemeName('');
+      setNewThemeDescription('');
+    } catch (err) {
+      message.error(`创建失败：${(err as Error).message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteTheme = async () => {
+    try {
+      await editorStore.deleteTheme(activeTheme.id);
+      message.success(`主题 "${activeTheme.name}" 已删除`);
+    } catch (err) {
+      message.error(`删除失败：${(err as Error).message}`);
+    }
+  };
+
+  const handleCopyTheme = async () => {
+    const copyId = `${activeTheme.id}-copy-${Date.now()}`;
+    try {
+      await editorStore.scaffoldTheme({
+        themeId: copyId,
+        name: `${activeTheme.name} 副本`,
+        description: activeTheme.description,
+        copyFrom: activeTheme.id,
+        activate: true,
+      });
+      message.success('主题已复制');
+    } catch (err) {
+      message.error(`复制失败：${(err as Error).message}`);
+    }
+  };
+
+  const handleValidate = async () => {
+    try {
+      const report = await editorStore.validateTheme();
+      if (report.ok) {
+        modal.success({
+          title: '主题校验通过',
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          content: `R-THEME-01~10 红线全部通过${report.warnings.length > 0 ? `（含 ${report.warnings.length} 条警告）` : ''}。`,
+        });
+      } else {
+        modal.error({
+          title: '主题校验失败',
+          icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
+          width: 720,
+          content: (
+            <div style={{ maxHeight: 400, overflow: 'auto' }}>
+              {(report.errors as Array<{ rule: string; message: string }>).map((e, i) => (
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <Tag color="red">{e.rule}</Tag> {e.message}
+                </div>
+              ))}
+              {(report.warnings as Array<{ rule: string; message: string }>).map((w, i) => (
+                <div key={`w${i}`} style={{ marginBottom: 8 }}>
+                  <Tag color="orange">{w.rule}</Tag> {w.message}
+                </div>
+              ))}
+            </div>
+          ),
+        });
+      }
+    } catch (err) {
+      message.error(`校验失败：${(err as Error).message}`);
+    }
+  };
+
+  const handleExport = () => {
+    const json = JSON.stringify(themeConfig, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `theme-${id}-${activeTheme.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    message.success('主题配置已导出');
+  };
 
   const navItems = [
     { key: 'overview', label: '📋 概览', group: '' },
@@ -98,6 +200,46 @@ export const ThemeCenterPage = observer(function ThemeCenterPage() {
             value={activeTheme.activeColorSchemeId}
             onChange={(val) => editorStore.switchColorScheme(val as string)}
           />
+          <div style={{ marginTop: 8, display: 'flex', gap: 4 }}>
+            {!activeTheme.colorSchemes.some(s => s.id === 'dark') && (
+              <Button
+                size="small"
+                block
+                icon={<PlusOutlined />}
+                onClick={async () => {
+                  try {
+                    await editorStore.addColorScheme({
+                      schemeId: 'dark',
+                      name: 'dark',
+                      label: '深色模式',
+                      kind: 'dark',
+                    });
+                    message.success('已添加深色模式');
+                  } catch (err) {
+                    message.error(`添加失败：${(err as Error).message}`);
+                  }
+                }}
+              >
+                添加深色模式
+              </Button>
+            )}
+            {activeTheme.colorSchemes.length > 2 && activeTheme.activeColorSchemeId !== 'light' && activeTheme.activeColorSchemeId !== 'dark' && (
+              <Popconfirm
+                title={`删除色彩方案 "${activeScheme?.label}"？`}
+                onConfirm={async () => {
+                  if (!activeScheme) return;
+                  try {
+                    await editorStore.removeColorScheme(activeScheme.id);
+                    message.success('已删除');
+                  } catch (err) {
+                    message.error(`删除失败：${(err as Error).message}`);
+                  }
+                }}
+              >
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            )}
+          </div>
         </div>
 
         {/* 导航菜单 */}
@@ -148,9 +290,26 @@ export const ThemeCenterPage = observer(function ThemeCenterPage() {
             <Tag color={themeConfig.customized ? 'green' : 'orange'}>
               {themeConfig.customized ? '已定制' : '默认模板'}
             </Tag>
-            <Button icon={<SyncOutlined />}>AI 重新生成</Button>
-            <Button icon={<CopyOutlined />}>复制主题</Button>
-            <Button type="primary">导出</Button>
+            <Tooltip title="跑 R-THEME-01~10 红线对账">
+              <Button icon={<CheckCircleOutlined />} onClick={handleValidate}>校验</Button>
+            </Tooltip>
+            <Tooltip title="复制当前主题为新主题">
+              <Button icon={<CopyOutlined />} onClick={handleCopyTheme}>复制主题</Button>
+            </Tooltip>
+            <Tooltip title="导出主题配置 JSON">
+              <Button icon={<SyncOutlined />} onClick={handleExport}>导出</Button>
+            </Tooltip>
+            {themeConfig.themes.length > 1 && (
+              <Popconfirm
+                title={`删除主题 "${activeTheme.name}"？`}
+                description="此操作不可恢复"
+                onConfirm={handleDeleteTheme}
+                okText="删除"
+                okType="danger"
+              >
+                <Button danger icon={<DeleteOutlined />}>删除</Button>
+              </Popconfirm>
+            )}
           </Space>
         </div>
 
@@ -173,18 +332,48 @@ export const ThemeCenterPage = observer(function ThemeCenterPage() {
         title="新增主题"
         open={addThemeVisible}
         onCancel={() => setAddThemeVisible(false)}
-        onOk={() => { message.success('主题创建成功'); setAddThemeVisible(false); }}
+        onOk={handleCreateTheme}
+        confirmLoading={submitting}
+        okText="创建"
       >
-        <Input
-          placeholder="主题名称（如：春节红、科技暗夜、清新自然）"
-          value={newThemeName}
-          onChange={e => setNewThemeName(e.target.value)}
-          style={{ marginBottom: 12 }}
-        />
-        <Input.TextArea
-          placeholder="描述你想要的风格，AI 会帮你生成完整的 Token 配置"
-          rows={3}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12 }}>主题 ID（kebab-case，如 spring-festival）</Text>
+            <Input
+              placeholder="spring-festival"
+              value={newThemeId}
+              onChange={e => setNewThemeId(e.target.value)}
+            />
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12 }}>主题名称（用户可见）</Text>
+            <Input
+              placeholder="春节红"
+              value={newThemeName}
+              onChange={e => setNewThemeName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12 }}>描述（可选）</Text>
+            <Input.TextArea
+              placeholder="节日营销主题，主色由蓝紫切换为中国红"
+              rows={2}
+              value={newThemeDescription}
+              onChange={e => setNewThemeDescription(e.target.value)}
+            />
+          </div>
+          <div>
+            <Segmented
+              block
+              options={[
+                { label: `从当前主题（${activeTheme.name}）复制`, value: 'copy' },
+                { label: '从默认模板创建', value: 'fresh' },
+              ]}
+              value={copyFromCurrent ? 'copy' : 'fresh'}
+              onChange={(val) => setCopyFromCurrent(val === 'copy')}
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );
@@ -245,14 +434,32 @@ function OverviewSection({ theme, scheme }: { theme: ThemeDefinition; scheme: Co
 }
 
 function IntentSection({ theme }: { theme: ThemeDefinition }) {
+  const { message } = AntdApp.useApp();
+  const [summary, setSummary] = useState(theme.intent.summary);
+
+  const handleSave = async () => {
+    try {
+      await editorStore.setThemeIntent({ summary }, theme.id);
+      message.success('已保存');
+    } catch (err) {
+      message.error(`保存失败：${(err as Error).message}`);
+    }
+  };
+
   return (
     <Card>
       <Title level={5}>风格意图</Title>
-      <Input.TextArea rows={3} value={theme.intent.summary} placeholder="描述风格..." style={{ marginBottom: 16 }} />
+      <Input.TextArea
+        rows={3}
+        value={summary}
+        onChange={e => setSummary(e.target.value)}
+        onBlur={handleSave}
+        placeholder="描述风格..."
+        style={{ marginBottom: 16 }}
+      />
       <Space wrap>
         <Text strong>标签:</Text>
-        {theme.intent.aesthetics?.map(tag => <Tag key={tag} color="blue" closable>{tag}</Tag>)}
-        <Tag style={{ borderStyle: 'dashed', cursor: 'pointer' }}><PlusOutlined /> 添加</Tag>
+        {theme.intent.aesthetics?.map(tag => <Tag key={tag} color="blue">{tag}</Tag>)}
       </Space>
       <Divider />
       <Space size="large">
@@ -276,6 +483,7 @@ function IntentSection({ theme }: { theme: ThemeDefinition }) {
 }
 
 function ColorsSection({ theme, scheme }: { theme: ThemeDefinition; scheme: ColorScheme | undefined }) {
+  const { message } = AntdApp.useApp();
   const groups = [
     { title: '品牌色', keys: ['primary', 'primaryHover', 'primaryActive', 'primaryLight', 'secondary', 'secondaryHover', 'secondaryActive'] },
     { title: '表面/背景', keys: ['background', 'surface', 'surfaceElevated', 'overlay'] },
@@ -283,6 +491,22 @@ function ColorsSection({ theme, scheme }: { theme: ThemeDefinition; scheme: Colo
     { title: '边框', keys: ['border', 'borderLight', 'borderFocus'] },
     { title: '语义色', keys: ['success', 'warning', 'error', 'info'] },
   ];
+
+  const handleChange = async (key: string, newValue: string) => {
+    try {
+      // 当前是非 base 色彩方案 → 写到 scheme.overrides
+      // 当前是 base（无任何 override 的） → 写到 theme.tokens
+      const isBaseScheme = !scheme || scheme.id === theme.colorSchemes[0]?.id;
+      if (isBaseScheme) {
+        await editorStore.setThemeTokens('colors', { [key]: newValue }, theme.id);
+      } else if (scheme) {
+        await editorStore.updateColorSchemeOverrides(scheme.id, 'colors', { [key]: newValue }, theme.id);
+      }
+      message.success(`${key} 已更新`);
+    } catch (err) {
+      message.error(`更新失败：${(err as Error).message}`);
+    }
+  };
 
   return (
     <div>
@@ -292,18 +516,24 @@ function ColorsSection({ theme, scheme }: { theme: ThemeDefinition; scheme: Colo
           {Object.keys(scheme.overrides?.colors ?? {}).length > 0 && (
             <Text type="secondary"> (覆盖了 {Object.keys(scheme.overrides?.colors ?? {}).length} 个颜色)</Text>
           )}
+          <Text type="secondary" style={{ marginLeft: 12, fontSize: 11 }}>
+            修改将写入当前色彩方案的 overrides；切到 base 方案可改主题原色
+          </Text>
         </Card>
       )}
       {groups.map(group => (
         <Card key={group.title} title={group.title} style={{ marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
             {group.keys.map(key => {
-              const baseValue = theme.tokens.colors[key]?.value;
               const actualValue = getColor(theme, scheme, key);
               const isOverridden = scheme?.overrides?.colors?.[key] !== undefined;
               return (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', borderRadius: 6, background: isOverridden ? '#fff7e6' : 'transparent' }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 6, background: actualValue, border: '1px solid #d9d9d9', flexShrink: 0 }} />
+                  <ColorPicker
+                    value={actualValue}
+                    size="small"
+                    onChangeComplete={(c) => handleChange(key, c.toRgbString())}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <Text strong style={{ fontSize: 12 }}>{key}</Text>
                     {isOverridden && <Tag color="orange" style={{ fontSize: 10, marginLeft: 4, lineHeight: '16px', padding: '0 4px' }}>覆盖</Tag>}
@@ -321,6 +551,19 @@ function ColorsSection({ theme, scheme }: { theme: ThemeDefinition; scheme: Colo
 }
 
 function SpacingSection({ theme }: { theme: ThemeDefinition }) {
+  const { message } = AntdApp.useApp();
+  const handleChange = async (key: string, px: number | null) => {
+    if (px == null) return;
+    if (px % 4 !== 0 && px !== 2) {
+      message.warning('间距应为 4 的倍数（保留 2 用于极小场景）');
+    }
+    try {
+      await editorStore.setThemeTokens('spacing', { [key]: px }, theme.id);
+      message.success(`${key} 已更新为 ${px}px`);
+    } catch (err) {
+      message.error(`更新失败：${(err as Error).message}`);
+    }
+  };
   return (
     <Card title="间距 Token">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -328,7 +571,16 @@ function SpacingSection({ theme }: { theme: ThemeDefinition }) {
           <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Text strong style={{ width: 40 }}>{name}</Text>
             <div style={{ width: token.px, height: 24, background: '#1677ff', borderRadius: 4, opacity: 0.7, transition: 'width 300ms ease' }} />
-            <Text type="secondary">{token.value} ({token.px}px)</Text>
+            <InputNumber
+              value={token.px}
+              min={0}
+              max={256}
+              step={4}
+              size="small"
+              addonAfter="px"
+              onBlur={(e) => handleChange(name, Number((e.target as HTMLInputElement).value))}
+              style={{ width: 120 }}
+            />
             <Text type="secondary" style={{ fontSize: 11 }}>{token.description}</Text>
           </div>
         ))}
@@ -338,6 +590,15 @@ function SpacingSection({ theme }: { theme: ThemeDefinition }) {
 }
 
 function RadiusSection({ theme }: { theme: ThemeDefinition }) {
+  const { message } = AntdApp.useApp();
+  const handleChange = async (key: string, value: string) => {
+    try {
+      await editorStore.setThemeTokens('radius', { [key]: value }, theme.id);
+      message.success(`${key} 已更新`);
+    } catch (err) {
+      message.error(`更新失败：${(err as Error).message}`);
+    }
+  };
   return (
     <Card title="圆角 Token">
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -345,7 +606,12 @@ function RadiusSection({ theme }: { theme: ThemeDefinition }) {
           <div key={name} style={{ textAlign: 'center' }}>
             <div style={{ width: 64, height: 64, border: '2px solid #1677ff', borderRadius: token.value, background: '#e6f4ff' }} />
             <Text strong style={{ display: 'block', marginTop: 8 }}>{name}</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>{token.value}</Text>
+            <Input
+              defaultValue={token.value}
+              size="small"
+              onBlur={e => handleChange(name, e.target.value)}
+              style={{ width: 80, marginTop: 4 }}
+            />
           </div>
         ))}
       </div>
@@ -373,17 +639,36 @@ function TypographySection({ theme }: { theme: ThemeDefinition }) {
 }
 
 function ShadowsSection({ theme, scheme }: { theme: ThemeDefinition; scheme: ColorScheme | undefined }) {
+  const { message } = AntdApp.useApp();
+  const isBaseScheme = !scheme || scheme.id === theme.colorSchemes[0]?.id;
+  const handleChange = async (key: string, value: string) => {
+    try {
+      if (isBaseScheme) {
+        await editorStore.setThemeTokens('shadows', { [key]: value }, theme.id);
+      } else if (scheme) {
+        await editorStore.updateColorSchemeOverrides(scheme.id, 'shadows', { [key]: value }, theme.id);
+      }
+      message.success(`${key} 已更新`);
+    } catch (err) {
+      message.error(`更新失败：${(err as Error).message}`);
+    }
+  };
   return (
     <Card title="阴影层级">
       <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
         {Object.entries(theme.tokens.shadows).map(([name, token]) => {
           const actual = getShadow(theme, scheme, name);
           return (
-            <div key={name} style={{ textAlign: 'center' }}>
-              <div style={{ width: 120, height: 80, background: '#fff', borderRadius: 8, boxShadow: actual, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div key={name} style={{ textAlign: 'center', minWidth: 220 }}>
+              <div style={{ width: 120, height: 80, background: '#fff', borderRadius: 8, boxShadow: actual, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
                 <Text>{name}</Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8, maxWidth: 120, wordBreak: 'break-all' }}>{actual}</Text>
+              <Input
+                defaultValue={actual}
+                size="small"
+                onBlur={e => handleChange(name, e.target.value)}
+                style={{ marginTop: 8, fontSize: 11 }}
+              />
             </div>
           );
         })}

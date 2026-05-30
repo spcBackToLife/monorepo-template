@@ -122,36 +122,39 @@
 ## ★ 沉淀到 schema 的结论
 
 ```jsonc
-// MCP: theme/update_tokens（深合并 typography/spacing/radii/shadows/durations/easings）
-{
-  projectId: "<projectId>",
-  tokens: {
-    typography: {
-      fontFamily:     "-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif",
-      fontFamilyMono: "ui-monospace, SFMono-Regular, Menlo, monospace",
-      fontSize: {
-        caption: 12, body: 14, bodyLg: 16,
-        h5: 18, h4: 20, h3: 24, h2: 28, h1: 36, display: 48
-      },
-      fontWeight: { regular: 400, medium: 500, semibold: 600, bold: 700 },
-      lineHeight: { tight: 1.2, normal: 1.5, relaxed: 1.7 }
-    },
-    spacing: { "2xs": 2, "xs": 4, "sm": 8, "md": 16, "lg": 24, "xl": 32, "2xl": 48, "3xl": 64 },
-    radii:   { none: 0, sm: 8, md: 16, lg: 24, xl: 32, full: 9999 },
-    shadows: {
-      sm: "0 2px 4px rgba(0,0,0,0.06)",
-      md: "0 4px 12px rgba(0,0,0,0.08)",
-      lg: "0 8px 24px rgba(0,0,0,0.12)",
-      xl: "0 12px 48px rgba(0,0,0,0.16)"
-    },
-    durations: { instant: 100, fast: 200, medium: 300, slow: 500 },
-    easings: {
-      ease:      "cubic-bezier(0.4, 0, 0.2, 1)",
-      easeIn:    "cubic-bezier(0.4, 0, 1, 1)",
-      easeOut:   "cubic-bezier(0, 0, 0.2, 1)",
-      easeInOut: "cubic-bezier(0.4, 0, 0.6, 1)",
-      spring:    "cubic-bezier(0.34, 1.56, 0.64, 1)"
-    }
-  }
-}
+// MCP: theme/set_theme_tokens（一个 kind 调一次，分 5 次依次写入）
+
+// 1. typography
+{ projectId, kind: "typography", values: {
+  display:   { fontFamily:"...", fontSize:"48px", lineHeight:"1.1",  fontWeight:"700" },
+  h1:        { fontFamily:"...", fontSize:"36px", lineHeight:"1.2",  fontWeight:"700" },
+  h2:        { fontFamily:"...", fontSize:"28px", lineHeight:"1.2",  fontWeight:"700" },
+  h3:        { fontFamily:"...", fontSize:"24px", lineHeight:"1.3",  fontWeight:"600" },
+  h4:        { fontFamily:"...", fontSize:"20px", lineHeight:"1.3",  fontWeight:"600" },
+  h5:        { fontFamily:"...", fontSize:"18px", lineHeight:"1.4",  fontWeight:"500" },
+  "body-lg": { fontFamily:"...", fontSize:"16px", lineHeight:"1.5", fontWeight:"400" },
+  body:      { fontFamily:"...", fontSize:"14px", lineHeight:"1.5",  fontWeight:"400" },
+  caption:   { fontFamily:"...", fontSize:"12px", lineHeight:"1.4",  fontWeight:"400" }
+}}
+
+// 2. spacing （8px 网格强制 R-THEME-04；传数字自动转 {value,px}）
+{ projectId, kind: "spacing", values: { "2xs":2, xs:4, sm:8, md:16, lg:24, xl:32, "2xl":48, "3xl":64 } }
+
+// 3. radius
+{ projectId, kind: "radius", values: { none:"0", sm:"4px", md:"8px", lg:"12px", xl:"16px", full:"9999px" } }
+
+// 4. shadows
+{ projectId, kind: "shadows", values: {
+  sm: "0 2px 4px rgba(0,0,0,0.06)",
+  md: "0 4px 12px rgba(0,0,0,0.08)",
+  lg: "0 8px 24px rgba(0,0,0,0.12)",
+  xl: "0 12px 48px rgba(0,0,0,0.16)"
+}}
+
+// 5. transitions
+{ projectId, kind: "transitions", values: {
+  fast:   "all 150ms ease",
+  normal: "all 300ms ease",
+  slow:   "all 500ms ease-out"
+}}
 ```
