@@ -209,6 +209,24 @@ function findNodeAcrossScreens(project: DesignProject, nodeId: string): Componen
   return undefined;
 }
 
+/**
+ * 递归保证整棵子树的 label 都已设置。
+ * priority: label > name > type（与 schema 契约一致）。
+ *
+ * MCP 层 insert_subtree 已在入口强制 label 必填；这里是兜底——
+ * 来自 asset.instantiate / element.duplicate / 旧版客户端的子树仍可能缺 label。
+ */
+function ensureSubtreeLabels(node: ComponentNode): void {
+  const trimmed = node.label?.trim();
+  node.label = trimmed && trimmed.length > 0 ? trimmed : (node.name || node.type);
+  if (node.children) {
+    for (const child of node.children) ensureSubtreeLabels(child);
+  }
+  if (node.repeat?.template) {
+    ensureSubtreeLabels(node.repeat.template);
+  }
+}
+
 // ===== element.add =====
 
 export function executeAddElement(project: DesignProject, params: ElementAddOp['params']): Result {
@@ -253,9 +271,9 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
   if (params.name) {
     newNode.name = params.name;
   }
-  if (params.label) {
-    newNode.label = params.label;
-  }
+  // label 是 UI 显示名（priority: label > name > type）。
+  // MCP 层已在入口强制必填；若上游（程序化调用 / 旧客户端）未传，回退到 name 兜底。
+  newNode.label = params.label?.trim() || newNode.name || newNode.type;
   if (params.componentBoundary) {
     newNode.componentBoundary = true;
   }
@@ -444,6 +462,9 @@ export function executeInsertSubtree(project: DesignProject, params: ElementInse
   if (!parent.children) parent.children = [];
 
   const cloned = deepClone(params.subtree);
+  // 递归补全 label（priority: label > name > type）。
+  // MCP 层 insert_subtree 已在入口校验整棵子树 label 必填；这里是程序化调用的兜底。
+  ensureSubtreeLabels(cloned);
   const position = params.position ?? parent.children.length;
   const safePos = Math.max(0, Math.min(position, parent.children.length));
   parent.children.splice(safePos, 0, cloned);

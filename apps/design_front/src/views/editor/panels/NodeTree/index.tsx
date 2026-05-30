@@ -20,6 +20,15 @@ function hasListRepeat(node: ComponentNode): boolean {
   return typeof r.expression === 'string' && r.expression.trim() !== '';
 }
 
+/**
+ * 节点显示名（图层树 / 搜索 / 编辑共用）。
+ * 与 schema 契约一致（features/design-schema/src/types/node.ts）：priority: label > name > type。
+ * label 是用户面向的中文显示名，name 是代码标识（PascalCase）。
+ */
+function getNodeDisplayName(node: ComponentNode): string {
+  return node.label ?? node.name ?? node.id.slice(0, 6);
+}
+
 /** W7-021：虚拟行高（与 py-0.5 + text-xs 行大致一致） */
 const ROW_HEIGHT = 28;
 
@@ -32,8 +41,14 @@ interface FlatRow {
 function subtreeMatchesSearch(node: ComponentNode, term: string): boolean {
   if (!term) return true;
   const t = term.toLowerCase();
-  const name = node.name ?? node.id.slice(0, 6);
-  if (name.toLowerCase().includes(t) || node.type.toLowerCase().includes(t)) return true;
+  // 搜索同时匹配 label（中文显示名）和 name（代码标识）—— 用户两种都可能输
+  const label = node.label ?? '';
+  const name = node.name ?? '';
+  if (
+    label.toLowerCase().includes(t) ||
+    name.toLowerCase().includes(t) ||
+    node.type.toLowerCase().includes(t)
+  ) return true;
   return (node.children ?? []).some((c) => subtreeMatchesSearch(c, term));
 }
 
@@ -152,7 +167,7 @@ const TreeRow = observer(function TreeRow({
   const isHovered = editorStore.hoveredNodeId === node.id;
   const isLocked = isNodeOrAncestorLocked(treeRoot, node.id);
   const isHidden = !node.visible;
-  const name = node.name ?? node.id.slice(0, 6);
+  const displayName = getNodeDisplayName(node);
 
   return (
     <div
@@ -242,7 +257,7 @@ const TreeRow = observer(function TreeRow({
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className="flex-1 truncate">{name}</span>
+          <span className="flex-1 truncate" title={node.name ? `${displayName} · ${node.name}` : displayName}>{displayName}</span>
         )}
 
         {hasListRepeat(node) && (
@@ -388,18 +403,20 @@ export const NewNodeTree = observer(function NewNodeTree() {
     });
   }, []);
 
+  // 双击改的是 label（中文显示名）。name（PascalCase 代码标识）由 MCP / 程序化创建时定，UI 不直接改 name。
+  // 进入编辑时优先编辑 label；若节点没 label 则把当前 name 当作初值，保存仍写到 label 字段。
   const beginRename = useCallback((node: ComponentNode) => {
     setEditingId(node.id);
-    setEditingName(node.name ?? '');
+    setEditingName(node.label ?? node.name ?? '');
   }, []);
 
   const commitRename = useCallback((node: ComponentNode) => {
     const next = editingName.trim();
     setEditingId(null);
-    if (!next || next === (node.name ?? '')) return;
+    if (next === (node.label ?? '')) return;
     const result = editorStore.execute({
       type: 'element.rename',
-      params: { nodeId: node.id, name: next },
+      params: { nodeId: node.id, label: next },
     });
     if (!result.success) message.error(result.description);
   }, [editingName, message]);

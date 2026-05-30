@@ -12,6 +12,45 @@ import { registerDomainTool, defineAction } from '../helpers/registerDomainTool.
 import type { ComponentNode, PrimitiveNodeType } from '@globallink/design-schema';
 import { apiClient } from '../../api-client.js';
 
+/**
+ * 节点子树的 zod schema（递归校验 element/insert_subtree 入参）。
+ *
+ * 强约束：
+ *   - name: PascalCase 必填（代码标识，给 codegen 用）
+ *   - label: 任意非空文本必填（中文显示名，节点树面板展示；priority: label > name > type）
+ *
+ * 其他字段全部宽松（z.unknown 透传），由后端 normalize 兜底——AI 只关心"节点骨架 + 命名"。
+ */
+const NodeNameSchema = z
+  .string()
+  .regex(
+    /^[A-Z][a-zA-Z0-9]*$/,
+    'Must be PascalCase: start with uppercase letter, followed by alphanumeric characters, no spaces or special chars (e.g. "HeaderContainer", "LoginButton", "UserAvatar")',
+  )
+  .describe(
+    'Node name in PascalCase (e.g. "MainContainer", "SubmitButton"). Required code identifier.',
+  );
+
+const NodeLabelSchema = z
+  .string()
+  .min(1, 'label 不能为空：节点树面板显示名（中文或任意文本，如 "顶部品牌区" / "手机号输入框"）')
+  .describe(
+    '节点展示名（中文或任意文本，必填）。在节点树面板中优先于 name 显示。priority: label > name > type。',
+  );
+
+/** 递归子树 schema —— 只严格校验 name/label，其余字段透传由后端处理 */
+type SubtreeSchema = z.ZodType<{ type: string; name: string; label: string; children?: unknown[] }>;
+const SubtreeNodeSchema: SubtreeSchema = z.lazy(() =>
+  z
+    .object({
+      type: z.string().describe('HTML primitive：div/span/button/input/img/...'),
+      name: NodeNameSchema,
+      label: NodeLabelSchema,
+      children: z.array(SubtreeNodeSchema).optional(),
+    })
+    .passthrough(), // 允许 props/styles/states/events 等其他字段透传
+) as SubtreeSchema;
+
 export function registerElementTools(server: McpServer): void {
   registerDomainTool(server, 'element', '元素增删改查、移动复制、包裹解包、重命名、可见性/锁定/列表绑定/受控 bind/编辑期 role/布局提示(layoutHint) 等', {
     add: defineAction({
@@ -25,8 +64,8 @@ export function registerElementTools(server: McpServer): void {
         '【添加后清理】创建复杂布局后需检查是否遗漏必要的容器（flex parent）、宽高约束或溢出滚动配置。',
       schema: z.object({
         projectId: z.string(), parentId: z.string(),
-        name: z.string().regex(/^[A-Z][a-zA-Z0-9]*$/, 'Must be PascalCase: start with uppercase letter, followed by alphanumeric characters, no spaces or special chars (e.g. "HeaderContainer", "LoginButton", "UserAvatar")').describe('Required node name in PascalCase (e.g. "MainContainer", "SubmitButton", "ProfileImage"). Must start with an uppercase letter and contain only English alphanumeric characters.'),
-        label: z.string().optional().describe('节点展示名（中文或任意文本，如 "验证码输入组"）。在节点树面板中优先于 name 显示。不传则自动使用 name。'),
+        name: NodeNameSchema,
+        label: NodeLabelSchema,
         tag: z.string().describe('div/span/p/h1-h3/button/input/textarea/select/img/a/ul/ol/li/nav/header/footer/section/main'),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
         props: z
@@ -82,9 +121,16 @@ export function registerElementTools(server: McpServer): void {
     }),
     insert_subtree: defineAction({
       description:
-        '在父节点下插入一棵完整的节点子树。文本节点：props.textContent 或 props.children（字符串，可含 {{state.data.*}}）；' +
+        '在父节点下插入一棵完整的节点子树。' +
+        '⚠️ 严格约束：每个节点（含所有后代）必须显式提供 name（PascalCase 代码标识）和 label（中文或任意文本展示名）。' +
+        '文本节点：props.textContent 或 props.children（字符串，可含 {{state.data.*}}）；' +
         '勿仅用树 children 数组承载纯文案（与 SchemaRenderer 一致）。',
-      schema: z.object({ projectId: z.string(), parentId: z.string(), subtree: z.record(z.string(), z.unknown()), position: z.number().optional() }),
+      schema: z.object({
+        projectId: z.string(),
+        parentId: z.string(),
+        subtree: SubtreeNodeSchema,
+        position: z.number().optional(),
+      }),
       handler: async (p) => {
         const tree = p.subtree as unknown as ComponentNode;
         // ID 由 API 层 ensureDeterministicIds 对缺失 ID 的节点兜底生成，MCP 层不覆盖
