@@ -16,7 +16,9 @@ import { observer } from 'mobx-react-lite';
 import type {
   ApiDataSource,
   ApiEndpoint,
+  ErrorCode,
   HttpMethod,
+  NetworkPolicy,
 } from '@globallink/design-schema';
 import { editorStore } from '@/stores/editor';
 import { ExpressionEditor } from '@/views/editor/components/ExpressionEditor';
@@ -41,6 +43,7 @@ export const ApiDataSourceEditor = observer(function ApiDataSourceEditor({
   return (
     <div className="flex flex-col gap-2">
       <EndpointSection screenId={screenId} dataSource={dataSource} />
+      <NetworkPolicySection screenId={screenId} dataSource={dataSource} />
       <FetchOptionsSection screenId={screenId} dataSource={dataSource} />
       <MockScenariosSection screenId={screenId} dataSource={dataSource} />
     </div>
@@ -205,6 +208,153 @@ const FetchOptionsSection = observer(function FetchOptionsSection({
           placeholder={'{\n  "pageSize": 20\n}'}
         />
         {error && <span className="text-[10px] text-red-500">{error}</span>}
+      </div>
+    </div>
+  );
+});
+
+// ===== NetworkPolicy（v2.6 ★：超时 / 重试） =====
+
+const RETRY_ON_OPTIONS: ErrorCode[] = ['TIMEOUT', 'NETWORK_ERROR', 'SERVER_ERROR'];
+
+const NetworkPolicySection = observer(function NetworkPolicySection({
+  screenId,
+  dataSource,
+}: Props) {
+  const policy = dataSource.endpoint.networkPolicy;
+  const enabled = !!policy;
+
+  const [timeout, setTimeoutVal] = useState<string>(policy?.timeout?.toString() ?? '');
+  const [retryCount, setRetryCount] = useState<string>(policy?.retryCount?.toString() ?? '0');
+  const [retryDelay, setRetryDelay] = useState<string>(policy?.retryDelay?.toString() ?? '1000');
+  const [retryOn, setRetryOn] = useState<Set<ErrorCode>>(
+    new Set(policy?.retryOn ?? ['TIMEOUT', 'NETWORK_ERROR']),
+  );
+
+  const commit = () => {
+    const next: NetworkPolicy = {};
+    const t = parseInt(timeout, 10);
+    if (!isNaN(t) && t > 0) next.timeout = t;
+    const rc = parseInt(retryCount, 10);
+    if (!isNaN(rc) && rc > 0) next.retryCount = rc;
+    const rd = parseInt(retryDelay, 10);
+    if (!isNaN(rd) && rd >= 0) next.retryDelay = rd;
+    if (retryOn.size > 0) next.retryOn = Array.from(retryOn);
+
+    if (Object.keys(next).length === 0) {
+      // 用户清空所有字段 → 清空策略
+      editorStore.execute({
+        type: 'dataSource.setNetworkPolicy',
+        params: { screenId, dataSourceId: dataSource.id, networkPolicy: null },
+      });
+      return;
+    }
+    editorStore.execute({
+      type: 'dataSource.setNetworkPolicy',
+      params: { screenId, dataSourceId: dataSource.id, networkPolicy: next },
+    });
+  };
+
+  const clear = () => {
+    editorStore.execute({
+      type: 'dataSource.setNetworkPolicy',
+      params: { screenId, dataSourceId: dataSource.id, networkPolicy: null },
+    });
+    setTimeoutVal('');
+    setRetryCount('0');
+    setRetryDelay('1000');
+    setRetryOn(new Set(['TIMEOUT', 'NETWORK_ERROR']));
+  };
+
+  const toggleRetryOn = (code: ErrorCode) => {
+    const next = new Set(retryOn);
+    if (next.has(code)) next.delete(code);
+    else next.add(code);
+    setRetryOn(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-1 border border-gray-200 rounded bg-white p-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-medium text-gray-600">
+          网络策略 (networkPolicy)
+          {enabled
+            ? <span className="ml-1 text-emerald-600">●</span>
+            : <span className="ml-1 text-gray-400">○ 未配置（无超时/重试）</span>}
+        </div>
+        {enabled && (
+          <button
+            type="button"
+            className="text-[10px] text-gray-500 hover:text-red-500"
+            onClick={clear}
+          >
+            清空
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-1">
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-500">timeout (ms)</span>
+          <input
+            type="number"
+            min={0}
+            className="h-6 px-1.5 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
+            value={timeout}
+            onChange={(e) => setTimeoutVal(e.target.value)}
+            onBlur={commit}
+            placeholder="留空=不限时"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[10px] text-gray-500">retryCount</span>
+          <input
+            type="number"
+            min={0}
+            max={10}
+            className="h-6 px-1.5 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
+            value={retryCount}
+            onChange={(e) => setRetryCount(e.target.value)}
+            onBlur={commit}
+            placeholder="0=不重试"
+          />
+        </label>
+        <label className="flex flex-col gap-0.5 col-span-2">
+          <span className="text-[10px] text-gray-500">
+            retryDelay (ms，指数退避基数：实际间隔 = base × 2^attempt)
+          </span>
+          <input
+            type="number"
+            min={0}
+            className="h-6 px-1.5 border border-gray-200 rounded text-[10px] outline-none focus:border-blue-400"
+            value={retryDelay}
+            onChange={(e) => setRetryDelay(e.target.value)}
+            onBlur={commit}
+            placeholder="默认 1000"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] text-gray-500">retryOn (哪些错误码触发重试)</span>
+        <div className="flex flex-wrap gap-1">
+          {RETRY_ON_OPTIONS.map((code) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => { toggleRetryOn(code); }}
+              onBlur={commit}
+              className={
+                'h-5 px-2 rounded text-[10px] border ' +
+                (retryOn.has(code)
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400')
+              }
+            >
+              {code}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

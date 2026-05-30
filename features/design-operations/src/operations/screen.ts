@@ -1,5 +1,5 @@
 import type { DesignProject } from '@globallink/design-schema';
-import { deepClone, generateScreenId, generateNodeId } from '@globallink/design-schema';
+import { deepClone } from '@globallink/design-schema';
 import type {
   ScreenAddOp,
   ScreenRemoveOp,
@@ -9,18 +9,21 @@ import type {
   OperationResult,
   InverseData,
 } from '../types';
+import { assertPregeneratedId } from '../utils/assert-id';
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
 // ===== screen.add =====
 
 export function executeAddScreen(project: DesignProject, params: ScreenAddOp['params']): Result {
+  // ID 严格契约：screenId + rootNodeId 必须由 ensureDeterministicIds 预生成
+  assertPregeneratedId(params.screenId, 'screen.add', 'screenId');
+  assertPregeneratedId(params.rootNodeId, 'screen.add', 'rootNodeId');
+
   const newProject = deepClone(project);
 
-  const screenId = params.screenId ?? generateScreenId();
-  const rootNodeId = params.rootNodeId ?? generateNodeId();
-  params.screenId = screenId;
-  params.rootNodeId = rootNodeId;
+  const screenId = params.screenId;
+  const rootNodeId = params.rootNodeId;
 
   const newScreen = {
     id: screenId,

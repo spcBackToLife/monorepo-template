@@ -82,6 +82,7 @@ import {
   executeRemoveDataSource,
   executeUpdateDataSource,
   executeSetEndpoint,
+  executeSetNetworkPolicy,
   executeSetDefaultParams,
   executeSetStaticInitial,
   executeAddMockScenario,
@@ -110,7 +111,10 @@ import {
   executeSetProjectMeta,
   executeAddPlanTasks,
   executeUpdatePlanTask,
+  executeRaiseUpstreamChallenge,
+  executeResolveUpstreamChallenge,
 } from '../operations/meta';
+import { executeSetGlobalOverlays } from '../operations/project';
 
 export type DispatchResult = {
   project: DesignProject;
@@ -195,6 +199,7 @@ export function dispatchOperation(project: DesignProject, op: Operation): Dispat
     case 'dataSource.remove': return executeRemoveDataSource(project, op.params);
     case 'dataSource.update': return executeUpdateDataSource(project, op.params);
     case 'dataSource.setEndpoint': return executeSetEndpoint(project, op.params);
+    case 'dataSource.setNetworkPolicy': return executeSetNetworkPolicy(project, op.params);
     case 'dataSource.setDefaultParams': return executeSetDefaultParams(project, op.params);
     case 'dataSource.setStaticInitial': return executeSetStaticInitial(project, op.params);
     case 'dataSource.addMockScenario': return executeAddMockScenario(project, op.params);
@@ -223,6 +228,11 @@ export function dispatchOperation(project: DesignProject, op: Operation): Dispat
     case 'meta.setProject': return executeSetProjectMeta(project, op.params);
     case 'meta.addPlanTasks': return executeAddPlanTasks(project, op.params);
     case 'meta.updatePlanTask': return executeUpdatePlanTask(project, op.params);
+    case 'meta.raiseUpstreamChallenge': return executeRaiseUpstreamChallenge(project, op.params);
+    case 'meta.resolveUpstreamChallenge': return executeResolveUpstreamChallenge(project, op.params);
+
+    // ===== Project（顶层一等字段，与 meta 严格分离） =====
+    case 'project.setGlobalOverlays': return executeSetGlobalOverlays(project, op.params);
 
     default: {
       const _exhaustive: never = op;

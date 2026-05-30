@@ -9,6 +9,7 @@ import type {
   StaticDataSource,
   ApiDataSource,
   ApiEndpoint,
+  NetworkPolicy,
   MockScenario,
   Expression,
   DataSourceTypeDef,
@@ -50,13 +51,27 @@ export interface DataSourceUpdateOp {
   };
 }
 
-/** 改 api 数据源的 endpoint 配置（method/path/headers/query/body/responseSchema） */
+/** 改 api 数据源的 endpoint 配置（method/path/headers/query/body/responseSchema/networkPolicy） */
 export interface DataSourceSetEndpointOp {
   type: 'dataSource.setEndpoint';
   params: {
     screenId: string;
     dataSourceId: string;
     endpoint: ApiEndpoint;
+  };
+}
+
+/**
+ * 改 api 数据源的网络层策略（v2.6 ★）。
+ * 粒度细于 setEndpoint，只动 networkPolicy 子结构，避免误重置 method/path/body。
+ */
+export interface DataSourceSetNetworkPolicyOp {
+  type: 'dataSource.setNetworkPolicy';
+  params: {
+    screenId: string;
+    dataSourceId: string;
+    /** 传 null 清空策略 */
+    networkPolicy: NetworkPolicy | null;
   };
 }
 
@@ -125,6 +140,7 @@ export type DataSourceOperation =
   | DataSourceRemoveOp
   | DataSourceUpdateOp
   | DataSourceSetEndpointOp
+  | DataSourceSetNetworkPolicyOp
   | DataSourceSetDefaultParamsOp
   | DataSourceSetStaticInitialOp
   | DataSourceAddMockScenarioOp

@@ -4,6 +4,8 @@
 >
 > 起草：2026-05-29 ｜ 关联：`DESIGN_FLOW_ANALYSIS.md`（问题实证）
 
+> ⚠️ **历史文档说明（v2.4 更新）**：本文是 v2.0 起草的方案记录。文中提及的 **R-EVENTS-01** 已于 **v2.4 删除**——它原本用 `meta.interaction.summary` 关键词正则启发式猜交互意图，对输入框 blur 校验、纯展示派生节点持续误报。屏级"有没有真交互"已改由 `I-X-events` 任务的 `expectedArtifacts: [{ kind: 'anyNodeHasEvents', path: 'rootNode' }]` 守（结构判断零误报）。最新红线全集见 `STAGE-CONTRACT.md` §7。本文正文保留原貌作历史档案，**不改写**。
+
 ---
 
 ## 0. 一句话

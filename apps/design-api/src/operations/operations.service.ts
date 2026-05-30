@@ -45,16 +45,29 @@ function findNodeInProjectApi(
 }
 
 /**
- * 事件溯源确定性保证：
+ * 事件溯源确定性保证（Schema-First v2.3 ★ 强契约）：
  *
  * 核心不变量：同一组 operation 日志，无论何时由谁重放，必须得到完全相同的 schema。
- * 因此**任何**会向 schema 写入新节点 ID 的 op，其 ID 必须在 op 入 DB 前就预生成
- * 并写回 op.params；executor 不能再调用随机生成器。
+ * 因此**任何**会向 schema 写入新节点/屏幕 ID 的 op，其 ID 必须在 op 入 DB 前就预生成
+ * 并写回 op.params；executor / reducer 一律禁止调用随机生成器。
  *
- * 本函数在 Service 层执行 op 前调用一次。除去 root ID，还预生成"子节点 ID 序列"
- * （DFS 顺序），覆盖：
- *   - instantiateTemplate：从 project.componentAssets 找模板，按模板 walkTree 数节点数预生成 _nodeIds
- *   - duplicateElement：从当前 project 找源节点，按源子树 walkTree 数节点数预生成 _childIds
+ * 本函数是**整个系统中唯一允许调用 generateNodeId / generateScreenId 的位置**。
+ * 在写路径（OperationsService.execute / executeBatch）的 op 入 DB 前调用一次；
+ * 读路径（findOne 重放快照之后的 ops）**不调用**——op 日志中已带 id，executor 直接消费。
+ *
+ * 添加新 op 类型时的硬性步骤（违反则 reducer 会通过 assertPregeneratedId 抛错）：
+ *   1. 在 op params 类型上加 _xxxId / _yyyIds 字段（optional 标注，但运行时必填）
+ *   2. 在本 switch 加一个 case，预生成 id 写回 params
+ *   3. reducer 用 assertPregeneratedId / assertPregeneratedIdArray 校验
+ *   ★ 不可省略 1 / 2 中任意一步——会让 reducer 抛错或破坏重放幂等。
+ *
+ * 已覆盖 op 类型（在 op 入 DB 前预生成）：
+ *   - element.add: elementId
+ *   - element.duplicate: newElementId + _childIds (按源子树 walkTree 节点数预生成)
+ *   - element.wrap: _wrapperId
+ *   - asset.instantiateTemplate: _nodeIds (按模板 walkTree 节点数预生成)
+ *   - screen.add: screenId + rootNodeId
+ *   - event.addNavigation (targetScreenId='new'): _generatedScreenId + _generatedRootNodeId
  *
  * 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
  */
@@ -112,6 +125,13 @@ function ensureDeterministicIds(operation: Operation, project: DesignProject): v
           }
         }
       }
+      break;
+    }
+
+    case 'element.wrap': {
+      // 新容器 ID 由 ensureDeterministicIds 预生成，写入 op 日志，
+      // 重放时由 executeWrapInContainer 通过 params._wrapperId 消费——确保幂等。
+      if (!p._wrapperId) p._wrapperId = generateNodeId();
       break;
     }
 

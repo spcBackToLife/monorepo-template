@@ -117,18 +117,39 @@ analysis-notes/<projectId>/theme/
 
 ### Phase 1：建 plan（新项目首次进入时一次）
 
+每个任务带 `expectedArtifacts`（v2.2 ★，path 相对 `DesignProject` 根，下文 `<T>` = activeThemeId）。
+service 端在 update_plan_task done 时自动校验，未达标拒绝标 done。
+
 ```
 meta/add_plan_tasks { projectId, scope: 'project', tasks: [
-  { id:"T0-scaffold",    title:"[theme] 主题脚手架（决定写到哪个 themeId）", stage:"theme", status:"pending" },
-  { id:"T1-intent",      title:"[theme] 风格意图提取（7 维度）",            stage:"theme", status:"pending" },
-  { id:"T2-colors",      title:"[theme] 色彩计算（HSL + APCA）",            stage:"theme", status:"pending" },
-  { id:"T3-typo-spacing",title:"[theme] 字体/间距/圆角/阴影/动效",            stage:"theme", status:"pending" },
-  { id:"T4-decoration",  title:"[theme] 装饰规则（aesthetics 映射）",        stage:"theme", status:"pending" },
-  { id:"T5-icon-state",  title:"[theme] iconSpec + stateSpec",             stage:"theme", status:"pending" },
-  { id:"T6-variants",    title:"[theme] 色彩方案派生（≥ 2 套）",             stage:"theme", status:"pending" },
+  { id:"T0-scaffold",    title:"[theme] 主题脚手架（决定写到哪个 themeId）", stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.activeThemeId' }] },
+
+  { id:"T1-intent",      title:"[theme] 风格意图提取（7 维度）",            stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.themes' }] },
+    // T1~T6 写入路径都在 themes[<T>] 内部；用 nonEmpty 兜底，靠 theme/validate 跑细化校验
+
+  { id:"T2-colors",      title:"[theme] 色彩计算（HSL + APCA）",            stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.themes' }] },
+
+  { id:"T3-typo-spacing",title:"[theme] 字体/间距/圆角/阴影/动效",            stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.themes' }] },
+
+  { id:"T4-decoration",  title:"[theme] 装饰规则（aesthetics 映射）",        stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.themes' }] },
+
+  { id:"T5-icon-state",  title:"[theme] iconSpec + stateSpec",             stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.themes' }] },
+
+  { id:"T6-variants",    title:"[theme] 色彩方案派生（≥ 2 套）",             stage:"theme", status:"pending",
+    expectedArtifacts:[{ kind:'nonEmpty', path:'themeConfig.themes' }] },
+
   { id:"T7-handover",    title:"[theme] 自检 + 移交 interaction-designer",   stage:"theme", status:"pending" }
+    // 自检任务由 theme/validate 兜底；不挂 expectedArtifacts
 ]}
 ```
+
+⚠️ T1~T6 的 expectedArtifacts 故意写得宽（只校验 themes 数组非空）——细粒度校验由 `theme/validate` 跑 R-THEME-01~10 完成（出场门禁），二者职责分工：expectedArtifacts 防"任务标 done 时 schema 完全没碰过"；theme/validate 防"碰了但写错位置/不达标"。
 
 ### Phase 2：按 plan 任务驱动（每轮一个最小任务）
 

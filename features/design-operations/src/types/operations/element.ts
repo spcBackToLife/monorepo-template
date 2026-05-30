@@ -30,6 +30,12 @@ export interface ElementAddOp {
   params: {
     parentId: string;
     tag: PrimitiveNodeType;
+    /**
+     * 新节点 ID（由服务端 ensureDeterministicIds 在 op 入 DB 前预生成）。
+     * 类型上 optional 兼容 MCP layer / 客户端调用（不传），但运行时由 reducer
+     * 通过 assertPregeneratedId 强制要求存在——确保 op 日志一定带 id，重放幂等。
+     * 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
+     */
     elementId?: string;
     styles?: ExpressionStyles | CSSProperties;
     props?: Record<string, unknown>;
@@ -65,9 +71,9 @@ export interface ElementDuplicateOp {
   type: 'element.duplicate';
   params: {
     elementId: string;
-    /** 新 root 节点 ID（由 ensureDeterministicIds 预生成） */
+    /** 新 root 节点 ID（由 ensureDeterministicIds 预生成，运行时强制要求存在） */
     newElementId?: string;
-    /** DFS 顺序的子节点 ID 序列（不含 root） */
+    /** DFS 顺序的子节点 ID 序列（不含 root；由 ensureDeterministicIds 预生成，长度需匹配子树） */
     _childIds?: string[];
   };
 }
@@ -98,6 +104,13 @@ export interface ElementWrapOp {
     nodeIds: string[];
     containerTag?: PrimitiveNodeType;
     containerStyles?: Partial<CSSProperties>;
+    /**
+     * 新容器 ID（由服务端 ensureDeterministicIds 在 op 入 DB 前预生成）。
+     * 重放时直接使用本字段，确保 op 日志与重放结果一致——参考 element.duplicate.newElementId
+     * 与 screen.add.rootNodeId 同一模式。
+     * 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
+     */
+    _wrapperId?: string;
   };
 }
 

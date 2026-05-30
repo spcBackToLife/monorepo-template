@@ -77,6 +77,7 @@ export type {
   DataSourceRemoveOp,
   DataSourceUpdateOp,
   DataSourceSetEndpointOp,
+  DataSourceSetNetworkPolicyOp,
   DataSourceSetDefaultParamsOp,
   DataSourceSetStaticInitialOp,
   DataSourceAddMockScenarioOp,

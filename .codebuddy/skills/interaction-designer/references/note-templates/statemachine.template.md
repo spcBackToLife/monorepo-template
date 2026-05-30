@@ -87,3 +87,24 @@ order.status ∈ {pending_payment, awaiting_shipment, shipping, completed, cance
 ```
 
 > Transitions / Effects 详细描述留 md 留痕；schema 不存——会通过 events.actions 间接体现。
+
+---
+
+## ★ 翻译契约（Decision-to-Artifact Mapping）
+
+> 上游分析 md 强制段落（v2.5 §0.1.10）。状态机的 transitions（"by 哪个 trigger 引起"）逐条对应到一个或多个 events.actions。
+
+| 决策 ID | 决策内容（一句话）| 应翻译为 schema 产物 | 落库任务 | nodeId | 期望指纹 |
+|---------|------------------|---------------------|---------|--------|---------|
+| S-T1 | idle → submitting：click SubmitBtn 通过 condition | SubmitBtn.click 含 condition 守卫 + state.set submitting=true | `I-X-events` | SubmitBtn | `nodeHasEvent { trigger:'click' }` |
+| S-T2 | submitting → success：ds-xxx.onSuccess | SubmitBtn.click.actions 内 effect.fetch.onSuccess 链含 state 写入 + nav.go | `I-X-events` | SubmitBtn | （含 S-T1 主指纹）|
+| S-T3 | submitting → error：ds-xxx.onError | SubmitBtn.click.actions 内 effect.fetch.onError 链含 logic.switch 分支 | `I-X-events` | SubmitBtn | （含 S-T1）|
+| S-T4 | error → locked：failureCount ≥ 5 | onError CREDENTIAL 分支含 logic.if failureCount≥5 then 写 lockedUntil | `I-X-events` | SubmitBtn | （含 S-T1）|
+| S-T5 | locked → idle：lockedUntil < now() | Root.screenEnter ui.startTimer onComplete 清 lockedUntil + failureCount | `I-X-events` | Root | `nodeHasEvent { trigger:'screenEnter' }` |
+| S-Effect-locked | locked 整表单 disabled | NormalFormView/LockedView visibleWhen 互斥 | `I-X-view-business` | NormalFormView / LockedView | `nonEmpty path: visibleWhen` × 2 |
+| S-Decl-states | states 数组完整入屏级 meta | screen.meta.interaction.states 非空数组 | （本任务直接落）| — | `arrayMin path: meta.interaction.states min: 3` |
+| S-Decl-summary | summary 入屏级 meta | screen.meta.interaction.summary 非空字符串 | （本任务直接落）| — | `nonEmpty path: meta.interaction.summary` |
+
+> 备注：状态机的 transitions/effects 多数由 events 任务承担实现；本表把"哪些状态切换在哪个节点的哪个 trigger"列清楚，让 events 任务能把它当 todo。
+
+字段说明见 `STAGE-CONTRACT.md §0.1.10`。

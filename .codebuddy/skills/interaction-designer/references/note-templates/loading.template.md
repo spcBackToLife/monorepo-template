@@ -65,3 +65,20 @@
 ```
 
 > 对应的衍生节点（FeedSkeleton / RefreshIndicator / LoadingOverlay 等）在 `I-X-view-loading` 任务中建。
+
+---
+
+## ★ 翻译契约（Decision-to-Artifact Mapping）
+
+> 上游分析 md 强制段落（v2.5 §0.1.10）。loading 决策的 5 类场景中，**适用** 的场景必须各对应一个 schema 产物（视图节点 / 动态文案 / spinner 节点）。
+
+| 决策 ID | 决策内容（一句话）| 应翻译为 schema 产物 | 落库任务 | nodeId | 期望指纹 |
+|---------|------------------|---------------------|---------|--------|---------|
+| L-1 | initial 适用 → FeedSkeleton 节点 | FeedSkeleton 节点 + visibleWhen `state.effects['ds-xxx'].status==='pending' && !data.loaded` + minimal-debug styles ☆ | `I-X-view-loading` | FeedSkeleton | `nonEmpty path: visibleWhen` |
+| L-2 | initial 不适用 | （无 schema 产物，决策记录即足）| — | — | — |
+| L-3 | button 适用（关键提交）| (1) SubmitBtn 内 spinner 子节点 + visibleWhen<br>(2) SubmitBtn props.textContent 动态文案（"登录中..."）<br>(3) SubmitBtn click actions 首步 state.set submitting=true | (1) `I-X-view-loading`<br>(2) `I-X-events`<br>(3) `I-X-events` | (1) SubmitSpinner<br>(2)(3) SubmitBtn | (1) `nonEmpty path: visibleWhen`<br>(2) `nonEmpty path: SubmitBtn.props.textContent` |
+| L-4 | refresh / pagination / silent 不适用 | （无产物）| — | — | — |
+
+> ☆ minimal-debug styles 适用：spinner 类（按钮内 spinner 子节点）允许写 7 属性白名单。
+
+字段说明见 `STAGE-CONTRACT.md §0.1.10`。

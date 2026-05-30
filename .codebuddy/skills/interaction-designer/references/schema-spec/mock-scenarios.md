@@ -121,12 +121,44 @@ defaultParams: {}        // 在 effect.fetch 时显式传 params: { phone: "{{vi
 
 **红线**：defaultParams 与 endpoint.body 表达式重复 → 选其一，避免双重默认。
 
+## §4.5 NetworkPolicy（v2.6 ★：超时 / 重试）
+
+```jsonc
+endpoint.networkPolicy = {
+  timeout:    15000,                    // 整个请求最长时间（ms）；触发后 onError code='TIMEOUT'
+  retryCount: 0,                         // 重试次数（不含首次）；默认 0
+  retryDelay: 1000,                      // 指数退避基数（ms）；实际间隔 = base × 2^attempt
+  retryOn:    ['TIMEOUT', 'NETWORK_ERROR'], // 哪些错误码触发重试；默认 ['TIMEOUT','NETWORK_ERROR']
+}
+```
+
+**取值建议表**（按 ds 类型）：
+
+| ds 类型 | timeout | retryCount | 理由 |
+|---------|---------|-----------|------|
+| 关键认证流（登录 / 短信码 / 支付）| 10-15s | 0 | 重试会重复扣费 / 多次发短信 / 多次锁账号 → 失败让用户主动重 |
+| 列表 / 详情读 | 8-12s | 2 | 读操作幂等，弱网可重试 2 次提高成功率 |
+| 后台静默上报 | 30s | 1 | 容忍长时延；偶尔重试 |
+| 流式 / SSE（如有）| undefined | 0 | 不限时；不重试（长连接） |
+| 文件上传 / 大请求 | 60s+ | 0 | 用户已可视化等待，长 timeout 优先于自动重试 |
+
+**关键边界**：
+- ❌ 写入业务错码（CREDENTIAL/LOCKED/LIMIT_EXCEEDED 等）到 retryOn → 业务错重试会乱套（多次写入失败计数等）
+- ❌ retryCount > 0 而 retryOn 包含 TIMEOUT → 超时阈值短（如 1s）+ 重试 3 次会让用户多等很久，要平衡 timeout × (retryCount+1) 的总时长
+- ✅ undefined = 沿用平台默认（无超时无重试），保持向后兼容；只有真需要才显式声明
+
+**与 mock scenario isTimeout 的关系**：
+- mock scenario.isTimeout=true → 强制走超时分支（兼容历史，无视 networkPolicy.timeout）
+- networkPolicy.timeout 触发自动 abort → 与 isTimeout=true 等效（都走 onError code='TIMEOUT'）
+- 推荐：mock scenario 的 networkTimeout 场景仍保留 isTimeout=true（明确表达"这个场景模拟超时"），networkPolicy.timeout 则在生产真接口时生效
+
 ## §5. MCP 操作
 
 ```
 data_source/list                  { projectId, screenId }
 data_source/update                { projectId, screenId, dataSourceId, patch: { autoFetchOnEnter, name, description } }
 data_source/set_default_params    { projectId, screenId, dataSourceId, defaultParams }
+data_source/set_network_policy    { projectId, screenId, dataSourceId, networkPolicy }   // v2.6 ★
 data_source/add_mock_scenario     { projectId, screenId, dataSourceId, scenario: { id, name, statusCode, delay, responseBody, isTimeout? } }
 data_source/update_mock_scenario  { projectId, screenId, dataSourceId, scenarioId, patch }
 data_source/switch_mock_scenario  { projectId, screenId, dataSourceId, scenarioId }
@@ -141,3 +173,5 @@ product 阶段已 `data_source/add`，interaction 阶段不应该重复 add。
 | R-DS-MOCK-01 | api 类型 dataSource 没有任何 mock 场景 |
 | R-DS-MOCK-02 | 缺典型 4 类（success / business-error / network-error）至少各 1 个 |
 | R-DS-AUTOFETCH-01 | 列表型首屏数据 autoFetchOnEnter = false（应 true，否则用户进页看不到数据）|
+| R-DS-POLICY-01 | networkPolicy.retryOn 含业务错码（如 'CREDENTIAL'）|
+| R-DS-POLICY-02 | timeout × (retryCount+1) > 60s（总等待过长，用户已离开）|

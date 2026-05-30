@@ -1,4 +1,4 @@
-import type { Screen } from './screen';
+import type { Screen, OverlayNode } from './screen';
 import type { Viewport } from './viewport';
 import type { ComponentTemplate } from './template';
 import type { GlobalStateInit } from './state';
@@ -25,6 +25,19 @@ export interface DesignProject {
   componentAssets: ComponentTemplate[];
   /** 项目级全局 state（替换 v1 environmentStates） */
   globalStateInit?: GlobalStateInit;
+  /**
+   * 项目级覆盖层（跨屏共享 UI，z-index 高于屏级 overlays）。
+   *
+   * 与 `Screen.overlays` 的区别：
+   *   - 屏级：仅本屏渲染，随屏切换销毁（如登录页的锁定 Sheet）
+   *   - 项目级：所有屏共享渲染、持续存在（如全局离线 banner / session 过期 modal）
+   *
+   * 二者用 `OverlayNode` 同一类型；通过挂载位置区分。
+   *
+   * 写入 op：`project.setGlobalOverlays`（整体替换）。⚠️ 不要走 `meta.setProject`——
+   * meta 是 B 类信息（渲染不读），globalOverlays 是 A 类一等字段（渲染读）。
+   */
+  globalOverlays?: OverlayNode[];
   /** 主题风格配置（项目级唯一） */
   themeConfig?: ThemeConfig;
   /**

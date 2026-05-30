@@ -58,6 +58,8 @@ export type {
   // v2 data source
   HttpMethod,
   ApiEndpoint,
+  ErrorCode,
+  NetworkPolicy,
   MockScenario,
   MockConfig,
   StaticDataSource,
@@ -81,12 +83,16 @@ export type {
   ExpressionStyles,
   RepeatBinding,
   Screen,
+  OverlayNode,
+  OverlayType,
+  OverlayAnimation,
   DesignProject,
   // Meta (Schema-First — 设计意图 / 溯源 / 完成度)
   DesignPhase,
   NodeStatus,
   ExtremeCase,
   PlanTask,
+  UpstreamChallengeRef,
   NodeMeta,
   ScreenMeta,
   ProjectMeta,
@@ -236,6 +242,8 @@ export {
   ApiDataSourceSchema,
   StaticDataSourceSchema,
   ApiEndpointSchema,
+  ErrorCodeSchema,
+  NetworkPolicySchema,
   MockScenarioSchema,
   MockConfigSchema,
   HttpMethodSchema,
@@ -273,6 +281,8 @@ export {
   checkScreenIntegrity,
   checkNodeIntegrity,
 } from './integrity';
+export type { ArtifactVerifyResult } from './integrity/verify-artifact';
+export { verifyArtifact, verifyArtifacts, resolvePath } from './integrity/verify-artifact';
 
 // ===== Asset Utilities =====
 export {

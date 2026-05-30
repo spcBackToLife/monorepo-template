@@ -110,6 +110,8 @@ query/next_pending_task { projectId, scope: 'auto' }
 
 #### 0.3 列任务清单（首次进入本阶段）
 
+**v2.2 ★**：素材应用任务带 `expectedArtifacts`（验证 materialProjectId 已绑定 / 节点 phase 推进）。详见 STAGE-CONTRACT §0.1.8。
+
 ```
 项目级任务：
 meta/add_plan_tasks {
@@ -127,13 +129,19 @@ meta/add_plan_tasks {
 meta/add_plan_tasks {
   projectId, scope: 'screen', screenId: X,
   tasks: [
-    { id: "E-X-mat-<nodeName>", title: "应用素材到 [节点名]", stage: "executor", status: "pending", refs: ["node:<nodeId>"] },
-    ...（每个素材节点一个任务）,
+    { id: "E-X-mat-<nodeName>", title: "应用素材到 [节点名]", stage: "executor", status: "pending",
+      refs: ["node:<nodeId>"] },
+      // expectedArtifacts 在 update_plan_task 时按节点 ID 一并传：
+      // { kind: 'nonEmpty', path: 'rootNode...<找到对应节点>...materialProjectId' }
+      // 或更通用：靠 R-STATUS-* 系列兜底
     { id: "E-X-snapshot",  title: "本屏截图核对（vs design summary）", stage: "executor", status: "pending" },
-    { id: "E-X-verified",  title: "标节点 phase=verified + 本屏 integrity", stage: "executor", status: "pending" }
+    { id: "E-X-verified",  title: "标节点 phase=verified + 本屏 integrity", stage: "executor", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.status.phase' }] }
   ]
 }
 ```
+
+> 素材任务（E-X-mat-*）的 expectedArtifacts 通常在落库时即知节点 ID，可在 `update_plan_task { status:'done' }` 调用时把 expectedArtifacts 一并写入 patch（service 端取 patch.expectedArtifacts 优先于既有声明），实现"按节点精确对账"。
 
 > 如果某屏没有任何素材需求节点（罕见，如纯文本输入页），`E-X-mat-*` 任务为空，但 snapshot + verified 仍要执行。
 

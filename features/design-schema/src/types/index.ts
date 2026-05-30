@@ -64,6 +64,8 @@ export type {
 export type {
   HttpMethod,
   ApiEndpoint,
+  ErrorCode,
+  NetworkPolicy,
   MockScenario,
   MockConfig,
   StaticDataSource,
@@ -99,6 +101,8 @@ export type {
   NodeStatus,
   ExtremeCase,
   PlanTask,
+  ArtifactCheck,
+  UpstreamChallengeRef,
   NodeMeta,
   ScreenMeta,
   ProjectMeta,

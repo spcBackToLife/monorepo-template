@@ -21,6 +21,7 @@ import type { DataSourceOperation } from './data-source';
 import type { ScreenStateOperation } from './screen-state';
 import type { GlobalStateOperation } from './global-state';
 import type { MetaOperation } from './meta';
+import type { ProjectOperation } from './project';
 
 // ===== Operation 联合 =====
 
@@ -39,7 +40,8 @@ export type Operation =
   | DataSourceOperation
   | ScreenStateOperation
   | GlobalStateOperation
-  | MetaOperation;
+  | MetaOperation
+  | ProjectOperation;
 
 export type OperationType = Operation['type'];
 
@@ -86,3 +88,4 @@ export type * from './data-source';
 export type * from './screen-state';
 export type * from './global-state';
 export type * from './meta';
+export type * from './project';

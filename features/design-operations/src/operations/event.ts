@@ -1,5 +1,5 @@
 import type { DesignProject, ComponentEvent, Action } from '@globallink/design-schema';
-import { deepClone, generateScreenId, generateNodeId, normalizeExpression } from '@globallink/design-schema';
+import { deepClone, normalizeExpression } from '@globallink/design-schema';
 import type {
   EventAddOp,
   EventRemoveOp,
@@ -9,6 +9,7 @@ import type {
   InverseData,
 } from '../types';
 import { findNodeById } from '../utils/tree';
+import { assertPregeneratedId } from '../utils/assert-id';
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
@@ -211,8 +212,11 @@ export function executeAddNavigation(project: DesignProject, params: EventAddNav
 
   if (targetScreenId === 'new') {
     const p = params as Record<string, unknown>;
-    const screenId = (p._generatedScreenId as string) || generateScreenId();
-    const rootNodeId = (p._generatedRootNodeId as string) || generateNodeId();
+    // ID 严格契约：新屏 + root 节点 ID 必须由 ensureDeterministicIds 预生成
+    assertPregeneratedId(p._generatedScreenId as string | undefined, 'event.addNavigation', '_generatedScreenId');
+    assertPregeneratedId(p._generatedRootNodeId as string | undefined, 'event.addNavigation', '_generatedRootNodeId');
+    const screenId = p._generatedScreenId as string;
+    const rootNodeId = p._generatedRootNodeId as string;
 
     const newScreen = {
       id: screenId,

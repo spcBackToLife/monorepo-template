@@ -8,11 +8,11 @@ import type {
   RepeatBinding,
 } from '@globallink/design-schema';
 import {
-  generateNodeId,
   deepClone,
   getDefaultStyles,
   isPrimitiveType,
   normalizeExpression,
+  countSubtreeNodes,
 } from '@globallink/design-schema';
 import type {
   ElementAddOp,
@@ -36,6 +36,7 @@ import type {
   LayoutHint,
 } from '../types';
 import { findNodeById, findParent, isNodeOrAncestorLocked, walkTree } from '../utils/tree';
+import { assertPregeneratedId, assertPregeneratedIdArray } from '../utils/assert-id';
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
@@ -135,12 +136,28 @@ function inferPracticalDefaults(
   return {};
 }
 
-/** Create a new ComponentNode with defaults */
+/**
+ * Create a new ComponentNode with defaults.
+ *
+ * ⚠️ 严格契约（Schema-First v2.3 ★）：
+ *   `id` 参数 **必填**。所有调用方必须显式传入由 `ensureDeterministicIds`
+ *   预生成的 ID（写路径前置中间件）。
+ *
+ *   ❌ 禁止在本函数内部 fallback 到 `generateNodeId()` —— 任何随机 id 源都
+ *      会导致 op 重放时产生新 id（findOne 每次重放快照之后的 ops），破坏
+ *      "id 创建一次永不变" 不变量。
+ *
+ *   ✅ id 生成的唯一合法位置：`apps/design-api/src/operations/operations.service.ts`
+ *      的 `ensureDeterministicIds` 函数（写路径中间件，op 入 DB 前 / 执行前调用一次）。
+ *
+ * 详见 design_docs/03-tech/editor/component-instance-id-stability.md。
+ */
 function createNode(
   tag: PrimitiveNodeType,
-  styles?: ExpressionStyles | CSSProperties,
-  props?: Record<string, unknown>,
-  explicitId?: string,
+  styles: ExpressionStyles | CSSProperties | undefined,
+  props: Record<string, unknown> | undefined,
+  /** 节点 ID（必填）—— 由 ensureDeterministicIds 在写路径预生成 */
+  id: string,
   parent?: ComponentNode,
   layoutHint?: LayoutHint,
 ): ComponentNode {
@@ -176,7 +193,7 @@ function createNode(
   }
 
   return {
-    id: explicitId ?? generateNodeId(),
+    id,
     type: tag as ComponentNode['type'],
     styles: { ...mergedDefaults, ...userStyles } as ExpressionStyles,
     children: [],
@@ -230,6 +247,9 @@ function ensureSubtreeLabels(node: ComponentNode): void {
 // ===== element.add =====
 
 export function executeAddElement(project: DesignProject, params: ElementAddOp['params']): Result {
+  // ID 严格契约：必须由 ensureDeterministicIds 预生成
+  assertPregeneratedId(params.elementId, 'element.add', 'elementId');
+
   const newProject = deepClone(project);
   const screenIdx = findScreenContaining(newProject, params.parentId);
   if (screenIdx === -1) {
@@ -462,6 +482,13 @@ export function executeInsertSubtree(project: DesignProject, params: ElementInse
   if (!parent.children) parent.children = [];
 
   const cloned = deepClone(params.subtree);
+
+  // ID 严格契约：subtree 中所有节点 ID 必须由 ensureDeterministicIds 预生成
+  // （ensureDeterministicIds case 'element.insertSubtree' 会 walkTree 给缺失节点补 id）
+  walkTree(cloned, (n) => {
+    assertPregeneratedId(n.id, 'element.insertSubtree', `subtree.<${n.name ?? n.type}>.id`);
+  });
+
   // 递归补全 label（priority: label > name > type）。
   // MCP 层 insert_subtree 已在入口校验整棵子树 label 必填；这里是程序化调用的兜底。
   ensureSubtreeLabels(cloned);
@@ -488,6 +515,9 @@ export function executeInsertSubtree(project: DesignProject, params: ElementInse
 // ===== element.duplicate =====
 
 export function executeDuplicateElement(project: DesignProject, params: ElementDuplicateOp['params']): Result {
+  // ID 严格契约：root + 所有子节点 ID 必须由 ensureDeterministicIds 预生成
+  assertPregeneratedId(params.newElementId, 'element.duplicate', 'newElementId');
+
   const newProject = deepClone(project);
 
   let parentInfo: { parent: ComponentNode; index: number } | undefined;
@@ -510,22 +540,23 @@ export function executeDuplicateElement(project: DesignProject, params: ElementD
   const originalNode = parentInfo.parent.children![parentInfo.index];
   const cloned = deepClone(originalNode);
 
+  // 计算子节点（不含 root）总数，用于 assert _childIds 长度
+  const subtreeTotal = countSubtreeNodes(cloned);
+  const childCount = Math.max(0, subtreeTotal - 1);
+  assertPregeneratedIdArray(params._childIds, childCount, 'element.duplicate', '_childIds');
+
   const rootId = params.newElementId;
   const childIds = params._childIds;
   let cursor = 0;
   let isFirst = true;
   walkTree(cloned, (n) => {
     if (isFirst) {
-      n.id = rootId ?? generateNodeId();
+      n.id = rootId;
       isFirst = false;
       return;
     }
-    if (childIds && cursor < childIds.length) {
-      n.id = childIds[cursor]!;
-      cursor += 1;
-    } else {
-      n.id = generateNodeId();
-    }
+    n.id = childIds[cursor]!;
+    cursor += 1;
   });
 
   parentInfo.parent.children!.splice(parentInfo.index + 1, 0, cloned);
@@ -593,6 +624,9 @@ export function executeRenameNode(project: DesignProject, params: ElementRenameO
 // ===== element.wrap =====
 
 export function executeWrapInContainer(project: DesignProject, params: ElementWrapOp['params']): Result {
+  // ID 严格契约：新容器 ID 必须由 ensureDeterministicIds 预生成
+  assertPregeneratedId(params._wrapperId, 'element.wrap', '_wrapperId');
+
   if (params.nodeIds.length === 0) {
     return {
       project,
@@ -650,7 +684,7 @@ export function executeWrapInContainer(project: DesignProject, params: ElementWr
   indices.sort((a, b) => a - b);
 
   const containerTag = params.containerTag ?? 'div';
-  const container = createNode(containerTag, params.containerStyles, undefined, undefined, parent);
+  const container = createNode(containerTag, params.containerStyles, undefined, params._wrapperId, parent);
 
   const nodesToWrap: ComponentNode[] = [];
   for (let i = indices.length - 1; i >= 0; i--) {

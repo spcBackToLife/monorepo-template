@@ -105,3 +105,23 @@ data_source/switch_mock_scenario {
   scenarioId: "success"
 }
 ```
+
+---
+
+## ★ 翻译契约（Decision-to-Artifact Mapping）
+
+> 上游分析 md 强制段落（v2.5 §0.1.10）。datasources 任务**本身就是落库任务**——它的产物是 dataSources[].mock + autoFetchOnEnter + defaultParams + endpoint.networkPolicy（v2.6 ★）。同时它声明的"哪些 ds 由哪些 events 调用 effect.fetch"是给 events 任务的关键 todo 输入。
+
+| 决策 ID | 决策内容（一句话）| 应翻译为 schema 产物 | 落库任务 | 字段路径 / nodeId | 期望指纹 |
+|---------|------------------|---------------------|---------|------------------|---------|
+| DS-1 | 各 api ds mock ≥ 4 场景 | dataSources[id=...].mock.scenarios 数组长度 ≥ 4 | （本任务直接落）| `dataSources` | `arrayMin path: dataSources min: N` |
+| DS-2 | autoFetchOnEnter=false（写入型）| dataSources[id=ds-login].autoFetchOnEnter=false | （本任务直接落）| 同上 | （随屏级 nonEmpty）|
+| DS-3 | networkPolicy.timeout=15000ms / 10000ms（v2.6 ★）| dataSources[id=ds-login].endpoint.networkPolicy={timeout:15000}<br>dataSources[id=ds-send-code].endpoint.networkPolicy={timeout:10000} | （本任务直接落 via `data_source/set_network_policy`）| 同上 | `nonEmpty path: dataSources[*].endpoint.networkPolicy.timeout`（如要校验）|
+| DS-4 | endpoint.body 含表达式（params 来自 view.form）| dataSources[id=ds-login].endpoint.body 非空 | （本任务直接落）| 同上 | （含主指纹）|
+| DS-5 | ds-login 由 SubmitBtn.click 调用 effect.fetch | SubmitBtn.click.actions 含 effect.fetch dataSourceId='ds-login' + onSuccess + onError | `I-X-events` | SubmitBtn | `nodeHasEvent { trigger:'click' }` |
+| DS-6 | ds-send-code 由 GetCodeBtn.click 调用 effect.fetch | GetCodeBtn.click.actions 含 effect.fetch dataSourceId='ds-send-code' + onSuccess + onError | `I-X-events` | GetCodeBtn | `nodeHasEvent { trigger:'click' }` |
+| DS-7 | screenExit 取消所有未完成 fetch | Root.screenExit 含 effect.cancel ds-login + ds-send-code | `I-X-events` | Root | `nodeHasEvent { trigger:'screenExit' }` |
+
+> 备注：本任务本身落 dataSources（产物直接落库），但表中 DS-5/6/7 是给 events 任务的关键 todo——若 events 漏译，会出现"ds-login 配齐了但没人调"的死接口。
+
+字段说明见 `STAGE-CONTRACT.md §0.1.10`。

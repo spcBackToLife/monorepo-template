@@ -13,6 +13,7 @@ import type {
   ApiDataSource,
   StaticDataSource,
   ApiEndpoint,
+  NetworkPolicy,
   MockScenario,
   Expression,
   DataSourceTypeDef,
@@ -22,6 +23,21 @@ import { apiClient } from '../../api-client.js';
 
 const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
 
+// 标准化错误码（NetworkPolicy.retryOn 用）
+const ErrorCodeSchema = z.enum(['TIMEOUT', 'NETWORK_ERROR', 'SERVER_ERROR']);
+
+// 网络层策略（v2.6）：超时 / 重试
+const NetworkPolicySchema = z.object({
+  timeout: z.number().int().positive().optional()
+    .describe('整个请求超时（毫秒）；触发后 status=error + error.code=TIMEOUT'),
+  retryCount: z.number().int().nonnegative().max(10).optional()
+    .describe('重试次数（不含首次）；默认 0'),
+  retryDelay: z.number().int().nonnegative().optional()
+    .describe('重试间隔基数（毫秒），指数退避：实际间隔 = retryDelay * 2^attempt；默认 1000ms'),
+  retryOn: z.array(ErrorCodeSchema).optional()
+    .describe('哪些错误码触发重试；默认 [TIMEOUT, NETWORK_ERROR]（不重试业务错）'),
+});
+
 const EndpointSchema = z.object({
   method: HttpMethodSchema,
   path: z.string().describe('如 "/api/chat/list" 或 "{{state.view.host}}/foo"'),
@@ -29,6 +45,7 @@ const EndpointSchema = z.object({
   query: z.record(z.string(), z.unknown()).optional(),
   body: z.record(z.string(), z.unknown()).optional().describe('对象或表达式字符串；GET 不填'),
   responseSchema: z.record(z.string(), z.unknown()).optional(),
+  networkPolicy: NetworkPolicySchema.optional().describe('网络层策略（v2.6）：超时/重试；undefined = 沿用平台默认'),
 });
 
 const MockScenarioSchema = z.object({
@@ -173,7 +190,7 @@ export function registerDataSourceTools(server: McpServer): void {
     }),
 
     set_endpoint: defineAction({
-      description: '设置/替换 api 数据源的 endpoint（method/path/headers/query/body/responseSchema）',
+      description: '设置/替换 api 数据源的 endpoint（method/path/headers/query/body/responseSchema/networkPolicy）',
       schema: z.object({
         projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
         endpoint: EndpointSchema,
@@ -182,6 +199,30 @@ export function registerDataSourceTools(server: McpServer): void {
         const result = await apiClient.executeOperation(p.projectId, {
           type: 'dataSource.setEndpoint',
           params: { screenId: p.screenId, dataSourceId: p.dataSourceId, endpoint: p.endpoint as unknown as ApiEndpoint },
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      },
+    }),
+
+    set_network_policy: defineAction({
+      description:
+        '设置/清空 api 数据源的网络层策略（v2.6 ★：timeout / retryCount / retryDelay / retryOn）。' +
+        '粒度细于 set_endpoint —— 只动 endpoint.networkPolicy 子结构，避免误重置 method/path/body。' +
+        '运行时 EffectExecutor 会按此策略：timeout 触发自动 abort + error.code="TIMEOUT"；retryCount + 指数退避重试。' +
+        '传 null 清空策略（恢复"无超时无重试"默认）。',
+      schema: z.object({
+        projectId: z.string(), screenId: z.string(), dataSourceId: z.string(),
+        networkPolicy: NetworkPolicySchema.nullable()
+          .describe('null 清空；对象设置：{ timeout?, retryCount?, retryDelay?, retryOn? }'),
+      }),
+      handler: async (p) => {
+        const result = await apiClient.executeOperation(p.projectId, {
+          type: 'dataSource.setNetworkPolicy',
+          params: {
+            screenId: p.screenId,
+            dataSourceId: p.dataSourceId,
+            networkPolicy: p.networkPolicy as NetworkPolicy | null,
+          },
         });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },

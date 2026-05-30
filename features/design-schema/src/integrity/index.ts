@@ -4,22 +4,32 @@
  * 与现有 `validators/`（zod 结构校验，校验 schema 形状）不同，本模块校验
  * **设计完成度**：一份 schema 中"该有的东西到底有没有"，例如：
  *
- *   - 节点 meta.interaction.summary 描述了 trigger，但 node.events[] 是空 → ❌ 缺 actions
- *   - 节点 meta.status.ready.events=true，但 node.events[] 实际为空 → ❌ 假完成
+ *   - 节点 events 的某项 trigger 写了但 actions=[] → ❌ 空壳事件
+ *   - effect.fetch 缺 onSuccess/onError 分支 → ❌ 失败用户没反馈
+ *   - 节点 meta.status.ready.events=true 但 events 实际无任何带 actions 的事件 → ❌ 假完成
  *   - 节点 meta.status.phase='verified'，但任一 ready.* 为 false → ❌ 阶段不一致
  *
  * 这取代了旧 design-registry 的外部 `validate.ts` 自我指涉式校验，把
  * "完成度真相"内建到 schema 自身——以真实 events/styles/states 算账，
  * 杜绝平行真相造假。详见 SCHEMA-FIRST-REFACTOR.md §6。
  *
+ * 设计原则（v2.4 重构）：
+ *   - **零自然语言启发式**：不再用 meta.summary 关键词正则猜测节点交互意图
+ *   - **零硬编码白名单**：不再维护"哪些 EventTrigger 算交互"的白名单
+ *   - 所有合法 EventTrigger 都可承载真交互；判定一律走结构：actions.length > 0
+ *   - "屏内有没有真交互"由 plan 任务的 expectedArtifacts(kind=anyNodeHasEvents) 守，
+ *     checker 只兜底单节点级一致性
+ *
  * 纯函数，零 I/O：传入 DesignProject → 返回 issue 数组。可被 design-api /
  * design-mcp / 校验脚本任何一处复用。
  */
 
 import type { ComponentNode } from '../types/node';
+import type { Action, EffectFetchAction } from '../types/action';
 import type { Screen } from '../types/screen';
 import type { DesignProject } from '../types/project';
-import type { NodeStatus } from '../types/meta';
+import type { NodeStatus, PlanTask } from '../types/meta';
+import { verifyArtifacts } from './verify-artifact';
 
 export type IntegritySeverity = 'error' | 'warning' | 'info';
 
@@ -43,57 +53,26 @@ export interface IntegrityReport {
 
 // ===== 规则 =====
 
-/** 已知会触发用户操作的 EventTrigger，需要配套 actions */
-const INTERACTIVE_TRIGGERS = new Set([
-  'click',
-  'doubleClick',
-  'longPress',
-  'change',
-  'submit',
-]);
+/** 判定一个 event 是否承载真交互：actions 是非空数组。 */
+function eventHasRealActions(ev: { actions?: unknown }): boolean {
+  return Array.isArray(ev.actions) && ev.actions.length > 0;
+}
 
 /**
- * 规则 R-EVENTS-01：
- * 节点 meta.interaction.summary 暗示了"用户触发"（trigger 字段或包含交互动词），
- * 但 node.events 中没有任何 interactive trigger 的 event。
+ * 规则 R-EVENTS-02：每个声明的 event 都必须有 actions —— "trigger 写了占坑没填行为"。
  *
- * 这是"events 全空但 checklist 标完成"问题的事前根因检测。
+ * 纯结构判断，不依赖任何白名单或关键词。任何合法 EventTrigger（含 blur/focus/hover/
+ * screenEnter 等）一旦写到 schema 里就必须配 actions，否则就是空壳事件。
+ *
+ * 规则 R-EVENTS-03：effect.fetch 必须含 onSuccess 或 onError（至少一个）。
+ *
+ * 失败路径没分支 = 用户失败时无任何反馈，是典型坑。这条同样纯结构。
  */
-function checkNodeEventsCoverage(node: ComponentNode, issues: IntegrityIssue[]): void {
-  const interaction = node.meta?.interaction;
-  if (!interaction) return;
-
-  // 收集 meta 中暗示的 trigger（结构化字段优先；其次 summary 启发式）
-  const declaredTriggers = new Set<string>();
-  // 后续 meta.interaction 可能扩展 triggers 字段；当前用 summary 启发：含"click/点击/tap"
-  const hint = (interaction.summary ?? '').toLowerCase();
-  if (/click|tap|点击|按下|长按|hover|焦点|focus|blur|change|输入/.test(hint)) {
-    declaredTriggers.add('click'); // 通用占位：只要暗示交互
-  }
-  if (declaredTriggers.size === 0) return;
-
-  const actualInteractiveEvents = (node.events ?? []).filter((e) =>
-    INTERACTIVE_TRIGGERS.has(e.trigger),
-  );
-
-  if (actualInteractiveEvents.length === 0) {
-    issues.push({
-      severity: 'error',
-      code: 'R-EVENTS-01',
-      target: { kind: 'node', id: node.id, name: node.name },
-      path: 'events',
-      message:
-        `节点声明了交互意图（meta.interaction.summary="${interaction.summary ?? ''}"），` +
-        `但 events[] 中没有任何 interactive trigger（click/change/submit/...）。` +
-        `这通常意味着上游已结构化的 actions 没被写入 schema。`,
-    });
-    return;
-  }
-
-  // 进一步：每个 interactive event 必须有 actions
-  for (let i = 0; i < actualInteractiveEvents.length; i++) {
-    const ev = actualInteractiveEvents[i]!;
-    if (!ev.actions || ev.actions.length === 0) {
+function checkNodeEventActions(node: ComponentNode, issues: IntegrityIssue[]): void {
+  const events = node.events ?? [];
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i]!;
+    if (!eventHasRealActions(ev)) {
       issues.push({
         severity: 'error',
         code: 'R-EVENTS-02',
@@ -101,14 +80,69 @@ function checkNodeEventsCoverage(node: ComponentNode, issues: IntegrityIssue[]):
         path: `events[${i}].actions`,
         message: `事件 trigger="${ev.trigger}" 没有 actions —— 触发后无任何动作。`,
       });
+      continue; // 没 actions 就不用进去查 fetch 分支了
+    }
+    // 递归扫 actions 链中所有 effect.fetch，校验 onSuccess/onError 至少有一
+    walkEffectFetches(ev.actions as Action[], (fetch, where) => {
+      const hasSuccess = Array.isArray(fetch.onSuccess) && fetch.onSuccess.length > 0;
+      const hasError = Array.isArray(fetch.onError) && fetch.onError.length > 0;
+      if (!hasSuccess && !hasError) {
+        issues.push({
+          severity: 'error',
+          code: 'R-EVENTS-03',
+          target: { kind: 'node', id: node.id, name: node.name },
+          path: `events[${i}].actions${where} (effect.fetch dataSourceId="${fetch.dataSourceId}")`,
+          message:
+            `effect.fetch（dataSourceId="${fetch.dataSourceId}"）既无 onSuccess 也无 onError —— ` +
+            `成功/失败都不会有任何反馈，用户会"沉默失败"。至少补一个分支。`,
+        });
+      }
+    });
+  }
+}
+
+/** 递归扫 actions 链找 effect.fetch（含 logic.if / logic.switch 内部嵌套）。 */
+function walkEffectFetches(
+  actions: Action[],
+  visit: (fetch: EffectFetchAction, where: string) => void,
+  prefix = '',
+): void {
+  if (!Array.isArray(actions)) return;
+  for (let i = 0; i < actions.length; i++) {
+    const a = actions[i]!;
+    const here = `${prefix}[${i}]`;
+    if (a.type === 'effect.fetch') {
+      visit(a, here);
+      // onSuccess / onError 内可能还有嵌套 fetch
+      if (Array.isArray(a.onSuccess)) walkEffectFetches(a.onSuccess, visit, `${here}.onSuccess`);
+      if (Array.isArray(a.onError)) walkEffectFetches(a.onError, visit, `${here}.onError`);
+    } else if (a.type === 'logic.if') {
+      if (Array.isArray(a.then)) walkEffectFetches(a.then, visit, `${here}.then`);
+      if (Array.isArray(a.else)) walkEffectFetches(a.else, visit, `${here}.else`);
+    } else if (a.type === 'logic.switch') {
+      if (Array.isArray(a.cases)) {
+        for (let j = 0; j < a.cases.length; j++) {
+          const c = a.cases[j];
+          if (c && Array.isArray(c.actions)) {
+            walkEffectFetches(c.actions, visit, `${here}.cases[${j}].actions`);
+          }
+        }
+      }
+      if (Array.isArray(a.default)) walkEffectFetches(a.default, visit, `${here}.default`);
     }
   }
 }
 
 /**
- * 规则 R-STATUS-01：
- * meta.status.ready.events=true 但 node.events 实际为空 / 无 interactive event。
- * 这是"假完成"的兜底检测——直接对照真实 schema 算账。
+ * 规则 R-STATUS-01：meta.status.ready.events=true 但节点 events 实际无任何"真 event"。
+ *
+ * "真 event" 判定（纯结构，零白名单）：
+ *   - events 数组非空
+ *   - 至少一项 actions.length > 0
+ *
+ * 任何合法 EventTrigger（blur/focus/hover/click/...）配齐 actions 都算数；
+ * 不再筛选 trigger 类型——AI 在交互阶段对输入框加 blur 校验、对滚动容器加
+ * scrollReachBottom 是常态，把它们排除在"交互"外是错的。
  */
 function checkNodeStatusConsistency(node: ComponentNode, issues: IntegrityIssue[]): void {
   const status = node.meta?.status;
@@ -116,17 +150,15 @@ function checkNodeStatusConsistency(node: ComponentNode, issues: IntegrityIssue[
   const ready = status.ready ?? {};
 
   if (ready.events === true) {
-    const hasInteractive = (node.events ?? []).some((e) =>
-      INTERACTIVE_TRIGGERS.has(e.trigger),
-    );
-    if (!hasInteractive) {
+    const hasReal = (node.events ?? []).some(eventHasRealActions);
+    if (!hasReal) {
       issues.push({
         severity: 'error',
         code: 'R-STATUS-01',
         target: { kind: 'node', id: node.id, name: node.name },
         path: 'meta.status.ready.events',
         message:
-          `meta.status.ready.events=true，但 node.events[] 不含任何 interactive trigger —— "假完成"。`,
+          `meta.status.ready.events=true，但 node.events[] 中没有任何带 actions 的事件 —— "假完成"。`,
       });
     }
   }
@@ -197,7 +229,7 @@ function walkNode(node: ComponentNode, visit: (n: ComponentNode) => void): void 
 
 /** 检查单个节点 */
 function checkNode(node: ComponentNode, issues: IntegrityIssue[]): void {
-  checkNodeEventsCoverage(node, issues);
+  checkNodeEventActions(node, issues);
   checkNodeStatusConsistency(node, issues);
   checkPhaseConsistency(
     { kind: 'node', id: node.id, name: node.name },
@@ -214,6 +246,53 @@ function checkScreen(screen: Screen, issues: IntegrityIssue[]): void {
     issues,
   );
   walkNode(screen.rootNode, (n) => checkNode(n, issues));
+  // R-PLAN-01：屏级 plan 任务的产物指纹回归检查
+  checkPlanArtifacts(
+    screen.meta?.plan,
+    screen,
+    { kind: 'screen', id: screen.id, name: screen.name },
+    issues,
+  );
+}
+
+/**
+ * R-PLAN-01：已 done 的 plan 任务，其 expectedArtifacts 必须仍然满足。
+ *
+ * 用途：
+ *   - 任务标 done 时由 service 端在 op 层强制（这里是兜底）
+ *   - 后续 schema 被改动后，发现产物消失就立即冒红
+ *
+ * 不校验 status='skipped'/'blocked'/'pending'/'doing' 的任务。
+ */
+function checkPlanArtifacts(
+  plan: PlanTask[] | undefined,
+  root: unknown,
+  target: { kind: 'node' | 'screen' | 'project'; id: string; name?: string },
+  issues: IntegrityIssue[],
+): void {
+  if (!plan || plan.length === 0) return;
+
+  const visit = (task: PlanTask) => {
+    if (task.status === 'done' && task.expectedArtifacts && task.expectedArtifacts.length > 0) {
+      const r = verifyArtifacts(root, task.expectedArtifacts);
+      if (!r.ok) {
+        for (const f of r.failures) {
+          issues.push({
+            severity: 'error',
+            code: 'R-PLAN-01',
+            target,
+            path: `meta.plan[id="${task.id}"].expectedArtifacts`,
+            message: `任务 ${task.id} 标 done 但产物不再满足：${f.detail ?? ''}`,
+          });
+        }
+      }
+    }
+    if (task.subtasks) {
+      for (const sub of task.subtasks) visit(sub);
+    }
+  };
+
+  for (const t of plan) visit(t);
 }
 
 // ===== 公共 API =====
@@ -224,6 +303,13 @@ export function checkProjectIntegrity(project: DesignProject): IntegrityReport {
   for (const screen of project.screens ?? []) {
     checkScreen(screen, issues);
   }
+  // 项目级 plan 任务的产物指纹回归检查（root = project 自身）
+  checkPlanArtifacts(
+    project.meta?.plan,
+    project,
+    { kind: 'project', id: project.id, name: project.name },
+    issues,
+  );
   return makeReport(issues);
 }
 

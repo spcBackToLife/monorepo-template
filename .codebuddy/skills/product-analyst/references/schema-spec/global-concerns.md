@@ -94,10 +94,31 @@ state/global_view_add {
 
 **红线**：判断不准时倾向"项目级"——重复定义在屏级会失去同步。
 
-### 4.2 完整骨架样板
+### 4.2 写入 op（v2.2 ★ 必读）
+
+`globalOverlays` 是 **A 类一等字段**（渲染契约会读，与 `meta.*` B 类信息严格分离）。
 
 ```jsonc
-// MCP: meta/set_project { patch: { globalOverlays: [...] } }
+// ✅ 正确：用专门的 project.setGlobalOverlays op
+//        MCP: meta/set_global_overlays
+meta/set_global_overlays {
+  projectId,
+  overlays: [ /* 整组覆盖层；见 4.3 样板 */ ]
+}
+
+// ❌ 错误：会被 service 端拒绝（v2.2 起）
+meta/set_project { patch: { globalOverlays: [...] } }
+//   → 报错："meta.setProject 不能写入顶层一等字段..."
+```
+
+历史遗留：v2.2 之前的项目可能在 `meta.globalOverlays` 有"幽灵数据"。一次性迁移：
+1. 用 `meta/set_global_overlays` 把数据写到顶层
+2. 用 `meta/set_project { patch: { globalOverlays: null } }` 清掉 meta 里的同名字段（v2.2 service 对 null 值放行用于迁移）
+
+### 4.3 完整骨架样板
+
+```jsonc
+// MCP: meta/set_global_overlays { projectId, overlays: [...] }
 project.globalOverlays = [
   // 1. 离线 banner
   {

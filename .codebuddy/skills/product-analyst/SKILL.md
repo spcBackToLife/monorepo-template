@@ -92,6 +92,29 @@ analysis-notes/<projectId>/
 
 骨架细节（每个任务有差异）见 `references/note-templates/<对应>.template.md`。**不为了形式裁剪推理深度**——模板只是骨架。
 
+### 3.5 任务级机器对账（expectedArtifacts，v2.2 新增 ★）
+
+**只靠 md 的"君子协定"防不住假完成**——v2.0 出现过"任务 done × md 写完 × schema 字段空"问题。从 v2.2 起每个任务**必须**在 `meta/add_plan_tasks` 时声明 `expectedArtifacts`（产物指纹），由 service 端在 `update_plan_task { status:'done' }` 时机器对账：通过才允许 done，不通过直接拒绝写入。
+
+**4 类校验器**：
+
+```jsonc
+expectedArtifacts: [
+  { kind: 'nonEmpty', path: 'meta.styleDirection.summary' },
+  { kind: 'arrayMin', path: 'screens[0].rootNode.children', min: 1 },
+  { kind: 'hasKeys',  path: 'meta.globalConcerns', keys: ['session','network','preferences','navigation','fallback'] },
+  { kind: 'eachItem', path: 'globalOverlays', check: { kind:'hasKeys', path:'$', keys:['id','type','showWhen','rootNode'] } }
+]
+```
+
+**path 取值根**：
+- 项目级任务（写在 `project.meta.plan`）→ 相对 `DesignProject` 整体
+- 屏级任务（写在 `screen.meta.plan`）→ 相对该 `Screen` 整体
+
+**path 语法**：`a.b` / `a[0].b` / `a[*].b`（`[*]` 通配数组）。
+
+**任务真不需要做** → `update_plan_task { status:'skipped', notes:'否决理由' }`（skipped 不校验）。
+
 ## 4. 工作流（任务驱动 + md/schema 双产出）
 
 ### Phase 0：项目锚定（启动必做，不可跳过）
@@ -119,6 +142,9 @@ analysis-notes/<projectId>/
        仅在真有歧义时才问
 
 3. 已有项目分支：
+   → ★ **Phase 0 第 ⑤ 步（v2.3 新增）**：query/list_open_challenges { projectId, targetStage: 'product' }
+     - 若返回 phase='open' 的 challenge → **优先级最高**，跳到 §11「接管 UpstreamChallenge 流程」
+     - 若返回空 → 继续走 next_pending_task
    → query/next_pending_task { projectId, scope: 'auto' }
      - 若返回 pending 任务 → 进入"新会话续接"流程（§10），从该任务开始执行 Phase 2
      - 若返回 null（plan 已全跑完）→ query/integrity 检查；有 R-* 错误就修，
@@ -168,29 +194,60 @@ read_file: references/schema-spec/project-meta.md                // 项目级字
    meta/set_project { patch: { targetUser, coreScenarios, styleDirection,
                                 constraints.decisions, modules, navigation } }
 
-4. 生成完整 plan（项目级 + 各模块/屏的子任务）
+4. 生成完整 plan（项目级 + 各模块/屏的子任务）—— **每个任务必带 expectedArtifacts（§3.5）**
    meta/add_plan_tasks { scope: 'project', tasks: [
      // 项目级
-     { id: "P-decisions",        title: "关键决策", stage: "product", status: "pending" },
-     { id: "P-global-concerns",  title: "5 类全局态识别", ... },
-     { id: "P-global-state",     title: "globalStateInit.view 占位", ... },
-     { id: "P-global-overlays",  title: "globalOverlays 兜底层骨架", ... },
-     { id: "P-integrity",        title: "全项目自检", ... },
-     { id: "P-trigger-theme",    title: "触发或建议 theme-generator", ... },
-     { id: "P-handover",         title: "移交 interaction-designer", ... },
+     { id: "P-decisions",
+       title: "关键决策", stage: "product", status: "pending",
+       expectedArtifacts: [{ kind: 'arrayMin', path: 'meta.constraints.decisions', min: 1 }] },
 
-     // 每个 P0/P1 模块挂 8 个子任务
+     { id: "P-global-concerns",
+       title: "5 类全局态识别", stage: "product", status: "pending",
+       expectedArtifacts: [{ kind: 'hasKeys', path: 'meta.globalConcerns',
+                             keys: ['session','network','preferences','navigation','fallback'] }] },
+
+     { id: "P-global-state",
+       title: "globalStateInit.view 占位", stage: "product", status: "pending",
+       expectedArtifacts: [{ kind: 'hasKeys', path: 'globalStateInit.view',
+                             keys: ['session','network','preferences','nav'] }] },
+
+     { id: "P-global-overlays",
+       title: "globalOverlays 兜底层骨架", stage: "product", status: "pending",
+       expectedArtifacts: [
+         { kind: 'arrayMin', path: 'globalOverlays', min: 1 },
+         { kind: 'eachItem', path: 'globalOverlays',
+           check: { kind: 'hasKeys', path: '$', keys: ['id','type','showWhen','rootNode'] } }
+       ] },
+
+     { id: "P-integrity",
+       title: "全项目自检", stage: "product", status: "pending" },     // 自检任务无产物指纹（动作型）
+
+     { id: "P-trigger-theme",
+       title: "触发或建议 theme-generator", stage: "product", status: "pending" },
+
+     { id: "P-handover",
+       title: "移交 interaction-designer", stage: "product", status: "pending" },
+
+     // 每个 P0/P1 模块挂 8 个子任务（screenId 见模块对应屏）
      { id: "M1-deepdive", title: "深入分析 M1", subtasks: [
-       { id: "M1-stories",     ... },
-       { id: "M1-flows",       ... },
-       { id: "M1-rules",       ... },
-       { id: "M1-data",        ... },
-       { id: "M1-skeleton",    ... },
-       { id: "M1-state-shape", ... },
-       { id: "M1-coverage",    ... },
-       { id: "M1-integrity",   ... }
+       { id: "M1-stories",     title: "用户故事", stage: "product", status: "pending" },  // 故事在 md 不在 schema
+       { id: "M1-flows",       title: "核心流程", stage: "product", status: "pending" },
+       { id: "M1-rules",       title: "业务规则 4 类齐", stage: "product", status: "pending",
+         expectedArtifacts: [{ kind: 'arrayMin', path: 'screens[0].meta.product.rules', min: 4 }] },
+       { id: "M1-data",        title: "数据模型 + dataSources", stage: "product", status: "pending",
+         expectedArtifacts: [{ kind: 'arrayMin', path: 'screens[0].dataSources', min: 1 }] },
+       { id: "M1-skeleton",    title: "节点骨架", stage: "product", status: "pending",
+         expectedArtifacts: [{ kind: 'arrayMin', path: 'screens[0].rootNode.children', min: 1 }] },
+       { id: "M1-state-shape", title: "stateInit.view 占位", stage: "product", status: "pending",
+         expectedArtifacts: [{ kind: 'nonEmpty', path: 'screens[0].stateInit.view' }] },
+       { id: "M1-coverage",    title: "三轴覆盖核对", stage: "product", status: "pending" },
+       { id: "M1-integrity",   title: "屏自检", stage: "product", status: "pending" }
      ]}
    ]}
+
+   ⚠️ 多屏项目：M1-skeleton/data/state-shape/rules 等任务的 expectedArtifacts 中 path 用 `screens[N]`
+   或更精确的 `screens[?(@.id=='<screenId>')]`（暂未支持）→ 当前临时用 `screens[*]`
+   通配符让校验对每个屏分别跑。
 
 5. 通知用户（§7 回复格式），开始 Phase 2
 ```
@@ -214,6 +271,11 @@ read_file: references/schema-spec/project-meta.md                // 项目级字
 5. ★ MCP 落 schema（把 md 末尾「沉淀段落」1:1 翻译成 MCP 调用）
 
 6. meta/update_plan_task { taskId: T, patch: { status: 'done', notes: 'md: <相对路径>' } }
+   ⚠️ service 端会用 task.expectedArtifacts 跑机器对账（§3.5）：
+      - 通过 → 任务标 done 成功
+      - 失败 → 返回 success:false + 详细原因（哪个 path 缺什么）
+        → 回到第 5 步把 schema 补全，再重试 update_plan_task
+      - 任务真不该做 → 改 patch={status:'skipped', notes:'否决理由：...'}
 
 7. 简短回复（§7 格式）
 ```
@@ -262,17 +324,29 @@ read_file: references/schema-spec/project-meta.md                // 项目级字
 - ❌ md 内容 ≤ schema（仅复述结论无推理）→ 失败
 - ❌ md 与 schema 结论不一致 → 任务回退
 
-### 5.2 schema 完整性红线（integrity 检查）
+### 5.2 schema 完整性红线（v2.2 改造）
 
-| 红线 | 触发条件 |
-|------|---------|
-| **R-PRODUCT-01** | 每屏 `meta.product.rules` < 4 条或 4 类未齐 |
-| **R-PRODUCT-02** | 任一节点 `meta.product.summary` 缺失 |
-| **R-PRODUCT-03** | 屏识别业务状态机但 rules 没显式枚举状态字段 + 值 |
-| **R-PRODUCT-04** | 项目缺 `meta.globalConcerns`（5 类未识别）|
-| **R-PRODUCT-05** | 缺必要的 `globalStateInit.view.session/network` 等 |
-| **R-STRUCTURE-01** | 屏 phase ≥ analyzed 但 `rootNode.children` ≤ 1 |
-| **R-COVERAGE-01** | rules 中某条没对应到任何节点 / state / dataSource |
+**机制变更**：v2.0 列在此处的 R-PRODUCT-* 红线**不再由 integrity checker 实现**——它们是"任务产物"类红线，应该由各任务的 `expectedArtifacts`（§3.5）在 `update_plan_task done` 时机器对账。
+
+| 旧 R-* 编号 | 改由谁守 |
+|------------|---------|
+| R-PRODUCT-01（rules ≥ 4 条 4 类齐）| `<M>-rules` 任务的 `arrayMin: meta.product.rules min:4` |
+| R-PRODUCT-02（节点 summary 非空）| `<M>-skeleton` 任务的 expectedArtifacts |
+| R-PRODUCT-03（业务状态机 enum 显式）| `<M>-rules` 任务（推理在 md，落 rules 时校验长度）|
+| R-PRODUCT-04（globalConcerns 5 类齐）| `P-global-concerns` 的 `hasKeys` |
+| R-PRODUCT-05（globalStateInit 必要项）| `P-global-state` 的 `hasKeys` |
+| R-STRUCTURE-01（屏 children ≥ 1）| `<M>-skeleton` 的 `arrayMin: rootNode.children min:1` |
+| R-COVERAGE-01（rules 三轴覆盖）| `<M>-coverage` 任务的产物声明 |
+
+**仍由 checker 守的红线**（这些是"运行时一致性"，不是"任务产物"）：
+
+| 红线 | 触发条件 | 用途 |
+|------|---------|------|
+| R-EVENTS-02 / R-EVENTS-03 / R-STATUS-01 / R-PHASE-01 | 节点 events / status / phase 字段假完成（纯结构判断） | 兜底 |
+| **R-PLAN-01** ★ | 任意 done 任务的 expectedArtifacts 当前不再满足（schema 后续被改坏）| 回归检测 |
+
+> ⚠️ R-EVENTS-01（旧版 summary 启发式）已于 v2.4 删除；屏级"有没有真交互"由 interaction 阶段 `I-X-events` 任务的 `anyNodeHasEvents` expectedArtifacts 守。
+
 
 ### 5.3 阶段边界红线（严禁本阶段写）
 
@@ -293,7 +367,7 @@ read_file: references/schema-spec/project-meta.md                // 项目级字
 | 时机 | 检查 |
 |------|------|
 | 入场 | □ Phase 0 项目锚定完成（已 `query/list_projects` + 拿到明确 `projectId`）<br>□ 锚定路径有据可查（用户明示 / 上下文清晰智能判断 / 用户回答 Phase 0 询问）|
-| 出场 | □ 所有屏 `meta.product.rules` ≥ 4 条（4 类齐）<br>□ 所有屏 `rootNode.children` ≥ 1<br>□ 所有业务节点 `meta.product.summary` 非空<br>□ 所有屏识别到的 API 已建 `dataSource` + `typeDef`<br>□ 业务状态机字段+枚举值已在 rules 中显式写清<br>□ `meta.globalConcerns` 5 类齐<br>□ `globalStateInit.view.session/network` 等必要全局态占位齐<br>□ `meta.styleDirection` 非空<br>□ `query/integrity` 0 个 R-PRODUCT-* / R-STRUCTURE-01 / R-COVERAGE-01 错误<br>□ 每个 done 任务的 md 已存在且含「沉淀到 schema 的结论」段 |
+| 出场 | □ 所有 plan 任务 `status` ∈ {done, skipped}（通过 `update_plan_task` 时已被 expectedArtifacts 机器验收）<br>□ skipped 任务的 notes 含否决理由<br>□ `meta.styleDirection` 非空<br>□ `query/integrity` 0 个 R-EVENTS-* / R-STATUS-* / R-PHASE-* / R-PLAN-* / R-THEME-* 错误<br>□ 每个 done 任务的 md 已存在（路径在 task.notes）|
 
 ## 7. 每轮回复格式
 
@@ -393,3 +467,43 @@ read_file: references/schema-spec/project-meta.md                // 项目级字
 | `prd-template.md` | 旧版 PRD 模板（仅作思路参考）| 不强制；用户索要 PRD 派生视图时加载 |
 | `../common/references/v2-actions-cheatsheet.md` | MCP 工具 + v2 actions 速查 | 第一次调用某个 MCP 工具时必须加载，验证字段拼写 |
 | `../../STAGE-CONTRACT.md` §0.1.7 + §1 | 本技能的契约依据 | 入场启动时必须加载一次，建立全局规则认知 |
+
+
+## 11. 接管 UpstreamChallenge 流程（v2.3 ★）
+
+当 Phase 0 第 ⑤ 步 `query/list_open_challenges { targetStage: 'product' }` 返回 phase=`open` 的 challenge 时：
+
+```
+1. 优先级最高——立刻接管，不走 next_pending_task
+2. read_file 加载强模板：
+   - ../common/references/challenge.template.md（理解下游写的格式）
+   - ../common/references/decision.template.md（本次决策要写的格式）
+3. read_file challenge md → 理解下游的诉求 + 候选方案
+4. 写 decision md：analysis-notes/<projectId>/challenges/<challengeId>-decision.md
+   - §1 决策（accepted / partially / rejected）
+   - §2 多角度产品理由（rationale ≥10 字符）
+   - §3 实施清单（accepted: 改 schema 的 MCP 调用清单 + 同步上游 task notes）
+   - §4 给下游的实现指南（accepted 写新结构怎么用；rejected 写等效不改路径）
+5. accepted 时改 schema：用本阶段允许的 MCP（element/wrap、move、insert_subtree、setBind 等）
+   - 改完后**同步**对应受影响 product task 的 notes 加补丁说明（追加，不删旧 notes）
+   - 不接受 → 不动 schema
+6. 调 meta/resolve_upstream_challenge {
+     projectId, challengeId, accepted, rationale, decisionMd
+   }
+   - service 端原子地：
+     a. 标 P-revise-* 任务 done（accepted）/ skipped（rejected）
+     b. unblock raisedBy 任务 → status=pending
+     c. accepted 时重跑受影响 targetTaskIds 的 expectedArtifacts（R-CHALLENGE-03）
+        ⚠️ 不通过会拒绝 resolve；上游必须先把受影响产物补回再 resolve
+7. 简短回复用户：「challenge 已 accepted/rejected，下游 SKILL 可以续做」
+```
+
+**红线**：
+
+- ❌ 不写 decision md 直接 resolve → R-CHALLENGE-02 拒
+- ❌ rationale 空话或 < 10 字符 → R-CHALLENGE-02 拒
+- ❌ accepted 时没真改 schema → 受影响 task 的 expectedArtifacts 重对账失败 → R-CHALLENGE-03 拒
+- ❌ accepted 时没同步上游 task notes → 人类回看时无法理解 done 任务产物为什么变了（不是 service 强制，是协作礼仪）
+- ❌ 接管 challenge 期间又开新 challenge → 同一 raisedBy 已有 open 的会被 R-CHALLENGE-04 拒
+
+详细协议见 `../../STAGE-CONTRACT.md` §0.1.9。

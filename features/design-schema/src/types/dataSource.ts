@@ -31,6 +31,54 @@ export interface DataSourceTypeDef {
 /** HTTP 请求方法 */
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+/**
+ * 标准化错误码枚举（NetworkPolicy / EffectStatus.error.code 共用语义边界）。
+ *
+ * 设计原则：按"用户该怎么处理"分类，不按 HTTP 协议分类。
+ *   - TIMEOUT：链路慢 → 用户该重试 / 换时段
+ *   - NETWORK_ERROR：物理断网 / DNS / connection refused → 用户该开网络
+ *   - SERVER_ERROR：5xx → 服务方问题，需上报
+ *   - 业务错误码（CREDENTIAL / LOCKED / LIMIT_EXCEEDED 等）：由具体业务约定，不在此枚举
+ */
+export type ErrorCode =
+  | 'TIMEOUT'
+  | 'NETWORK_ERROR'
+  | 'SERVER_ERROR';
+
+/**
+ * 网络层策略（v2.6 ★）：超时 / 重试 / 取消的统一配置。
+ *
+ * 与 effect.cancel 的关系：
+ *   - effect.cancel 主动取消 → status='idle'（与超时/失败语义不同）
+ *   - networkPolicy.timeout 自动触发 → status='error' + code='TIMEOUT'
+ *
+ * 与 MockScenario.isTimeout 的关系：
+ *   - mock 场景 isTimeout=true → 强制走超时分支（无视 timeout 阈值）
+ *   - mock 场景 delay > timeout → 也走超时分支（运行时按阈值兜底）
+ */
+export interface NetworkPolicy {
+  /**
+   * 整个请求的最长时间（毫秒）。
+   * undefined = 不限时（沿用浏览器/平台默认）。
+   * 触发后 status='error' + error.code='TIMEOUT'。
+   */
+  timeout?: number;
+  /**
+   * 重试次数（不含首次请求）。默认 0（不重试）。
+   * 仅当返回的 error.code 命中 retryOn 时才重试。
+   */
+  retryCount?: number;
+  /**
+   * 重试间隔基数（毫秒），指数退避：实际间隔 = retryDelay * 2^attempt。
+   * 默认 1000ms。
+   */
+  retryDelay?: number;
+  /**
+   * 哪些错误码触发重试。默认 ['TIMEOUT', 'NETWORK_ERROR']（不重试业务错误如 CREDENTIAL/LOCKED）。
+   */
+  retryOn?: ErrorCode[];
+}
+
 /** 真实接口配置 */
 export interface ApiEndpoint {
   method: HttpMethod;
@@ -42,6 +90,11 @@ export interface ApiEndpoint {
   body?: Expression | Record<string, Expression | unknown>;
   /** 响应数据结构描述（编辑器 hints + codegen 类型用） */
   responseSchema?: Record<string, unknown>;
+  /**
+   * 网络层策略（v2.6 ★）：超时 / 重试 / 取消。
+   * undefined = 沿用平台默认（无超时无重试）。
+   */
+  networkPolicy?: NetworkPolicy;
 }
 
 /** Mock 场景 */

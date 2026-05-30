@@ -1,10 +1,10 @@
 # Schema-First 阶段共建契约 STAGE-CONTRACT.md
 
-> 版本：v2.1 · 2026-05-30（theme-generator 改造完成）
+> 版本：v2.6 · 2026-05-31（新增 §0.1.11 NetworkPolicy 平台一等公民：超时 / 重试统一抽象）
 > 目的：为五个角色（product-analyst / theme-generator / interaction-designer / design-planner / design-executor）建立**深度对等于旧 SKILL.md 的角色定位 + 工作内容 + schema 写入契约**。
 > 来源：完整回顾 git 历史中的旧 SKILL.md（392/374/252 行）+ 旧 `.design-workspaces/campus-geo-social/` 实战产物（28 屏 / 12 模块 / 每节点 8 层 JSON）
-> 适用：作为四个 SKILL.md 重写的契约依据。
-> 改造进度：product-analyst（v2.0）+ theme-generator（v2.1，本次）已落地；interaction/design/executor 按相同模板后续推广。
+> 适用：作为五个 SKILL.md 重写的契约依据。
+> 改造进度：v2.0 product-analyst / v2.1 theme-generator / v2.2 expectedArtifacts 任务级机器对账 / v2.3 UpstreamChallenge 跨阶段回流协议 / v2.4 R-EVENTS-01 退役 + anyNodeHasEvents / v2.5 翻译契约 DAM + nodeHasEvent + minimal-debug styles / **v2.6 NetworkPolicy 网络层平台一等公民**（解决 endpoint.timeout/retry 长期"约定但 schema 缺字段"的洞）。
 
 ---
 
@@ -42,6 +42,8 @@
    - 后半：「→ 沉淀到 schema 的结论」（即将通过 MCP 落到的字段值）
 4. ★ MCP 落 schema：把「沉淀」段落 1:1 翻译成 MCP 调用
 5. update_plan_task { taskId: T, status: 'done', notes: 'md: <相对路径>' }
+   ★ service 端会跑 task.expectedArtifacts 校验（见 §0.1.8）；不通过则被拒，
+     回到第 4 步把 schema 补全再重试。
 6. 给用户简短回复
 ```
 
@@ -82,6 +84,345 @@ analysis-notes/<projectId>/
 ```
 
 **本次落地范围**：product-analyst（已完成）+ theme-generator（已完成 2026-05-30）；其余 3 个角色（interaction/design/executor）按相同约定后续推广。
+
+#### 0.1.8 expectedArtifacts —— 任务级机器对账（v2.2 新增 ★）
+
+**问题背景**：v2.0/v2.1 双产出机制下出现过"任务 done × md 写完 × schema 字段空"的假完成（如 product 阶段 `P-global-overlays` 标 done 但 `globalOverlays=null`）。根因不是 AI 偷懒，是**plan 任务的"完成判定"被设计成了 AI 主观自报**——既没有机器对账，也没有兜底校验。
+
+**解决方案**：让每个 plan 任务自带"产物指纹"声明（`expectedArtifacts`），`update_plan_task { status:'done' }` 时 service 端强制校验产物路径，校验不过直接拒绝写入。
+
+**核心契约**：
+
+```ts
+// features/design-schema/src/types/meta.ts
+interface PlanTask {
+  // ... 原有字段
+  expectedArtifacts?: ArtifactCheck[];   // 任务标 done 时由机器对账
+}
+
+type ArtifactCheck =
+  | { kind: 'nonEmpty';        path: string }                                 // path 非空
+  | { kind: 'arrayMin';        path: string; min: number }                    // 数组 ≥ min
+  | { kind: 'hasKeys';         path: string; keys: string[] }                 // 对象含全部 keys（值非空）
+  | { kind: 'eachItem';        path: string; check: ArtifactCheck }           // 数组每项满足
+  | { kind: 'anyNodeHasEvents'; path: string; min?: number }                  // 子树内 ≥ min 个节点有"真 event"（events[i].actions 非空）
+  | { kind: 'nodeHasEvent';    nodeId: string; trigger?: EventTrigger;        // 翻译契约精确指纹（v2.5 ★，DAM 配套）
+                               min?: number; path?: string };
+```
+
+> **`anyNodeHasEvents`（v2.4 ★）**：递归扫描从 `path` 起的节点子树（含自身、children、repeat.template），统计满足 `events[i].actions.length > 0` 的节点数。`min` 默认 1。
+>
+> 这是「该屏/该子树有没有真交互」的**结构判断**，取代旧的 R-EVENTS-01 自然语言启发式。任何合法 EventTrigger（含 blur/focus/hover/scrollReachBottom 等）配齐 actions 都算"真交互"——不再有硬编码白名单。
+
+> **`nodeHasEvent`（v2.5 ★，配套 §0.1.10 DAM）**：在 `path`（默认 `rootNode`）起的子树深度优先查找 `id===nodeId` 的节点，要求：
+> - actions 非空的 event 数 ≥ `min`（默认 1）
+> - 若指定 `trigger`，至少 1 个匹配 trigger 的 event 有非空 actions
+>
+> 这是「上游决策声明的精确节点 + 触发器真有对应 actions」的精确指纹，配合 §0.1.10 翻译契约段使用——上游 md 列每条决策的目标 nodeId + trigger，下游 events 落库任务直接抄进 expectedArtifacts，service 端逐条对账，杜绝"决策写了但翻译漏了"。
+
+**path 取值根**（相对，由 task 所在 scope 决定）：
+
+| 任务挂在 | path 相对根 |
+|---------|------------|
+| `project.meta.plan` | `DesignProject` 整体 |
+| `screen.meta.plan` | 该 `Screen` 整体 |
+
+`path` 语法：dot/bracket，如 `globalOverlays` / `meta.globalConcerns.session` / `screens[0].rootNode.children` / `screens[*].rootNode.children`（`[*]` 是通配）。
+
+**强制行为**：
+
+- `update_plan_task { status: 'done' }` 时：service 跑 `verifyArtifacts(root, task.expectedArtifacts)` → 全过才允许 done
+- 失败 → MCP 调用返回 `success: false` + 详细原因（哪个 path 缺什么），AI 必须真把 schema 写到位再标 done
+- 任务无需做 → 改 `status: 'skipped'` + `notes` 写否决理由（skipped 不校验）
+- `query/integrity`：兜底规则 R-PLAN-01 检查所有已 done 任务的产物是否仍满足（防 schema 后续被改坏）
+
+**示例（product-analyst P-global-overlays）**：
+
+```jsonc
+meta/add_plan_tasks {
+  scope: "project",
+  tasks: [{
+    id: "P-global-overlays",
+    title: "globalOverlays 兜底层骨架",
+    stage: "product",
+    status: "pending",
+    expectedArtifacts: [
+      { kind: "arrayMin", path: "globalOverlays", min: 1 },
+      { kind: "eachItem", path: "globalOverlays",
+        check: { kind: "hasKeys", path: "$",
+                 keys: ["id", "type", "showWhen", "rootNode"] } }
+    ]
+  }]
+}
+```
+
+→ AI 把 `globalOverlays` 写到位才能标 done；忘写或字段不全直接被拒。
+
+**与原"漂移防护"的关系**：
+
+| 防护层 | 形式 | 生效时机 |
+|-------|------|---------|
+| md 末尾「→ 沉淀到 schema 的结论」段 | 文本约定（人类可读，AI 自律）| 写 md 时 |
+| **expectedArtifacts** ★ | **机器声明 + service 强制**（不可绕过）| update_plan_task done 时 |
+| query/integrity R-PLAN-01 | 全项目兜底校验 | 任意时刻 |
+
+新机制**取代了** v2.1 里"R-PRODUCT-04 / R-PRODUCT-05 等由 integrity 检查"那批"假红线"——所有具体产物对账都由 expectedArtifacts 内建，不再让 SKILL.md 列具体 R-XX 编号（避免"声明 vs 履约"再次脱节）。
+
+**红线**：
+
+- ❌ 任务 add 时未声明 expectedArtifacts → 允许（兼容旧任务），但失去机器对账保护，强烈建议补
+- ❌ 任务 done 时 service 报 `expectedArtifacts 未满足` → 必须改 status 或补 schema
+- ❌ 用 patch={status:'done'} 同时塞假数据绕过 → 校验对的是真实 schema 真值，绕不过
+- ❌ 把不该做的任务硬标 done → 改 skipped + 写否决理由是合法路径
+
+
+#### 0.1.9 UpstreamChallenge —— 跨阶段回流协议（v2.3 新增 ★）
+
+**问题背景**：v2.0~v2.2 下游 SKILL（interaction/design/executor）发现上游产物的某个具体决策不利于本阶段最佳实现时（如 interaction 想 wrap product 已建的三个节点为一个业务态容器），旧规则只给"⛔ 退回上游"硬终止——既无协议、又无留痕、又无续做路径。下游被迫做次优实现，或用户介入手动切技能，摩擦极大。
+
+**解决方案**：把"挑战上游"变成 schema 上的一等公民产物。下游写 challenge md 触发 `meta.raiseUpstreamChallenge`，service 端原子完成"add P-revise-* 任务 + block raisedBy"；上游 SKILL 通过 Phase 0 门禁扫到 open challenge 后接管处理，写 decision md 触发 `meta.resolveUpstreamChallenge`，service 端原子完成"标 revise 任务 done/skipped + unblock raisedBy + 重对账受影响 expectedArtifacts"。
+
+**核心契约**：
+
+```ts
+// features/design-schema/src/types/meta.ts
+interface UpstreamChallengeRef {
+  challengeId: string;            // 约定 C-<阶段简写>-<screenId 简写>-<NN>，如 "C-INT-00-login-001"
+  challengeMd: string;            // analysis-notes/<projectId>/challenges/<challengeId>.md
+  decisionMd?: string;            // resolve 时 service 写入
+  phase: 'open' | 'accepted' | 'rejected' | 'resolved';
+  raisedBy: string;               // 触发任务 ID
+  raisedByScope: 'project' | 'screen';
+  raisedByScreenId?: string;
+  targetStage: 'product' | 'theme' | 'interaction' | 'design';
+  targetTaskIds: Array<{ taskId: string; scope: 'project' | 'screen'; screenId?: string }>;
+  decision?: { accepted: boolean; rationale: string; appliedAt: string };
+}
+
+interface PlanTask {
+  // ... 原有字段
+  upstreamChallenge?: UpstreamChallengeRef;
+}
+```
+
+**5 步工作流**：
+
+```
+1. 下游 SKILL 推进任务 T_down 时发现冲突
+2. 下游写 challenge md（强模板见 .codebuddy/skills/common/references/challenge.template.md，
+   ≥3 候选方案 + 影响面声明 + 推荐理由）
+3. 调 meta.raiseUpstreamChallenge → service 原子地：
+   a. 在 project.meta.plan 末尾追加 stage='product' 的 P-revise-<challengeId> 任务（含 ref）
+   b. T_down 置 status='blocked' + blockedReason + 写 ref
+4. 用户切到 targetStage 对应 SKILL 接管，或上游 SKILL Phase 0 门禁扫到 open challenge 自驱接管
+5. 上游 SKILL：
+   a. read challenge md
+   b. 写 decision md（accepted / partially / rejected + 完整论证 + 给下游的实现指南）
+   c. accepted → 用本阶段允许的 MCP 改 schema + 同步上游 task notes
+   d. 调 meta.resolveUpstreamChallenge → service 原子地：
+      i. 标 P-revise-* 任务 done（accepted）/ skipped（rejected）
+      ii. unblock T_down → status='pending'（保留 challenge ref 用于追溯）
+      iii. accepted 时重跑受影响 targetTaskIds 的 expectedArtifacts（R-CHALLENGE-03）
+6. 下游 SKILL 重新激活，next_pending_task 拿到 T_down，read decision md 后续做
+```
+
+**关键 op**：
+
+| op | 调用方 | 作用 |
+|----|-------|-----|
+| `meta.raiseUpstreamChallenge` | 下游 SKILL | 原子触发挑战；自动 add P-revise-* + block raisedBy |
+| `meta.resolveUpstreamChallenge` | 上游 SKILL | 原子关闭挑战；unblock raisedBy + 重对账受影响产物 |
+| `query.list_open_challenges` | 上游 SKILL | Phase 0 门禁第 ⑤ 项扫描；过滤 targetStage |
+| `query.blocked_tasks` | 任意 SKILL | 新会话续接排查"卡住的任务"用 |
+
+**红线**：
+
+- ❌ **R-CHALLENGE-01**：raise 时 challengeMd 缺失 / 不以 .md 结尾 → service 拒
+- ❌ **R-CHALLENGE-02**：resolve 时 decisionMd 缺失 / rationale < 10 字符 → service 拒
+- ❌ **R-CHALLENGE-03**：accepted resolve 时受影响 targetTaskIds 的 expectedArtifacts 重对账失败 → service 拒；上游必须先把受影响产物补回再 resolve
+- ❌ **R-CHALLENGE-04**：同一 raisedBy 当前已有 open / accepted 状态的 challenge → service 拒；先 resolve 再发新挑战
+- ❌ **R-CHALLENGE-05**：raisedBy 任务 status 当前已是 blocked → service 拒；先 unblock
+
+**何时该挑战上游**（必须满足之一）：
+
+1. 想做的实现触发上游 forbidden 红线（且红线动机不是为了挡这个具体场景）
+2. 上游产物的某个决策与本阶段同一节点/字段的最佳实现存在不可调和分歧
+
+**不满足** → 按现有红线走（自己绕过去 / 用次优实现 / 留 md 备注），不要滥用挑战。
+
+**与现有 forbidden / expectedArtifacts 机制的关系**：
+
+| 防护层 | 守什么 |
+|-------|--------|
+| `forbidden-fields-<阶段>.md` | 静态边界（"哪些字段你不能写"）|
+| `expectedArtifacts` | 任务级动态对账（"你声明 done 之后，schema 真有产物吗"）|
+| **`UpstreamChallenge`** ★ | 跨阶段协商（"你越界写不了，但发现真有问题怎么办"）|
+
+三层互补：forbidden 兜界、expectedArtifacts 兜履约、UpstreamChallenge 兜分歧。
+
+详细方案：`UPSTREAM-FEEDBACK-PROPOSAL.md`。
+
+
+#### 0.1.10 翻译契约（Decision-to-Artifact Mapping，DAM）—— v2.5 新增 ★
+
+**问题背景**：v2.0~v2.4 流程下出现过这种"事前漏译"：
+
+- `errors.md` 决策 D-E4 写"校验时机 onBlur+onSubmit 双档"
+- `events.md` 落库时只写了 onBlur 校验，**onSubmit 校验漏译**
+- `expectedArtifacts: anyNodeHasEvents` 看不出来这种语义级遗漏（屏内有 events 就过）
+- checker 也看不出来（不检查 md 的决策有没有翻译完）
+- 用户预览时点 SubmitBtn 输入非法直接静默，反映到 UI 才发现"事前怎么漏的"
+
+**根因**：上游分析 md（`statemachine / operations / loading / errors / boundaries / state-vars / datasources`）的"决策 → schema 产物"映射只活在 AI 脑子里，写完 md 就丢失，下游 `events / state-vars / datasources` 等落库任务执行时**没有显式 todo 清单**可逐条勾选，自然会漏。
+
+**解决方案**：把"决策 → 产物"映射变成 md 的**强制结构化段落** + service 端机器对账。
+
+#### 1. 上游分析 md 强制 ★ 翻译契约 段
+
+每份分析 md（statemachine / operations / loading / errors / boundaries / state-vars / datasources / 7 类衍生视图 / overlays）末尾**强制**写一段：
+
+```markdown
+## ★ 翻译契约（Decision-to-Artifact Mapping）
+
+> 本任务的所有决策中，**有 schema 产物**的部分按下表 1:1 映射。
+> 下游落库任务执行时把所有上游分析 md 的"翻译契约"段拼起来形成 todo 清单，逐条勾掉。
+
+| 决策 ID | 决策内容（一句话）| 应翻译为 schema 产物 | 落库任务 | nodeId（如适用）| 期望指纹 |
+|---------|------------------|---------------------|---------|-----------------|---------|
+| D-E4 | 校验时机 onBlur+onSubmit 双档 | (1) PhoneInput.blur 校验 actions<br>(2) CredentialInput.blur 校验 actions<br>(3) **SubmitBtn.click 前置校验 actions** | `I-X-events` | `nd_083c...`<br>`nd_989c...`<br>`nd_5a15...` | `nodeHasEvent { trigger:'blur' }`<br>`nodeHasEvent { trigger:'blur' }`<br>`nodeHasEvent { trigger:'click' }` |
+| D-B1 | ds-login networkPolicy.timeout=15000ms（v2.6 ★）| ds-login.endpoint.networkPolicy={timeout:15000} | `I-X-datasources` | — | `nonEmpty path: dataSources[id=ds-login].endpoint.networkPolicy.timeout` |
+| D-E5 | 不做 onChange debounce | （无 schema 产物，决策记录即足）| — | — | — |
+
+字段说明：
+- **决策 ID**：md 内决策段落的 ID（如 `D-E4`），便于追溯
+- **决策内容**：一句话总结
+- **应翻译为 schema 产物**：精确到节点 + 字段；多产物各写一行
+- **落库任务**：归属哪个 `I-X-*` 任务执行（events / state-vars / datasources / view-* / overlays / meta 之一）
+- **nodeId**：如果产物落到具体节点，写节点真实 ID；多个用 `<br>` 分隔
+- **期望指纹**：建议的 ArtifactCheck 指纹（kind + 关键参数），下游落库时直接抄入 plan 任务 expectedArtifacts
+
+**没有 schema 产物的决策**（如"反向论证否决"、"次要 UX 取舍"）也要列出来——以"无 schema 产物"标注，证明 AI 没漏想这条。
+
+#### 2. 落库任务（events / state-vars / datasources / view-* / overlays）执行流改造
+
+落库类任务（events / state-vars / datasources / 7 类 view-* / overlays / global-overlay-events）md 头部**强制**先写一段：
+
+```markdown
+## ☐ 翻译清单 todo（从上游分析 md 汇总）
+
+> 启动时把所有上游分析 md 的"翻译契约"段汇总到这里，每条 [ ] 必须落 schema 后改 [x]，
+> 全部勾完才能定稿本 md 并标本任务 done。
+
+来源：
+- `statemachine.md` 翻译契约段：3 条
+- `operations.md` 翻译契约段：12 条
+- `errors.md` 翻译契约段：8 条
+- `boundaries.md` 翻译契约段：5 条
+- `state-vars.md` 翻译契约段：6 条（已落库——本任务不重复执行，仅核对）
+
+合计 34 条产物。逐条落：
+
+- [ ] D-E4(1) PhoneInput.blur 校验 actions → `nodeHasEvent { nodeId: nd_083c..., trigger: 'blur' }`
+- [ ] D-E4(2) CredentialInput.blur 校验 actions
+- [ ] D-E4(3) **SubmitBtn.click 前置校验 actions** ★ ← 历史漏译复盘
+- [ ] D-EV1 ModeToggle click 切 loginMode
+- [ ] ...
+- [x] D-B1 ds-login.endpoint.networkPolicy.timeout=15000  （由 datasources 任务已落，本任务跳过）
+```
+
+**强制规则**：
+- 落库任务的 md 中必须含此 todo 清单
+- 每条产物对应一段"actions 链翻译过程"或"产物字段值"的细节推理
+- 全部 [x] 后写 ★ 沉淀到 schema 的结论 段
+- 任务标 done 时把所有有 nodeId 的 [x] 项的指纹塞进 expectedArtifacts，service 端机器对账
+
+#### 3. 配套 ArtifactCheck 类型（v2.5 新增）
+
+```ts
+type ArtifactCheck =
+  // ... 原有 5 种
+  | {
+      kind: 'nodeHasEvent';
+      nodeId: string;          // 节点真实 ID（schema 已生成）
+      trigger?: EventTrigger;  // 可选：限定 trigger
+      min?: number;            // 默认 1
+      path?: string;           // 默认 'rootNode'，子树搜索起点
+      message?: string;
+    };
+```
+
+实现见 `features/design-schema/src/integrity/verify-artifact.ts` 的 `checkNodeHasEvent`：
+- 在 path 起的节点子树深度优先查 `id===nodeId` 的节点
+- actions 非空的 event 数 ≥ min；若指定 trigger 则要求该 trigger 至少 1 个有非空 actions
+- 失败返回精确路径 + nodeId 让 AI 立即定位
+
+#### 4. 派生展示节点的 minimal-debug styles（配套）
+
+为了让"翻译契约 → 产物 → 用户能预览到"形成完整闭环，**interaction 阶段对纯展示派生节点（如 PhoneError / CredentialError / 各 InlineFieldError）允许写一组最小调试 styles 白名单**：`color / fontSize / marginTop / minHeight / padding`。
+
+理由：interaction 阶段验证决策有没有翻译落地的最直接方式就是预览看到红字。一直等到 design 阶段才有视觉，会让 interaction 期间的"翻译契约 todo 已勾完"和"用户实际能看到错误"脱节。design 阶段会用主题 token 覆盖这组 minimal-debug styles，不会冲突。
+
+详见 `forbidden-fields-interaction.md` §派生展示节点 minimal-debug styles 白名单。
+
+#### 5. 影响面
+
+- `interaction-designer/references/note-templates/*.template.md` 的 5 个分析模板 + 2 个准产物模板（state-vars/datasources）末尾全部加 ★ 翻译契约段
+- `events.template.md` 头部强制 ☐ 翻译清单 todo
+- `interaction-designer/SKILL.md` 任务流程改造（events 任务前**必须**先 read 所有上游 md 的翻译契约段）
+- `forbidden-fields-interaction.md` 加 minimal-debug styles 白名单
+
+#### 6. 防止 DAM 段本身造假的兜底
+
+DAM 段本身也是 AI 写的——会不会"决策列了但翻译契约段没列产物"？
+
+兜底机制：
+- 落库任务（events 等）的 md 头部 todo 清单**必须从所有上游 md 自动汇总**：缺一条就显式写"上游 md 此决策没列翻译契约 → 退回上游补"
+- 这是 AI 的诚实义务，service 端不强制（因为 md 是过程文档不进 schema）；但 AI 在做 events 落库时若发现某个上游决策没列翻译契约，**必须当作上游缺陷退回**
+
+#### 7. 与 anyNodeHasEvents / R-EVENTS-02 的关系
+
+| 防护层 | 守什么 | 谁在用 |
+|-------|--------|------|
+| `anyNodeHasEvents` | 屏 / 子树**至少有一个**真交互 | events 任务粗粒度兜底 |
+| `nodeHasEvent` ★ | 上游决策声明的**精确节点 + 触发器**真有对应 actions | events 任务的翻译契约逐条对账 |
+| R-EVENTS-02 | 任意 event 写了 trigger 但 actions=[] | checker 全节点扫描兜底 |
+
+三层互补：粗→精→零空壳。
+
+#### 0.1.11 NetworkPolicy —— 网络层平台一等公民（v2.6 新增 ★）
+
+**问题背景**：v2.5 之前，boundaries.md 里"ds-login timeout=15000ms"这样的边界写了很多，但 schema 的 `ApiEndpoint` 类型**根本没有 timeout 字段** —— 写入直接被 zod strip。Mock 场景靠 `delay + isTimeout` 模拟"超时态"，HTTP 真接口靠浏览器默认超时（通常 5min+）兜底。事实链：
+- AI 落 datasources 任务时多次发现工具不支持 → 标"D-DS6 暂不动" 草草跳过
+- v2.5 复盘把它列为"事前漏译"，但根因不是 AI 漏译——**是平台少了一等字段**
+- 错误码也乱：mock 已用 'TIMEOUT'，但 events 模板/AI 写的全是 NETWORK_ERROR
+
+**解决方案**：把"超时 / 重试 / 取消"统一抽象为 `ApiEndpoint.networkPolicy` 子结构，五层闭环：
+
+| 层 | 改动 |
+|----|------|
+| Layer 1: schema types | `features/design-schema/src/types/dataSource.ts` 新增 `NetworkPolicy` + `ErrorCode` 类型；`ApiEndpoint.networkPolicy?` 字段 |
+| Layer 2: validator | `features/design-schema/src/validators/data.ts` 加 `NetworkPolicySchema` + `ErrorCodeSchema`；`ApiEndpointSchema.networkPolicy` 接入 |
+| Layer 3: ops type | `features/design-operations/src/types/operations/data-source.ts` 新增 `DataSourceSetNetworkPolicyOp` + 联合类型；`features/design-operations/src/operations/data-source.ts` 新增 `executeSetNetworkPolicy` 实现 |
+| Layer 4: runtime | `features/design-engine/src/state/EffectExecutor.ts`：`run()` 按 policy 安装 setTimeout(controller.abort, timeout)；超时后 status='error' + code='TIMEOUT'；retryCount + retryDelay 实现指数退避；区分 abort reason（timeout vs cancel）保证 cancel→idle 不变 |
+| Layer 5: MCP 工具 | `apps/design-mcp/src/tools/domain/data-source.ts` `EndpointSchema.networkPolicy` 接入 + 新增 `set_network_policy` action（粒度细于 set_endpoint，避免误重置 method/path/body）|
+| Layer 6: 编辑器 UI | `apps/design_front/.../ApiEditor.tsx` 新增 `NetworkPolicySection` 面板（timeout/retryCount/retryDelay/retryOn 多选）|
+
+**错误码标准化（同步 v2.6）**：
+- `TIMEOUT`（v2.6 ★ 新拆）：链路慢 → 用户该重试
+- `NETWORK_ERROR`：物理断网 / DNS / connection refused → 用户该开网络
+- `SERVER_ERROR`：5xx → 服务方问题
+- 业务错码（CREDENTIAL/LOCKED/LIMIT_EXCEEDED 等）：保留原 code（4xx 数字或 responseBody.code 字符串），与 retry / Network 错误彻底解耦
+- HttpDriver 5xx 自动归一化为 SERVER_ERROR；4xx 保留原数字 code 给 logic.switch 消费业务错
+
+**重要边界（写入 mock-scenarios.md §4.5）**：
+- ❌ 写入业务错码到 retryOn → 重复扣费 / 多次写错误计数
+- ❌ retryCount × timeout 总等待 > 60s → 用户已离开
+- ✅ undefined 沿用平台默认（无超时无重试），保持向后兼容
+
+**influx 扫描结果**（影响面）：
+- 受影响测试：`features/design-engine/src/state/__tests__/effectExecutor.test.ts`（statusCode 5xx 测试期望从 500 数字改为 'SERVER_ERROR' 字符串；新增 4 个 NetworkPolicy 测试）
+- 新增 SKILL 文档：`mock-scenarios.md §4.5`、`datasources.template.md DS-3 翻译契约`、`boundaries.template.md "请求超时" 行`、`errors.template.md 错误类表 + TIMEOUT 翻译契约行`
+- 后续阶段（design-planner / design-executor）**无需感知**——networkPolicy 是 interaction 层契约，不读写 styles / visualState。
 
 ### 0.2 五个角色的链路与产出
 
@@ -2919,48 +3260,53 @@ design-executor
 
 ## 7. integrity 校验规则（全集）
 
-| 规则 | 触发条件 | 修复方 |
-|------|---------|--------|
-| R-EVENTS-01 | 节点声明 interactive 意图但 events 缺触发器 | interaction |
-| R-EVENTS-02 | event 没 actions | interaction |
-| R-STATUS-01 | ready.events=true 但 events 空（假完成） | interaction |
-| R-STATUS-02 | ready.styles=true 但 styles 空（假完成） | design |
-| R-STATUS-03 | ready.visualStates=true 但 visualStates 空 | design |
-| R-PHASE-01 | phase=verified 但 ready 仍有 false | executor |
-| **R-STRUCTURE-01** | 屏 phase ≥ interaction-defined 但 rootNode 子节点 ≤ 1 | product |
-| **R-STRUCTURE-02** | 节点 styles 用了硬编码颜色（非 $token:） | design |
-| **R-MATERIAL-01** | 节点 meta.design 标记需要素材但 materialSpec 缺失 | design |
-| **R-MATERIAL-02** | materialSpec.colorStrategy 出现硬编码 hex | design |
-| **R-VISUALSTATE-01** | 交互节点缺少必要状态（如 Button 缺 hover/disabled） | design |
-| **R-BUDGET-01** | screen.meta.design.componentBudgets 总权重 > 30 | design |
-| **R-BUDGET-02** | 节点视觉手段超出 budget 表里给的 allowedTools | design |
-| **R-THEME-01** | themeConfig.customized 不为 true（任何写设计 styles 的阶段都看这个） | 退回 theme |
-| **R-THEME-02** | 任一主题 tokens.colors 缺必备 14 类语义色 | theme |
-| **R-THEME-03** | 任一主题 × 色彩方案上 textPrimary on background APCA Lc < 75 | theme |
-| **R-THEME-04** | tokens.spacing.* 非 4 倍数 | theme |
-| **R-THEME-05** | tokens.typography.*.fontSize 偏离 modular scale ±5% | theme |
-| **R-THEME-06** | 任一主题 colorSchemes 少于 2 套 | theme |
-| **R-THEME-07** | decorationRules / iconSpec / stateSpec 任一空对象 | theme |
-| **R-THEME-08** | activeThemeId 或 activeColorSchemeId 未命中 | theme |
-| **R-THEME-09** | colorScheme.overrides 字段不在 base tokens（warning）| theme |
-| **R-THEME-10** | 多主题间必备语义色集合不一致（warning）| theme |
-| **R-PRODUCT-01** | screen.meta.product.rules 少于 4 条（4 类规则未覆盖） | product |
-| **R-PRODUCT-02** | 节点 meta.product.summary 缺失 | product |
-| **R-PRODUCT-03** | 屏识别了业务状态机但 product 未在 rules 中说清每个状态字段 + 枚举值 | product |
-| **R-PRODUCT-04** | 项目缺 `meta.globalConcerns`（5 类全局态未识别） | product |
-| **R-PRODUCT-05** | 项目缺 `globalStateInit.view.session/network` 等必要全局态占位 | product |
-| **R-COVERAGE-01** | 屏 product.rules 中某条没对应到任何 event/state/UI | interaction |
-| **R-VIEW-LOADING-01** | 屏有 API dataSource 但缺少 loading 视图节点（骨架/spinner） | interaction |
-| **R-VIEW-EMPTY-01** | 屏有列表型 dataSource 但缺少空态节点 | interaction |
-| **R-VIEW-ERROR-01** | 屏有 API dataSource 但缺少错误态节点（整页/区域/Banner 至少一个） | interaction |
-| **R-VIEW-BUSINESS-01** | 业务状态字段的某个 enum 值没对应 visibleWhen 节点 | interaction |
-| **R-VIEW-AUTH-01** | 屏依赖 session/user 但缺少未登录/无权限态节点 | interaction |
-| **R-VIEW-DESIGN-01** | 衍生视图节点（loading/empty/error/state-view）缺少 styles 或 meta.design | design |
-| **R-GLOBAL-STATE-01** | `globalStateInit.view.<key>` 子结构不完整（如 session 缺 status/token/user 等字段） | interaction |
-| **R-GLOBAL-OVERLAY-01** | `globalOverlays[*].showWhen` 表达式缺失或语法错（无法自动显隐） | interaction |
-| **R-GLOBAL-OVERLAY-02** | `globalOverlays[*].rootNode` 缺 styles 或 meta.design | design |
-| **R-GLOBAL-USAGE-01** | 登录页 onSuccess 未同步写 globalView.session（跨屏认证态丢失） | interaction |
-| **R-TOKEN-COVERAGE** | 项目 `$token:` 引用率 < 95% | design |
+> **重要说明（v2.2）**：integrity checker 实际只实现了下表中**带 ✓ 实现**标记的规则。其余以 ⚠️ 标记的"产物完整性"类规则**不再追加到 checker**——它们的本意（"该有的产物到底有没有"）由 §0.1.8 的 expectedArtifacts 机制在**任务级**保证，比 integrity 全局扫描更精准、更早暴露。
+>
+> 选择 expectedArtifacts 而非 checker 规则的理由：
+> 1. 产物归属一目了然（由具体任务声明），便于定位补救方
+> 2. 任务标 done 时即时拦截，不需要等到全项目自检
+> 3. 加新红线零代码改动（任务模板里加一条 ArtifactCheck 即可）
+>
+> 节点级运行时一致性（events/styles/visualStates 真假对账）仍由 checker 兜底——它们不属于"任务产物"而是"运行时契约"。
+>
+> **v2.4 重构（★）**：删除 R-EVENTS-01 + 整个 `INTERACTIVE_TRIGGERS` 硬编码白名单。原因：
+> 1. 旧实现用 `meta.interaction.summary` 关键词正则（`/click|tap|blur|focus|输入.../`）启发式猜节点是否声明了交互意图——summary 是 AI 写给人看的自然语言，关键词撞库本质上不可能精确（描述邻居事件的派生显示、描述显示逻辑都会误中），持续误报。
+> 2. 启发式触发后又用 `INTERACTIVE_TRIGGERS = {click,doubleClick,longPress,change,submit}` 5 个 trigger 的白名单去筛真事件——而 EventTrigger 类型有 15 个合法值（含 blur/focus/hover 等用户交互），白名单与类型脱节，输入框 onBlur 校验、滚动到底加载等正常交互全被误判为"没做交互"。
+> 3. R-EVENTS-01 当初要解决的"声明 vs 产物不一致"已被两个更可靠的机制接管：
+>    - **`anyNodeHasEvents` expectedArtifacts**：屏 / 子树级"有没有真交互"，结构判断零误报
+>    - **R-EVENTS-02（去白名单后）**：单节点 event 写了 trigger 但 actions=[] 的空壳事件，纯结构判断
+>    - **R-EVENTS-03（v2.4 落实）**：effect.fetch 缺 onSuccess/onError 的沉默失败，纯结构判断
+> 4. AI 在交互阶段做"输入框 blur 校验 + 行内错误派生显示"是教科书级的标准设计，不应被任何 checker 拦下。
+
+| 规则 | 实现 | 触发条件 | 修复方 |
+|------|:---:|---------|--------|
+| ~~R-EVENTS-01~~ | ❌ 已删除（v2.4） | 旧：summary 启发式猜交互意图 → 误报严重；改由 plan 任务的 `anyNodeHasEvents` expectedArtifacts 守屏/子树级"有没有真交互" | — |
+| R-EVENTS-02 | ✓ | 任意 event（含 blur/focus/screenEnter/...）`actions=[]` 空壳事件 | interaction |
+| R-EVENTS-03 | ✓（v2.4 落实） | effect.fetch 既无 onSuccess 也无 onError —— 用户失败时无任何反馈 | interaction |
+| R-STATUS-01 | ✓ | ready.events=true 但 events[] 中无任何 actions 非空的事件（去白名单后基于纯结构判断） | interaction |
+| R-STATUS-02 | ✓ | ready.styles=true 但 styles 空（假完成） | design |
+| R-STATUS-03 | ✓ | ready.visualStates=true 但 visualStates 空 | design |
+| R-PHASE-01 | ✓ | phase=verified 但 ready 仍有 false | executor |
+| **R-PLAN-01** ★ | ✓ | 已 done 的任务其 expectedArtifacts 不再满足（§0.1.8 兜底） | 触发产物缺失的阶段 |
+| R-THEME-01 ~ R-THEME-10 | ✓ | 主题红线（见 theme 包 validation.ts） | theme |
+| R-STRUCTURE-01 | ⚠️ 移交 | 屏 phase ≥ interaction-defined 但 rootNode 子节点 ≤ 1 → 改用 product 阶段 `<M>-skeleton` 任务的 expectedArtifacts: `arrayMin path:rootNode.children min:1` | product |
+| R-PRODUCT-01 | ⚠️ 移交 | rules 少于 4 条 → 改用 `<M>-rules` 任务 expectedArtifacts: `arrayMin path:meta.product.rules min:4` | product |
+| R-PRODUCT-02 | ⚠️ 移交 | 节点 meta.product.summary 缺失 → 改用 `<M>-skeleton` 任务 expectedArtifacts | product |
+| R-PRODUCT-03 | ⚠️ 移交 | 业务状态机字段未在 rules 显式枚举 → 改用 `<M>-rules` expectedArtifacts | product |
+| R-PRODUCT-04 | ⚠️ 移交 | 缺 globalConcerns 5 类 → 改用 `P-global-concerns` expectedArtifacts: `hasKeys path:meta.globalConcerns keys:[session,network,preferences,navigation,fallback]` | product |
+| R-PRODUCT-05 | ⚠️ 移交 | 缺 session/network 占位 → 改用 `P-global-state` expectedArtifacts | product |
+| R-COVERAGE-01 | ⚠️ 移交 | rules 没对应任何 event/state/UI → 改用 `<M>-coverage` 与 `I-X-coverage` 任务 | product/interaction |
+| R-STRUCTURE-02 | 待实现 | 节点 styles 用了硬编码颜色（非 $token:） | design |
+| R-MATERIAL-01 / R-MATERIAL-02 | 待实现 | 素材规格红线 | design |
+| R-VISUALSTATE-01 | 待实现 | 交互节点缺必要状态 | design |
+| R-BUDGET-01 / R-BUDGET-02 | 待实现 | 视觉预算红线 | design |
+| R-VIEW-LOADING-01 / R-VIEW-EMPTY-01 / R-VIEW-ERROR-01 / R-VIEW-BUSINESS-01 / R-VIEW-AUTH-01 | ⚠️ 移交 | 7 类衍生视图缺失 → 改用对应 `I-X-view-*` 任务 expectedArtifacts | interaction |
+| R-VIEW-DESIGN-01 | 待实现 | 衍生视图缺 styles/meta.design | design |
+| R-GLOBAL-STATE-01 | ⚠️ 移交 | globalStateInit 子结构不完整 → 改用 `I-global-state-fill` expectedArtifacts | interaction |
+| R-GLOBAL-OVERLAY-01 | ⚠️ 移交 | globalOverlays showWhen 缺失 → 改用 `P-global-overlays` expectedArtifacts: `eachItem path:globalOverlays check:hasKeys $:[id,type,showWhen,rootNode]` | product/interaction |
+| R-GLOBAL-OVERLAY-02 | 待实现 | overlay rootNode 缺 styles/design | design |
+| R-GLOBAL-USAGE-01 | ⚠️ 移交 | 登录 onSuccess 未写 globalView.session → 改用 `I-X-events` expectedArtifacts | interaction |
+| R-TOKEN-COVERAGE | 待实现 | $token: 引用率 < 95% | design |
 
 ---
 
@@ -3039,7 +3385,9 @@ interaction?: {
 
 见 §4.6。
 
-### 8.5 DesignProject.globalOverlays（新增）★
+### 8.5 DesignProject.globalOverlays（v2.2 已落地 ✅）
+
+**状态**：v2.2 已落地（`features/design-schema/src/types/project.ts` + `features/design-operations/src/operations/project.ts`）。
 
 ```typescript
 export interface DesignProject {
@@ -3048,6 +3396,9 @@ export interface DesignProject {
    * 项目级全局覆盖层。渲染在所有屏内容 + 屏级 overlays 之上，跨屏共享。
    * 由 showWhen 表达式自动控制显隐（读 globalView）。
    * 例：OfflineBanner / SessionExpiredModal / GlobalErrorBoundary / AppUpdatePrompt。
+   *
+   * 写入 op：`project.setGlobalOverlays`（整体替换）。
+   * 严禁通过 `meta.setProject` 写入——v2.2 起 service 端会显式拒绝。
    */
   globalOverlays?: OverlayNode[];
 }
@@ -3055,12 +3406,16 @@ export interface DesignProject {
 
 **渲染契约**：渲染器需要新增一层"globalOverlays 层"，z-index 高于屏级 overlays。当前 schema 已有 `OverlayNode` 类型（屏级用），可直接复用。
 
+**MCP 入口**：`meta/set_global_overlays { projectId, overlays: OverlayNode[] | null }`（设计上 action 名归在 `meta` 工具下是为了和 globalConcerns 等"全局态相关"的工具就近——后续可考虑独立 `project` 工具）。
+
 **与屏级 overlays 的区别**：
 - 屏级（`Screen.overlays`）：仅本屏渲染，随屏切换被销毁
 - 项目级（`DesignProject.globalOverlays`）：所有屏共享渲染、持续存在
 - 两者用 `OverlayNode` 同一类型，区别只在挂载位置
 
-### 8.6 ProjectMeta.globalConcerns（新增）★
+### 8.6 ProjectMeta.globalConcerns（v2.2 已落地 ✅）
+
+**状态**：v2.2 已落地（`features/design-schema/src/types/meta.ts`）。写入走 `meta/set_project { patch: { globalConcerns: {...} } }`（B 类信息，正常 meta 路径）。
 
 ```typescript
 export interface ProjectMeta {

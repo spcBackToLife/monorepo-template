@@ -21,10 +21,12 @@ node.events = [
 ```
 
 **红线**：
-- R-EVENTS-01：节点声明交互意图但 events 缺对应 trigger
-- R-EVENTS-02：event.actions 为空数组
+- R-EVENTS-02：event 写了 trigger 但 actions=[] 空壳事件（任何合法 EventTrigger 都校验，不再有白名单）
+- R-EVENTS-03：effect.fetch 既无 onSuccess 也无 onError（用户失败时无反馈）
 - description 缺失 → AI / 调试器看不懂
 - trigger 用非标准动词（"tap" / "submit-form"）
+
+> ⚠️ **R-EVENTS-01 已删除（v2.4）**：旧版用 summary 关键词启发式猜交互意图，对输入框 blur 校验、纯展示派生节点持续误报。现「该屏有没有真交互」由 `I-X-events` 任务的 `expectedArtifacts: [{ kind: 'anyNodeHasEvents', path: 'rootNode' }]` 守——结构判断零误报，且任何合法 EventTrigger（含 blur/focus/hover/screenEnter/scrollReachBottom）配齐 actions 都算真交互。
 
 ## §2. v2 actions 22 种动词（dot-namespace）
 
@@ -258,9 +260,10 @@ component_prop/update_props { projectId, nodeId, props: { textContent, placehold
 
 | 红线 | 触发 |
 |------|-----|
-| R-EVENTS-01 | 节点声明交互意图但 events 缺对应 trigger |
-| R-EVENTS-02 | event.actions 为空数组 |
-| R-EVENTS-03 | effect.fetch 缺 onSuccess 或 onError |
+| R-EVENTS-02 | event 写了 trigger 但 actions=[]（任意 trigger，含 blur/focus/screenEnter 等）|
+| R-EVENTS-03 | effect.fetch 既无 onSuccess 也无 onError —— 沉默失败 |
 | R-BIND-01 | input/textarea/select 用 event.change → state.set 而不是 set_bind |
 | R-EVENT-DESC-01 | event.description 缺失 |
 | R-LIFECYCLE-01 | 列表型屏缺 screenExit cancel；首屏屏缺 screenEnter 重置 |
+
+> ⚠️ R-EVENTS-01（旧版 summary 启发式）已删除（v2.4）；屏级"有没有真交互"由 `I-X-events` 的 `anyNodeHasEvents` expectedArtifacts 守。

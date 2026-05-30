@@ -137,9 +137,8 @@ meta/set_screen {
 
 | 红线 | 触发条件 |
 |------|---------|
-| **R-EVENTS-01** | 节点声明交互意图但 events 缺对应 trigger |
-| **R-EVENTS-02** | event 没 actions（actions[] 为空数组）|
-| **R-EVENTS-03** | effect.fetch 缺 onSuccess 或 onError 分支 |
+| **R-EVENTS-02** | event 写了 trigger 但 actions=[] 空壳事件（任意合法 trigger，含 blur/focus/screenEnter 等）|
+| **R-EVENTS-03** | effect.fetch 既无 onSuccess 也无 onError —— 沉默失败 |
 | **R-VIEW-LOAD-01** | dataSource 类型 = api 但本屏无对应 pending 视图节点 |
 | **R-VIEW-EMPTY-01** | 列表型 data 但本屏无对应 empty 视图节点 |
 | **R-VIEW-ERROR-01** | dataSource 类型 = api 但本屏无对应 error 视图 |

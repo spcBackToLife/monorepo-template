@@ -73,3 +73,30 @@
   }
 }
 ```
+
+---
+
+## ★ 翻译契约（Decision-to-Artifact Mapping）
+
+> 上游分析 md 强制段落（v2.5 §0.1.10）。**operations 7 列表的每一行都隐含一个"翻译契约"**：op 由具体节点的具体 trigger 触发，feedback / inProgress / success / failure / boundary 的实现都要落到 events.actions。
+
+| 决策 ID | 决策内容（一句话）| 应翻译为 schema 产物 | 落库任务 | nodeId | 期望指纹 |
+|---------|------------------|---------------------|---------|--------|---------|
+| O-1 | 切换登录方式（click ModeToggle）| ModeToggle 子按钮 click → state.set loginMode + 清相关 errors | `I-X-events` | CodeModeBtn / PasswordModeBtn | `nodeHasEvent { trigger:'click' }` × 2 |
+| O-2 | 输入手机号（input PhoneInput）| PhoneInput.bind=view.form.phone | `I-X-events` | PhoneInput | `nonEmpty path: bind` |
+| O-3 | 失焦校验手机号（blur PhoneInput）| PhoneInput.blur 校验 actions | `I-X-events` | PhoneInput | `nodeHasEvent { trigger:'blur' }` |
+| O-4 | 输入凭证 + 失焦校验 | CredentialInput.bind + .blur 校验 | `I-X-events` | CredentialInput | `nonEmpty path: bind` + `nodeHasEvent { trigger:'blur' }` |
+| O-5 | 切密码可见 | PasswordToggleEye.click → state.toggle | `I-X-events` | PasswordToggleEye | `nodeHasEvent { trigger:'click' }` |
+| O-6 | 获取验证码 | GetCodeBtn.click → effect.fetch ds-send-code + 60s 倒计时 | `I-X-events` | GetCodeBtn | `nodeHasEvent { trigger:'click' }` |
+| O-7 | **提交登录（click SubmitBtn）** ★ | SubmitBtn.click → 前置校验 + ui.haptic + state.set submitting + effect.fetch ds-login + onSuccess 写 session+nav.go + onError 6-case 分支 | `I-X-events` | SubmitBtn | `nodeHasEvent { trigger:'click' }` |
+| O-8 | 跳转注册 | RegisterLink.click → nav.go 00-register | `I-X-events` | RegisterLink | `nodeHasEvent { trigger:'click' }` |
+| O-9 | 跳转忘记密码 | ForgotLink.click → nav.go 00-forgot-password | `I-X-events` | ForgotLink | `nodeHasEvent { trigger:'click' }` |
+| O-10 | 进屏门禁 | Root.screenEnter → logic.if active 跳 home / 重启 lockedCountdown timer | `I-X-events` | Root | `nodeHasEvent { trigger:'screenEnter' }` |
+| O-11 | 离屏副作用清理 | Root.screenExit → effect.cancel × 2 + ui.stopTimer × 2 | `I-X-events` | Root | `nodeHasEvent { trigger:'screenExit' }` |
+| ⚠️ 协议链接点击 | （若文案要点击）PolicyText 子链接 click → ui.openUrl | `I-X-events` | PolicyText 子节点 | （含主指纹）|
+
+> 备注：operations 含"系统生命周期"操作（如 #10/#11）不是用户主动触发，但同样产 events，必须列入。
+>
+> "📊 反馈层级 / 进行中态 / 成功失败反馈"列的具体 actions 在 events.template 里逐节点细写——本表只列**节点 + trigger 的存在性**，作为 events 任务的 todo 清单源。
+
+字段说明见 `STAGE-CONTRACT.md §0.1.10`。

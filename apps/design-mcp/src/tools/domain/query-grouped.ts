@@ -59,10 +59,14 @@ export function registerQueryTools(server: McpServer): void {
     integrity: defineAction({
       description:
         '完成度对账（Schema-First）：基于真实 schema 检查"声明 vs 产物"是否一致。' +
-        '规则：R-EVENTS-01（节点声明了交互意图但 events 缺 interactive trigger）、' +
-        'R-EVENTS-02（event 没 actions）、R-STATUS-01（ready.events=true 但事件空—假完成）、' +
-        'R-PHASE-01（phase=verified 但 ready 仍有 false）等。' +
-        '不指定 screenId 则校验整个项目。',
+        '规则：R-EVENTS-02（event 写了 trigger 但 actions=[] —— 空壳事件）、' +
+        'R-EVENTS-03（effect.fetch 缺 onSuccess/onError —— 沉默失败）、' +
+        'R-STATUS-01（ready.events=true 但无任何带 actions 的事件—假完成）、' +
+        'R-STATUS-02/03（ready.styles/visualStates=true 但实际为空）、' +
+        'R-PHASE-01（phase=verified 但 ready 仍有 false）、' +
+        'R-PLAN-01（已 done 任务的 expectedArtifacts 当前不再满足—回归检测）。' +
+        '不指定 screenId 则校验整个项目。' +
+        '⚠️「该屏有没有真交互」由各 plan 任务的 expectedArtifacts 守（如 anyNodeHasEvents），不在 checker 兜底。',
       schema: z.object({
         projectId: z.string(),
         screenId: z.string().optional().describe('可选：仅校验此屏'),
@@ -176,6 +180,109 @@ export function registerQueryTools(server: McpServer): void {
         }
         return { content: [{ type: 'text', text: JSON.stringify({
           scope: 'auto', next: null, message: '所有任务均已完成或无可执行的 pending 任务',
+        }, null, 2) }] };
+      },
+    }),
+    list_open_challenges: defineAction({
+      description:
+        '★ 列出所有未关闭的跨阶段回流挑战（v2.3 ★）。' +
+        '上游 SKILL（product/theme/interaction/design）Phase 0 入场门禁必须扫这一项——' +
+        '有 phase="open" 且 targetStage 匹配本 SKILL 阶段的 challenge 时，优先级最高，必须接管处理。\n\n' +
+        '可选 targetStage 过滤；不传则返回所有 open + accepted-pending 状态的 challenge。\n\n' +
+        '返回字段：challengeId / phase / raisedBy / targetStage / targetTaskIds / challengeMd / decisionMd / reviseTaskId。',
+      schema: z.object({
+        projectId: z.string(),
+        targetStage: z.enum(['product', 'theme', 'interaction', 'design']).optional(),
+      }),
+      handler: async (p) => {
+        const prj = await apiClient.getProject(p.projectId);
+        const all: Array<Record<string, unknown>> = [];
+        const seen = new Set<string>();
+
+        const collect = (tasks: Array<Record<string, unknown>> | undefined, _scope: string) => {
+          if (!tasks) return;
+          for (const t of tasks) {
+            const ref = t['upstreamChallenge'] as Record<string, unknown> | undefined;
+            if (ref && (ref['phase'] === 'open' || ref['phase'] === 'accepted')) {
+              const id = ref['challengeId'] as string;
+              if (!seen.has(id)) {
+                seen.add(id);
+                all.push({
+                  challengeId: id,
+                  phase: ref['phase'],
+                  raisedBy: ref['raisedBy'],
+                  raisedByScope: ref['raisedByScope'],
+                  raisedByScreenId: ref['raisedByScreenId'],
+                  targetStage: ref['targetStage'],
+                  targetTaskIds: ref['targetTaskIds'],
+                  challengeMd: ref['challengeMd'],
+                  decisionMd: ref['decisionMd'],
+                  decision: ref['decision'],
+                  reviseTaskId: t['id'], // 当前 task 是 P-revise-* 时这就是 revise 任务 id
+                });
+              }
+            }
+            const sub = t['subtasks'] as Array<Record<string, unknown>> | undefined;
+            if (sub && sub.length > 0) collect(sub, _scope);
+          }
+        };
+
+        collect(prj.meta?.plan as Array<Record<string, unknown>> | undefined, 'project');
+        for (const scr of prj.screens) {
+          collect(scr.meta?.plan as Array<Record<string, unknown>> | undefined, `screen:${scr.id}`);
+        }
+
+        const filtered = p.targetStage
+          ? all.filter((c) => c['targetStage'] === p.targetStage)
+          : all;
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          targetStageFilter: p.targetStage ?? null,
+          total: all.length,
+          filtered: filtered.length,
+          challenges: filtered,
+        }, null, 2) }] };
+      },
+    }),
+    blocked_tasks: defineAction({
+      description:
+        '★ 列出所有 status="blocked" 的任务（v2.3 ★）。' +
+        '新会话续接 / 任意时刻排查"卡住的任务"时使用。' +
+        '返回字段：taskId / scope / screenId / blockedReason / upstreamChallenge（如有）。',
+      schema: z.object({
+        projectId: z.string(),
+      }),
+      handler: async (p) => {
+        const prj = await apiClient.getProject(p.projectId);
+        const all: Array<Record<string, unknown>> = [];
+
+        const collect = (tasks: Array<Record<string, unknown>> | undefined, scope: string, screenId?: string) => {
+          if (!tasks) return;
+          for (const t of tasks) {
+            if (t['status'] === 'blocked') {
+              all.push({
+                taskId: t['id'],
+                title: t['title'],
+                stage: t['stage'],
+                scope,
+                screenId,
+                blockedReason: t['blockedReason'],
+                upstreamChallenge: t['upstreamChallenge'],
+              });
+            }
+            const sub = t['subtasks'] as Array<Record<string, unknown>> | undefined;
+            if (sub && sub.length > 0) collect(sub, scope, screenId);
+          }
+        };
+
+        collect(prj.meta?.plan as Array<Record<string, unknown>> | undefined, 'project');
+        for (const scr of prj.screens) {
+          collect(scr.meta?.plan as Array<Record<string, unknown>> | undefined, 'screen', scr.id);
+        }
+
+        return { content: [{ type: 'text', text: JSON.stringify({
+          total: all.length,
+          tasks: all,
         }, null, 2) }] };
       },
     }),

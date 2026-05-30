@@ -157,12 +157,15 @@ query/next_pending_task { projectId, scope: 'auto' }
 
 #### 0.3 列任务清单（首次进入本阶段）
 
+**v2.2 ★**：每个落库任务带 `expectedArtifacts` 由 service 端机器对账（详见 STAGE-CONTRACT §0.1.8）。
+
 ```
 项目级任务（一次性）：
 meta/add_plan_tasks {
   projectId, scope: 'project',
   tasks: [
-    { id: "D-theme",     title: "全局 ThemeConfig（colors/typography/spacing/radii/shadows/durations/easings）", stage: "design", status: "pending" },
+    { id: "D-theme",     title: "全局 ThemeConfig（colors/typography/spacing/radii/shadows/durations/easings）", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'themeConfig.themes' }] },
     { id: "D-templates", title: "抽通用业务组件模板（首次出现时 save_as_template）", stage: "design", status: "pending" },
     { id: "D-audit",     title: "跨屏一致性 audit", stage: "design", status: "pending" },
     { id: "D-integrity", title: "全项目 integrity 自检", stage: "design", status: "pending" },
@@ -170,16 +173,20 @@ meta/add_plan_tasks {
   ]
 }
 
-每屏任务：
+每屏任务（path 相对 Screen 根）：
 对每个 phase = "interaction-defined" 的屏 X：
 meta/add_plan_tasks {
   projectId, scope: 'screen', screenId: X,
   tasks: [
-    { id: "D-X-visual",      title: "视觉先行分析（情感/层级/手段/装饰/素材/规格/契合度）", stage: "design", status: "pending" },
+    { id: "D-X-visual",      title: "视觉先行分析（情感/层级/手段/装饰/素材/规格/契合度）", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.design.summary' }] },
     { id: "D-X-structure",   title: "补全节点结构（element/add 装饰/容器节点）",            stage: "design", status: "pending" },
-    { id: "D-X-styles",      title: "全量样式落库（每个节点 style/update 一次到位）",       stage: "design", status: "pending" },
+      // 装饰节点 ID 在落库时确定；如要严格校验，update 时一并传 expectedArtifacts
+    { id: "D-X-styles",      title: "全量样式落库（每个节点 style/update 一次到位）",       stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'rootNode.styles' }] },
     { id: "D-X-states",      title: "visualStates（hover/pressed/focus/disabled/error 等）", stage: "design", status: "pending" },
-    { id: "D-X-meta",        title: "落库 meta.design 叙事（summary + rationale）",        stage: "design", status: "pending" },
+    { id: "D-X-meta",        title: "落库 meta.design 叙事（summary + rationale）",        stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.design' }] },
     { id: "D-X-integrity",   title: "本屏 integrity 自检（0 个 R-STATUS-02/03）",          stage: "design", status: "pending" }
   ]
 }
@@ -363,7 +370,7 @@ query/integrity { projectId, screenId }
 
 | 规则 | 期望结果 | 不达标怎么办 |
 |------|---------|------------|
-| R-EVENTS-01/02 | 0 错误（应该上一阶段过了，这里 double-check） | 退回 interaction-designer |
+| R-EVENTS-02/03 | 0 错误（应该上一阶段过了，这里 double-check） | 退回 interaction-designer |
 | R-STATUS-02（声明 styles 完成但 styles 为空） | 0 错误 | 立刻补 style/update |
 | R-STATUS-03（visualStates 不一致） | 0 错误 | 立刻补 visual_state/add |
 | R-PHASE-01（phase 一致性） | 0 错误 | meta.status.phase 设成 "designed" |

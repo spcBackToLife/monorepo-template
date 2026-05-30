@@ -5,6 +5,17 @@ import { z } from 'zod';
 // HTTP 方法
 export const HttpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+// 错误码（标准化语义）
+export const ErrorCodeSchema = z.enum(['TIMEOUT', 'NETWORK_ERROR', 'SERVER_ERROR']);
+
+// 网络层策略（v2.6 ★）
+export const NetworkPolicySchema = z.object({
+  timeout: z.number().int().positive().optional(),
+  retryCount: z.number().int().nonnegative().max(10).optional(),
+  retryDelay: z.number().int().nonnegative().optional(),
+  retryOn: z.array(ErrorCodeSchema).optional(),
+});
+
 // 真实接口配置
 export const ApiEndpointSchema = z.object({
   method: HttpMethodSchema,
@@ -13,6 +24,7 @@ export const ApiEndpointSchema = z.object({
   query: z.record(z.string(), z.unknown()).optional(),
   body: z.unknown().optional(),
   responseSchema: z.record(z.string(), z.unknown()).optional(),
+  networkPolicy: NetworkPolicySchema.optional(),
 });
 
 // Mock 场景

@@ -11,6 +11,7 @@ import type {
   DataSourceRemoveOp,
   DataSourceUpdateOp,
   DataSourceSetEndpointOp,
+  DataSourceSetNetworkPolicyOp,
   DataSourceSetDefaultParamsOp,
   DataSourceSetStaticInitialOp,
   DataSourceAddMockScenarioOp,
@@ -228,6 +229,52 @@ export function executeSetEndpoint(project: DesignProject, params: DataSourceSet
         screenId: params.screenId,
         dataSourceId: params.dataSourceId,
         endpoint: oldEndpoint,
+      },
+    },
+  };
+}
+
+// ===== dataSource.setNetworkPolicy（v2.6 ★） =====
+
+export function executeSetNetworkPolicy(
+  project: DesignProject,
+  params: DataSourceSetNetworkPolicyOp['params'],
+): Result {
+  const newProject = deepClone(project);
+  const screen = findScreen(newProject, params.screenId);
+  const ds = screen?.dataSources.find((d) => d.id === params.dataSourceId) as ApiDataSource | undefined;
+
+  if (!screen || !ds || ds.type !== 'api') {
+    return {
+      project,
+      result: { success: false, description: `Api data source ${params.dataSourceId} not found`, affectedNodeIds: [] },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
+  const oldPolicy = ds.endpoint.networkPolicy ? deepClone(ds.endpoint.networkPolicy) : null;
+  if (params.networkPolicy === null) {
+    delete ds.endpoint.networkPolicy;
+  } else {
+    ds.endpoint.networkPolicy = params.networkPolicy;
+  }
+  newProject.updatedAt = new Date().toISOString();
+
+  return {
+    project: newProject,
+    result: {
+      success: true,
+      description: params.networkPolicy === null
+        ? `Cleared networkPolicy of "${ds.name}"`
+        : `Updated networkPolicy of "${ds.name}"`,
+      affectedNodeIds: [params.screenId],
+    },
+    inverse: {
+      type: 'dataSource.setNetworkPolicy',
+      params: {
+        screenId: params.screenId,
+        dataSourceId: params.dataSourceId,
+        networkPolicy: oldPolicy,
       },
     },
   };

@@ -417,7 +417,13 @@ export function getAvailableOperations(): OperationDescription[] {
       params: [
         { name: 'screenId', type: 'string', required: true, description: 'Screen ID' },
         { name: 'dataSourceId', type: 'string', required: true, description: 'Data source ID' },
-        { name: 'endpoint', type: 'ApiEndpoint', required: true, description: 'New endpoint (method/path/headers/query/body/responseSchema)' },
+        { name: 'endpoint', type: 'ApiEndpoint', required: true, description: 'New endpoint (method/path/headers/query/body/responseSchema/networkPolicy)' },
+      ] },
+    { type: 'dataSource.setNetworkPolicy', description: 'Set / clear the network-layer policy (timeout / retry) of an api data source. Finer granularity than setEndpoint—only touches endpoint.networkPolicy without resetting other endpoint fields.', category: 'dataSource',
+      params: [
+        { name: 'screenId', type: 'string', required: true, description: 'Screen ID' },
+        { name: 'dataSourceId', type: 'string', required: true, description: 'Data source ID' },
+        { name: 'networkPolicy', type: 'NetworkPolicy | null', required: true, description: 'Policy { timeout?, retryCount?, retryDelay?, retryOn? }, or null to clear' },
       ] },
     { type: 'dataSource.setDefaultParams', description: 'Set / clear defaultParams of an api data source', category: 'dataSource',
       params: [
