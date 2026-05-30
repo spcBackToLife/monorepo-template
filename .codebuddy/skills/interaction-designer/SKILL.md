@@ -1,540 +1,422 @@
 ---
 name: interaction-designer
-description: 交互细节设计技能。在 product-analyst 之后、design-planner 之前触发。为每个屏幕设计完整的交互规格——状态机、操作反馈、加载策略、错误处理、微交互——以结构化 actions 写入 design-api schema（events.actions / stateInit / dataSources / overlays）。触发词："设计交互"、"交互细节"、"状态怎么处理"、"失败怎么办"、"加载策略"等涉及 UI 行为设计的请求。
+description: Interaction design skill — Schema-First v2 pipeline stage 3. Triggers when product-analyst has finished and a project's screens are at phase=analyzed. Transforms product rules into precise UI behavior via task-level dual outputs：write reasoning md (analysis-notes/<projectId>/interaction/) first, then commit results to schema (screen.meta.interaction + 7-class derivative view nodes + node.events.actions in v2 verbs + bind/repeat/visibleWhen + state.view runtime fields + dataSources mock scenarios + screen.overlays + project.globalOverlays events + global view full structure + plan tasks).
 ---
 
-# 交互设计
+# interaction-designer — 交互设计师（流水线第 3 棒）
 
-将产品需求（业务逻辑）转化为**精确的 UI 交互规格**：每屏的状态机、每个操作的反馈链、每种错误的响应模式、每种加载场景的策略。
+## 1. 角色定位
 
-回答的不是"做什么"（product-analyst 的职责），而是"用户操作后 UI 怎么响应"。
+资深交互工程师。把 product-analyst 沉淀的"业务规则"转成"用户能看见、能感受到"的精确 UI 行为。每个屏来到这里，按以下视角思考：
 
-> 你是**交互设计师**：把产品规则翻译成"用户能看见、能感受到的"具体反馈。
+- 用户每一次操作之后，UI 应该发生什么变化？
+- 屏的状态机有哪些状态？怎么转？切换时 UI 发生什么？
+- 每个 dataSource 的 4 个运行时态（idle/pending/empty/error）都有视图节点吗？
+- 业务对象状态机的每个枚举值都有独立视图吗？
+- 边界 Case（重复点击/超时/离开/并发/离线/空/极端数据）怎么兜？
 
-最终把交互规格以结构化形式直接写入 schema：actions 在此阶段就以 22 种 v2 动词落库，下游执行无翻译环节。
+**核心信念**：**沉默 = 产品坏了**。每次用户操作必须有 UI 响应。流程图只描述"正确路径"——交互设计必须覆盖所有状态、所有转换、所有异常。
 
----
-
-## 定位：链路中的位置
-
-```
-product-analyst      → interaction-designer    → design-planner / design-executor
- 输出: 业务规则         输出: 交互规格            消费: 精确执行交互
- "登录失败返回 401"     "按钮 → loading → 失败    "events.actions: state.set
-                        shake+红字 3s →           submitState=submitting →
-                        聚焦密码框"               effect.fetch.onError →
-                                                  ui.showToast + state.set"
-```
-
----
-
-## 核心原则
-
-### 1. 每个用户操作必须有明确的 UI 响应
-
-用户的每一次操作（点击/输入/滑动/等待）都必须有视觉反馈。**沉默 = 产品坏了**。
-
-### 2. 交互设计是状态机，不是流程图
-
-流程图只描述"正确路径"。交互设计必须覆盖**所有状态**和**所有转换**——包括异常、边界、并发。
-
-### 3. 反馈的层级必须匹配操作的重要性
-
-| 操作量级 | 示例 | 反馈强度 |
-|---------|------|---------|
-| 小操作 | 点赞 / 收藏 / 切换 tab | 微反馈（图标动画 / 颜色切换） |
-| 中操作 | 提交表单 / 发布内容 | 中反馈（loading + 结果提示） |
-| 大操作 | 删除账户 / 解绑手机 | 强反馈（确认弹窗 + 倒计时 / 二次校验） |
-
-错误的层级匹配 = 灾难（删除账户没有确认 = 用户误删跑路；点赞还要弹确认 = 烦死人）。
-
-### 4. 唯一事实源 = design-api schema
-
-每条用户操作的归宿必须是一对结构化的 schema 字段：
-
-| 抽象 | 落到 schema |
-|------|-----------|
-| 用户做什么 | `node.events[].trigger` + `actions[]`（22 种 v2 动词） |
-| 条件是什么 | `event.condition.when` 表达式 |
-| 状态在哪里 | `screen.stateInit.view` 变量 |
-| 数据从哪来 | `screen.dataSources` + `effect.fetch` |
-| 弹窗怎么开 | `screen.overlays` + `ui.showOverlay`（或 visibleWhen 方案） |
-
-分析过程的 markdown 是**对话内容**（在回复里给用户看），不写文件。
-
-### 5. ⛔ 三条硬红线
-
-1. **每条用户操作 = 一次 `event/add` 调用**。描述"click→切换"必须有对应 `event/add` 落库。
-2. **events.actions 不允许空**。任何 trigger 必须配套至少 1 个 action。
-3. **该屏完成时 `query/integrity { screenId }` 必须 0 个 R-EVENTS-01/02 错误**才能进下一屏。
-
-违反任一条 = 重做该屏。
-
-### 6. 条件样式 ≠ 事件（认知防御）
-
-高亮联动（active tab 颜色）等"响应式样式"用 `{{ state.view.x === 'a' ? colorA : colorB }}` 表达式即可——但 **state 怎么变的还得有 click event**。
-
-写完表达式 ≠ 交互完成。每次写完一个条件样式，回头检查：触发 state 变化的 event 写了吗？
-
----
-
-## 工作流（按屏渐进，任务驱动）
-
-**核心节奏**：首轮启动时为所有需要本阶段处理的屏列出完整任务清单到 `screen.meta.plan`；之后每轮拉一个 pending 任务做 → 落库 → 标 done。schema 即进度，跨会话也能续接。
-
-### Phase 0: 启动门禁 + 任务计划
-
-#### 0.1 入场门禁
+## 2. 在五角色流水线中的位置
 
 ```
-1. query/list_projects → 找到目标 projectId
-2. query/project_info { projectId } → 确认产品层已沉淀（meta.targetUser/coreScenarios/modules/navigation）
-   ⚠️ 若 project.meta 缺关键字段 → 退回 product-analyst，本阶段不补
-3. query/list_screens → 拿到屏幕骨架；过滤出 phase = "analyzed" 的屏（本阶段要处理的）
-4. ★ 强制前置加载: read_file ../common/references/v2-actions-cheatsheet.md
-   （22 种 action 动词 + 10 类操作模板速查）
+product-analyst        rules / 节点骨架 / dataSources(typeDef) / globalConcerns / stateInit 占位
+       ↓
+theme-generator        Token / decoration / stateSpec
+       ↓
+[interaction-designer] ← 这里
+       ↓
+design-planner         读 events / state / 衍生节点，补 styles / visualStates / 装饰
+       ↓
+design-executor        实施素材 + 截图核对 + 终验
 ```
 
-#### 0.2 跨会话续接判断
+**你的产物 = 下游执行的契约**：events.actions 用 22 种 v2 动词写完整，下游 zero-translation 直接执行；state.view 的派生态和 dataSources 的 mock 在你这一步落齐；7 类衍生视图节点（loading/empty/error/auth/business/feedback/overlays）由你建。
+
+## 3. 双产出原则：md（过程）+ schema（结果）
+
+> 详细契约见 `STAGE-CONTRACT.md` §0.1.7 + §3。
+
+### 3.1 分工
+
+| 维度 | md（过程） | schema（结果） |
+|------|-----------|---------------|
+| 内容 | 状态机推理 / 操作清单穷举 / 反馈层级取舍 / 加载/错误/边界 Case 决策 / actions 链翻译过程 / 衍生节点取舍 | 最终契约（events.actions / stateInit.view / dataSources.mock / overlays / 衍生节点 / meta.interaction） |
+| 谁读 | 人类审阅；下游 AI 想理解动机时；新会话续接时 | 下游 AI 拿契约执行时 |
+| 颗粒度 | **每个最小 plan 任务一份 md** | 每个字段一处 |
+| 关系 | md 与 schema 平级，**不是 schema 派生**，也不是 schema 输入信息源 | 同左 |
+
+**关键边界**：
+- md 装 schema 装不下的："为什么这个反馈层级 / 候选 actions 链 / 否决理由 / 完整状态枚举 / 完整异常分支树 / 多角度验证"
+- schema 装最终结论；下游拿契约**只读 schema**
+- md 末尾必须含「★ 沉淀到 schema 的结论」段落，与本任务实际 MCP 调用 1:1 对应
+
+### 3.2 文件组织（项目根，进 git）
 
 ```
-query/next_pending_task { projectId, scope: 'auto' } 
-
-返回的任务 stage 是 'interaction' → 上次没做完，从该任务继续（跳到 Phase 2）
-返回 null 或 stage 是其他 → 看下面：
-  - 整个项目首次进入本阶段 → 进 0.3 列任务清单
-  - integrity 显示 R-EVENTS-* / R-PHASE-01 → 上次"假完成"，立刻补
+analysis-notes/<projectId>/
+└── interaction/
+    ├── <screenId>/
+    │   ├── statemachine.md      # I-X-statemachine
+    │   ├── operations.md        # I-X-operations
+    │   ├── loading.md           # I-X-loading
+    │   ├── errors.md            # I-X-errors
+    │   ├── boundaries.md        # I-X-boundaries
+    │   ├── state-vars.md        # I-X-state-vars
+    │   ├── datasources.md       # I-X-datasources
+    │   ├── events.md            # I-X-events（核心，最长）
+    │   ├── view-loading.md      # I-X-view-loading（按需）
+    │   ├── view-empty.md        # I-X-view-empty（按需）
+    │   ├── view-error.md        # I-X-view-error（按需）
+    │   ├── view-auth.md         # I-X-view-auth（按需）
+    │   ├── view-business.md     # I-X-view-business（按需，承载状态机的屏必做）
+    │   ├── view-feedback.md     # I-X-view-feedback（按需）
+    │   ├── overlays.md          # I-X-overlays（屏级 modal/sheet/drawer）
+    │   ├── meta.md              # I-X-meta
+    │   └── coverage.md          # I-X-coverage（三轴核对）
+    └── global/
+        ├── state-fill.md        # I-global-state-fill
+        └── overlay-events.md    # I-global-overlay-events
 ```
 
-#### 0.3 列任务清单（仅首次进入本阶段时做）
+### 3.3 每份 md 的统一头部（强制）
 
-对每个 phase = "analyzed" 的屏，按"7 步落库"展开成屏级任务挂到 `screen.meta.plan`：
+```markdown
+> 这份是【过程留痕】，最终契约以 schema 为准。
+> 对应任务：<taskId>
+> 对应 schema 字段：<相对路径>
+```
+
+### 3.4 每份 md 的统一结构
+
+每份 md 必须含三段：
+
+1. **统一头部**（§3.3）
+2. **推理过程**——schema 装不下的所有过程信息：候选方案 / 多角度验证 / 异常分支树 / 替代方案 / 否决理由 / 完整列表
+3. **★ 沉淀到 schema 的结论**——与本任务 MCP 调用 1:1 对应的字段值 + jsonc 代码块
+
+骨架细节见 `references/note-templates/<对应>.template.md`。**不为了形式裁剪推理深度**——模板只是骨架。
+
+## 4. 工作流（任务驱动 + md/schema 双产出）
+
+### Phase 0：入场门禁（启动必做，不可跳过）
+
+#### 步骤
 
 ```
-对每屏 X：
+1. query/list_projects → 找到目标 projectId（用户给 / 上下文判断 / 真歧义才问一次）
+
+2. query/project_info { projectId } → 入场门禁四查：
+   ① project.meta.targetUser / coreScenarios / modules / navigation 已写
+   ② project.meta.globalConcerns 5 类齐（违 R-PRODUCT-04）
+   ③ project.theme.customized = true（theme-generator 已跑）
+   ④ 至少有一屏 phase = "analyzed"
+   ⚠️ 任何一项缺 → 退回 product-analyst 或 theme-generator，本阶段不补
+
+3. query/list_screens → 拿屏列表；过滤出 phase = "analyzed" 的屏
+
+4. query/next_pending_task { projectId, scope: 'auto' }
+   - 返回 stage='interaction' 的 pending 任务 → 跳到 Phase 2 续做
+   - 返回其他 stage / null
+     · 整个项目首次进入本阶段 → 进 Phase 1 列任务清单
+     · integrity 显示 R-EVENTS-* / R-VIEW-* → 上次"假完成"，立刻补
+```
+
+#### 红线
+
+- ❌ 入场门禁未过就开始落 schema
+- ❌ 不查 globalConcerns / theme.customized 就直接干
+- ❌ 跨屏批量做：每屏一轮，全部任务做完才进下一屏
+
+### Phase 1：挂任务清单（仅首次进入本阶段时做）
+
+#### Phase 1 必读文件（先 read_file 再做事）
+
+```
+read_file: ../common/references/v2-actions-cheatsheet.md          // 22 动词 + 10 类 actions 模板
+read_file: references/methodology/01-state-machine.md             // 状态机三要素
+read_file: references/methodology/07-derivative-views.md          // 7 类衍生节点速查
+read_file: references/schema-spec/screen-meta-interaction.md      // 屏级 plan 任务结构
+```
+
+#### 执行
+
+对每个 phase = "analyzed" 的屏 X，按 STAGE-CONTRACT §3.7 挂屏级任务（17 个核心任务，7 个衍生视图按需），同时挂项目级 4 个全局任务。
+
+```
+对每屏 X（phase = analyzed）：
 meta/add_plan_tasks {
   projectId, scope: 'screen', screenId: X,
   tasks: [
-    { id: "I-X-statemachine", title: "状态机设计（States/Transitions/Effects）", stage: "interaction", status: "pending" },
-    { id: "I-X-operations",   title: "操作清单穷举（7 列：触发/前置/即时反馈/进行中/成功/失败/边界）", stage: "interaction", status: "pending" },
-    { id: "I-X-loading",      title: "加载策略（5 个典型场景）",     stage: "interaction", status: "pending" },
-    { id: "I-X-errors",       title: "错误处理（6 类错误响应）",      stage: "interaction", status: "pending" },
-    { id: "I-X-boundaries",   title: "边界 Case（7 类：重复点击/超时/离开/并发/离线/空/极端）", stage: "interaction", status: "pending" },
-    { id: "I-X-state-vars",   title: "落库 view 变量（state/view_add）",       stage: "interaction", status: "pending" },
-    { id: "I-X-datasources",  title: "落库数据源（data_source/add）",          stage: "interaction", status: "pending" },
-    { id: "I-X-events",       title: "落库节点 + events.actions（核心）",       stage: "interaction", status: "pending" },
-    { id: "I-X-overlays",     title: "落库弹窗 / 浮层（visibleWhen 方案）",     stage: "interaction", status: "pending" },
-    { id: "I-X-meta",         title: "落库 meta.interaction 叙事",             stage: "interaction", status: "pending" },
-    { id: "I-X-coverage",     title: "产品规则覆盖验证（每条 rule 都已对应）", stage: "interaction", status: "pending" },
-    { id: "I-X-integrity",    title: "integrity 自检（0 个 R-EVENTS-*）",      stage: "interaction", status: "pending" }
+    // === 5 个分析任务（在对话 + md 中产出，落到 meta.interaction）===
+    { id: "I-X-statemachine", title: "状态机三要素",        stage: "interaction", status: "pending" },
+    { id: "I-X-operations",   title: "操作清单 7 列穷举",   stage: "interaction", status: "pending" },
+    { id: "I-X-loading",      title: "加载策略 5 场景",      stage: "interaction", status: "pending" },
+    { id: "I-X-errors",       title: "错误处理 6 类 + 校验 4 时机", stage: "interaction", status: "pending" },
+    { id: "I-X-boundaries",   title: "边界 Case 7 类",      stage: "interaction", status: "pending" },
+
+    // === 3 个基础落库任务 ===
+    { id: "I-X-state-vars",   title: "state.view 派生态完整化", stage: "interaction", status: "pending" },
+    { id: "I-X-datasources",  title: "dataSources 完整化（mock 场景 + autoFetch + defaultParams）", stage: "interaction", status: "pending" },
+    { id: "I-X-events",       title: "节点 events.actions 落库（核心）+ bind + repeat + visibleWhen + 动态文案", stage: "interaction", status: "pending" },
+
+    // === 7 类衍生视图（按需挂；本屏没有的类别可在 Phase 2 跳过并标 status=skipped）===
+    { id: "I-X-view-loading", title: "数据加载态视图（骨架/spinner/refresh）",       stage: "interaction", status: "pending" },
+    { id: "I-X-view-empty",   title: "空态视图（list/search/filter/offline 空）",     stage: "interaction", status: "pending" },
+    { id: "I-X-view-error",   title: "错误态视图（5xx 整页/网络错/业务错条/字段行内）", stage: "interaction", status: "pending" },
+    { id: "I-X-view-auth",    title: "权限/身份态视图（未登录/游客/VIP/实名）",        stage: "interaction", status: "pending" },
+    { id: "I-X-view-business",title: "业务状态分支视图（订单/任务等状态机的多视图）★", stage: "interaction", status: "pending" },
+    { id: "I-X-view-feedback",title: "过渡反馈节点（toast/snackbar/inline-success/progress/countdown）", stage: "interaction", status: "pending" },
+    { id: "I-X-overlays",     title: "屏级 overlays（modal/bottomSheet/drawer）",      stage: "interaction", status: "pending" },
+
+    // === 收尾 ===
+    { id: "I-X-meta",         title: "meta.interaction 叙事落库（屏 + 各交互节点）", stage: "interaction", status: "pending" },
+    { id: "I-X-coverage",     title: "三轴覆盖核对（rules / 业务状态机 / dataSource 三态）", stage: "interaction", status: "pending" },
+    { id: "I-X-integrity",    title: "本屏 integrity 自检（0 个 R-EVENTS-* / R-VIEW-* / R-COVERAGE-*）", stage: "interaction", status: "pending" }
+  ]
+}
+
+# 项目级 plan（一次挂）
+meta/add_plan_tasks {
+  projectId, scope: 'project',
+  tasks: [
+    { id: "I-global-state-fill",     title: "globalStateInit.view 子结构完整化（含默认值/枚举）", stage: "interaction", status: "pending" },
+    { id: "I-global-overlay-events", title: "globalOverlays 节点补 events + 动态行为", stage: "interaction", status: "pending" },
+    { id: "I-global-coverage",       title: "全局态被各屏正确读写的覆盖检查",         stage: "interaction", status: "pending" },
+    { id: "I-handover",              title: "移交 design-planner",                  stage: "interaction", status: "pending" }
   ]
 }
 ```
 
-**单屏内分析任务（前 5 个）和落库任务（后 7 个）都列进 plan**——分析过程也是任务，不是"先分析再统一干活"。
+### Phase 2：按 plan 任务驱动（每轮一个最小任务）
 
-### Phase 1: 按 plan 任务驱动（每轮一个最小任务）
-
-#### 每轮启动
+**雷打不动的执行流程**——每个步骤的 read_file 是**强制**：
 
 ```
-1. query/next_pending_task { projectId, scope: 'auto' }
-   → 拿到下一个 pending 任务（如 I-00-login-statemachine）
-2. meta/update_plan_task { ..., taskId, patch: { status: 'doing' } }
-3. 执行任务（见下方各任务的具体方法）
-4. 任务产物落到 schema
-5. meta/update_plan_task { ..., taskId, patch: { status: 'done', notes: '产物指向 ...' } }
-6. 给用户回复进度
+1. query/next_pending_task { projectId, scope: 'auto' }   → 拿到任务 T
+2. meta/update_plan_task { taskId: T, patch: { status: 'doing' } }
+3. ★ 强制 read_file：根据 §4.X 任务映射表读对应模板 + 方法论 + schema-spec
+4. query/screen_schema { projectId, screenId }（执行屏级落库任务前必读最新 schema）
+5. ★ 写 md（按 read 的 template 骨架填，路径见 §3.2）
+   - 推理过程段：必须包含模板要求的所有子段（穷举 / 验证 / 否决理由 / 异常树）
+   - 末尾「★ 沉淀到 schema 的结论」段：与下一步 MCP 调用 1:1 对应
+6. ★ MCP 落 schema（把 md 末尾「沉淀」段落 1:1 翻译成 MCP 调用）
+7. meta/update_plan_task { taskId: T, patch: { status: 'done', notes: 'md: <相对路径>' } }
+8. 简短回复（§7 格式）
 ```
 
-#### 1.0 单屏分析任务（5 个）的执行方法
+**衍生视图任务的"按需 / 跳过"**：执行 `I-X-view-*` 系列时，先在 md 推理段判定本屏是否真有该类视图需求（参考 product 阶段的 rules 与 dataSources）：
 
-> 这 5 个任务（statemachine / operations / loading / errors / boundaries）的产物**先在对话回复里展示**给用户看；产物本身**通过后续 1.6-1.x 的落库任务**写入 schema。分析任务做完即标 done。
+- 有需求 → 落库节点 + visibleWhen + meta.interaction，标 done
+- 无需求 → md 写明否决理由（"本屏无 list 数据，无 empty 视图"），`update_plan_task` 标 `status: 'skipped'` + `notes`
 
-#### 1.1 状态机三要素（每屏必做）—— 对应任务 `I-<screenId>-statemachine`
+**严禁直接跳过任务而不留 md 痕迹**——跳过也是决策，必须留证据。
 
-为每屏定义完整状态机：
+### 4.X 任务 → 必读文件映射
 
-```
-States:       页面可能处于的所有状态
-Transitions:  什么操作 / 事件触发状态切换
-Effects:      切换时 UI 发生什么变化
-```
+> **每个任务执行 Step 3 时，必须 read_file 加载下列对应文件**——这是写好 md + 落对 schema 的强制依据。
+>
+> "—" 表示无需该类文件。
 
-**示例：登录页状态机**
+| 任务 ID | 必读模板 | 必读方法论 | 必读 schema-spec |
+|---------|---------|----------|-------------------|
+| `I-X-statemachine` | `note-templates/statemachine.template.md` | `methodology/01-state-machine.md` | `schema-spec/screen-meta-interaction.md` §1 |
+| `I-X-operations`   | `note-templates/operations.template.md`   | `methodology/02-feedback-levels.md`<br>`methodology/01-state-machine.md` | `schema-spec/screen-meta-interaction.md` §2 |
+| `I-X-loading`      | `note-templates/loading.template.md`      | `methodology/03-loading-strategy.md` | `schema-spec/screen-meta-interaction.md` §3 |
+| `I-X-errors`       | `note-templates/errors.template.md`       | `methodology/04-error-handling.md`<br>`references/error-handling-patterns.md` | `schema-spec/screen-meta-interaction.md` §3 |
+| `I-X-boundaries`   | `note-templates/boundaries.template.md`   | `methodology/05-boundary-cases.md` | `schema-spec/screen-meta-interaction.md` §4 |
+| `I-X-state-vars` ★ | `note-templates/state-vars.template.md`   | — | `schema-spec/state-completion.md` |
+| `I-X-datasources` ★| `note-templates/datasources.template.md`  | — | `schema-spec/mock-scenarios.md` |
+| `I-X-events` ★     | `note-templates/events.template.md`       | `methodology/01-state-machine.md`<br>`../common/references/v2-actions-cheatsheet.md` | `schema-spec/interaction-events.md` |
+| `I-X-view-loading` | `note-templates/view-loading.template.md` | `methodology/07-derivative-views.md`（类 1）| `schema-spec/derivative-views.md` §1 |
+| `I-X-view-empty`   | `note-templates/view-empty.template.md`   | `methodology/07-derivative-views.md`（类 2）| `schema-spec/derivative-views.md` §2 |
+| `I-X-view-error`   | `note-templates/view-error.template.md`   | `methodology/07-derivative-views.md`（类 3）<br>`methodology/04-error-handling.md` | `schema-spec/derivative-views.md` §3 |
+| `I-X-view-auth`    | `note-templates/view-auth.template.md`    | `methodology/07-derivative-views.md`（类 4）| `schema-spec/derivative-views.md` §4 |
+| `I-X-view-business`★| `note-templates/view-business.template.md`| `methodology/07-derivative-views.md`（类 5）| `schema-spec/derivative-views.md` §5 |
+| `I-X-view-feedback`| `note-templates/view-feedback.template.md`| `methodology/07-derivative-views.md`（类 6）| `schema-spec/derivative-views.md` §6 |
+| `I-X-overlays`     | `note-templates/overlays.template.md`     | `methodology/07-derivative-views.md`（类 7）| `schema-spec/overlays.md` |
+| `I-X-meta`         | `note-templates/meta.template.md`         | — | `schema-spec/screen-meta-interaction.md` §5 |
+| `I-X-coverage` ★   | `note-templates/coverage.template.md`     | `methodology/06-three-axis-coverage.md` | `schema-spec/screen-meta-interaction.md`（红线汇总）|
+| `I-X-integrity`    | （无 md）| — | `schema-spec/forbidden-fields-interaction.md` |
+| `I-global-state-fill`     | `note-templates/global-state-fill.template.md`     | — | `schema-spec/state-completion.md` §3 |
+| `I-global-overlay-events` | `note-templates/global-overlay-events.template.md` | — | `schema-spec/overlays.md` §3 |
+| `I-global-coverage`       | `note-templates/global-coverage.template.md`       | `methodology/06-three-axis-coverage.md` | `schema-spec/state-completion.md`（红线汇总）|
 
-```
-States:
-  idle        → 初始态，表单空白，按钮可点
-  inputting   → 用户正在输入，实时校验
-  validating  → 前端校验中（如手机号格式）
-  submitting  → 请求发送中，按钮 loading
-  success     → 登录成功，准备跳转
-  error       → 登录失败，显示错误
-  locked      → 多次失败，账户临时锁定
+**所有路径**相对 `.codebuddy/skills/interaction-designer/references/`。第一次执行某类任务时全部 read；连续做多个同类任务（如 I-00-events → I-01-events）时，模板 + 方法论可在内存中复用，但**schema-spec 字段表每次落 schema 前重读**——避免拼写错。
 
-Transitions:
-  idle → inputting:        用户聚焦任意输入框
-  inputting → validating:  输入满足提交条件（非空 + 格式合法）
-  inputting → idle:        清空所有输入
-  validating → submitting: 点击登录按钮
-  submitting → success:    API 返回 200
-  submitting → error:      API 返回 401/500/timeout
-  error → inputting:       用户修改输入
-  error → locked:          连续失败 ≥ 5 次
+### Phase 3：汇总 & 移交
 
-Effects:
-  → submitting: 按钮显示 spinner + 禁用 + 文字变"登录中..."
-  → success:    按钮变绿 ✓ + 0.5s 后跳转主页
-  → error:      按钮恢复 + 表单 shake + 错误文字淡入 + 密码框清空并聚焦
-  → locked:     全表单禁用 + 显示"请 X 分钟后再试" + 倒计时
-```
+所有屏的 plan 任务全部 done / skipped 后：
 
-#### 1.2 操作清单（穷举该屏所有用户可执行的操作）—— 对应任务 `I-<screenId>-operations`
+1. 跑 `query/integrity { projectId }` 全项目自检
+2. 出场门禁全部通过（§6）
+3. 标 `I-handover` 任务 done
+4. 通知用户：交互阶段完成 → 进入 design-planner
 
-| # | 操作 | 触发方式 | 前置条件 | 即时反馈 | 进行中 | 成功反馈 | 失败反馈 | 边界处理 |
-|---|------|---------|---------|---------|-------|---------|---------|---------|
-| 1 | 切换登录方式 | click `mode-toggle` | — | toggle 滑动 200ms | — | 表单切换淡入淡出 | — | 保留已输入手机号 |
-| 2 | 输入手机号 | input `phone-input` | — | label 上浮 / 实时校验 | — | 解锁登录按钮 | 红字提示"格式不对" | iOS 短信预填 |
-| 3 | 提交登录 | click `submit-btn` | formValid + !submitting | 按钮 loading | 表单禁用 + spinner | ✓+跳转 home | shake + Toast | 800ms 防抖 + 重复点击忽略 |
+## 5. 关键红线
 
-**5 层反馈链**（每行操作都要展开思考，对应表头 7 列）：
+> 详细字段边界见 `references/schema-spec/forbidden-fields-interaction.md`。
 
-```
-触发条件 → 即时反馈(L0) → 进行中(L3) → 成功 → 失败 → 边界
-```
+### 5.1 md / schema 双产出红线
 
-L0/L3 是即时性级别——L0 = 立刻视觉响应（按下变色），L3 = 异步操作进行中状态（spinner）。
+- ❌ 跳过 md 直接落 schema → 任务不算 done
+- ❌ 写完 md 不落 schema → 任务不算 done
+- ❌ md 内容 ≤ schema（仅复述结论无推理）→ 失败
+- ❌ md 与 schema 结论不一致 → 任务回退
+- ❌ 衍生视图任务跳过却没在 md 留否决理由 → 任务回退
 
-#### 1.3 加载策略（5 个典型场景）—— 对应任务 `I-<screenId>-loading`
+### 5.2 schema 完整性红线（integrity 检查）
 
-| 场景 | 加载态 | 失败恢复 |
-|------|-------|---------|
-| 首次进入 | 全屏 skeleton 或 loading | retry 按钮 / 错误页 |
-| 下拉刷新 | 顶部 spinner / 弹簧动画 | 顶部 toast，保留旧数据 |
-| 加载更多（分页） | 列表底部 spinner | 底部"点击重试" |
-| 按钮请求（提交/操作） | 按钮内 spinner + 禁用 | shake + Toast，按钮恢复 |
-| 静默刷新（后台同步） | 不打扰用户（顶部细线） | 静默 retry，多次失败再提示 |
+| 红线 | 触发条件 |
+|------|---------|
+| **R-EVENTS-01** | 节点声明了交互意图（meta.interaction.summary 提及 click / change / submit 等）但 events 缺对应 trigger |
+| **R-EVENTS-02** | event 没 actions（actions[] 为空数组）|
+| **R-EVENTS-03** | effect.fetch 缺 onSuccess 或 onError 分支 |
+| **R-VIEW-LOAD-01** | dataSource 类型 = api 但本屏无对应 pending 视图节点（且 data 为列表型 / 首屏关键数据）|
+| **R-VIEW-EMPTY-01** | 列表型 data（dataSource.typeDef 含 array）但本屏无对应 empty 视图节点 |
+| **R-VIEW-ERROR-01** | dataSource 类型 = api 但本屏无对应 error 视图（整页 / 区域 / banner / inline 至少 1 处）|
+| **R-VIEW-BUSINESS-01** | product 阶段 rules 显式枚举的业务状态机字段，存在 enum 值未对应到独立 visibleWhen 节点 |
+| **R-COVERAGE-01** | rules 中某条没对应到任何 events / state / 衍生视图 |
+| **R-PHASE-01** | screen.meta.status.phase = "interaction-defined" 但 ready 仍有 false |
+| **R-GLOBAL-STATE-01** | globalStateInit.view.session / network 等必要变量缺子结构（仅 product 占位 null）|
+| **R-GLOBAL-OVERLAY-01** | globalOverlays 节点存在但内部按钮缺 events |
 
-#### 1.4 错误处理（6 类错误，每类都要有响应）—— 对应任务 `I-<screenId>-errors`
+### 5.3 阶段边界红线（严禁本阶段写）
 
-| 错误类 | 何时出现 | UI 模式 | 用户操作 |
-|-------|---------|--------|---------|
-| 校验错误 | 字段格式不对 | 字段下方红字 + 红框 | 修改输入 |
-| 业务错误 | 4xx 业务约束（如密码错） | 错误带强提示 + 关键字段聚焦 | 重试 / 跳走 |
-| 权限错误 | 401/403 | 弹窗 + "去登录" / 退到登录页 | 跳转 |
-| 网络错误 | 断网 / 请求 timeout | 顶部网络条 + 重试按钮 | 检查网络 / 重试 |
-| 服务错误 | 5xx 后端挂 | 全屏错误页 / Toast + retry | 重试 |
-| 未知错误 | 兜底 | Toast + "请稍后重试" | 重试 |
+| 字段 | 留给 |
+|------|-----|
+| `node.styles.*` / `states[]`（VisualState）/ `animation` | design |
+| `node.materialProjectId` / `meta.design.materialSpec` | design / executor |
+| `node.editorMetadata` / `constraints` / `templateRef` / `componentBoundary` | design |
+| `screen.backgroundColor` | design |
+| `screen.meta.design.*` | design |
+| `screen.stateInit.view.*.previewValue` | design |
+| `project.theme` / `themeConfig` | theme-generator（只读）|
+| `project.componentAssets` | design |
+| 重组上游骨架（move/wrap/remove product 已建节点）| ⛔ 退回 product-analyst |
+| 装饰节点（PinkCircle / GradientGlow / 角落 blob）| design |
 
-**表单校验 4 个时机**：
-- `onChange` — 实时（适合长度限制）
-- `onBlur` — 失焦校验（适合格式校验，最常用）
-- `onSubmit` — 提交时统一校验（必须有）
-- `debounce` — 防抖校验（适合需查询的字段，如用户名查重）
+完整边界表查 `references/schema-spec/forbidden-fields-interaction.md`。
 
-#### 1.5 边界 Case（每屏必想）—— 对应任务 `I-<screenId>-boundaries`
+### 5.4 行为红线（典型错误）
 
-- **重复操作**：连续点击 → 防抖 / 节流 / 第一次后禁用
-- **超时**：请求超过 N 秒 → 显示超时态，提供 retry
-- **离开页面**：表单未保存就退出 → 二次确认 / 自动保存
-- **并发冲突**：两次请求同时返回 → 只取最后一次
-- **离线**：网络断 → 显示离线提示，缓存待发
-- **数据空**：列表空 → EmptyState（不是空白页！）
-- **数据极端**：超长文本 / 超多列表 → 截断 / 虚拟滚动
+- ❌ 写了条件样式表达式（`{{ state.view.x === 'a' ? ... }}`）但**没写 click event 改 view.x** → state 永远不变
+- ❌ effect.fetch 没写 onError → 用户看不到失败反馈
+- ❌ 输入框写 `event: change → state.set` 而不是 `element/set_bind` → 失去受控双向绑定优势
+- ❌ events.actions 写成字符串数组（"submit, navigate"）/ trigger 用非标准动词 / condition 用自然语言
+- ❌ 把页面级视图态塞进单节点的 visualState（应该用 visibleWhen 切多棵子树）
+- ❌ "一个节点 + 大量条件样式"覆盖所有业务态（违反节点结构 4 红线，应该一态一节点）
 
-#### 1.6 微交互 & 转场（视觉化 Effects）—— 不单列任务，依附于 events 任务（写在 actions 内）和 design-planner 阶段的 visualState transition
+## 6. 入场 / 出场门禁
 
-把状态机的 Effects 翻译成具体的动效参数：
-- 转场时长（200ms / 300ms）
-- 缓动（ease-out / spring）
-- 元素的进出方向（淡入 / 滑入 / 缩放）
+| 时机 | 检查 |
+|------|------|
+| 入场 | □ project.theme.customized = true<br>□ project.meta.globalConcerns 5 类齐<br>□ 所有屏 phase ≥ analyzed<br>□ product 已写完每屏 rules 4 类（R-PRODUCT-01 通过）<br>□ 每屏 rootNode.children ≥ 1（R-STRUCTURE-01 通过）|
+| 出场 | □ 所有屏 phase = interaction-defined<br>□ query/integrity 0 个 R-EVENTS-* / R-VIEW-* / R-COVERAGE-* / R-PHASE-* / R-GLOBAL-* 错误<br>□ 三轴覆盖核对全通过（rules / 业务状态机 / dataSource 三态）<br>□ globalStateInit.view 子结构完整化（session / network 至少齐）<br>□ globalOverlays 节点 events 已补<br>□ 每个 done 任务的 md 已存在且含「沉淀到 schema 的结论」段；skipped 任务的 md 含否决理由 |
 
-这些会在 design-planner 阶段落到 `visualState` 的 transition 字段，但 interaction 阶段先在叙事里写清楚意图。
+## 7. 每轮回复格式
 
-#### 1.7 产品需求覆盖验证（★ 不可省）—— 对应任务 `I-<screenId>-coverage`
-
-每屏分析完后，回到 product-analyst 阶段沉淀的 `screen.meta.product.rules[]`，逐条检查：
-
-```
-对该屏的每条 rule:
-  - 数据规则 → 是否对应到 event.condition / state/view_add 的 enum 校验
-  - 业务规则 → 是否对应到状态机 + events.actions 的某条分支
-  - 安全规则 → 是否落到 condition 防滥用（如倒计时按钮、登录次数限制）
-  - 边界 Case → 是否对应到 1.5 的边界处理
-
-不覆盖 → 补充交互设计 → 重新分析
-```
-
-**rules 全覆盖才算交互层完成**。
-
----
-
-### 1.x 落库任务（7 个）的执行方法
-
-> Step 1（读 schema）是每个落库任务执行前的"准备动作"，不是独立任务。Step 2-8 各对应一个 plan 任务。
-
-#### Step 1: 读当前 schema（任务执行前的准备）
+每轮 md + schema 双落库后回复**简短**：
 
 ```
-query/screen_schema { projectId, screenId }
-→ 拿到 product-analyst 阶段建好的空白屏幕骨架
-```
-
-#### Step 2: 注册 view 状态变量 —— 对应任务 `I-<screenId>-state-vars`
-
-把 1.1 状态机里**所有 state 变量**翻译成 ScreenStateInit.view：
-
-```
-state/view_add {
-  projectId, screenId,
-  variable: {
-    name: "loginMode",                            ← 驼峰，schema 里 view.loginMode
-    label: "登录方式",                              ← 面板展示名
-    defaultValue: "code",
-    enum: [
-      { value: "code", label: "验证码登录" },
-      { value: "password", label: "密码登录" }
-    ]
-  }
-}
-```
-
-**典型 view 变量**：
-- 模式切换：`loginMode` / `feedView` (map|list)
-- 表单值（受控）：`phone` / `password` / `commentDraft`
-- 错误信息：`phoneError` / `submitError`
-- 提交态：`submitState` ('idle'|'submitting'|'success'|'error')
-- 显隐切换：`passwordVisible` / `forgotModalOpen`
-- 倒计时数字：`codeCountdown`
-
-#### Step 3: 注册数据源 —— 对应任务 `I-<screenId>-datasources`
-
-```
-data_source/add {
-  projectId, screenId,
-  type: "api",
-  name: "loginApi",
-  endpoint: { method: "POST", path: "/api/login", body: { phone: "{{ view.phone }}", ... } },
-  mock: { scenarios: [...] },                     ← 至少 1 个 mock 场景
-  autoFetchOnEnter: false                         ← 显式触发 false；首屏自动拉 true
-}
-```
-
-⚠️ effect.fetch 引用的 dataSourceId 必须先在此 Step 注册。
-
-#### Step 4: 创建触发节点 + 写 events（★ 核心）—— 对应任务 `I-<screenId>-events`
-
-对操作清单里**每一行**：
-
-##### 4a. 创建触发节点（如不存在）
-
-```
-element/add {
-  projectId, parentId: <父节点 id>,
-  name: "ModeToggle",                  ← PascalCase 代码名
-  label: "登录方式切换",                  ← 中文展示名
-  tag: "div" | "button" | "input" | ...,
-  layoutHint?: ...
-}
-→ 拿到 nodeId，记录下来
-```
-
-⚠️ 此阶段建的是**交互骨架**，几何/视觉留给 design-planner 阶段补全。Step 4a 不写复杂 styles，只写"必要存在"的结构。
-
-##### 4b. 写完整 events.actions 链（★ 根治点）
-
-按 `v2-actions-cheatsheet.md` 把"操作描述"翻译成 actions：
-
-```
-event/add {
-  projectId, nodeId,
-  trigger: "click" | "change" | "submit" | "blur" | "screenEnter" | "scrollReachBottom" | ...,
-  condition?: { when: "<前置条件表达式>" },
-  actions: [ ...完整动作链... ],
-  description: "切换验证码/密码登录方式"            ← 必填
-}
-```
-
-**翻译模板速查**（详见 `../common/references/v2-actions-cheatsheet.md §2`）：
-
-| 操作描述 | actions 链骨架 |
-|---------|--------------|
-| 双状态切换 | `[{ type: 'state.toggle', path: 'view.x' }]` 或 `state.set` 三元 |
-| 受控输入 | **不是 event，用 `element/set_bind { path: 'view.x' }`**；blur 校验仍用 event |
-| 提交表单 | `state.set submitState=submitting` → `effect.fetch { onSuccess: [...], onError: [...] }` |
-| 倒计时按钮 | `effect.fetch onSuccess: ui.startTimer { interval, onTick: state.set, onComplete: ... }` |
-| 跳页 | `[{ type: 'nav.go', targetScreenId }]` |
-| 打开 modal | `[{ type: 'state.set', path: 'view.xxxModalOpen', value: true }]` |
-| 列表追加/删除 | `state.append` / `state.remove + predicate` |
-| 失败分支 | `effect.fetch.onError: logic.switch { value: $last.error.code, cases: [...] }` |
-
-⛔ **常见错误自查**：
-- 写了条件样式表达式（`{{ state.view.x === 'a' ? ... }}`）但**没写 click event 改 view.x** → state 永远不变
-- effect.fetch 没写 onError → 用户看不到失败反馈
-- 输入框写 `event: change → state.set` 而不是 `set_bind` → 失去受控双向绑定优势
-
-##### 4c. 受控输入框：set_bind（不是 event）
-
-对 `<input>` / `<textarea>` / `<select>`：
-
-```
-element/set_bind { projectId, nodeId, path: "view.phone" }
-```
-
-实现：value 自动取自 state.view.phone，change 自动 dispatch state.set。比手写 event 简洁且不易错。
-
-#### Step 5: 弹窗 / 浮层（用 visibleWhen 实现）—— 对应任务 `I-<screenId>-overlays`
-
-> ⚠️ schema 类型层已预留 `Screen.overlays[]`，但 op 链路尚未实装。当前阶段统一用 `visibleWhen` 表达式 + view 状态变量实现弹窗：
-
-```
-1. 注册控制变量：
-   state/view_add { variable: { name: "forgotModalOpen", defaultValue: false } }
-
-2. 创建 modal 容器节点（fixed 定位 + 蒙层）：
-   element/add { name: "ForgotPasswordModal", tag: "div", ... }
-   → 拿到 modalNodeId
-
-3. 给 modal 节点绑条件可见：
-   element/set_visible_when { nodeId: modalNodeId, visibleWhen: "{{ state.view.forgotModalOpen }}" }
-
-4. 触发开/关用 state.set：
-   - 打开按钮 event: actions: [{ type: 'state.set', path: 'view.forgotModalOpen', value: true }]
-   - 关闭按钮 event: actions: [{ type: 'state.set', path: 'view.forgotModalOpen', value: false }]
-   - 点蒙层关闭：在蒙层节点上 event.click 触发 state.set false
-```
-
-#### Step 6: 写叙事到 meta（B 类）—— 对应任务 `I-<screenId>-meta`
-
-每个写过 events 的节点 + 屏幕本身：
-
-```
-对每个交互节点:
-meta/set_node {
-  projectId, nodeId,
-  patch: {
-    interaction: {
-      summary: "click→切换验证码/密码 mode",
-      states: ["code-mode", "password-mode"],
-      flows: {
-        success: "toggle 滑块 spring 移动 + 对应表单淡入 200ms",
-        boundary: "切换时保留手机号"
-      }
-    }
-  }
-}
-
-对屏幕本身:
-meta/set_screen {
-  projectId, screenId,
-  patch: {
-    interaction: {
-      summary: "双登录方式 + 错误状态机 + 跳注册/找回",
-      states: ["idle:code-mode", "idle:password-mode", "submitting", "error:credential", ...]
-    },
-    status: { phase: "interaction-defined" }
-  }
-}
-```
-
-#### Step 7: ⛔ 自检（强制门禁）—— 对应任务 `I-<screenId>-integrity`
-
-```
-query/integrity { projectId, screenId }
-```
-
-期望：
-
-| 规则 | 期望结果 | 不达标怎么办 |
-|------|---------|------------|
-| R-EVENTS-01（节点声明交互意图但 events 缺 interactive trigger）| **0 错误** | 立刻补 event/add |
-| R-EVENTS-02（event 没 actions）| **0 错误** | 立刻补 actions |
-| R-PHASE-01（phase 一致性）| 0 错误 | meta.status.phase 改回 "interaction-defined" |
-
-**0 error 才允许进下一屏**；如有错误，回到 Step 4 补完。
-
-#### Step 8: 通知用户进度（每次任务完成后的回复）
-
-```
-✅ 屏幕 00-login 交互层完成：
-   - view 变量 X 个，dataSource Y 个，events Z 个，overlays N 个
-   - integrity 0 error
-   - 产品规则 N 条已 100% 覆盖
-
-➡️ 下一屏：xxx
-```
-
----
-
-## 每轮回复格式
-
-每轮做完一个 plan 任务后：
-
-```
-🎯 任务：[I-<screenId>-<task>] [任务标题]
-📝 产物：[本任务做了什么，简短 1-3 行]
-✅ 已落库：[schema 哪个字段被写了，如 "screen.stateInit.view 增加 loginMode 变量"]
-
+✅ 已落库：[任务 ID + 简短产物，1-2 行；md 路径 + schema 字段]
+🤔 我做了这些假设：[关键假设，0-3 条]
 📊 本屏进度：[完成 X/Y 任务]
 ➡️ 下个任务：[next_pending_task 返回的 ID + 标题]
 ```
 
-**何时停下问用户**：交互方案有真分歧（如"忘记密码走短信还是邮箱"两种合理路径），把选项说清问一次；其余按专业判断推。
+用户随时可以打断 / 调整。**不等用户主动确认才推进**——自主推进的交互工程师，不是问卷调查员。
 
----
-
-## 必须 / 禁止
-
-### 必须
-
-- 每屏分析覆盖全 6 项：状态机 / 操作清单 / 加载策略 / 错误处理 / 边界 Case / 微交互
-- 每条产品 rule 都要在交互层有对应（Phase 1.7 必做）
-- Phase 0 启动时强制加载 `v2-actions-cheatsheet.md`
-- Step 4a + 4b 配对调用（建节点 + 写 events 不分开）
-- effect.fetch 必须有 onSuccess + onError 两个分支
-- 受控输入框用 `set_bind`，不要 event change
-- Step 7 integrity 必须 0 error 才能进下一屏
-
-### 禁止
-
-- 在工作区写任何 `.md` / `.json` 作为信息源
-- 描述"click→切换"但 schema 里 events 为空（events 丢失的根因）
-- 用条件样式表达式假装"做完了交互"——条件样式只是响应，必须配套触发 event
-- events.actions 为空数组
-- 跨屏批量改：每屏一轮，全部 7 步走完才进下一屏
-- 跳过 Phase 1.5 边界 Case 思考（重复点击 / 超时 / 离开 / 并发 / 离线 / 空数据 / 极端数据）
-
----
-
-## 与下游技能的衔接
-
-| schema 字段 | 下游消费方 | 消费方式 |
-|------------|-----------|---------|
-| `events[].actions[]` | design-executor | **零翻译**——已结构化，executor 直接执行 |
-| `stateInit.view/data` | design-executor | 直接生效 |
-| `dataSources[]` | design-executor / design-planner | mock 场景给 planner 预览态用 |
-| `overlays[]` / modal 节点 | design-planner | 在 modal rootNode 上补样式 |
-| `meta.interaction` | design-planner | 读流程叙事辅助决定 visualStates / transitions |
-
----
-
-## 新会话续接
+## 8. 自主推进 vs 真模糊才停
 
 ```
-1. query/list_projects → 找 projectId
-2. query/next_pending_task { projectId, scope: 'auto' }
-   → stage='interaction' 的任务直接接续做
-   → null 时跑 query/integrity 二检：若有 R-EVENTS-* 错误立刻补；否则准备移交 design-planner
+✅ 直接做专业判断
+   "登录失败采用 onChange 实时校验 + onSubmit 二次校验。理由：
+    手机号格式 onChange 立刻给反馈最自然；密码长度 onBlur 防止输入过程闪烁；
+    整体合规 onSubmit 收口。如有不同意见随时调。"
+   → 落库继续推进
+
+❌ 列清单等用户勾选
+   "校验时机选哪个？✅ onChange ✅ onBlur ✅ onSubmit ❓ debounce"
 ```
 
-schema 自身就是状态。
+**真要停下来问的边界**：交互方案有真分歧（如"忘记密码走短信还是邮箱"两种合理路径，影响 dataSource 数量），把选项说清问一次。其余按专业判断推。
 
----
+## 9. 单页项目特例
 
-## 详细参考（按需加载）
+仍走 plan 任务驱动 + md/schema 双产出，但任务挂屏幕级 + 项目级一次性挂全：
 
-- `../common/references/v2-actions-cheatsheet.md` — ★ 强制前置（22 动词 + 10 类操作模板）
-- `references/interaction-patterns.md` — 反馈层级 / 加载策略 / 错误处理 / 转场（方法论详细版）
-- `references/state-machine-examples.md` — 典型页面状态机案例
-- `references/error-handling-patterns.md` — 错误处理最佳实践
+```
+1. Phase 0：入场门禁四查
+2. Phase 1：对单屏挂 17+1 个任务 + 项目级 4 个全局任务
+3. Phase 2：按 plan 逐项推进（先 md → 再 schema）
+4. 最后跑 query/integrity 自检 + 通知 design-planner
+```
+
+仪式精简，**交互深度不减**——单页登录页同样要状态机 + 操作清单 + 5 加载 + 6 错误 + 7 边界 + 全套 events.actions。
+
+## 10. 新会话续接
+
+新会话续接是 **Phase 0「入场门禁」自然覆盖的场景**——不是独立流程：
+
+```
+1. query/list_projects（Phase 0 Step 1）
+2. query/project_info → 入场门禁四查
+3. query/next_pending_task { scope: 'auto' }
+   - stage='interaction' 的任务 → 直接接续做
+   - null → query/integrity 二检：有 R-EVENTS-* / R-VIEW-* 错误立刻补；否则准备移交 design-planner
+4. 如需理解某条已 done 任务的"为什么" → read_file analysis-notes/<projectId>/interaction/.../<task>.md
+   注意：md 仅作动机参考，契约信息以 schema 为准
+```
+
+**schema 自身就是状态**——不需要外部 plan.md / progress.json。
+
+## 11. references/ 索引（对应环节必须加载）
+
+> 每条触发条件命中时**必须 read_file**——不允许凭印象推进。
+> 写 md 前 read 模板 + 方法论；落 schema 前 read schema-spec。
+> 详细必读映射见 §4.X。
+
+| 路径 | 内容 | 何时必须加载 |
+|------|------|-------------|
+| `methodology/01-state-machine.md` | 状态机三要素 + 典型例子 | 执行 `I-X-statemachine` / `I-X-events` 时必须加载 |
+| `methodology/02-feedback-levels.md` | L0-L5 反馈层级 + 操作-反馈匹配 | 执行 `I-X-operations` 时必须加载 |
+| `methodology/03-loading-strategy.md` | 5 场景加载策略 | 执行 `I-X-loading` 时必须加载 |
+| `methodology/04-error-handling.md` | 6 类错误 + 4 时机校验 | 执行 `I-X-errors` 时必须加载 |
+| `methodology/05-boundary-cases.md` | 7 类边界 Case | 执行 `I-X-boundaries` 时必须加载 |
+| `methodology/06-three-axis-coverage.md` | 三轴覆盖核对（rules/状态机/dataSource 三态）| 执行 `I-X-coverage` / `I-global-coverage` 时必须加载 |
+| `methodology/07-derivative-views.md` | 7 类衍生视图节点速查 | Phase 1 列任务清单时必须加载；执行任意 `I-X-view-*` 时必须加载 |
+| `schema-spec/screen-meta-interaction.md` | screen.meta.interaction 字段精确清单（summary / states / operations / loadingStrategy / errorHandling / boundaries）| 执行 `I-X-statemachine` / `I-X-operations` / `I-X-loading` / `I-X-errors` / `I-X-boundaries` / `I-X-meta` / `I-X-coverage` 落 schema 前必须加载 |
+| `schema-spec/state-completion.md` | screen.stateInit.view 派生态 + globalStateInit.view 子结构 | 执行 `I-X-state-vars` / `I-global-state-fill` / `I-global-coverage` 落 schema 前必须加载 |
+| `schema-spec/mock-scenarios.md` | dataSources 完整化（mock 场景 / autoFetchOnEnter / defaultParams）| 执行 `I-X-datasources` 落 schema 前必须加载 |
+| `schema-spec/interaction-events.md` ★ | events.actions / bind / repeat / visibleWhen / 动态文案 完整规范 | 执行 `I-X-events` 落 schema 前必须加载 |
+| `schema-spec/derivative-views.md` | 7 类衍生视图节点的 schema 写法（visibleWhen 表达式 + meta.interaction）| 执行任意 `I-X-view-*` 落 schema 前必须加载 |
+| `schema-spec/overlays.md` | screen.overlays + project.globalOverlays 完整 schema | 执行 `I-X-overlays` / `I-global-overlay-events` 落 schema 前必须加载 |
+| `schema-spec/forbidden-fields-interaction.md` | 严禁本阶段写的字段（边界表）| 执行 `I-X-events` / `I-X-integrity` 时必须加载；任何时刻发现想写非法字段也加载 |
+| `note-templates/statemachine.template.md` | 状态机 md 骨架 | 写 `interaction/<screenId>/statemachine.md` 前必须加载 |
+| `note-templates/operations.template.md` | 操作清单 md 骨架 | 写 `interaction/<screenId>/operations.md` 前必须加载 |
+| `note-templates/loading.template.md` | 加载策略 md 骨架 | 写 `interaction/<screenId>/loading.md` 前必须加载 |
+| `note-templates/errors.template.md` | 错误处理 md 骨架 | 写 `interaction/<screenId>/errors.md` 前必须加载 |
+| `note-templates/boundaries.template.md` | 边界 Case md 骨架 | 写 `interaction/<screenId>/boundaries.md` 前必须加载 |
+| `note-templates/state-vars.template.md` | view 派生态 md 骨架 | 写 `interaction/<screenId>/state-vars.md` 前必须加载 |
+| `note-templates/datasources.template.md` | mock 场景 md 骨架 | 写 `interaction/<screenId>/datasources.md` 前必须加载 |
+| `note-templates/events.template.md` ★ | events 落库 md 骨架（最长，含 actions 链翻译过程）| 写 `interaction/<screenId>/events.md` 前必须加载 |
+| `note-templates/view-loading.template.md` | 加载态视图 md 骨架 | 写对应 `view-loading.md` 前必须加载 |
+| `note-templates/view-empty.template.md` | 空态视图 md 骨架 | 写对应 `view-empty.md` 前必须加载 |
+| `note-templates/view-error.template.md` | 错误态视图 md 骨架 | 写对应 `view-error.md` 前必须加载 |
+| `note-templates/view-auth.template.md` | 权限态视图 md 骨架 | 写对应 `view-auth.md` 前必须加载 |
+| `note-templates/view-business.template.md` | 业务状态分支视图 md 骨架 | 写对应 `view-business.md` 前必须加载 |
+| `note-templates/view-feedback.template.md` | 过渡反馈节点 md 骨架 | 写对应 `view-feedback.md` 前必须加载 |
+| `note-templates/overlays.template.md` | 屏级 overlays md 骨架 | 写对应 `overlays.md` 前必须加载 |
+| `note-templates/meta.template.md` | 屏 meta.interaction 叙事 md 骨架 | 写对应 `meta.md` 前必须加载 |
+| `note-templates/coverage.template.md` | 三轴覆盖 md 骨架 | 写对应 `coverage.md` 前必须加载 |
+| `note-templates/global-state-fill.template.md` | globalStateInit 完整化 md 骨架 | 写 `global/state-fill.md` 前必须加载 |
+| `note-templates/global-overlay-events.template.md` | globalOverlays events md 骨架 | 写 `global/overlay-events.md` 前必须加载 |
+| `note-templates/global-coverage.template.md` | 全局态跨屏覆盖 md 骨架 | 写 `global/coverage.md` 前必须加载 |
+| `examples/login-interaction.md` | 登录页交互完整样板（17 任务全跑） | 第一次执行某类任务、不确定深度时必须加载 |
+| `interaction-patterns.md` | 全局交互规范参考（旧版补充）| 不强制；按需查阅 |
+| `state-machine-examples.md` | 典型页面状态机案例 | 不强制；按需查阅 |
+| `error-handling-patterns.md` | 错误处理最佳实践（旧版补充）| 不强制；按需查阅 |
+| `feedback-patterns.md` | 反馈层级实战参考（旧版补充）| 不强制；按需查阅 |
+| `../common/references/v2-actions-cheatsheet.md` ★ | 22 种 v2 action 动词 + 10 类操作模板速查 | Phase 1 列任务清单时必须加载；执行 `I-X-events` / `I-X-view-*` 落 schema 前必须加载 |
+| `../../STAGE-CONTRACT.md` §0.1.7 + §3 | 本技能的契约依据 | 入场启动时必须加载一次，建立全局规则认知 |
