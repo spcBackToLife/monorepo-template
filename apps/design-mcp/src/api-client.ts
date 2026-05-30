@@ -587,29 +587,10 @@ export async function materialEditorAction(
 }
 
 /**
- * 获取素材编辑器工程数据（用于 MCP Resource 读取）。
- */
-export async function getMaterialEditorProject(
-  projectId: string,
-  materialId?: string,
-): Promise<unknown> {
-  const params: Record<string, string> = {};
-  if (materialId) params.materialId = materialId;
-  return request(`/api/projects/${projectId}/material-editor/project`, { params });
-}
-
-/**
  * 获取素材编辑器所有预设（渐变、动画、纹理、阴影）。
  */
 export async function getMaterialEditorPresets(): Promise<unknown> {
   return request('/api/material-editor/presets');
-}
-
-/**
- * 获取素材编辑器能力清单（可用操作列表及其参数说明）。
- */
-export async function getMaterialEditorCapabilities(): Promise<unknown> {
-  return request('/api/material-editor/capabilities');
 }
 
 // ===== Material Slots (素材槽位 CRUD) =====
@@ -715,8 +696,8 @@ const apiClient = {
   findMaterialProjectByNode, findAllMaterialProjectsByNode, deleteMaterialProject,
   executeMaterialOperation, executeMaterialBatch, getMaterialOperationsSince,
   materialUndo, materialRedo, getMaterialSchema,
-  materialEditorAction, getMaterialEditorProject,
-  getMaterialEditorPresets, getMaterialEditorCapabilities,
+  materialEditorAction,
+  getMaterialEditorPresets,
   findSlotsByNode, findSlot, createSlot, updateSlot, deleteSlot,
   uploadExportedMaterial,
   getTheme, updateTheme,

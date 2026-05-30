@@ -20,14 +20,14 @@ const PROP_REGISTRY: Record<string, Record<string, { type:string; description:st
 export function registerComponentPropsTools(server: McpServer): void {
   registerDomainTool(server, 'component_prop', '组件模板属性定义、实例属性更新、元素属性查询与定义 CRUD', {
     get_template_props: defineAction({
-      description: '获取指定组件模板的属性定义（propDefinitions）',
+      description: '获取指定组件模板的完整信息（propDefinitions、kind、schema）',
       schema: z.object({ projectId: z.string(), templateId: z.string() }),
       handler: async (p) => {
         const proj = await apiClient.getProject(p.projectId);
         // 后端返回的 componentAssets 即模板列表
         const tpl = proj.componentAssets?.find((t) => t.id === p.templateId);
         if (!tpl) return { content: [{ type:'text', text: JSON.stringify({error:`not found`}) }] };
-        return { content: [{ type:'text', text: JSON.stringify({ templateId:tpl.id, name:tpl.name, propDefinitions:tpl.propDefinitions }, null, 2) }] };
+        return { content: [{ type:'text', text: JSON.stringify({ templateId:tpl.id, name:tpl.name, kind:tpl.kind, propDefinitions:tpl.propDefinitions, schema:tpl.schema }, null, 2) }] };
       },
     }),
     update_props: defineAction({

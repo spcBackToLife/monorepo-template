@@ -1,9 +1,10 @@
 # Schema-First 阶段共建契约 STAGE-CONTRACT.md
 
-> 版本：v2.0 · 2026-05-30（深度重写）
+> 版本：v2.1 · 2026-05-30（theme-generator 改造完成）
 > 目的：为五个角色（product-analyst / theme-generator / interaction-designer / design-planner / design-executor）建立**深度对等于旧 SKILL.md 的角色定位 + 工作内容 + schema 写入契约**。
 > 来源：完整回顾 git 历史中的旧 SKILL.md（392/374/252 行）+ 旧 `.design-workspaces/campus-geo-social/` 实战产物（28 屏 / 12 模块 / 每节点 8 层 JSON）
 > 适用：作为四个 SKILL.md 重写的契约依据。
+> 改造进度：product-analyst（v2.0）+ theme-generator（v2.1，本次）已落地；interaction/design/executor 按相同模板后续推广。
 
 ---
 
@@ -80,7 +81,7 @@ analysis-notes/<projectId>/
 > 对应 schema 字段：<相对路径，如 screen.meta.product.rules>
 ```
 
-**本次落地范围**：先在 product-analyst 落地 + 验证；其余 4 个角色（theme/interaction/design/executor）按相同约定后续推广。
+**本次落地范围**：product-analyst（已完成）+ theme-generator（已完成 2026-05-30）；其余 3 个角色（interaction/design/executor）按相同约定后续推广。
 
 ### 0.2 五个角色的链路与产出
 
@@ -852,25 +853,45 @@ h5 = 18, h4 = 20, h3 = 24, h2 = 28, h1 = 36, display = 48
 | flat | solid | subtle | none | smooth | rounded |
 | playful | gradient | subtle | soft | spring | pill |
 
-### 2.6 工作流（单一任务）
+### 2.6 工作流（任务级 md/schema 双产出）
+
+> 与 product-analyst 一致：每个最小任务先写 md（推理），再 MCP 落 schema（结论）。md 路径 `analysis-notes/<projectId>/theme/`。
 
 ```
-T-generate   一次性任务：
-  Phase 1 理解意图 → 提取 7 维度结构化信息
-  Phase 2 色彩计算 → HSL 推导 + APCA 验证
-  Phase 3 间距/字体/圆角/阴影 计算
-  Phase 4 装饰规则映射
-  Phase 5 组件状态规范推导
-  Phase 5b 图标规格推导
-  Phase 6 输出（theme/update）
+T1-intent        风格意图提取（7 维度）           → md: theme/T1-intent.md      → theme/set_intent
+T2-colors  ★    色彩计算（HSL + APCA 实测）     → md: theme/T2-colors.md      → theme/update_tokens
+T3-typo-spacing  字体/间距/圆角/阴影/动效         → md: theme/T3-typo-spacing.md → theme/update_tokens
+T4-decoration    装饰规则（aesthetics 映射）      → md: theme/T4-decoration.md  → theme/set_decoration
+T5-icon-state    iconSpec + stateSpec            → md: theme/T5-icon-state.md  → theme/update
+T6-variants      主题变体（≥ 2 套）               → md: theme/T6-variants.md    → theme/update
+T7-handover      自检 + 移交                     → md: theme/T7-handover.md    → 仅 theme/get 自检
 ```
+
+**红线**：
+- 每个任务 md 末尾必须含「★ 沉淀到 schema 的结论」段，与下一步 MCP 调用 1:1 对应
+- T2-colors / T6-variants 必须给出 APCA 实测表（不允许"略"）
+- T2-colors 必须给出 HSL 推导算式（不允许仅给 hex）
+
+详见 `.codebuddy/skills/theme-generator/SKILL.md` §4。
 
 ### 2.7 入场 / 出场门禁
 
 | 时机 | 检查 |
 |------|------|
 | 入场 | `project.meta.styleDirection` 已存在 |
-| 出场 | `project.theme.customized = true` + 至少 2 套主题变体 + 所有 colors token 对比度达标 |
+| 出场 | `project.theme.customized = true` + 至少 2 套主题变体 + 所有 colors token 对比度达标 + 0 个 R-THEME-* 错误 |
+
+### 2.7.1 R-THEME-* 红线（integrity 检查项）
+
+| 红线 | 触发条件 |
+|------|---------|
+| **R-THEME-01** | `themeConfig.customized` 不为 true |
+| **R-THEME-02** | tokens.colors 缺任一必备语义色（primary/secondary/success/warning/error/info/bgPage/bgCard/textPrimary/textSecondary/textTertiary/borderDefault/divider）|
+| **R-THEME-03** | textPrimary on bgPage 的 APCA Lc < 75 / textSecondary on bgCard < 60 |
+| **R-THEME-04** | tokens.spacing 不在 8px 网格上（非 4 倍数）|
+| **R-THEME-05** | tokens.fontSize 偏离 modular scale 1.25 超过 ±5% |
+| **R-THEME-06** | themes[] 少于 2 套主题变体 |
+| **R-THEME-07** | decorationRules / iconSpec / stateSpec 任一为空对象 |
 
 ### 2.8 重要约束
 

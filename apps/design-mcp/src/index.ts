@@ -37,14 +37,6 @@ import { registerSnapshotTools } from './tools/snapshot-tools.js';
 import { registerBatchTool } from './tools/batch.js';
 import { registerComponentRecipeTools } from './tools/component-recipes.js';
 
-// ── Resources ─────────────────────────────────────
-import { registerResources } from './resources/index.js';
-import { registerDatasourceResources } from './resources/datasource-resources.js';
-import { registerStateResources } from './resources/state-resources.js';
-import { registerTemplateResources } from './resources/template-resources.js';
-import { registerMaterialResources } from './resources/material-resources.js';
-import { registerThemeResources } from './resources/theme-resources.js';
-
 const server = new McpServer({
   name: '@globallink/design-mcp',
   version: '0.3.0',
@@ -99,14 +91,6 @@ registerMetaTools(server);                     // meta（Schema-First 设计意�
 registerSnapshotTools(server);                 // generate_snapshots
 registerBatchTool(server);                     // execute_operations_batch
 registerComponentRecipeTools(server);          // create_primary_button
-
-// ===== Resources =====
-registerResources(server);
-registerDatasourceResources(server);
-registerStateResources(server);                // state://screen | state://project（v2）
-registerTemplateResources(server);
-registerMaterialResources(server);
-registerThemeResources(server);                // theme://project/{projectId}
 
 // ===== Start =====
 async function main(): Promise<void> {
