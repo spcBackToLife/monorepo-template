@@ -2,10 +2,51 @@
 /**
  * design-schema 版本。
  *
+ * v0.4.0 = expression-lang v1.0（平台第二 DSL 立约 / 2026-05-31）
  * v0.3.0 = state/action/expression 模型（RFC 2026-05-08）
  * v0.2.0 = v1 的 domainState/environmentState 模型（已废弃）
  */
-export const DESIGN_SCHEMA_VERSION = '0.3.0';
+export const DESIGN_SCHEMA_VERSION = '0.4.0';
+
+// ===== Expression Language v1.0（平台第二 DSL） =====
+//
+// 真相源：./expression-lang/spec.json
+// 人读规约：./expression-lang/EXPR-LANG-SPEC.md
+//
+// 任何讨论"表达式什么语法/标识符/方法被支持"，必须 import 本 barrel 的工具，
+// 不允许在使用方代码里硬编码语法白名单。
+export {
+  spec as EXPR_LANG_SPEC,
+  SPEC_VERSION as EXPR_LANG_VERSION,
+  isContextualIdentifier,
+  isBuiltinNamespace,
+  isAllowedGlobal,
+  isForbiddenGlobal,
+  getBuiltinFunction,
+  getGlobalMember,
+  getInstanceMember,
+  listContextualIdentifiers,
+  listAllowedGlobals,
+  listGlobalMembers,
+  listInstanceMembers,
+  listBuiltinFunctions,
+  getErrorDef,
+  findMigrationHint,
+} from './expression-lang';
+
+export type {
+  ExpressionLangSpec,
+  SyntaxSpec,
+  ScopeSpec,
+  ContextualIdentifier,
+  GlobalNamespace,
+  GlobalMember,
+  BuiltinNamespace,
+  TypeName,
+  InstanceMember,
+  ErrorCode as ExprLangErrorCode,
+  ErrorCodeDef as ExprLangErrorCodeDef,
+} from './expression-lang';
 
 // ===== Types =====
 export type {

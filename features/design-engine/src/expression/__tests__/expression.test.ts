@@ -163,12 +163,22 @@ describe('安全性 — 禁止访问全局', () => {
     expect(() => evaluateExpression('{{ Function("alert(1)") }}', {})).toThrow(ExpressionEvaluationError);
   });
 
-  it('禁止调用对象实例方法', () => {
+  it('禁止调用对象实例方法（不在白名单的）', () => {
     const ctx = { state: { data: { name: 'tom' }, view: {}, effects: {} } };
-    // state.data.name 是字符串，但不允许调用 .toUpperCase()
-    expect(() => evaluateExpression('{{ state.data.name.toUpperCase() }}', ctx)).toThrow(
+    // v1.0：toLocaleString / valueOf 等不在 spec.scope.instanceMethods.string 白名单 → 拒绝
+    expect(() => evaluateExpression('{{ state.data.name.toLocaleString() }}', ctx)).toThrow(
       ExpressionEvaluationError,
     );
+    expect(() => evaluateExpression('{{ state.data.name.valueOf() }}', ctx)).toThrow(
+      ExpressionEvaluationError,
+    );
+  });
+
+  it('白名单实例方法允许调用（v1.0 ★）', () => {
+    const ctx = { state: { data: { name: 'tom' }, view: {}, effects: {} } };
+    expect(evaluateExpression('{{ state.data.name.toUpperCase() }}', ctx)).toBe('TOM');
+    expect(evaluateExpression('{{ state.data.name.length }}', ctx)).toBe(3);
+    expect(evaluateExpression('{{ state.data.name.startsWith("t") }}', ctx)).toBe(true);
   });
 
   it('不访问 __proto__', () => {
@@ -265,3 +275,223 @@ describe('parseExpression 错误处理', () => {
     expect(() => parseExpression('$.length(x')).toThrow();
   });
 });
+
+// ========== v1.0 新能力套件 ==========
+
+describe('v1.0 ★ 正则字面量 + .test', () => {
+  it('regex 字面量返回 RegExp', () => {
+    const re = evaluateExpression('{{ /^abc$/ }}', {}) as RegExp;
+    expect(re instanceof RegExp).toBe(true);
+    expect(re.source).toBe('^abc$');
+    expect(re.flags).toBe('');
+  });
+
+  it('regex 字面量 with flags', () => {
+    const re = evaluateExpression('{{ /^abc$/i }}', {}) as RegExp;
+    expect(re.flags).toContain('i');
+  });
+
+  it('regex.test(string) 实例方法', () => {
+    const ctx = { state: { view: { form: { phone: '13812345678' } }, data: {}, effects: {} } };
+    expect(
+      evaluateExpression('{{ /^1[3-9]\\d{9}$/.test(state.view.form.phone) }}', ctx),
+    ).toBe(true);
+    expect(
+      evaluateExpression('{{ /^1[3-9]\\d{9}$/.test("138") }}', ctx),
+    ).toBe(false);
+  });
+
+  it('demo 场景：SubmitBtn condition 表达式', () => {
+    const ctx = {
+      state: { view: { form: { phone: '13812345678' } }, data: {}, effects: {} },
+    };
+    expect(
+      evaluateExpression(
+        "{{ state.view.form.phone && /^1[3-9]\\d{9}$/.test(state.view.form.phone) ? '' : '请输入正确的手机号' }}",
+        ctx,
+      ),
+    ).toBe('');
+
+    const ctx2 = {
+      state: { view: { form: { phone: '138' } }, data: {}, effects: {} },
+    };
+    expect(
+      evaluateExpression(
+        "{{ state.view.form.phone && /^1[3-9]\\d{9}$/.test(state.view.form.phone) ? '' : '请输入正确的手机号' }}",
+        ctx2,
+      ),
+    ).toBe('请输入正确的手机号');
+  });
+});
+
+describe('v1.0 ★ 数组 / 对象 字面量', () => {
+  it('数组字面量', () => {
+    expect(evaluateExpression('{{ [1, 2, 3] }}', {})).toEqual([1, 2, 3]);
+    expect(evaluateExpression('{{ [state.x, state.y] }}', { state: { x: 'a', y: 'b' } as Record<string, unknown> })).toEqual(['a', 'b']);
+  });
+
+  it('对象字面量', () => {
+    expect(evaluateExpression('{{ { a: 1, b: 2 } }}', {})).toEqual({ a: 1, b: 2 });
+  });
+
+  it('对象字面量含字符串 key / computed key', () => {
+    const ctx = { state: { view: { k: 'dynamicKey' }, data: {}, effects: {} } };
+    expect(evaluateExpression('{{ { "str-key": 1, [state.view.k]: 2 } }}', ctx)).toEqual({
+      'str-key': 1,
+      dynamicKey: 2,
+    });
+  });
+
+  it('demo 场景：写入 globalView.session 复合对象', () => {
+    const ctx = { state: {}, $last: { response: { user: 'tom', token: 'jwt-x', expiresIn: 86400 } } };
+    const result = evaluateExpression(
+      "{{ { user: $last.response.user, token: $last.response.token, status: 'active', expiresAt: $last.response.expiresIn * 1000 } }}",
+      ctx,
+    );
+    expect(result).toEqual({ user: 'tom', token: 'jwt-x', status: 'active', expiresAt: 86400000 });
+  });
+});
+
+describe('v1.0 ★ 可选链 + 空合并', () => {
+  it('?. 路径有值', () => {
+    const ctx = { state: { data: { user: { name: 'tom' } }, view: {}, effects: {} } };
+    expect(evaluateExpression('{{ state.data.user?.name }}', ctx)).toBe('tom');
+  });
+
+  it('?. 路径中间 null 安全短路', () => {
+    const ctx = { state: { data: { user: null }, view: {}, effects: {} } };
+    expect(evaluateExpression('{{ state.data.user?.name }}', ctx)).toBeUndefined();
+  });
+
+  it('?.[expr] 计算下标可选', () => {
+    const ctx = { state: { data: { arr: null }, view: {}, effects: {} } };
+    expect(evaluateExpression('{{ state.data.arr?.[0] }}', ctx)).toBeUndefined();
+  });
+
+  it('?? 空合并 与 || 区分', () => {
+    expect(evaluateExpression('{{ 0 ?? "fallback" }}', {})).toBe(0);        // ?? 不当 0 falsy
+    expect(evaluateExpression('{{ "" ?? "fallback" }}', {})).toBe('');      // ?? 不当 "" falsy
+    expect(evaluateExpression('{{ null ?? "fallback" }}', {})).toBe('fallback');
+    expect(evaluateExpression('{{ undefined ?? "fallback" }}', {})).toBe('fallback');
+    expect(evaluateExpression('{{ 0 || "fallback" }}', {})).toBe('fallback'); // || 当 0 falsy
+  });
+});
+
+describe('v1.0 ★ Globals (Date / Math / Number / String / Boolean / JSON / Object / Array)', () => {
+  it('Date.now()', () => {
+    const before = Date.now();
+    const r = evaluateExpression('{{ Date.now() }}', {}) as number;
+    const after = Date.now();
+    expect(r).toBeGreaterThanOrEqual(before);
+    expect(r).toBeLessThanOrEqual(after);
+  });
+
+  it('Date.now() + 算术 — demo 锁定 30 分钟场景', () => {
+    const r = evaluateExpression('{{ Date.now() + 30 * 60 * 1000 }}', {}) as number;
+    expect(r).toBeGreaterThan(Date.now());
+  });
+
+  it('Math.floor / max / min', () => {
+    expect(evaluateExpression('{{ Math.floor(state.x / 60) }}', { state: { x: 125 } as Record<string, unknown> })).toBe(2);
+    expect(evaluateExpression('{{ Math.max(0, -5) }}', {})).toBe(0);
+    expect(evaluateExpression('{{ Math.min(3, 5, 1, 8) }}', {})).toBe(1);
+  });
+
+  it('Number(x) / String(x) / Boolean(x) 类型转换', () => {
+    expect(evaluateExpression('{{ Number("42") }}', {})).toBe(42);
+    expect(evaluateExpression('{{ String(42) }}', {})).toBe('42');
+    expect(evaluateExpression('{{ Boolean(0) }}', {})).toBe(false);
+    expect(evaluateExpression('{{ Boolean(1) }}', {})).toBe(true);
+  });
+
+  it('JSON.stringify / parse', () => {
+    expect(evaluateExpression('{{ JSON.stringify({ a: 1 }) }}', {})).toBe('{"a":1}');
+    expect(evaluateExpression('{{ JSON.parse(\'{"a":1}\') }}', {})).toEqual({ a: 1 });
+  });
+
+  it('Object.keys / Array.isArray', () => {
+    expect(evaluateExpression('{{ Object.keys(state.x) }}', { state: { x: { a: 1, b: 2 } } as Record<string, unknown> }))
+      .toEqual(['a', 'b']);
+    expect(evaluateExpression('{{ Array.isArray(state.x) }}', { state: { x: [1, 2] } as Record<string, unknown> }))
+      .toBe(true);
+  });
+});
+
+describe('v1.0 ★ globalView contextual identifier', () => {
+  it('globalView.session.status', () => {
+    const ctx = { state: {}, globalView: { session: { status: 'active' } } };
+    expect(evaluateExpression('{{ globalView.session.status === "active" }}', ctx)).toBe(true);
+  });
+
+  it('globalView 未注入时安全返回 undefined', () => {
+    expect(evaluateExpression('{{ globalView }}', {})).toBeUndefined();
+    expect(evaluateExpression('{{ globalView?.session?.status }}', {})).toBeUndefined();
+  });
+
+  it('demo 场景：SubmitBtn condition 系统级守卫', () => {
+    const ctx = {
+      state: { view: { submitting: false, lockedUntil: null }, data: {}, effects: {} },
+      globalView: { network: { status: 'online' } },
+    };
+    const result = evaluateExpression(
+      "{{ !state.view.submitting && globalView.network.status !== 'offline' && !(state.view.lockedUntil && state.view.lockedUntil > Date.now()) }}",
+      ctx,
+    );
+    expect(result).toBe(true);
+  });
+});
+
+describe('v1.0 ★ 字符串实例方法白名单', () => {
+  it('.length / .padStart / .slice / .includes / .startsWith', () => {
+    const ctx = { state: { view: { name: 'hello' } as Record<string, unknown>, data: {}, effects: {} } };
+    expect(evaluateExpression('{{ state.view.name.length }}', ctx)).toBe(5);
+    expect(evaluateExpression('{{ state.view.name.slice(0, 3) }}', ctx)).toBe('hel');
+    expect(evaluateExpression('{{ state.view.name.includes("ll") }}', ctx)).toBe(true);
+    expect(evaluateExpression('{{ state.view.name.startsWith("he") }}', ctx)).toBe(true);
+    expect(evaluateExpression('{{ "5".padStart(3, "0") }}', {})).toBe('005');
+  });
+
+  it('demo 场景：lockedCountdown mm:ss 格式化', () => {
+    const ctx = { state: { view: { lockedCountdown: 125 } as Record<string, unknown>, data: {}, effects: {} } };
+    expect(
+      evaluateExpression(
+        '{{ Math.floor(state.view.lockedCountdown / 60) }}:{{ String(state.view.lockedCountdown % 60).padStart(2, "0") }}',
+        ctx,
+      ),
+    ).toBe('2:05');
+  });
+});
+
+describe('v1.0 ★ 新内置 $.now / $.matches', () => {
+  it('$.now() 等价 Date.now()', () => {
+    const a = Date.now();
+    const r = evaluateExpression('{{ $.now() }}', {}) as number;
+    const b = Date.now();
+    expect(r).toBeGreaterThanOrEqual(a);
+    expect(r).toBeLessThanOrEqual(b);
+  });
+
+  it('$.matches with string pattern', () => {
+    expect(evaluateExpression('{{ $.matches("13812345678", "^1[3-9]\\\\d{9}$") }}', {})).toBe(true);
+    expect(evaluateExpression('{{ $.matches("138", "^1[3-9]\\\\d{9}$") }}', {})).toBe(false);
+  });
+
+  it('$.matches with RegExp literal', () => {
+    expect(evaluateExpression('{{ $.matches("13812345678", /^1[3-9]\\d{9}$/) }}', {})).toBe(true);
+  });
+});
+
+describe('v1.0 ★ 危险全局仍被拒', () => {
+  it('window / globalThis / eval / Function / document 都抛 E007', () => {
+    expect(() => evaluateExpression('{{ window.x }}', {})).toThrow();
+    expect(() => evaluateExpression('{{ globalThis.x }}', {})).toThrow();
+    expect(() => evaluateExpression('{{ eval("1+1") }}', {})).toThrow();
+    expect(() => evaluateExpression('{{ Function("alert(1)") }}', {})).toThrow();
+    expect(() => evaluateExpression('{{ document.cookie }}', {})).toThrow();
+  });
+
+  it('new Date() 仍被拒（parser 不支持 new）', () => {
+    expect(() => evaluateExpression('{{ new Date() }}', {})).toThrow();
+  });
+});
+

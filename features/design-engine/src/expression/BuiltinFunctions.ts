@@ -21,6 +21,10 @@ export interface BuiltinFunctions {
   isEmpty(v: unknown): boolean;
   not(v: unknown): boolean;
   defaultTo<T>(v: T | null | undefined, fallback: T): T;
+  /** v1.0 ★ 当前时间戳（ms）。等价 Date.now()；推荐前端首选 */
+  now(): number;
+  /** v1.0 ★ 正则匹配；pattern 可以是字符串或 RegExp 字面量 */
+  matches(s: string, pattern: string | RegExp): boolean;
 }
 
 export const builtinFunctions: BuiltinFunctions = {
@@ -87,6 +91,20 @@ export const builtinFunctions: BuiltinFunctions = {
 
   defaultTo<T>(v: T | null | undefined, fallback: T): T {
     return v === undefined || v === null ? fallback : v;
+  },
+
+  now(): number {
+    return Date.now();
+  },
+
+  matches(s: string, pattern: string | RegExp): boolean {
+    if (typeof s !== 'string') return false;
+    try {
+      const re = pattern instanceof RegExp ? pattern : new RegExp(pattern);
+      return re.test(s);
+    } catch {
+      return false;
+    }
   },
 };
 
