@@ -6,13 +6,25 @@ export interface CodegenOptions {
   includeEvents?: boolean;
 }
 
-/** 与 PrimitiveRenderer 一致：textContent / text / props.children（字符串） */
-function pickInlinePropText(props: Record<string, unknown> | undefined): string | undefined {
+/**
+ * 与 PrimitiveRenderer.readInlineTextFromProps 必须保持同一行为。
+ *
+ * 渲染契约（v1.0 起明确）：
+ * - 字符串值 `''` 视为「显式无叶子文本」，让 codegen 走 children 分支
+ * - 数字 `0` 仍输出 `'0'`
+ *
+ * 详见 PrimitiveRenderer.tsx 上方注释。
+ *
+ * export 仅供单元测试使用。
+ */
+export function pickInlinePropText(props: Record<string, unknown> | undefined): string | undefined {
   if (!props) return undefined;
   const a = props.textContent ?? props.text;
-  if (typeof a === 'string' || typeof a === 'number') return String(a);
+  if (typeof a === 'number') return String(a);
+  if (typeof a === 'string' && a !== '') return a;
   const c = props.children;
-  if (typeof c === 'string' || typeof c === 'number') return String(c);
+  if (typeof c === 'number') return String(c);
+  if (typeof c === 'string' && c !== '') return c;
   return undefined;
 }
 

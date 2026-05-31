@@ -444,11 +444,19 @@ function PreviewNodeRenderer({
       if (cur && typeof cur === 'object') cur = (cur as Record<string, unknown>)[s];
       else { cur = undefined; break; }
     }
+    // ★ 区分 checkbox/radio（用 e.target.checked）vs 普通 input/textarea/select（用 e.target.value）
+    const inputType = (resolvedProps.type as string | undefined)?.toLowerCase();
+    const isCheckbox = effectiveNode.type === 'input' && (inputType === 'checkbox' || inputType === 'radio');
     propsForRender = {
       ...resolvedProps,
-      value: cur ?? '',
+      // checkbox/radio 用 checked 注入；其它注入 value（cur ?? '' 兜底）
+      ...(isCheckbox
+        ? { checked: Boolean(cur) }
+        : { value: cur ?? '' }),
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const newValue = e.target.value;
+        const target = e.target as HTMLInputElement;
+        // checkbox/radio 写 boolean；其它写 string
+        const newValue: unknown = isCheckbox ? target.checked : target.value;
         dispatcher.run([{ type: 'state.set', path: bindPath, value: newValue }]);
       },
     };

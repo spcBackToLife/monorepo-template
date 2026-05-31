@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'bun:test';
-import { evaluateExpression } from '../../expression';
+import { evaluateExpression } from '@globallink/design-expression';
 import { reduceStateAction } from '../Reducer';
 import type { ScreenState } from '@globallink/design-schema';
 

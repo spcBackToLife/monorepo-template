@@ -135,6 +135,21 @@ analysis-notes/<projectId>/
    - 返回其他 stage / null
      · 整个项目首次进入本阶段 → 进 Phase 1 列任务清单
      · integrity 显示 R-EVENTS-* / R-VIEW-* → 上次"假完成"，立刻补
+
+5. ★ 跑全 expression 扫描（v1.0 起强制）：
+   bash .claude/skills/interaction-designer/skill-tools/scan-all-expressions.sh <schemaJsonFile>
+
+   该脚本输出 7 段视图：
+     ① visibleWhen ② bind.path ③ props 含表达式 ④ events.actions 内表达式
+     ⑤ dataSources endpoint/params/mock ⑥ stateInit defaultValue 异常 ⑦ deprecated 用法计数
+
+   特别留意第 7 段 deprecated 计数（Date.now / new Date / cases[].when）：
+     - 全 0 → 符合 v1.0 规约
+     - 非 0 → 后续 events 重写任务必须按 expression-lang/spec.json knownMigrations 一并修干净
+     - 配合 Phase 2 的"翻译契约段"使用，避免 visibleWhen 等字段漏迁
+
+   AI 是 stateless 的：每次重新加载 cheatsheet 时不会"记得自己上次写了什么"。
+   这步把整屏所有含 `{{...}}` 的字段拉一份对照表，让 Phase 2 决策不会漏字段。
 ```
 
 #### 红线
@@ -142,6 +157,7 @@ analysis-notes/<projectId>/
 - ❌ 入场门禁未过就开始落 schema
 - ❌ 不查 globalConcerns / theme.customized 就直接干
 - ❌ 跨屏批量做：每屏一轮，全部任务做完才进下一屏
+- ❌ 跳过步骤 5 的全 expression 扫描就开始改 events / visibleWhen / props 表达式（必然漏字段）
 
 ### Phase 1：挂任务清单（仅首次进入本阶段时做）
 

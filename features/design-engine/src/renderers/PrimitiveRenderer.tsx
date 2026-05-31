@@ -19,12 +19,26 @@ export interface PrimitiveRendererProps {
  * 叶子文案在 schema 里常见写法：`props.textContent` / `props.text`（推荐），
  * 或 **`props.children` 存字符串**（含 `{{data.*}}`，且树 `children[]` 为空）。
  * 解析顺序：textContent → text → props.children；均未定义时再回退到树子节点。
+ *
+ * ⚠️ 渲染契约（v1.0 起明确）：
+ * - 字符串值 `''`（空字符串）视为「显式无叶子文本」，让渲染层 fall through 到 `children` 树
+ * - 数字 `0` 仍渲染为 `'0'`（非空叶子文本）
+ *
+ * 这条契约修复了一个易踩坑：如果 schema 的 `props.textContent: ''` + `children: [...]`
+ * 同时存在（典型场景：把段落拆成多段子节点 + 父节点 textContent 留空让 children 接管），
+ * 旧实现会把空字符串当成有效叶子，children 永远不渲染（"协议没展示"类 bug）。
+ *
+ * 与 codegen/reactCodegen.ts 的 pickInlinePropText 必须保持同一行为。
+ *
+ * export 仅供单元测试使用——本函数在文件内被 resolvedInlineOrTreeChildren 调用。
  */
-function readInlineTextFromProps(resolvedProps: Record<string, unknown>): string | undefined {
+export function readInlineTextFromProps(resolvedProps: Record<string, unknown>): string | undefined {
   const a = resolvedProps.textContent ?? resolvedProps.text;
-  if (typeof a === 'string' || typeof a === 'number') return String(a);
+  if (typeof a === 'number') return String(a);
+  if (typeof a === 'string' && a !== '') return a;
   const c = resolvedProps.children;
-  if (typeof c === 'string' || typeof c === 'number') return String(c);
+  if (typeof c === 'number') return String(c);
+  if (typeof c === 'string' && c !== '') return c;
   return undefined;
 }
 
@@ -140,6 +154,12 @@ export function PrimitiveRenderer({
             type={inputType}
             defaultChecked={resolvedProps.checked as boolean ?? resolvedProps.value as boolean ?? false}
             disabled={resolvedProps.disabled as boolean}
+            onChange={(e) => {
+              // ★ 受控 checkbox/radio：从 resolvedProps 读 onChange（PreviewRenderer 通过 bind 注入）
+              // 不从 domHandlers 读 —— extractDomEventHandlers 已显式排除 onChange，避免非表单节点误绑
+              const onChangeFn = resolvedProps.onChange as ((e: React.SyntheticEvent) => void) | undefined;
+              onChangeFn?.(e);
+            }}
           />
         ) : (
           <input
@@ -152,7 +172,9 @@ export function PrimitiveRenderer({
             inputMode={inputMode as React.HTMLAttributes<HTMLInputElement>['inputMode']}
             pattern={pattern}
             onChange={(e) => {
-              const onChangeFn = (domHandlers as Record<string, unknown>).onChange as ((e: React.SyntheticEvent) => void) | undefined;
+              // ★ 受控 input：从 resolvedProps 读 onChange（PreviewRenderer 通过 bind 注入）
+              // 不从 domHandlers 读 —— extractDomEventHandlers 已显式排除 onChange，避免非表单节点误绑
+              const onChangeFn = resolvedProps.onChange as ((e: React.SyntheticEvent) => void) | undefined;
               onChangeFn?.(e);
               handleAutoAdvance?.(e);
             }}
