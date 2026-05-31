@@ -26,12 +26,19 @@ theme-generator        Token / decoration / stateSpec
        ↓
 [interaction-designer] ← 这里
        ↓
-design-planner         读 events / state / 衍生节点，补 styles / visualStates / 装饰
+design-planner (v3)    读 events / state / 衍生节点，补 styles / visualStates / 装饰
+                       + v3 ★ 6 项创作权（含 element/add 视觉容器、自跑 material-painter 画素材、自创 craft 任务）
+                       + v3 ★ 写 screen.meta.design.{briefing, visualConcept, visualStrategy}
        ↓
-design-executor        实施素材 + 截图核对 + 终验
+design-executor (v3 退化为 QA 摄影师)
+                       仅截图 + 对账 + 标 verified（不画素材、不写 styles）
 ```
 
 **你的产物 = 下游执行的契约**：events.actions 用 22 种 v2 动词写完整，下游 zero-translation 直接执行；state.view 的派生态和 dataSources 的 mock 在你这一步落齐；7 类衍生视图节点（loading/empty/error/auth/business/feedback/overlays）由你建。
+
+> ⚠️ **v3 兼容性说明**：v3 起 design-planner 会基于你写的 **state.view 派生态**自创 visualState（如 `state.view.errors.phone` 非空 → design 加 invalid 态 + activeWhen）。所以你写 state.view 派生态时**字段名要清晰**（用 `errors.phone` 而非 `err1`），否则 design 看不懂会退回。
+>
+> 另外 v3 design 可以**追加视觉 overlay** 到 `screen.overlays` / `project.globalOverlays`（如 LoadingBackdrop / FocusMask）——这些是视觉性 overlay，与你建的业务 overlay（Modal / Sheet / Drawer / Toast）并存不冲突。如发现 design 改了你建的业务 overlay 的 events / showWhen → 退回 design（越权）。详根目录 `STAGE-CONTRACT.md` 顶部 v3 修订摘要。
 
 ## 3. 双产出原则：md（过程）+ schema（结果）
 

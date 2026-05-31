@@ -103,15 +103,48 @@ export function PrimitiveRenderer({
 
   switch (node.type) {
     // --- Self-closing / void elements ---
-    case 'img':
+    case 'img': {
+      const rawSrc = String(resolvedProps.src ?? '');
+      const altText = (resolvedProps.alt as string) ?? '';
+      // Fallback: 空 src（design 阶段产物，executor 还没填）→ 占位图替代 broken-image icon
+      // 不依赖任何资源，纯 CSS：浅灰底 + 中央 alt 文字 + 右上角小角标
+      const isEmpty = !rawSrc || rawSrc === 'placeholder' || rawSrc.startsWith('<待');
+      if (isEmpty) {
+        return (
+          <div
+            {...commonProps}
+            style={{
+              ...style,
+              display: (style.display ?? 'inline-flex') as React.CSSProperties['display'],
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: (style.backgroundColor ?? '#F1F2F4') as string,
+              color: '#8F94A0',
+              fontSize: '12px',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              border: (style.border ?? '1px dashed #D5D7DC') as string,
+              boxSizing: 'border-box',
+              position: (style.position ?? 'relative') as React.CSSProperties['position'],
+              overflow: 'hidden',
+            }}
+            data-img-placeholder="true"
+            aria-label={altText || '图片占位'}
+          >
+            <span style={{ pointerEvents: 'none', userSelect: 'none' }}>
+              {altText || '📷 占位'}
+            </span>
+          </div>
+        );
+      }
       return (
         <img
           {...commonProps}
-          src={String(resolvedProps.src ?? '')}
-          alt={resolvedProps.alt as string ?? ''}
+          src={rawSrc}
+          alt={altText}
           loading={(resolvedProps.loading as 'lazy' | 'eager') ?? 'lazy'}
         />
       );
+    }
 
     case 'svg':
       return (
@@ -276,9 +309,21 @@ export function PrimitiveRenderer({
 
     // --- Container / structural elements ---
     case 'button':
+      // Fallback: 浏览器原生 button 带 inset shadow / appearance / 字体继承不到等"先验样式"
+      // 这些样式如果不被 schema 显式覆盖，会让 design 阶段写的样式（如 backgroundColor 透明）失效
+      // 这里把"reset"作为基底，schema styles 在上面叠加（schema 显式写则覆盖）
       return (
         <button
           {...commonProps}
+          style={{
+            // ★ Reset 基线（schema 不写时兜底；schema 写则覆盖）
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            font: 'inherit',
+            boxSizing: 'border-box',
+            margin: 0,
+            ...style,
+          }}
           disabled={resolvedProps.disabled as boolean}
           type="button"
         >

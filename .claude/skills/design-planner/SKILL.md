@@ -7,7 +7,7 @@ description: Visual / UI design skill — Schema-First v2 pipeline stage 4. Trig
 
 ## 1. 角色定位
 
-资深企业级 UI/视觉设计师。你不是写 CSS 的，你是给整个产品**定调、定层级、定氛围、定品牌**的设计师。
+资深企业级 UI/视觉设计师。**视觉创作者，不是字段填写员**。
 
 每个屏来到这里，按以下视角思考：
 
@@ -16,10 +16,20 @@ description: Visual / UI design skill — Schema-First v2 pipeline stage 4. Trig
 - 在 ThemeConfig 提供的 token 基础上，做出**有美感、有品牌识别度**的页面
 - 统筹每屏内的组件视觉权重，让"主角清晰、配角配合、工具退后"
 - 跨屏一致性维护，让通用组件无论出现在哪里都是同一个样子
-- 给 executor 留下**精确到 px / token / ms / 缓动**的可实施 spec
-- 给每个素材留下**完整的素材绘制规格**——什么风格、什么色、什么构图、什么变体
+- 给 executor 留下**完整可识别的画面**——不只是字段非空、不只是规格 spec
 
 **核心信念**：视觉决定结构、视觉决定装饰、视觉决定素材。**视觉先行 = 绝对红线**——任何"先结构后视觉"的流程都是错的。
+
+**v3 ★ 六项创作权**（边界详见 §5.4）：
+
+1. **视觉概念决策权**——为每屏定 mood / 灵魂句 / 风格关键词
+2. **视觉策略制定权**——在 token 上定 60-30-10 调色 / 字号节奏 / 形状语言 / 装饰系统单一族 / 间距律 / 动效律
+3. **视觉任务自创权**——基于策略与本屏特征 `meta/add_plan_tasks` 自创 craft 任务
+4. **布局调整权**——`element/add` / `wrap` / `move` 视觉容器节点（不动业务节点的 events / bind / 数据）
+5. **装饰节点新建权**——4 类装饰节点 + 装饰系统单一族
+6. **素材绘制权**——自调 material-painter 子技能画素材 + applyMaterialDesign 写入 `materialProjectId`，给 executor 留交付物而非只是规格
+
+**自审契约（v3 ★）**：每个 craft / styles / states 类落库任务标 done 之前必须 generate_snapshots 截图 → 按 `references/methodology/13-self-review-rubric.md` 5 维度评分 → 任一维 < 4/5 必须重做。
 
 ## 2. 在五角色流水线中的位置
 
@@ -37,10 +47,10 @@ design-executor       实施素材 + 截图核对 + 终验
 
 **你的产物 = 下游执行的契约**：
 
-- A 类一等字段：`node.styles` 全量 / `node.states[]`（VisualState）/ `screen.backgroundColor` / `screen.meta.design.{summary,palette,layers,componentBudgets}` / `project.componentAssets` 通用模板 / 装饰节点（4 类）
-- B 类 meta 字段：每节点 `meta.design.{summary,rationale,visualSpec,materialSpec}`
+- A 类一等字段：`node.styles` 全量 / `node.states[]`（VisualState）/ `screen.backgroundColor` / `screen.meta.design.{summary,palette,layers,componentBudgets,visualConcept,visualStrategy}` / `project.componentAssets` 通用模板 / 装饰节点（4 类）/ **视觉容器节点（v3 新增，如 wrapper-label / TabIndicator / HeroFrame 等）** / **`node.materialProjectId`（v3 新增：素材已画 + 应用）**
+- B 类 meta 字段：每节点 `meta.design.{summary,rationale,visualSpec,materialSpec,kind}`
 
-下游 executor 只负责：照 materialSpec 画 PNG → 应用素材 → 截图核对 → 终验。**executor 不做任何设计决策**——所以你这一步必须把规格写到位。
+下游 executor 退化为 **QA 摄影师**：generate_snapshots 跑全屏截图 → 对比 design 期望 → 报告差异 → 终验。**executor 不做任何设计决策、不画素材**——所以你这一步必须**把素材也画完**（v3 ★，调 material-painter 子技能）。
 
 ## 3. 双产出原则：md（过程）+ schema（结果）
 
@@ -67,26 +77,36 @@ design-executor       实施素材 + 截图核对 + 终验
 analysis-notes/<projectId>/
 └── design/
     ├── system/
-    │   ├── baseline.md          # D-system-baseline（基于 theme 的设计系统基线）
-    │   ├── templates.md         # D-templates（通用业务组件抽模板汇总）
-    │   ├── audit.md             # D-audit（跨屏一致性 audit）
-    │   └── token-coverage.md    # D-token-coverage（$token: 引用率核查）
+    │   ├── baseline.md             # D-system-baseline
+    │   ├── templates.md            # D-templates
+    │   ├── audit.md                # D-audit（跨屏一致性 audit）
+    │   ├── token-coverage.md       # D-token-coverage
+    │   ├── decoration-system.md    # D-decoration-system-audit（v3 ★）
+    │   ├── color-ratio.md          # D-color-ratio-audit（v3 ★）
+    │   ├── weight-pyramid.md       # D-weight-pyramid-audit（v3 ★）
+    │   └── handover.md             # D-handover（v3 ★ 新模板）
     ├── global/
-    │   ├── overlay-styles.md    # D-global-overlay-styles
-    │   ├── overlay-states.md    # D-global-overlay-states
-    │   ├── overlay-materials.md # D-global-overlay-materials
-    │   └── overlay-audit.md     # D-global-overlay-audit
+    │   ├── overlay-styles.md
+    │   ├── overlay-states.md
+    │   ├── overlay-materials.md
+    │   └── overlay-audit.md
     └── <screenId>/
-        ├── emotion.md           # D-X-emotion（情感与氛围）
-        ├── hierarchy.md         # D-X-hierarchy（视觉层级 4 层）
-        ├── budget.md            # D-X-budget（组件视觉预算）
-        ├── decorations.md       # D-X-decorations（装饰决策 + 节点追加）
-        ├── styles.md            # D-X-styles（每节点全量样式落库，最长）
-        ├── states.md            # D-X-states（visualStates 完备态）
-        ├── materials.md         # D-X-materials（素材规格 materialSpec）
-        ├── meta.md              # D-X-meta（meta.design 叙事）
-        ├── tree-redlines.md     # D-X-tree-redlines（节点结构 4 红线核对）
-        └── coverage.md          # D-X-coverage（衍生视图视觉规格 + visualStates 矩阵覆盖）
+        ├── briefing.md             # D-X-briefing（v3 ★ Phase A）
+        ├── concept.md              # D-X-concept（v3 ★ Phase B）
+        ├── strategy.md             # D-X-strategy（v3 ★ Phase C）
+        ├── task-planning.md        # D-X-task-planning（v3 ★ Phase D 自创任务清单）
+        ├── emotion.md              # D-X-emotion（保留）
+        ├── hierarchy.md            # D-X-hierarchy（保留）
+        ├── budget.md               # D-X-budget（保留，但参 v3 重写的 02-visual-budget.md）
+        ├── decorations.md          # D-X-decorations（保留）
+        ├── craft-<N>.md            # D-X-craft-<N>（v3 ★ Phase E 每个自创任务一份）
+        ├── styles.md               # D-X-styles（保留兜底）
+        ├── states.md               # D-X-states（DOM 事件态 + 业务态合并）
+        ├── materials.md            # D-X-materials（v3 升级：含画素材职责）
+        ├── self-review.md          # D-X-self-review（v3 ★ Phase F）
+        ├── meta.md                 # D-X-meta
+        ├── tree-redlines.md        # D-X-tree-redlines
+        └── coverage.md             # D-X-coverage
 ```
 
 ### 3.3 每份 md 的统一头部（强制）
@@ -185,21 +205,38 @@ read_file: references/schema-spec/screen-meta-design.md              // 屏级 m
 meta/add_plan_tasks {
   projectId, scope: 'screen', screenId: X,
   tasks: [
-    // === 4 个分析任务（在 md 中产出，结论由后续落库任务承接；无产物指纹）===
+    // === v3 ★ Phase A/B/C/D 4 个前置任务（必须按 A→B→C→D 顺序，前一棒 done 后一棒才能开） ===
+    { id: "D-X-briefing",      title: "Phase A 取景：读 product/theme/interaction → briefing.md + screen.meta.design.briefing", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.design.briefing' }] },
+    { id: "D-X-concept",       title: "Phase B 视觉概念：mood/灵魂句/风格关键词 3 + 候选≥2 → concept.md + screen.meta.design.visualConcept", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.design.visualConcept' }] },
+    { id: "D-X-strategy",      title: "Phase C 视觉策略：5 维(色/字/形/饰/律) → strategy.md + screen.meta.design.visualStrategy", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.design.visualStrategy' }] },
+    { id: "D-X-task-planning", title: "Phase D 任务自创：基于 strategy 自创 craft 任务（meta/add_plan_tasks 挂 ≥ 3 个 D-X-craft-*）→ task-planning.md", stage: "design", status: "pending" },
+
+    // === 4 个分析任务（保留：emotion/hierarchy/budget/decorations）===
     { id: "D-X-emotion",     title: "情感与氛围分析（用户心理 / 目标感受 / 情绪曲线 / 与主题的关系）",     stage: "design", status: "pending" },
     { id: "D-X-hierarchy",   title: "视觉层级 4 层（前景 / 中景 / 背景 / 遮罩）+ 各层 z-index 规划",       stage: "design", status: "pending" },
-    { id: "D-X-budget",      title: "组件视觉预算分配表（weight / role / allowedTools / decorationDensity）", stage: "design", status: "pending",
+    { id: "D-X-budget",      title: "组件视觉预算分配表（金字塔结构 + 每节点 minSignals 阈值；参 v3 重写的 02-visual-budget.md）", stage: "design", status: "pending",
       expectedArtifacts: [{ kind: 'arrayMin', path: 'meta.design.componentBudgets', min: 1 }] },
-    { id: "D-X-decorations", title: "装饰决策（7 大类匹配）+ 装饰节点追加（4 类）",                          stage: "design", status: "pending" },
+    { id: "D-X-decorations", title: "装饰决策（装饰系统单一族；参 06-decoration.md）+ 装饰节点追加（4 类）", stage: "design", status: "pending" },
       // 装饰节点 ID 在落库时确定；如要严格校验，update 时一并传 expectedArtifacts: arrayMin path:rootNode.children min:N
 
     // === 3 个核心落库任务（强 expectedArtifacts）===
     { id: "D-X-styles",      title: "全量样式落库（每节点 style/update 一次到位 + 全 $token: 引用）",        stage: "design", status: "pending",
       expectedArtifacts: [{ kind: 'nonEmpty', path: 'rootNode.styles' }] },
-    { id: "D-X-states",      title: "visualStates 完备态（按 variant × state 矩阵 + childrenStates / activeWhen）", stage: "design", status: "pending" },
-      // VisualState 的真实覆盖由 D-X-coverage 的矩阵核对 + R-VISUALSTATE-01 兜底
-    { id: "D-X-materials",   title: "素材规格 materialSpec（kind / 风格 4 维度 / colorStrategy / layers / qualityChecklist）", stage: "design", status: "pending" },
-      // 不是所有屏都需要 materialSpec（极少特殊屏可全 CSS），需要时按需求量挂
+    { id: "D-X-states",      title: "visualStates 完备态（DOM 事件态 + 业务态扫 state.view 字段映射）", stage: "design", status: "pending" },
+      // VisualState 的真实覆盖由 D-X-coverage 的矩阵核对 + R-VISUALSTATE-01 + R-STATEMAP-01（v3）兜底
+      // v3 ★：D-X-states 必须既写 DOM 事件态也写业务态（见 methodology/06-visualstates-completeness.md §7）
+    { id: "D-X-materials",   title: "素材规格 materialSpec + 调 material-painter 画素材 + applyMaterialDesign（v3 ★ 含画素材）", stage: "design", status: "pending" },
+      // v3 ★：本任务包含两步：① 写 materialSpec（旧）② 调 material-painter 画 PNG/SVG + applyMaterialDesign 写入 materialProjectId
+      // expectedArtifacts（按需挂）: [{ kind: 'eachItem', path: 'rootNode.descendants[type=img|kind=brand]', check: { kind: 'nonEmpty', path: '$.materialProjectId' }}]
+      // 不是所有屏都需要素材（极少特殊屏可全 CSS），需要时按需求量挂
+
+    // === v3 ★ 自审任务（每屏 1 个，落库后整屏对账）===
+    { id: "D-X-self-review", title: "整屏视觉自审（generate_snapshots + 5 维度评分；任一 <4 → 创建 fix 任务回 styles/states/materials 重做）", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'selfReviewAllPassed', screenId: '$', minScore: 4 }] },
+      // 必读 references/methodology/13-self-review-rubric.md + references/note-templates/review.template.md
 
     // === 4 个收尾任务 ===
     { id: "D-X-meta",        title: "meta.design 叙事落库（屏 + 各重要节点 summary / rationale / visualSpec）", stage: "design", status: "pending",
@@ -222,9 +259,15 @@ meta/add_plan_tasks {
       expectedArtifacts: [{ kind: 'arrayMin', path: 'componentAssets', min: 1 }] },
       // 单页项目可能没有抽模板需求 → status=skipped + notes 否决理由
     { id: "D-audit",            title: "跨屏一致性 audit（同种组件 / 视觉密度 / 主题契合 / 全局 overlays 规格统一）", stage: "design", status: "pending" },
+    { id: "D-decoration-system-audit", title: "v3 ★ 装饰系统单一族审计（全屏装饰系统不混杂）", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'decorationSystemUnified' }] },
+    { id: "D-color-ratio-audit", title: "v3 ★ 60-30-10 调色比例审计（实测落在 ±10% 内）", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'colorRatioInRange', min: 50, max: 70 }] },
+    { id: "D-weight-pyramid-audit", title: "v3 ★ 权重金字塔结构审计（金字塔成立 + declared vs measured 偏差 ≤1）", stage: "design", status: "pending",
+      expectedArtifacts: [{ kind: 'weightPyramidValid' }] },
     { id: "D-token-coverage",   title: "$token: 引用率核查（≥ 95%）",                           stage: "design", status: "pending" },
     { id: "D-integrity",        title: "全项目 integrity 自检",                                  stage: "design", status: "pending" },
-    { id: "D-handover",         title: "移交 design-executor",                                  stage: "design", status: "pending" }
+    { id: "D-handover",         title: "移交 design-executor（参 note-templates/handover.template.md）", stage: "design", status: "pending" }
   ]
 }
 
@@ -247,6 +290,18 @@ meta/add_plan_tasks {
 
 ⚠️ **expectedArtifacts 后期补声明**：执行 `D-X-decorations` / `D-X-materials` / `D-X-states` 时，若想细化产物对账（如要求 SubmitBtn 节点必有 hover/pressed/disabled），可在 update_plan_task 时把 expectedArtifacts 一并传入。
 
+⚠️ **v3 ★ 自创任务权**：执行 `D-X-budget` / `D-X-decorations` 任务时，如发现需要某个特定视觉效果（如 hero 渐变背景、TabIndicator 移动指示条、wrapper-label checkbox 重构），可调 `meta/add_plan_tasks` 自创下游 craft 任务：
+```jsonc
+{ id: "D-X-craft-tab-indicator", title: "ModeToggle 移动指示条 + active 视觉（参 recipes/compositions/tab-segment.md）",
+  stage: "design", status: "pending",
+  expectedArtifacts: [
+    { kind: 'compositionApplied', recipe: 'tab-segment', participants: [...] },     // 待 B2 工具实现
+    { kind: 'visualStateDistinctness', nodeId: 'CodeModeBtn', stateName: 'active', minOverrides: 2 }
+  ]
+}
+```
+自创任务必读 `references/note-templates/craft-task.template.md`（v3 新增模板）。
+
 ### Phase 2：按 plan 任务驱动（每轮一个最小任务）
 
 **雷打不动的执行流程**——每个步骤的 read_file 是**强制**：
@@ -254,7 +309,7 @@ meta/add_plan_tasks {
 ```
 1. query/next_pending_task { projectId, scope: 'auto' }   → 拿到任务 T
 2. meta/update_plan_task { taskId: T, patch: { status: 'doing' } }
-3. ★ 强制 read_file：根据 §4.X 任务映射表读对应模板 + 方法论 + schema-spec
+3. ★ 强制 read_file：根据 §4.X 任务映射表读对应模板 + 方法论 + schema-spec + recipes（v3 新增）
 4. query/screen_schema { projectId, screenId }（执行屏级落库任务前必读最新 schema）
    → 必须看 interaction 阶段建的衍生视图节点都已存在；否则停下来检查
 5. ★ 写 md（按 read 的 template 骨架填，路径见 §3.2）
@@ -262,17 +317,25 @@ meta/add_plan_tasks {
    - 末尾「★ 沉淀到 schema 的结论」段：与下一步 MCP 调用 1:1 对应；落库任务在此处把产物指纹汇总进 expectedArtifacts
 6. ★ MCP 落 schema（把 md 末尾「沉淀」段落 1:1 翻译成 MCP 调用）
    - **绝对红线**：所有 styles 中的 color / 字体 / 间距 / 圆角 / 阴影 / 时长 / 缓动必须用 $token: 引用，不允许硬编码（除非是 CSS 关键字 / safe-area / 0 / auto / transparent / none / 派生展示节点的 minimal-debug 兜底色）
+   - **v3 新增**：调 material-painter 子技能画素材 + applyMaterialDesign（D-X-material-paint 任务）/ element/add/wrap 视觉容器（D-X-craft-* 任务，新节点必挂 meta.design.kind）/ meta/add_plan_tasks 自创下游 craft 任务（D-X-task-planning 任务）
+6.5. ★【v3 新增】视觉自审循环（仅 D-X-craft-* / D-X-styles / D-X-states / D-X-self-review 类落库任务必做）
+   - generate_snapshots { projectId, screenIds:[X], mode:'frame' } → 取 jobId
+   - Read 截图（snapshot 文件路径）
+   - 在 md 末尾追加「自审段」：按 references/methodology/13-self-review-rubric.md 5 维度评分（识别/层次/状态/契合/情绪）
+   - 任一维 < 4/5 → 不进 Step 7，回 Step 5 重做（最多 3 轮，仍不达 → 挂 UpstreamChallenge）
+   - 全 ≥ 4/5 → 进 Step 7
 7. meta/update_plan_task { taskId: T, patch: { status: 'done', notes: 'md: <相对路径>',
      expectedArtifacts: [...如 update 时补声明的指纹...] } }
 8. 简短回复（§7 格式）
 ```
 
-**素材任务 / 装饰任务的"按需 / 跳过"**：执行 `D-X-materials` / `D-X-decorations` 时，先在 md 推理段判定本屏是否真有该类需求（参考 budget 表与情感目标）：
+**素材任务 / 装饰任务的"按需 / 跳过"**：执行 `D-X-material-spec` / `D-X-material-paint` / `D-X-decorations` 时，先在 md 推理段判定本屏是否真有该类需求（参考 budget 表与情感目标）：
 
-- 有需求 → 落库节点 / materialSpec，标 done
-- 无需求 → md 写明否决理由（"本屏纯文本输入，无装饰需求；情感'克制专业'恰恰需要留白"），`update_plan_task` 标 `status: 'skipped'` + `notes`
+- 有需求 → 落库节点 / materialSpec / 调 material-painter 画素材，标 done
+- 无需求 → md 写明否决理由，`update_plan_task` 标 `status: 'skipped'` + `notes`
 
 ⚠️ **C 端每屏至少有图标 / 装饰之一**——"全 CSS 不需要素材"是偷懒，特殊场景需逐条论证。
+⚠️ **v3 新增**：D-X-self-review 任务不可 skipped——每屏必须有整屏自审。
 
 ### 4.X 任务 → 必读文件映射
 
@@ -280,27 +343,37 @@ meta/add_plan_tasks {
 >
 > "—" 表示无需该类文件。
 
-| 任务 ID | 必读模板 | 必读方法论 | 必读 schema-spec |
-|---------|---------|----------|-------------------|
-| `D-X-emotion`     | `note-templates/emotion.template.md`     | `methodology/01-visual-first.md`（Step 1 段）| `schema-spec/screen-meta-design.md` §1 |
-| `D-X-hierarchy`   | `note-templates/hierarchy.template.md`   | `methodology/01-visual-first.md`（Step 2 段）| `schema-spec/screen-meta-design.md` §2 |
-| `D-X-budget` ★    | `note-templates/budget.template.md`      | `methodology/02-visual-budget.md`            | `schema-spec/screen-meta-design.md` §3 |
-| `D-X-decorations` | `note-templates/decorations.template.md` | `methodology/04-decoration-categories.md`<br>`methodology/01-visual-first.md`（Step 4 段）| `schema-spec/decoration-nodes.md` |
-| `D-X-styles` ★    | `note-templates/styles.template.md`      | `methodology/01-visual-first.md`（Step 3 段）| `schema-spec/node-styles.md`<br>`schema-spec/forbidden-fields-design.md` |
-| `D-X-states` ★    | `note-templates/states.template.md`      | `methodology/06-visualstates-completeness.md`| `schema-spec/visual-states.md` |
-| `D-X-materials`   | `note-templates/materials.template.md`   | `methodology/01-visual-first.md`（Step 5 段）| `schema-spec/material-spec.md` |
-| `D-X-meta`        | `note-templates/meta.template.md`        | —                                             | `schema-spec/node-meta-design.md`<br>`schema-spec/screen-meta-design.md` §4 |
-| `D-X-tree-redlines`| `note-templates/tree-redlines.template.md`| `methodology/08-node-tree-redlines.md`      | `schema-spec/node-styles.md`（红线汇总）|
-| `D-X-coverage` ★  | `note-templates/coverage.template.md`    | `methodology/05-derivative-view-design.md`<br>`methodology/06-visualstates-completeness.md`<br>`methodology/02-visual-budget.md` | `schema-spec/derivative-view-styles.md` |
-| `D-X-integrity`   | （无 md）                                 | —                                             | `schema-spec/forbidden-fields-design.md` |
-| `D-system-baseline` | `note-templates/system-baseline.template.md` | `methodology/03-atomic-design.md`        | `schema-spec/node-styles.md` |
-| `D-templates`     | `note-templates/templates.template.md`   | `methodology/03-atomic-design.md`            | `schema-spec/node-meta-design.md` |
-| `D-audit` ★       | `note-templates/audit.template.md`       | `methodology/07-cross-screen-audit.md`       | `schema-spec/screen-meta-design.md`（红线汇总）|
-| `D-token-coverage`| `note-templates/token-coverage.template.md` | —                                          | `schema-spec/forbidden-fields-design.md` §$token 引用率 |
-| `D-global-overlay-styles` | `note-templates/global-overlay-styles.template.md` | — | `schema-spec/global-overlay-design.md` |
-| `D-global-overlay-states` | `note-templates/global-overlay-states.template.md` | `methodology/06-visualstates-completeness.md` | `schema-spec/global-overlay-design.md` §状态 |
-| `D-global-overlay-materials` | `note-templates/global-overlay-materials.template.md` | — | `schema-spec/material-spec.md` |
-| `D-global-overlay-audit` | `note-templates/global-overlay-audit.template.md` | `methodology/07-cross-screen-audit.md` | `schema-spec/global-overlay-design.md` §跨屏协调 |
+| 任务 ID | 必读模板 | 必读方法论 | 必读 schema-spec | 必读 pitfalls / recipes（v3 ★）|
+|---------|---------|----------|-------------------|-------------------|
+| `D-X-briefing` ★ v3 | `note-templates/briefing.template.md` | `methodology/00-design-thinking.md`<br>`methodology/01-briefing.md` | `schema-spec/screen-meta-design.md` §6 | — |
+| `D-X-concept` ★ v3 | `note-templates/concept.template.md` | `methodology/02-visual-concept.md` | `schema-spec/screen-meta-design.md` §7 | — |
+| `D-X-strategy` ★ v3 | `note-templates/strategy.template.md` | `methodology/03-color.md`<br>`methodology/04-typography.md`<br>`methodology/05-shape.md`<br>`methodology/06-decoration.md`<br>`methodology/07-rhythm.md` | `schema-spec/screen-meta-design.md` §8 | `recipes/decoration-systems/<system>.md` |
+| `D-X-task-planning` ★ v3 | （沿用 craft-task.template.md 思路）| `methodology/00-design-thinking.md`<br>`methodology/09-coordinated-visual.md` | — | `recipes/visual-effects/*` + `recipes/compositions/*` |
+| `D-X-emotion`     | `note-templates/emotion.template.md`     | `methodology/01-visual-first.md`（Step 1 段）| `schema-spec/screen-meta-design.md` §1 | — |
+| `D-X-hierarchy`   | `note-templates/hierarchy.template.md`   | `methodology/01-visual-first.md`（Step 2 段）| `schema-spec/screen-meta-design.md` §2 | — |
+| `D-X-budget` ★    | `note-templates/budget.template.md`      | `methodology/02-visual-budget.md`（v3 重写：金字塔+阈值）| `schema-spec/screen-meta-design.md` §3 | `pitfalls/web-rendering.md`<br>`pitfalls/composite-patterns.md` |
+| `D-X-decorations` | `note-templates/decorations.template.md` | `methodology/04-decoration-categories.md`<br>`methodology/06-decoration.md`（v3 装饰系统单一族）| `schema-spec/decoration-nodes.md` | `recipes/decoration-systems/<system>.md` |
+| `D-X-craft-*`（自创任务 v3）| `note-templates/craft-task.template.md` | `methodology/02-visual-budget.md`<br>`methodology/06-visualstates-completeness.md`<br>`methodology/09-coordinated-visual.md`<br>`methodology/11-layout-adjustment.md` | `schema-spec/node-styles.md`<br>`schema-spec/visual-states.md`<br>`schema-spec/forbidden-fields-design.md` | `recipes/visual-effects/<本任务效果>.md`<br>`recipes/compositions/<本任务复合控件>.md`<br>`recipes/theme-element-dict/<theme.intent>.md`<br>`pitfalls/web-rendering.md`（如涉及 native 控件）|
+| `D-X-styles` ★    | `note-templates/styles.template.md`      | `methodology/01-visual-first.md`（Step 3 段）<br>`methodology/02-visual-budget.md` §4（最低识别阈值）| `schema-spec/node-styles.md`<br>`schema-spec/forbidden-fields-design.md` | `pitfalls/web-rendering.md`<br>`pitfalls/composite-patterns.md`<br>`recipes/visual-effects/*`<br>`recipes/compositions/*` |
+| `D-X-states` ★    | `note-templates/states.template.md`      | `methodology/06-visualstates-completeness.md`（v3 升级：含 §7 业务态）<br>`methodology/10-state-visual-mapping.md` | `schema-spec/visual-states.md` | `pitfalls/composite-patterns.md` |
+| `D-X-materials`   | `note-templates/materials.template.md`   | `methodology/01-visual-first.md`（Step 5 段）<br>`methodology/12-material-painting-flow.md` | `schema-spec/material-spec.md` | `../../material-painter/SKILL.md` |
+| `D-X-self-review` ★ v3 | `note-templates/review.template.md`     | `methodology/13-self-review-rubric.md`| — | — |
+| `D-X-meta`        | `note-templates/meta.template.md`        | —                                             | `schema-spec/node-meta-design.md`<br>`schema-spec/screen-meta-design.md` §4 | — |
+| `D-X-tree-redlines`| `note-templates/tree-redlines.template.md`| `methodology/08-node-tree-redlines.md`<br>`methodology/11-layout-adjustment.md`      | `schema-spec/node-styles.md`（红线汇总）| — |
+| `D-X-coverage` ★  | `note-templates/coverage.template.md`    | `methodology/05-derivative-view-design.md`<br>`methodology/06-visualstates-completeness.md`<br>`methodology/02-visual-budget.md` | `schema-spec/derivative-view-styles.md` | — |
+| `D-X-integrity`   | （无 md）                                 | —                                             | `schema-spec/forbidden-fields-design.md` | — |
+| `D-system-baseline` | `note-templates/system-baseline.template.md` | `methodology/03-atomic-design.md`        | `schema-spec/node-styles.md` | — |
+| `D-templates`     | `note-templates/templates.template.md`   | `methodology/03-atomic-design.md`            | `schema-spec/node-meta-design.md` | — |
+| `D-audit` ★       | `note-templates/audit.template.md`       | `methodology/07-cross-screen-audit.md`       | `schema-spec/screen-meta-design.md`（红线汇总）| — |
+| `D-decoration-system-audit` ★ v3 | （沿用 audit.template）| `methodology/06-decoration.md` | — | `recipes/decoration-systems/*` |
+| `D-color-ratio-audit` ★ v3 | （沿用 audit.template）| `methodology/03-color.md` | — | — |
+| `D-weight-pyramid-audit` ★ v3 | （沿用 audit.template）| `methodology/02-visual-budget.md` §3 §4 §5 | — | — |
+| `D-token-coverage`| `note-templates/token-coverage.template.md` | —                                          | `schema-spec/forbidden-fields-design.md` | — |
+| `D-handover` ★ v3 | `note-templates/handover.template.md` | `methodology/00-design-thinking.md` | — | — |
+| `D-global-overlay-styles` | `note-templates/global-overlay-styles.template.md` | — | `schema-spec/global-overlay-design.md` | — |
+| `D-global-overlay-states` | `note-templates/global-overlay-states.template.md` | `methodology/06-visualstates-completeness.md` | `schema-spec/global-overlay-design.md` §状态 | — |
+| `D-global-overlay-materials` | `note-templates/global-overlay-materials.template.md` | `methodology/12-material-painting-flow.md` | `schema-spec/material-spec.md` | `../../material-painter/SKILL.md` |
+| `D-global-overlay-audit` | `note-templates/global-overlay-audit.template.md` | `methodology/07-cross-screen-audit.md` | `schema-spec/global-overlay-design.md` §跨屏协调 | — |
 
 **所有路径**相对 `.codebuddy/skills/design-planner/references/`。第一次执行某类任务时全部 read；连续做多个同类任务（如 D-00-styles → D-01-styles）时，模板 + 方法论可在内存中复用，但**schema-spec 字段表每次落 schema 前重读**——避免拼写错。
 
@@ -357,20 +430,46 @@ meta/add_plan_tasks {
 | **R-BUDGET-01 / R-BUDGET-02**（待实现）| 视觉预算红线（总 weight > 30 / 主角 > 2）|
 | **R-TOKEN-COVERAGE**（待实现）| $token: 引用率 < 95% |
 
-### 5.4 阶段边界红线（严禁本阶段写）
+### 5.4 阶段边界红线（v3 ★ 重写：放开创作权，收紧业务字段）
 
-| 字段 | 留给 |
-|------|-----|
-| `node.events[]` / `bind` / `repeat` / `visibleWhen` | ⛔ interaction 已写（不动） |
+#### ✅ design 阶段允许（v3 创作权）
+
+| 字段 / 操作 | 用途 |
+|---|---|
+| `element/add` 新增**视觉容器节点** | 如 `<label>` 包 checkbox + visual + text；`<HeroFrame>` 包 Logo + 渐变背景；`<TabIndicator>` 移动指示条 |
+| `element/wrap` 包裹现有兄弟 | 如 PolicyCheckbox + PolicyText 包成 PolicyCheckLabel |
+| `element/move` 移动节点位置 | 同父级内调位（如把 PolicyText 提到 Label 内）|
+| 新增**装饰节点**（4 类） | 背景氛围 / 角落溢出 / 分割装饰 / 品牌点缀 |
+| 调用 **material-painter** 子技能画素材 + `applyMaterialDesign` | 写入 `node.materialProjectId`；type=img 节点真正"出图" |
+| `meta/add_plan_tasks` **自创下游 craft 任务** | 基于 visualStrategy 拆出 N 个 D-X-craft-* 任务（参 Phase 1 §扩展任务）|
+| `node.styles` 全量 / `node.states[]` | 标准产物 |
+| `screen.backgroundColor` / `screen.meta.design.*`（含 v3 新增 visualConcept / visualStrategy）| 标准产物 |
+| `node.meta.design.{summary,rationale,visualSpec,materialSpec,kind}` | 标准产物 |
+| `project.componentAssets` 通用模板 | 标准产物 |
+| 在 `screen.overlays` 中**新增** backdrop / loading-mask 等视觉 overlay | 用于 trust/focus 等场景；不动 interaction 已建的业务 overlay |
+
+⚠️ **新增节点必须挂 `meta.design.kind ∈ ['decoration', 'visual-container', 'material-frame']` 之一**——否则视为试图加业务节点 → service 端拒。
+
+#### ❌ design 阶段禁止（这些是上游已定的业务真理，动了 = 推翻业务设计）
+
+| 字段 / 操作 | 留给 |
+|---|-----|
+| `element/remove` 业务节点（product/interaction 已建）| ⛔ 走 §5.6 UpstreamChallenge |
+| `node.events[]` / `bind` / `repeat` / `visibleWhen` | ⛔ interaction 已写（不动）|
 | `node.props.textContent`（动态表达式部分如 `{{state.x}}`）| ⛔ interaction 已写；静态文案 design 可写 |
-| `screen.dataSources` / `stateInit.view/data` 主体 | ⛔ interaction 已写；可补 `previewValue` |
-| `screen.overlays`（结构）| ⛔ interaction 已建 overlay 节点；design 可补 overlay 内节点的 styles + visualStates |
+| `screen.dataSources` / `stateInit.view/data` 主体（字段定义）| ⛔ interaction 已写；可补 `previewValue` |
+| `screen.overlays`（**业务**结构 + showWhen + events）| ⛔ interaction 已建；design 可补 styles + visualStates，及为视觉效果新增 backdrop overlay |
 | `project.globalOverlays`（结构 + showWhen + events）| ⛔ product/interaction 已建；design 可补 styles + visualStates + materialSpec |
-| `node.materialProjectId` | ⛔ executor 写（素材上传产物）|
 | `project.themeConfig` | ⛔ theme-generator 写；design 只读 + 引用 |
-| 重组上游骨架（move/wrap/remove product/interaction 已建节点）| ⛔ 优先走 §5.6 UpstreamChallenge 协议；只有 typo 级真错误走旧式口头退回 |
+| 重组上游骨架（move/wrap **业务节点** product/interaction 已建的）| ⛔ 优先走 §5.6 UpstreamChallenge；只有 typo 级真错误走旧式口头退回 |
 
 完整边界表查 `references/schema-spec/forbidden-fields-design.md`。
+
+#### ⚠️ 边界情况
+
+- 想改 interaction 建的衍生视图节点结构 → 走 UpstreamChallenge
+- 想加新业务字段（如 state.view.passwordVisible 但 interaction 没暴露）→ 走 UpstreamChallenge 让 interaction 补
+- 想改 token 池（如缺 elevation-2 阴影、缺 successBg 色）→ 走 UpstreamChallenge 让 theme-generator 补
 
 ### 5.5 行为红线（典型错误）
 
@@ -542,49 +641,159 @@ meta/add_plan_tasks {
 
 详细协议见 `../../STAGE-CONTRACT.md` §0.1.9。
 
+
 ## 12. references/ 索引（对应环节必须加载）
 
 > 每条触发条件命中时**必须 read_file**——不允许凭印象推进。
 > 写 md 前 read 模板 + 方法论；落 schema 前 read schema-spec。
-> 详细必读映射见 §4.X。
+> 详细必读映射见 §4.X（任务 → 必读文件 dict）。
+>
+> ★ = 高频；★★ = v3 核心新增/重写。
+
+---
+
+### 12.1 methodology（思维框架，告诉 AI **怎么想**）
 
 | 路径 | 内容 | 何时必须加载 |
 |------|------|-------------|
-| `methodology/01-visual-first.md` ★ | 视觉先行原则 + 7 步思考框架（情感/层级/手段/装饰/素材/预算/契合度）| Phase 1 列任务清单时；执行任意 `D-X-emotion` / `D-X-hierarchy` / `D-X-styles` / `D-X-decorations` / `D-X-materials` 时必须加载 |
-| `methodology/02-visual-budget.md` ★ | 视觉统筹三层级（L0 全局 / L1 页面 / L2 组件）+ 组件视觉预算分配表 + 预算上限 | Phase 1；执行 `D-X-budget` / `D-audit` 时必须加载 |
-| `methodology/03-atomic-design.md` | Atomic Design 组件分层（Atom / Molecule / Organism）+ 跨屏复用判定 | 执行 `D-system-baseline` / `D-templates` 时必须加载 |
-| `methodology/04-decoration-categories.md` ★ | 装饰元素 7 大类（几何/有机/光效/纹理/符号/数学科学/裁剪溢出）+ 主题风格匹配 | 执行 `D-X-decorations` 时必须加载 |
-| `methodology/05-derivative-view-design.md` ★ | 7 类衍生视图节点（loading/empty/error/auth/business/feedback/overlays）的视觉规格要点 | 执行 `D-X-coverage` / 任意涉及衍生视图的 `D-X-styles` / `D-X-materials` 时必须加载 |
-| `methodology/06-visualstates-completeness.md` ★ | visualStates 完备性矩阵（按 variant × state；按钮/输入框/卡片必备状态清单）| 执行 `D-X-states` / `D-X-coverage` / `D-global-overlay-states` 时必须加载 |
-| `methodology/07-cross-screen-audit.md` | 跨屏一致性 audit 5 维度（同种组件 / 视觉密度 / 主题契合 / 模板复用 / 全局 overlays 风格）| 执行 `D-audit` / `D-global-overlay-audit` 时必须加载 |
-| `methodology/08-node-tree-redlines.md` | 节点结构 4 红线（组件内联展开 / 状态-节点对应 / 完整样式 / 叶子有内容）| 执行 `D-X-tree-redlines` 时必须加载 |
-| `schema-spec/screen-meta-design.md` ★ | screen.meta.design 完整字段（summary / palette / layers / componentBudgets）+ screen.backgroundColor | 执行 `D-X-emotion` / `D-X-hierarchy` / `D-X-budget` / `D-X-meta` / `D-audit` 落 schema 前必须加载 |
-| `schema-spec/node-styles.md` ★ | node.styles 一次到位规范（layout / typography / color / spacing / shadow / transition / token 引用）| 执行 `D-X-styles` / `D-system-baseline` / `D-token-coverage` / `D-global-overlay-styles` 落 schema 前必须加载 |
-| `schema-spec/visual-states.md` ★ | VisualState 完整字段（styles / styleOverrides / childrenStates / childrenVisibility / disabledEvents / activeWhen / transition）| 执行 `D-X-states` / `D-global-overlay-states` 落 schema 前必须加载 |
-| `schema-spec/node-meta-design.md` | node.meta.design 完整字段（summary / rationale / visualSpec.{weight,zIndex,role} / materialSpec / ref）| 执行 `D-X-meta` / `D-X-materials` 落 schema 前必须加载 |
-| `schema-spec/material-spec.md` ★ | MaterialSpec 接口完整 10 节（kind / referenceFrame / styleAnalysis / colorStrategy / lineStyle / composition / layers / variants / qualityChecklist / renderHint）| 执行 `D-X-materials` / `D-global-overlay-materials` 落 schema 前必须加载 |
-| `schema-spec/decoration-nodes.md` | 装饰节点追加规则（背景氛围 / 角落溢出 / 分割装饰 / 品牌点缀 4 类 + position:absolute 强制）| 执行 `D-X-decorations` 落 schema 前必须加载 |
-| `schema-spec/global-overlay-design.md` | 项目级 globalOverlays 视觉规格（出入动画 / backdrop / safe-area / 跨屏并存协调）| 执行任意 `D-global-overlay-*` 落 schema 前必须加载 |
-| `schema-spec/derivative-view-styles.md` | 7 类衍生视图节点的样式规格要点（骨架屏 shimmer / 空态居中插图 / 错误页重试按钮 / 业务状态独立 layout）| 执行 `D-X-coverage` / 涉及衍生视图的 `D-X-styles` 落 schema 前必须加载 |
-| `schema-spec/forbidden-fields-design.md` ★ | 严禁本阶段写的字段（边界表 + 自检 mental check）| 执行 `D-X-integrity` 时必须加载；任何时刻发现想写非法字段也加载 |
-| `note-templates/emotion.template.md`     | 情感与氛围 md 骨架            | 写 `design/<screenId>/emotion.md` 前必须加载 |
-| `note-templates/hierarchy.template.md`   | 视觉层级 md 骨架              | 写 `design/<screenId>/hierarchy.md` 前必须加载 |
-| `note-templates/budget.template.md` ★    | 视觉预算 md 骨架              | 写 `design/<screenId>/budget.md` 前必须加载 |
-| `note-templates/decorations.template.md` | 装饰决策 md 骨架              | 写 `design/<screenId>/decorations.md` 前必须加载 |
-| `note-templates/styles.template.md` ★    | 全量样式 md 骨架（最长，含每节点完整 styles + token 引用论证）| 写 `design/<screenId>/styles.md` 前必须加载 |
-| `note-templates/states.template.md` ★    | visualStates md 骨架（按 variant × state 矩阵 + childrenStates 联动）| 写 `design/<screenId>/states.md` 前必须加载 |
-| `note-templates/materials.template.md`   | materialSpec md 骨架          | 写 `design/<screenId>/materials.md` 前必须加载 |
-| `note-templates/meta.template.md`        | meta.design 叙事 md 骨架      | 写 `design/<screenId>/meta.md` 前必须加载 |
-| `note-templates/tree-redlines.template.md` | 节点结构 4 红线核对 md 骨架 | 写 `design/<screenId>/tree-redlines.md` 前必须加载 |
-| `note-templates/coverage.template.md` ★  | 覆盖核对 md 骨架（衍生视图 + visualStates 矩阵 + 视觉预算）| 写 `design/<screenId>/coverage.md` 前必须加载 |
-| `note-templates/system-baseline.template.md` | 设计系统基线 md 骨架       | 写 `design/system/baseline.md` 前必须加载 |
-| `note-templates/templates.template.md`   | 通用组件抽模板 md 骨架        | 写 `design/system/templates.md` 前必须加载 |
-| `note-templates/audit.template.md`       | 跨屏一致性 audit md 骨架      | 写 `design/system/audit.md` 前必须加载 |
-| `note-templates/token-coverage.template.md` | $token: 引用率核查 md 骨架 | 写 `design/system/token-coverage.md` 前必须加载 |
-| `note-templates/global-overlay-styles.template.md`    | 全局 overlay 样式 md 骨架 | 写 `design/global/overlay-styles.md` 前必须加载 |
-| `note-templates/global-overlay-states.template.md`    | 全局 overlay states md 骨架 | 写 `design/global/overlay-states.md` 前必须加载 |
-| `note-templates/global-overlay-materials.template.md` | 全局 overlay 素材 md 骨架  | 写 `design/global/overlay-materials.md` 前必须加载 |
-| `note-templates/global-overlay-audit.template.md`     | 全局 overlay audit md 骨架 | 写 `design/global/overlay-audit.md` 前必须加载 |
-| `examples/login-design.md` | 登录页视觉设计完整样板（11 屏级任务 + 6 项目级任务全跑） | 第一次执行某类任务、不确定深度时必须加载 |
-| `../common/references/v2-actions-cheatsheet.md` | MCP 工具 + v2 actions 速查 | 第一次调用某个 MCP 工具时必须加载，验证字段拼写 |
+| `methodology/00-design-thinking.md` ★★ | **v3 新增**：设计思维总纲——8-Phase 总览 / 6 项创作权 / 创作者 vs 字段填写员心智 | 入场启动时；任何陷入"机械填字段"的迹象时 |
+| `methodology/01-briefing.md` ★★ | **v3 新增**：取景方法 4 维度（核心任务 / 成功标准 / mood / 关键词 ≤ 3） | 执行 `D-X-briefing`；Phase A 取景时 |
+| `methodology/01-visual-first.md` ★ | 视觉先行原则 + 7 步思考框架 | Phase 1；执行任意 `D-X-emotion` / `D-X-hierarchy` / `D-X-styles` / `D-X-decorations` / `D-X-materials` |
+| `methodology/02-visual-budget.md` ★★ | **v3 重写**：视觉权重金字塔 + minSignals + weight 量化公式 | Phase 1；`D-X-budget` / `D-X-styles` / `D-X-craft-*` / `D-audit` |
+| `methodology/02-visual-concept.md` ★★ | **v3 新增**：视觉概念（mood / 灵魂句 / 关键词 3 个 / 反例）| 执行 `D-X-concept`；Phase B 视觉概念 |
+| `methodology/03-atomic-design.md` | Atomic Design 组件分层 + 跨屏复用判定 | `D-system-baseline` / `D-templates` |
+| `methodology/03-color.md` ★★ | **v3 新增**：60-30-10 调色策略 + 主辅强用法 + token 选用 | `D-X-strategy` 色彩段；任意 `D-X-craft-*` 写填充色 |
+| `methodology/04-decoration-categories.md` ★ | 装饰元素 7 大类 + 主题风格匹配 | `D-X-decorations` |
+| `methodology/04-typography.md` ★★ | **v3 新增**：字号节奏（display/h2/body 比例 / 字重对比 / 字距）| `D-X-strategy` 字段；`D-X-craft-*` 写文字样式 |
+| `methodology/05-derivative-view-design.md` ★ | 7 类衍生视图节点视觉规格 | `D-X-coverage` / 涉及衍生视图的 `D-X-styles` / `D-X-materials` |
+| `methodology/05-shape.md` ★★ | **v3 新增**：形状语言 4 基调 + 圆角档位 | `D-X-strategy` 形状段 |
+| `methodology/06-decoration.md` ★★ | **v3 新增**：装饰系统单一族原则 + 5 系统简介 + 密度档位 | `D-X-strategy` 装饰段；`D-X-decorations` 决定族 |
+| `methodology/06-visualstates-completeness.md` ★★ | **v3 升级**：visualStates 完备性矩阵 + §7 业务态来源（扫 state.view 字段映射）+ 复合控件最低覆盖 | `D-X-states` / `D-X-coverage` / `D-X-craft-*` / `D-global-overlay-states` |
+| `methodology/07-cross-screen-audit.md` | 跨屏一致性 audit 5 维度 | `D-audit` / `D-global-overlay-audit` |
+| `methodology/07-rhythm.md` ★★ | **v3 新增**：间距与动效律动（spacing 档位 / transition 时长 / easing） | `D-X-strategy` 节奏段；`D-X-craft-*` 写 transition |
+| `methodology/08-node-tree-redlines.md` | 节点结构 4 红线 | `D-X-tree-redlines` |
+| `methodology/09-coordinated-visual.md` ★★ | **v3 新增**：协同视觉 4 角色（主体/邻居/父容器/装饰）+ 多元素联动 | `D-X-craft-*` 涉及多节点联动；urgency / focus / delight 配方 |
+| `methodology/10-state-visual-mapping.md` ★★ | **v3 新增**：业务态 → visualState 映射 5 步流程（state.view 扫描 / 命名 / activeWhen / 视觉差异 / 自动消失） | `D-X-states` 业务态段；`D-X-craft-*` 涉及业务态 |
+| `methodology/11-layout-adjustment.md` ★★ | **v3 新增**：布局调整边界（design 可改 padding/spacing/对齐 / 不能动 interaction-designer 定的节点结构） | `D-X-craft-*` 想调布局；判定要不要发 upstreamChallenge |
+| `methodology/12-material-painting-flow.md` ★★ | **v3 新增**：素材绘制工作流（spec → painter → manifest → applyMaterialDesign → 自审截图） | `D-X-materials` 落地（v3：design 自跑 painter）|
+| `methodology/13-self-review-rubric.md` ★★ | **v3 新增**：5 维度自审评分标尺（识别/层次/状态/契合/情绪）+ 出场标尺 + 重做循环 | `D-X-self-review`；`D-X-craft-*` / `D-X-styles` / `D-X-states` 在 Phase 2 Step 6.5 自审时 |
+
+---
+
+### 12.2 pitfalls（避坑清单，告诉 AI **哪里会翻车**）
+
+| 路径 | 内容 | 何时必须加载 |
+|------|------|-------------|
+| `pitfalls/web-rendering.md` ★★ | **v3 新增**：native HTML 控件清单 + 不可设计属性 + workaround 模式（wrapper-label / combobox / label-button）| `D-X-budget` 扫到 native 控件；`D-X-styles` / `D-X-craft-form` 涉及 native input |
+| `pitfalls/composite-patterns.md` ★★ | **v3 新增**：业务复合控件必备视觉态清单 + 节点结构 + activeWhen 表达式 | `D-X-budget` 扫到复合控件；`D-X-states` / `D-X-craft-*` 涉及复合控件 |
+
+---
+
+### 12.3 recipes（配方库，告诉 AI **可以照抄什么**）
+
+按需加载。每份配方解决一类具体问题。
+
+#### visual-effects（视觉效果配方，7 份）
+| 路径 | 何时必须加载 |
+|------|-------------|
+| `recipes/visual-effects/floating.md` ★ | `D-X-craft-*` 想做"卡片浮起" |
+| `recipes/visual-effects/focus.md` ★ | `D-X-craft-form` 输入控件聚焦 |
+| `recipes/visual-effects/trust.md` ★ | `D-X-strategy` 选 trust mood |
+| `recipes/visual-effects/urgency.md` ★ | `D-X-craft-countdown` / 限时 / 错误警告 |
+| `recipes/visual-effects/delight.md` ★ | `D-X-craft-like-button` / 任务完成 / 解锁 |
+| `recipes/visual-effects/playful.md` ★ | `D-X-strategy` 选 playful（互斥 trust）|
+| `recipes/visual-effects/premium.md` ★ | `D-X-strategy` 选 premium 主题 |
+
+#### compositions（业务复合控件配方，10 份）
+| 路径 | 何时必须加载 |
+|------|-------------|
+| `recipes/compositions/checkbox.md` ★ | `D-X-craft-checkbox`（label-button workaround）|
+| `recipes/compositions/tab-segment.md` ★ | `D-X-craft-tab`（横向选项 + active 强调）|
+| `recipes/compositions/accordion-collapse.md` | `D-X-craft-accordion` |
+| `recipes/compositions/radio.md` | `D-X-craft-radio` |
+| `recipes/compositions/select-combobox.md` | `D-X-craft-select` |
+| `recipes/compositions/stepper.md` | `D-X-craft-stepper` |
+| `recipes/compositions/pagination.md` | `D-X-craft-pagination` |
+| `recipes/compositions/switch-toggle.md` | `D-X-craft-switch` |
+| `recipes/compositions/modal-drawer.md` | `D-X-craft-modal` |
+| `recipes/compositions/toast-snackbar.md` | `D-X-craft-toast` |
+
+#### decoration-systems（装饰系统配方，5 族；每屏只能选 1 族）
+| 路径 | 何时必须加载 |
+|------|-------------|
+| `recipes/decoration-systems/soft-glow.md` ★ | `D-X-decorations` 选 soft-glow |
+| `recipes/decoration-systems/geometric-line.md` ★ | `D-X-decorations` 选 geometric-line |
+| `recipes/decoration-systems/illustration.md` ★ | `D-X-decorations` 选 illustration |
+| `recipes/decoration-systems/texture.md` | `D-X-decorations` 选 texture |
+| `recipes/decoration-systems/organic-curve.md` | `D-X-decorations` 选 organic-curve |
+
+#### theme-element-dict（主题词典，8 主题）
+每屏 `D-X-strategy` 阶段对照 theme.intent.tone 选 1 份。
+
+| 路径 | 何时必须加载 |
+|------|-------------|
+| `recipes/theme-element-dict/minimal.md` ★ | theme=minimal |
+| `recipes/theme-element-dict/trustworthy.md` ★ | theme=trustworthy（登录 / 支付）|
+| `recipes/theme-element-dict/warm.md` ★ | theme=warm |
+| `recipes/theme-element-dict/playful.md` ★ | theme=playful（教育 / 社交）|
+| `recipes/theme-element-dict/premium.md` ★ | theme=premium（金融 / VIP）|
+| `recipes/theme-element-dict/clean.md` | theme=clean（数据 / 工具）|
+| `recipes/theme-element-dict/bold.md` | theme=bold |
+| `recipes/theme-element-dict/natural.md` | theme=natural |
+
+---
+
+### 12.4 schema-spec（schema 字段规范，告诉 AI **写什么字段**）
+
+| 路径 | 内容 | 何时必须加载 |
+|------|------|-------------|
+| `schema-spec/screen-meta-design.md` ★★ | screen.meta.design 完整字段 + **v3 §6 briefing / §7 visualConcept / §8 visualStrategy** | `D-X-emotion` / `D-X-hierarchy` / `D-X-budget` / `D-X-meta` / `D-X-briefing` / `D-X-concept` / `D-X-strategy` / `D-audit` 落 schema 前 |
+| `schema-spec/node-styles.md` ★ | node.styles 一次到位规范（layout / typography / color / spacing / shadow / transition / token 引用）| `D-X-styles` / `D-system-baseline` / `D-token-coverage` / `D-global-overlay-styles` 落 schema 前 |
+| `schema-spec/visual-states.md` ★ | VisualState 完整字段（styles / styleOverrides / childrenStates / childrenVisibility / disabledEvents / activeWhen / transition）| `D-X-states` / `D-global-overlay-states` 落 schema 前 |
+| `schema-spec/node-meta-design.md` | node.meta.design 完整字段（含 v3 `kind: 'decoration' / 'visual-container' / 'material-frame'`） | `D-X-meta` / `D-X-materials` 落 schema 前 |
+| `schema-spec/material-spec.md` ★★ | MaterialSpec 接口 10 节 + **v3 §12 design 自跑 painter manifest** | `D-X-materials` / `D-global-overlay-materials` 落 schema 前 |
+| `schema-spec/decoration-nodes.md` | 装饰节点追加规则 | `D-X-decorations` 落 schema 前 |
+| `schema-spec/global-overlay-design.md` | 项目级 globalOverlays 视觉规格 | 任意 `D-global-overlay-*` 落 schema 前 |
+| `schema-spec/derivative-view-styles.md` | 7 类衍生视图节点的样式规格要点 | `D-X-coverage` / 涉及衍生视图的 `D-X-styles` 落 schema 前 |
+| `schema-spec/forbidden-fields-design.md` ★★ | **v3 重写**：放开/收紧二元表（design 放开 6 创作权 + 收紧业务字段） | `D-X-integrity`；任何时刻发现想写非法字段 |
+
+---
+
+### 12.5 note-templates（md 模板，告诉 AI **md 怎么填**）
+
+| 路径 | 内容 | 何时必须加载 |
+|------|------|-------------|
+| `note-templates/briefing.template.md` ★★ | **v3 新增**：取景 md 骨架（4 维度） | 写 `design/<screenId>/briefing.md` 前 |
+| `note-templates/concept.template.md` ★★ | **v3 新增**：视觉概念 md 骨架（mood / 灵魂句 / 关键词 / 反例）| 写 `design/<screenId>/concept.md` 前 |
+| `note-templates/strategy.template.md` ★★ | **v3 新增**：视觉策略 md 骨架（5 维：色 / 字 / 形 / 饰 / 律）| 写 `design/<screenId>/strategy.md` 前 |
+| `note-templates/craft-task.template.md` ★★ | **v3 新增**：craft 子任务 md 骨架（多元素联动 + 自审段） | 写 `design/<screenId>/craft-N/<节点>.md` 前 |
+| `note-templates/review.template.md` ★★ | **v3 新增**：自审 md 骨架（5 维度评分） | 写 `design/<screenId>/self-review.md` 前；任意 craft 任务自审段 |
+| `note-templates/handover.template.md` ★★ | **v3 新增**：移交 md 骨架（截图 + 指纹 + 已知 trade-off）| 写 `design/<screenId>/handover.md` 前 |
+| `note-templates/emotion.template.md` | 情感与氛围 md 骨架 | 写 `design/<screenId>/emotion.md` 前 |
+| `note-templates/hierarchy.template.md` | 视觉层级 md 骨架 | 写 `design/<screenId>/hierarchy.md` 前 |
+| `note-templates/budget.template.md` ★ | 视觉预算 md 骨架 | 写 `design/<screenId>/budget.md` 前 |
+| `note-templates/decorations.template.md` | 装饰决策 md 骨架 | 写 `design/<screenId>/decorations.md` 前 |
+| `note-templates/styles.template.md` ★ | 全量样式 md 骨架（最长，含每节点完整 styles + token 引用论证）| 写 `design/<screenId>/styles.md` 前 |
+| `note-templates/states.template.md` ★ | visualStates md 骨架（按 variant × state 矩阵 + childrenStates 联动）| 写 `design/<screenId>/states.md` 前 |
+| `note-templates/materials.template.md` | materialSpec md 骨架 | 写 `design/<screenId>/materials.md` 前 |
+| `note-templates/meta.template.md` | meta.design 叙事 md 骨架 | 写 `design/<screenId>/meta.md` 前 |
+| `note-templates/tree-redlines.template.md` | 节点结构 4 红线核对 md 骨架 | 写 `design/<screenId>/tree-redlines.md` 前 |
+| `note-templates/coverage.template.md` ★ | 覆盖核对 md 骨架（衍生视图 + visualStates 矩阵 + 视觉预算）| 写 `design/<screenId>/coverage.md` 前 |
+| `note-templates/system-baseline.template.md` | 设计系统基线 md 骨架 | 写 `design/system/baseline.md` 前 |
+| `note-templates/templates.template.md` | 通用组件抽模板 md 骨架 | 写 `design/system/templates.md` 前 |
+| `note-templates/audit.template.md` | 跨屏一致性 audit md 骨架 | 写 `design/system/audit.md` 前 |
+| `note-templates/token-coverage.template.md` | $token: 引用率核查 md 骨架 | 写 `design/system/token-coverage.md` 前 |
+| `note-templates/global-overlay-styles.template.md` | 全局 overlay 样式 md 骨架 | 写 `design/global/overlay-styles.md` 前 |
+| `note-templates/global-overlay-states.template.md` | 全局 overlay states md 骨架 | 写 `design/global/overlay-states.md` 前 |
+| `note-templates/global-overlay-materials.template.md` | 全局 overlay 素材 md 骨架 | 写 `design/global/overlay-materials.md` 前 |
+| `note-templates/global-overlay-audit.template.md` | 全局 overlay audit md 骨架 | 写 `design/global/overlay-audit.md` 前 |
+
+---
+
+### 12.6 examples + 跨技能引用
+
+| 路径 | 内容 | 何时必须加载 |
+|------|------|-------------|
+| `examples/login-design-v3.md` ★★ | **v3 新增**：登录页 8-Phase 全跑样板（Phase A briefing → H handover；含 6 自创 craft + self-review.md）| 第一次执行 v3 流程不确定深度时；困惑"怎么取景 / 怎么自创任务" |
+| `../common/references/v2-actions-cheatsheet.md` | MCP 工具 + v2 actions 速查 | 第一次调用某个 MCP 工具时，验证字段拼写 |
 | `../../STAGE-CONTRACT.md` §0.1.7 + §4 | 本技能的契约依据 | 入场启动时必须加载一次，建立全局规则认知 |

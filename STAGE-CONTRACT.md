@@ -8,6 +8,52 @@
 
 ---
 
+## ★ v3 修订摘要（2026-05-31，design ↔ executor 职责重新分工）
+
+> 本节为 v3 SKILL（design-planner v3 / design-executor v3）落地后的契约修订摘要。**与下文 §1-§5 中的旧表述如有冲突，以本节为准。**
+
+### v3 ★ 职责重新分工（design-planner ↔ design-executor）
+
+| 职责 | v2 归属 | v3 归属 |
+|------|--------|--------|
+| 调用 `material-painter` 子技能画素材 | **executor** | **design-planner** |
+| 写 `node.materialProjectId`（素材工程绑定） | **executor** | **design-planner** |
+| 写 `node.styles.{backgroundImage, backgroundSize, backgroundPosition, backgroundRepeat, backgroundColor, backgroundOrigin, backgroundClip, backgroundAttachment, imageRendering}`（applyMaterialDesign 9 项） | **executor** | **design-planner** |
+| 写 `node.props.src`（img 节点素材应用） | **executor** | **design-planner** |
+| `screen.meta.design.briefing / visualConcept / visualStrategy` | （不存在） | **design-planner**（v3 新增 3 字段） |
+| `meta/add_plan_tasks` 自创 D-X-craft-* / D-X-fix-* 任务 | （不允许）| **design-planner**（v3 创作权） |
+| `element/add` 视觉容器 / 装饰节点 / 视觉 overlay | （受限）| **design-planner**（v3 创作权） |
+| `generate_snapshots` 截图 + 与 design 移交对账 | executor | **executor**（v3 唯一职责） |
+| `meta.status.phase = "verified"` | executor | **executor**（v3 唯一职责） |
+| 创建 D-X-fix-* 退回 design | （不存在）| **executor**（v3 新增）|
+
+### v3 ★ design-planner 新增 6 项创作权
+
+详 `.claude/skills/design-planner/SKILL.md` §1。简要：
+1. 视觉概念决策权（mood / 灵魂句 / 关键词）
+2. 视觉策略制定权（5 维：色 / 字 / 形 / 饰 / 律）
+3. 视觉任务自创权（基于策略自创 craft 任务）
+4. 布局调整权（视觉容器节点的 element/add/wrap/move）
+5. 装饰节点新建权（4 类装饰 + 装饰系统单一族）
+6. **素材绘制权（自调 material-painter + applyMaterialDesign）**
+
+### v3 ★ design-executor 角色根本变化（QA 摄影师）
+
+详 `.claude/skills/design-executor/SKILL.md` §1。简要：
+
+executor v3 **不再画素材、不再写 styles 任何字段、不再调 material-painter**——只做 3 件事：
+1. `generate_snapshots` 跑全屏 / 多 viewport / Frame 长图截图
+2. 把截图与 design 的 `self-review.md` / `handover.md` 对账，找差异
+3. 0 差异 → 标 phase=verified；有差异 → 创建 `D-X-fix-*` 退回 design-planner（不亲自补）
+
+### v3 ★ 上线门禁（B 类代码改造）
+
+v3 SKILL 的字段放开（briefing/visualConcept/visualStrategy + materialProjectId）需要 6 项 B 类代码改造（B1-B6）落地后才能真正生效。详根目录 `B类代码改造补丁文档-2026-05-31.md`。
+
+**B5（service 字段禁令调整）是 gating PR**——不合 B5，design-planner 写 v3 新字段会被 `executeSetScreenMeta` 拒绝。
+
+---
+
 ## 0. 总体架构
 
 ### 0.1 不可违反的原则
@@ -991,7 +1037,7 @@ node = {
   // bind: undefined,           interaction（受控绑定）
   // repeat: undefined,         interaction（列表绑定）
   // animation: undefined,      design（动画配置）
-  // materialProjectId: undefined,  executor（素材产物）
+  // materialProjectId: undefined,  **v3 ★ design 写**（v2 是 executor 写）
   // editorMetadata: undefined,  design（layoutHint 等编辑期角色）
   // constraints: undefined,     design（如有 pin 约束）
   // templateRef: undefined,     design（如复用组件模板）
@@ -1030,7 +1076,7 @@ node = {
 | `node.visibleWhen` | interaction | 动态显隐 |
 | `node.props.textContent`（动态文本如 `{{state.xxx}}`） | interaction | 状态驱动文案 |
 | `node.animation` | design | CSS/外部动画 |
-| `node.materialProjectId` | executor | 素材绑定产物 |
+| `node.materialProjectId` | **design (v3 ★)** | 素材绑定产物（v3：design 自跑 painter 后绑定；v2 是 executor）|
 | `node.editorMetadata` | design | 编辑期角色提示 |
 | `node.constraints` | design | 布局约束 |
 | `node.templateRef` | design | 模板引用 |
@@ -2119,7 +2165,7 @@ I-handover              移交 design-planner
 | `node.styles` | design | 视觉 |
 | `node.states[]`（VisualState） | design | hover/pressed/focus 视觉态 |
 | `node.animation` | design | CSS 动画配置 |
-| `node.materialProjectId` | executor | 素材产物 |
+| `node.materialProjectId` | **design (v3 ★)** | 素材产物（v3：design 自跑 painter；v2 是 executor）|
 | `screen.backgroundColor` | design | 视觉 |
 | `node.editorMetadata` / `constraints` / `templateRef` / `componentBoundary` | design | 设计期 / 模板复用 |
 | `screen.meta.design.*` | design | 视觉决策 |
@@ -2229,9 +2275,13 @@ for each dataSource in screen.dataSources:
 
 ## 4. 角色：design-planner（UI/视觉设计师）★ 重点
 
+> ⚠️ **v3 ★ 角色升级**：v3 起 design-planner 从"字段填写员"升级为"视觉创作者"——新增 6 项创作权（视觉概念 / 视觉策略 / 任务自创 / 布局调整 / 装饰节点新建 / **素材绘制权**）。详顶部 v3 修订摘要 + `.claude/skills/design-planner/SKILL.md` §1。
+
 ### 4.1 视角与定位
 
 **你是企业级 UI/视觉设计师。你不是写 CSS 的，你是给整个产品定调、定层级、定氛围、定品牌的设计师。**
+
+> ⚠️ **v3 ★ 新增**：v3 起你也是「素材绘制者」——自调 material-painter 子技能画素材 + applyMaterialDesign 落地 9 项 background-* CSS。
 
 你的工作不是"补样式"——这种描述是侮辱。你的工作是：
 - 站在用户体验心理学的角度看每屏想让用户感受到什么
@@ -2241,6 +2291,7 @@ for each dataSource in screen.dataSources:
 - 跨屏一致性维护，让通用组件无论出现在哪里都是同一个样子
 - 给 executor 留下**精确到 px / token / ms / 缓动**的可实施 spec
 - 给每个素材留下**完整的素材绘制规格**——什么风格、什么色、什么构图、什么变体
+- **v3 ★ 新增**：基于 spec 自调 material-painter 把素材**画出来**，applyMaterialDesign 把 9 项 background-* CSS 落到节点（executor 不再画）
 
 ### 4.2 核心方法论（旧版精华，全部保留）
 
@@ -2550,12 +2601,12 @@ interface MaterialSpec {
   /** 9. 质量核对清单 */
   qualityChecklist: string[];
 
-  /** 10. 渲染提示（决定 executor 怎么处理） */
+  /** 10. 渲染提示（v2: executor 处理；v3: design 处理） */
   renderHint: 'png' | 'svg' | 'css-gradient' | 'css-only';
-  // png: 调 material-painter 画 + 上传 + 应用到 backgroundImage/src
-  // svg: 内联 SVG（小图标）
-  // css-gradient: design 已在 styles 写背景，executor 跳过
-  // css-only: 全 CSS 实现，executor 跳过
+  // png: 调 material-painter 画 + 上传 + 应用到 backgroundImage/src（**v3 ★ 改 design 调**）
+  // svg: 内联 SVG（小图标）（**v3 ★ 改 design 写**）
+  // css-gradient: design 已在 styles 写背景（v2/v3 同）
+  // css-only: 全 CSS 实现（v2/v3 同）
 
   notes?: string;
 }
@@ -3072,7 +3123,7 @@ project.componentAssets.push({
 | `screen.dataSources` | ⛔ interaction 已写 | — |
 | `screen.stateInit.view/data` | ⛔ interaction 已写 | 但可补 `previewValue` |
 | `screen.overlays` | ⛔ interaction 已建 overlay 节点 | design 可补 overlay 内节点的 styles |
-| `node.materialProjectId` | ⛔ executor 写 | 素材上传产物 |
+| `node.materialProjectId` | ⛔ **v3 ★ 改 design 写**（v2 是 executor） | 素材上传产物（v3 已归 design） |
 | `project.themeConfig` | ⛔ theme-generator 写 | design 只读 + 引用 |
 | 重组上游骨架（move/remove）| ⛔ 退回上游 | 禁止重组 |
 
@@ -3125,31 +3176,46 @@ D-handover         移交 design-executor
 
 ## 5. 角色：design-executor（实施 + QA）
 
+> ⚠️ **v3 ★ 角色变化**：v3 起 executor 退化为 **QA 摄影师**——不再画素材、不再写 styles 任何字段、不再调 material-painter。本节 §5.1-§5.3 描述 v2 视角；v3 实际职责见顶部 v3 修订摘要 + `.claude/skills/design-executor/SKILL.md`。
+
 ### 5.1 视角与定位
 
 **你是工程实施 + QA。你不做任何设计决策。**
 
-design-planner 把所有规格都写到 schema 了：styles 全量 / visualStates 全量 / materialSpec 全量。你的工作是：
-1. 照 materialSpec 画素材 + 应用到节点
+> ⚠️ **v3 ★ 修订**：v3 起仅"QA"——画素材职责已归 design-planner。
+
+design-planner 把所有规格都写到 schema 了：styles 全量 / visualStates 全量 / materialSpec 全量。你的工作是（**v2 视角**）：
+1. ~~照 materialSpec 画素材 + 应用到节点~~ → **v3 ★ 已归 design**
 2. 截图核对，看真实渲染和 design 意图是否一致
 3. integrity 终验，标 phase = verified
 4. 交付
 
+**v3 实际三职责**：① 截图 ② 截图与 design self-review.md / handover.md 对账找差异 ③ 0 差异时标 phase=verified；有差异创建 D-X-fix-* 任务退回 design-planner。
+
 如果发现 schema 里规格不全 → **退回上游**，不在本阶段补。
 
-### 5.2 核心工作流（旧版精华保留）
+### 5.2 核心工作流（v2 视角；v3 已退化）
 
 ```
-逐节点遍历 → 读节点 + 读 materialSpec → 调子技能 → 验证 → 回写 status
+v2: 逐节点遍历 → 读节点 + 读 materialSpec → 调子技能 → 验证 → 回写 status
+v3: 跑 generate_snapshots → 与 design 移交对账 → 0 差异 → phase=verified
 ```
 
-**红线**：
+**红线（v2 + v3 共有）**：
 - ❌ 不从 summary 推断规格（summary 是摘要不是精确值）
-- ❌ 不跳过 materialSpec 任何字段
+- ❌ 不跳过 materialSpec 任何字段（v3：不再画，但仍要读 spec 做核对参照）
 - ❌ 不一次性处理 10+ 节点才验证（小步快跑）
 - ❌ 不修 styles / events / 结构（那是上游的事）
 
-### 5.3 素材绘制流程（按 renderHint 分流）
+**v3 ★ 额外红线**：
+- ❌ 不调 material-painter（v3 已断绝）
+- ❌ 不写 node.styles 任何 background-* / props.src / materialProjectId
+
+### 5.3 素材绘制流程（v2 视角；**v3 已废止本流程**）
+
+> ⚠️ **v3 ★ 本节已废止**：素材绘制完整移交 design-planner（详 design-planner SKILL.md §1 创作权 6 + `references/methodology/12-material-painting-flow.md`）。executor v3 不执行任何 renderHint 分流。
+
+下方为 v2 历史描述，保留供 v2 兼容场景查阅：
 
 ```
 对每个有 materialSpec 的节点：
@@ -3169,27 +3235,45 @@ design-planner 把所有规格都写到 schema 了：styles 全量 / visualState
 
 ### 5.4 截图核对（视觉验证）
 
+> ⚠️ **v3 ★ 升级**：v3 的截图核对是 **5 维度逐项对账**（识别 / 层次 / 状态 / 契合 / 情绪），对照 design 的 self-review.md（5 维评分）。详 `.claude/skills/design-executor/references/methodology/02-snapshot-verification.md` + `references/note-templates/qa-diff.template.md`。
+
 每屏 / 每个素材节点完成后：
 
 ```
-1. generate_snapshots 截图
-2. 对照 screen.meta.design.summary + 各节点 meta.design.summary 检查
-   - 整体氛围对吗？
-   - 主角 CTA 视觉权重突出吗？
-   - 装饰节点过度抢戏吗？
-   - 与 design.palette 配色一致吗？
-3. 不一致：
-   - 是 styles 错？退回 design-planner
-   - 是 materialSpec 不够精确？退回 design-planner 补
-   - 是 executor 画素材出错？重画
-4. 一致 → meta.status.phase = verified
+v2 视角：
+  1. generate_snapshots 截图
+  2. 对照 screen.meta.design.summary + 各节点 meta.design.summary 检查
+     - 整体氛围对吗？
+     - 主角 CTA 视觉权重突出吗？
+     - 装饰节点过度抢戏吗？
+     - 与 design.palette 配色一致吗？
+  3. 不一致：
+     - 是 styles 错？退回 design-planner
+     - 是 materialSpec 不够精确？退回 design-planner 补
+     - 是 executor 画素材出错？重画                      ⛔ v3 ★ 改"退回 design-planner 重画"
+  4. 一致 → meta.status.phase = verified
+
+v3 视角（推荐）：
+  1. generate_snapshots 跑各 viewport / Frame 长图 / 各 visualState 截图
+  2. 对照 design self-review.md + handover.md 5 维度逐项打分：
+     - 识别（用户能立刻认出每个元素是干什么的吗？）
+     - 层次（主角 / 配角 / 工具 视觉权重对吗？）
+     - 状态（hover / pressed / disabled / loading / empty / error 都对吗？）
+     - 契合（theme intent.tone 与实际视觉一致吗？）
+     - 情绪（用户看了会有 design 想要的情绪反应吗？）
+  3. 不一致：v3 ★ 一律创建 D-X-fix-* 退回 design-planner（不亲自补）
+  4. 一致 → meta.status.phase = verified
 ```
 
 ### 5.5 写入 schema 的字段清单（精细到字段名）
 
-#### A. 节点级（仅这些是 executor 的产物）
+> ⚠️ **v3 ★ 重大变化**：v3 起 §5.5 A 段（素材应用 / materialProjectId）**全部归 design**——本节描述 v2 视角；v3 实际允许写的只有下方 §B 屏幕级 phase / ready / notes。
+
+#### A. 节点级（**v2 视角；v3 ★ 全部归 design，executor 不写**）
 
 ```jsonc
+// ⚠️ v3 ★ 整段 A 已归 design，executor 不再写——下方 v2 内容保留供历史查阅
+
 // 1. 素材应用结果（仅 renderHint=png 的节点）
 node.styles.backgroundImage:  "url('https://cdn.example.com/materials/abc-123.png')"
 // 或对 <img> 节点：
@@ -3233,21 +3317,28 @@ project.meta.plan 中相关任务全部 status=done
 
 #### D. 严格只能写这些字段（其余一律不动）
 
-| 字段 | 来源 | executor 是否可写 |
-|------|------|:-----------------:|
-| `node.styles.backgroundImage` / `props.src` | 素材应用 | ✅ |
-| `node.styles.backgroundSize/Position/Repeat` | 素材应用配套 | ✅（仅当 design 漏写时补 contain/center/no-repeat 默认值，并 notes 记录） |
-| `node.materialProjectId` | 素材工程绑定 | ✅ |
-| `node.meta.status.{phase, ready, notes}` | 完成度标记 | ✅ |
-| `screen.meta.status.*` | 屏终态 | ✅ |
-| **以上之外任何字段** | — | ❌ 退回上游 |
+> ⚠️ **v3 ★ 修订**：本表 v2 视角。v3 起 executor 不再写任何 styles / 不再写 materialProjectId（这些已归 design）。v3 实际允许写的只有底部 ✅ phase / ready / notes 三项。
 
-**禁止**：
+| 字段 | 来源 | executor 是否可写（v2） | v3 ★ |
+|------|------|:-----------------:|:-----:|
+| `node.styles.backgroundImage` / `props.src` | 素材应用 | ✅ | ⛔ **改 design 写** |
+| `node.styles.backgroundSize/Position/Repeat` | 素材应用配套 | ✅（仅当 design 漏写时补 contain/center/no-repeat 默认值，并 notes 记录） | ⛔ **改 design 写**（含全 9 项 background-*）|
+| `node.materialProjectId` | 素材工程绑定 | ✅ | ⛔ **改 design 写** |
+| `node.meta.status.{phase, ready, notes}` | 完成度标记 | ✅ | ✅ |
+| `screen.meta.status.*` | 屏终态 | ✅ | ✅ |
+| **以上之外任何字段** | — | ❌ 退回上游 | ❌ 退回上游 |
+
+**禁止（v2 + v3 共有）**：
 - ❌ 改 styles 任何非素材属性（color/font/padding/...）
 - ❌ 改 events / bind / repeat / visibleWhen
 - ❌ 改节点 type / name / 结构
 - ❌ 改 materialSpec（如发现 spec 有问题 → 退回 design-planner）
 - ❌ 改 ThemeConfig
+
+**v3 ★ 额外禁止**：
+- ❌ 调 material-painter 子技能（v3 已断绝；归 design）
+- ❌ 写 node.styles 任何 background-* / props.src / materialProjectId（v3 已归 design）
+- ❌ 自己补 design 漏的素材 → 必须创建 D-X-fix-* 任务退回 design-planner
 
 #### E. 截图核对的产物（仅作核对，不写 schema）
 
@@ -3265,32 +3356,50 @@ generate_snapshots → 拿到 PNG URL
 
 ### 5.6 工作流（任务驱动）
 
-每屏任务：
+> ⚠️ **v3 ★ 重写**：v3 起 executor 任务清单大幅简化（删 mat-* / svg-* / global-mat-* / inventory），新增 handover-check / qa-diff。详 `.claude/skills/design-executor/SKILL.md` §4 Phase 1。
+
+**v2 任务清单（已废止）**：
 
 ```
-E-X-mat-<nodeName>    每个 renderHint=png 的素材节点一个任务
-E-X-svg-<nodeName>    每个 renderHint=svg 的节点（如有）
-E-X-snapshot          本屏完整截图核对
-E-X-verified          本屏 phase 标记 + integrity 自检
+v2 每屏任务：
+  E-X-inventory            本屏素材清单识别
+  E-X-mat-<nodeName>       每个 renderHint=png 的素材节点一个任务
+  E-X-svg-<nodeName>       每个 renderHint=svg 的节点
+  E-X-snapshot             本屏完整截图核对
+  E-X-verified             本屏 phase 标记 + integrity 自检
+
+v2 项目级：
+  E-global-inventory       全局 overlays 内素材清单
+  E-global-mat-<overlay-node>  全局 overlays 内每个素材节点
+  E-global-snapshot        全局 overlays 截图核对
+  E-cross-screen           跨屏一致性核对
+  E-integrity              全项目 integrity 终验
+  E-snapshots              全屏完整截图集
+  E-handover               交付用户验收
 ```
 
-项目级：
+**v3 任务清单（实际跑的）**：
 
 ```
-E-global-mat-<overlay-node>   ★ 项目级 globalOverlays 内的每个素材节点
-E-global-snapshot             ★ 全局 overlays 在不同屏上的截图核对
-E-integrity                   全项目 integrity 终验
-E-snapshots                   全屏完整截图集
-E-cross-screen                跨屏一致性核对
-E-handover                    交付用户验收
+v3 每屏任务：
+  E-X-handover-check    ★ v3 新增：核对 design 移交（9 项 background-* / materialProjectId / self-review.md / handover.md）
+  E-X-snapshot          多 viewport / Frame 长图 / 各 visualState 截图
+  E-X-qa-diff           ★ v3 新增：截图与 design 5 维度对账（识别/层次/状态/契合/情绪）
+  E-X-verified          0 差异时标 phase=verified；有差异创建 D-X-fix-* 退回 design
+
+v3 项目级：
+  E-global-overlay-snapshot  全局 overlays 在不同屏上截图核对
+  E-cross-screen-snapshot    跨屏一致性核对
+  E-integrity                全项目 integrity 终验
+  E-snapshots                全屏完整截图集 + handover 给用户
 ```
 
 ### 5.7 入场 / 出场门禁
 
-| 时机 | 检查 |
-|------|------|
-| 入场 | 所有屏 phase = designed + integrity 0 error + 所有需要素材节点 materialSpec 完整 |
-| 出场 | 所有屏 + 节点 phase = verified + 全项目 integrity 0 error + 所有 png 素材已应用 + 截图核对通过 |
+| 时机 | v2 检查 | **v3 检查（实际）** |
+|------|---------|----------------------|
+| 入场 | 所有屏 phase = designed + integrity 0 error + 所有需要素材节点 materialSpec 完整 | 所有屏 phase = designed + integrity 0 error + **design 已自跑 painter 完成所有素材**（materialProjectId 全绑 + 9 项 background-* 全齐）+ design self-review.md / handover.md 已交付 |
+| 出场 | 所有屏 + 节点 phase = verified + 全项目 integrity 0 error + 所有 png 素材已应用 + 截图核对通过 | 所有屏 + 节点 phase = verified + 全项目 integrity 0 error + **5 维度对账全通过**（识别 / 层次 / 状态 / 契合 / 情绪）+ 跨 viewport 截图全通过 |
 
 ---
 
@@ -3318,7 +3427,7 @@ materialSpec.colorStrategy 也必须用 token：
 { value: "#FF6F91", role: "主体气泡" }
 ```
 
-executor 在画 png 素材前，`theme/get` 解析 token 拿真实色值给 material-painter。
+**v3 ★**：design-planner 在画 png 素材前，`theme/get` 解析 token 拿真实色值给 material-painter（v2 是 executor 做这件事）。
 
 ### 6.2 主题变更影响
 

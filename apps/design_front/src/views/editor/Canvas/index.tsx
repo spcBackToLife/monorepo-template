@@ -20,6 +20,7 @@ import {
   getPlacementParentRect,
   screenToContainerLogical,
   resolvePlacementParentElement,
+  ThemeConfigProvider,
   type CoordinateMap,
   type DrawBounds,
   type NodeRect,
@@ -656,18 +657,21 @@ export const Canvas = observer(function Canvas() {
                   transitionKey={screen.id}
                   transition={editorStore.previewTransition}
                 >
-                  <PreviewRenderer
-                    screen={screen}
-                    assets={editorStore.project?.componentAssets ?? []}
-                    onNavigate={handlePreviewNavigate}
-                    onNavigateBackRef={editorStore.previewNavigateBackRef}
-                    embedded
-                    staticAssetOrigin={getEditorStaticAssetOrigin()}
-                    env={editorStore.previewEffectEnv}
-                  />
+                  <ThemeConfigProvider themeConfig={editorStore.project?.themeConfig}>
+                    <PreviewRenderer
+                      screen={screen}
+                      assets={editorStore.project?.componentAssets ?? []}
+                      onNavigate={handlePreviewNavigate}
+                      onNavigateBackRef={editorStore.previewNavigateBackRef}
+                      embedded
+                      staticAssetOrigin={getEditorStaticAssetOrigin()}
+                      env={editorStore.previewEffectEnv}
+                    />
+                  </ThemeConfigProvider>
                 </TransitionAnimator>
               ) : (
                 <>
+                  <ThemeConfigProvider themeConfig={editorStore.project?.themeConfig}>
                   <SchemaRenderer
                     screen={screen}
                     assets={editorStore.project?.componentAssets}
@@ -709,6 +713,7 @@ export const Canvas = observer(function Canvas() {
                       画布为空：从左侧组件库拖入元素，或使用底部工具绘制
                     </div>
                   )}
+                  </ThemeConfigProvider>
                 </>
               )}
             </div>

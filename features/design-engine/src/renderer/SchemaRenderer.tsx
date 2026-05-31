@@ -13,6 +13,7 @@ import { mergeStateMaps } from '../styles/mergeStateMaps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContextProvider';
 import type { DataContext } from '../data/dataContext';
+import { useThemeConfig } from './ThemeConfigContext';
 import { buildScreenDataContext, buildEditorPreviewState } from '../data/dataContext';
 import { ListRenderer } from '../data/ListRenderer';
 import type { CoordinateMap } from '../overlay/coordinateMap';
@@ -239,6 +240,7 @@ function NodeRenderer({
   const dataContext = useDataContext();
   const vctx = useSchemaVirtualize();
   const staticOrigin = useStaticAssetOrigin();
+  const themeConfig = useThemeConfig();
 
   // Step 1: Resolve component instances
   const node = isComponentInstanceType(rawNode.type)
@@ -265,7 +267,7 @@ function NodeRenderer({
   }
 
   // Step 3: Resolve styles
-  const baseStyles = resolveNodeStyles(node, dataContext, interactionForNode, parentStateOverride);
+  const baseStyles = resolveNodeStyles(node, dataContext, interactionForNode, parentStateOverride, themeConfig);
   const isListContainer = node.repeat !== undefined;
   let reactStyles =
     rootNodeId && node.id === rootNodeId

@@ -22,13 +22,22 @@ product-analyst       写好 project.meta.styleDirection
        ↓
 interaction-designer  读 themeConfig.themes[active].tokens（不修改）
        ↓
-design-planner        所有 styles 必须 $token: 引用
+design-planner (v3)   所有 styles 必须 $token: 引用
+                      + v3 ★ 按 theme.intent.tone 选 8 主题词典 1 份（minimal/trustworthy/warm/playful/premium/clean/bold/natural）
+                      + v3 ★ 按 decorationRules.system 选 5 装饰系统 1 族（soft-glow/geometric-line/illustration/texture/organic-curve）
        ↓
-design-executor       素材绘制时按 themeConfig.themes[active].iconSpec 出图
+design-executor (v3)  退化为 QA 摄影师；仅核对 theme 一致性，不动 token
 ```
 
 **入场依赖**：`project.meta.styleDirection.summary` 非空（product 阶段已写）。
 **出场承诺**：`theme/validate` 返回 ok=true（R-THEME-01~10 全过）。
+
+> ⚠️ **v3 兼容性说明**：v3 起 design-planner 会按 `theme.intent.tone`（8 枚举）+ `decorationRules.system`（5 枚举）选词典/装饰系统。**theme-generator 出场时必须确保**：
+>
+> 1. `theme.intent.tone` ∈ ['minimal','trustworthy','warm','playful','premium','clean','bold','natural']（v3 ★ B6 代码改造将强制此枚举）
+> 2. `decorationRules.system` ∈ ['soft-glow','geometric-line','illustration','texture','organic-curve','none']
+>
+> 写错枚举 → design v3 找不到对应词典 / 装饰系统 → 视觉策略选不出来。详根目录 `STAGE-CONTRACT.md` 顶部 v3 修订摘要 + `B类代码改造补丁文档-2026-05-31.md` §B6。
 
 ## 3. 核心心智模型：主题 × 色彩方案二维（v1.0 重点）
 

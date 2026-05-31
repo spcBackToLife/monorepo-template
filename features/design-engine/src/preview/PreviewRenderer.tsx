@@ -16,6 +16,7 @@ import { resolveNodeProps, resolvePropsForRender } from '../styles/resolveProps'
 import { resolveComponentInstance } from '../assets/resolveInstance';
 import { DataContextProvider, useDataContext } from '../data/DataContextProvider';
 import { StaticAssetOriginProvider, useStaticAssetOrigin } from '../renderer/StaticAssetOriginContext';
+import { useThemeConfig } from '../renderer/ThemeConfigContext';
 import { rewriteMediaSrc, rewriteStyleObjectUrls } from '../assets/rewriteLocalAssetRefs';
 import type { DataContext } from '../data/dataContext';
 import { buildScreenDataContext, buildEditorPreviewState } from '../data/dataContext';
@@ -389,6 +390,7 @@ function PreviewNodeRenderer({
 }: PreviewNodeRendererProps) {
   const dataContext = useDataContext();
   const staticOrigin = useStaticAssetOrigin();
+  const themeConfig = useThemeConfig();
 
   const node = isComponentInstanceType(rawNode.type)
     ? resolveComponentInstance(rawNode, assets)
@@ -407,7 +409,7 @@ function PreviewNodeRenderer({
 
   if (visible === false) return null;
 
-  const baseStyles = resolveNodeStyles(effectiveNode, dataContext);
+  const baseStyles = resolveNodeStyles(effectiveNode, dataContext, null, null, themeConfig);
   const isListContainer = effectiveNode.repeat !== undefined;
   let reactStyles =
     rootNodeId && node.id === rootNodeId

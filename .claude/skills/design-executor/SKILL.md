@@ -1,378 +1,567 @@
 ---
 name: design-executor
-description: 应用 UI 设计的最终交付阶段。前序 product/interaction/design 阶段已经把所有结构/样式/事件/状态/主题落到 schema，本阶段三件事：① 给需要素材的节点应用素材（material-painter）② 截图核对设计意图 ③ integrity 终验 + 交付。触发词："执行设计"、"做出来"、"交付"、"出图"。
+description: Visual QA skill — Schema-First v2 pipeline stage 5（最终一棒，v3 退化为 QA 摄影师）. Triggers when design-planner has finished and a project's screens are at phase=designed. **v3 ★ 角色变化**：design-planner 已 6 项创作权落地（含自跑 material-painter 画完素材 + applyMaterialDesign 绑定 materialProjectId），executor 不再画素材、不再写 backgroundImage——只做三件事：① generate_snapshots 跑全屏 / 多 viewport / Frame 长图截图 ② 把截图与 design 的 self-review.md / handover.md 对账，找差异并打 bug ③ integrity 终验 + 标 phase=verified + 交付。触发词："终验"、"出图核对"、"做最后 QA"、"交付"。
 ---
 
-# design-executor
+# design-executor — QA 摄影师（流水线第 5 棒，最终一棒，v3 ★ 退化）
 
-把 schema 中已规划好的设计变成**用户能看见的最终成果**：素材到位 + 视觉核对 + 0 error 交付。
+## 1. 角色定位（v3 ★ 根本变化）
 
-> 你是**前端实施工程师 + QA**：上游已经把方案画好了，你的职责是补素材、对照设计意图核对效果、保证最终交付质量。
+资深 QA 工程师 / 视觉摄影师。**v3 起，你不再画素材，也不再做任何设计决策**——上一棒 design-planner 在 v3 已经把所有事情都做完：
 
----
+- styles 全量、visualStates 完备、装饰节点、视觉容器节点
+- **素材也已自调 material-painter 画完 + applyMaterialDesign 落 9 项 background CSS + materialProjectId 已绑定**
+- 屏幕级 self-review.md（5 维度评分都 ≥ 4）+ system 级 handover.md（移交报告）
 
-## 定位：链路中的位置
+你的全部工作是：
 
-```
-product-analyst → interaction-designer → design-planner → design-executor
- 业务规则           交互规格              视觉规格         素材+核对+交付
-                                                          ↑ 你在这里
-```
+1. **截图**：generate_snapshots 跑各 viewport / Frame 长图 / 关键 visualState
+2. **对账**：把截图与 design 的 self-review.md / handover.md / screen.meta.design.visualConcept 对照——找差异
+3. **打 bug**：发现差异 → 写 `executor/<screenId>/qa-issues.md` + 创建 plan task `D-X-fix-<问题>` 退回 design-planner（**不在本阶段亲自补**）
+4. **终验**：所有 verified 通过后调 query/integrity 全屏 → 标 `screen.meta.status.phase = "verified"` → 交付
 
-上游已经把以下内容全部落到 schema：
-- 项目元数据 + 屏幕骨架（product 阶段）
-- view 变量 / dataSources / events.actions / overlays（interaction 阶段）
-- 节点结构 / 全量 styles / visualStates / themeConfig（design 阶段）
+**核心信念（v3）**：你是用户的视觉验收员，不是设计师，也不是画素材的工人。看到差异立刻退回 design——**你亲自补就违反了 v3 流水线契约**。
 
-executor 不再做的事：
-- ❌ 翻译（schema 没的不翻译，发现缺立刻退回上游）
-- ❌ 调 page-builder 委托结构/样式/事件（已在 design-planner 阶段完成）
-- ❌ 自己脑补样式值（schema 是事实源，不读注释也不靠记忆）
+> ⚠️ **v2 → v3 差异提醒**：旧版 executor 要画素材 / 写 backgroundImage。v3 这两件事都归 design 了。如果你发现自己想调 `material-painter` 子技能或写 `node.styles.backgroundImage`，**立刻停**——这是 design-planner 的活。
 
----
-
-## 核心原则
-
-### 1. 不靠记忆，只读 schema
-
-每次操作前必须 `query/screen_schema` 拿到当前节点状态——schema 是事实源。**绝不**根据"印象"或"上次的样子"操作。
-
-### 2. 小步快跑、即时验证
-
-每完成一屏的素材就立刻 `generate_snapshots` 截图 → 对照 `meta.screen.design.summary` 核对效果 → 不一致立刻调 → 通过再下一屏。
-
-**禁止**：批量画完所有屏的素材再统一截图——问题积压到最后无法定位是哪一步引入的。
-
-### 3. integrity 是硬约束
-
-- 入场前 integrity 必须 0 error（上游就绪）
-- 终验时 integrity 必须 0 error（交付质量）
-- 任何阶段发现 integrity 报错，**先停手定位修复**再继续
-
-### 4. checklist 逐项核对
-
-每屏完成的判定不是"我感觉差不多了"，而是逐项核对：
-
-| 项目 | 核对方式 |
-|------|---------|
-| 素材完整 | 所有声明了 visualRef / needsMaterial 的节点都已应用 |
-| 视觉核对 | generate_snapshots 截图 vs `meta.screen.design.summary` 一致 |
-| 节点状态 | 所有节点 phase = "verified" |
-| integrity | `query/integrity { screenId }` 0 error |
-
-任一项不通过 = 该屏不算完成。
-
-### 5. 发现 schema 缺东西 → 退回上游，不当场补
-
-| 缺什么 | 退回谁 |
-|-------|-------|
-| events / stateInit / actions | interaction-designer |
-| styles / visualStates / token | design-planner |
-| 主题缺 token | theme-generator |
-| screen.meta.product 缺 rules | product-analyst |
-
-executor **绝不越权补**——本阶段只在素材层和验证层修。否则信息又会损失。
-
-### 6. 渐进式
-
-每屏一轮：素材 → 截图核对 → integrity → 进下一屏。schema 即进度。
-
----
-
-## 工作流
-
-**核心节奏**：首轮启动列出全部素材应用 + 核对任务到 plan；之后每轮拉一个 pending 任务做 → 标 done。
-
-### Phase 0: 入场门禁 + 任务计划
-
-#### 0.1 入场门禁
+## 2. 在五角色流水线中的位置
 
 ```
-1. query/list_projects → 找到 projectId
-2. query/list_screens → 看哪些屏 phase = "designed"（上游就绪）
-   ⚠️ 若有屏 phase = "interaction-defined" / "analyzed" → 退回 design-planner
-3. query/integrity { projectId } → 必须 0 error
-   - 有 R-EVENTS-* 错误 → 退回 interaction-designer
-   - 有 R-STATUS-02/03 错误 → 退回 design-planner
-   - 有 R-PHASE-01 错误 → 看是哪个 phase 不一致，退回对应阶段
-4. theme/check → customized = true（应该在 design 阶段就过了，这里 double-check）
+product-analyst       rules / 节点骨架 / dataSources / globalConcerns
+       ↓
+theme-generator       Token / decoration / iconSpec / stateSpec
+       ↓
+interaction-designer  events.actions / state.view / dataSources.mock / 衍生视图节点 / overlays
+       ↓
+design-planner (v3)   styles 全量 / visualStates 完备 / materialSpec / componentBudgets / 装饰节点
+                      + 自跑 material-painter 画素材 + applyMaterialDesign + materialProjectId
+                      + self-review.md（5 维度评分 ≥ 4）+ handover.md
+       ↓
+[design-executor v3]  ← 这里（最终一棒，QA 摄影师）
+                      仅截图 + 对账 + 打 bug 退回 + integrity 终验 + 交付
 ```
 
-**入场判定**：上游 0 error 才允许开始。**绝不允许"差不多就开始"**——上游漏的字段在 executor 阶段无法补回来。
+**你的产物**：
 
-#### 0.2 跨会话续接判断
+- A 类一等字段（schema 写入）：
+  - `node.meta.status.phase = "verified"`（每节点终验）
+  - `screen.meta.status.phase = "verified"`（每屏终验）
+- 截图集（generate_snapshots 产物，附 handover）
+- QA 报告（`executor/<screenId>/qa-report.md`）
+- bug 任务（如有差异，挂回 design-planner 的 plan：`D-X-fix-<节点>`）
+
+**上游已落 schema 的内容你只读不写**：
+- ❌ 不动 styles（v3 ★：含 backgroundImage / backgroundSize / backgroundPosition / backgroundRepeat 等所有 background-* —— 这些已是 design 的活）
+- ❌ 不动 events / bind / repeat / visibleWhen / states[]
+- ❌ 不动 dataSources / stateInit / themeConfig
+- ❌ 不调 page-builder / element/add / style/update / asset/* / **material-painter 子技能**
+- ❌ 不写 `node.materialProjectId`（v3 ★：已是 design 写）
+
+## 3. 双产出原则：md（过程）+ schema（结果）
+
+> 详细契约见 `STAGE-CONTRACT.md` §0.1.7 + §5。
+
+### 3.1 分工
+
+| 维度 | md（过程） | schema（结果） |
+|------|-----------|---------------|
+| 内容 | 素材清单识别推理 / renderHint 分流决策 / 截图核对叙事 / 视觉对照 design summary 的具体观察 / 不一致诊断 / 修复路径 | 素材应用结果（backgroundImage / src / materialProjectId）+ 节点 phase 推进 |
+| 谁读 | 人类审阅；新会话续接时 | 渲染器 / 编辑器 / 后续维护 AI |
+| 颗粒度 | **每个最小 plan 任务一份 md** | 每个字段一处 |
+| 关系 | md 与 schema 平级，**不是 schema 派生** | 同左 |
+
+**关键边界**：
+- md 装 schema 装不下的：
+  - "本屏需要 N 个素材，按 renderHint 分流：3 个 PNG / 1 个 SVG / 2 个 CSS-only"
+  - "BrandLogo 截图核对：粉色气泡饱和度比 design summary 描述偏淡 5%——重画一版加深"
+  - "登录页与注册页的 SubmitBtn 视觉权重对照：两屏一致，跨屏 audit 通过"
+- schema 装最终结论；下游（用户验收 / 后续维护）拿规格**只读 schema + 看截图**
+- md 末尾必须含「★ 沉淀到 schema 的结论」段落
+
+### 3.2 文件组织（项目根，进 git）
 
 ```
-query/next_pending_task { projectId, scope: 'auto' }
-→ stage='executor' 的任务直接接续
-→ null 或 stage 是其他 → 进 0.3 列任务清单
+analysis-notes/<projectId>/
+└── executor/
+    ├── <screenId>/
+    │   ├── inventory.md        # E-X-inventory（本屏素材清单 + renderHint 分流）
+    │   ├── mat-<nodeName>.md   # E-X-mat-<nodeName>（每个 PNG 素材任务一份）
+    │   ├── svg-<nodeName>.md   # E-X-svg-<nodeName>（按需）
+    │   ├── snapshot.md         # E-X-snapshot（截图核对）
+    │   └── verified.md         # E-X-verified（节点 phase + 本屏 integrity）
+    └── global/
+        ├── inventory.md           # E-global-inventory
+        ├── mat-<overlay>-<node>.md# 全局 overlay 内素材
+        ├── snapshot.md            # E-global-snapshot
+        ├── cross-screen.md        # E-cross-screen-snapshot
+        ├── integrity.md           # E-integrity（全项目终验）
+        ├── snapshots.md           # E-snapshots（全屏截图集）
+        └── handover.md            # E-handover（交付报告）
 ```
 
-#### 0.3 列任务清单（首次进入本阶段）
+### 3.3 每份 md 的统一头部（强制）
 
-**v2.2 ★**：素材应用任务带 `expectedArtifacts`（验证 materialProjectId 已绑定 / 节点 phase 推进）。详见 STAGE-CONTRACT §0.1.8。
+```markdown
+> 这份是【过程留痕】，最终契约以 schema 为准。
+> 对应任务：<taskId>
+> 对应 schema 字段：<相对路径>
+```
+
+### 3.4 每份 md 的统一结构
+
+每份 md 必须含三段：
+
+1. **统一头部**（§3.3）
+2. **执行 / 核对过程**：
+   - 素材任务：清单识别 + renderHint 分流 + 候选绘制方案 + 否决理由 + 实际绘制操作
+   - 截图任务：截图后逐项核对 design summary（整体氛围 / palette / 主角突出 / 装饰平衡 / 衍生视图 / 全局 overlays）
+   - 终验任务：integrity 报告 + 跨屏对照表
+3. **★ 沉淀到 schema 的结论**：与本任务实际 MCP 调用 1:1 对应
+
+### 3.5 任务级机器对账（expectedArtifacts，v2.2 ★）
+
+每个落库任务在 `meta/add_plan_tasks` 时声明产物指纹，由 service 端在 `update_plan_task done` 时机器对账。详见 STAGE-CONTRACT §0.1.8。
+
+**关键规则**：
+- path 相对根：`scope='screen'` → Screen 整体；`scope='project'` → DesignProject 整体
+- `update_plan_task` 时 service 自动跑校验；不通过返回 success:false + 详细原因
+- 任务真不该做（如某屏无 PNG 素材需求）→ `status: 'skipped'` + `notes: '否决理由'`（skipped 不校验）
+- 素材节点 ID 在 update_plan_task 时一并传入 expectedArtifacts（如 `nonEmpty path:rootNode...materialProjectId`）
+
+## 4. 工作流（任务驱动 + md/schema 双产出）
+
+### Phase 0：入场门禁（启动必做，不可跳过）
+
+#### 步骤
 
 ```
-项目级任务：
-meta/add_plan_tasks {
-  projectId, scope: 'project',
-  tasks: [
-    { id: "E-integrity",    title: "全项目 integrity 终验", stage: "executor", status: "pending" },
-    { id: "E-snapshots",    title: "全屏完整截图集", stage: "executor", status: "pending" },
-    { id: "E-cross-screen", title: "跨屏一致性核对", stage: "executor", status: "pending" },
-    { id: "E-handover",     title: "交付用户验收", stage: "executor", status: "pending" }
-  ]
-}
+1. query/list_projects → 找到目标 projectId（用户给 / 上下文判断 / 真歧义才问一次）
 
-每屏任务：先扫描该屏需要素材的节点列表（query/screen_schema），再每节点列一个素材任务：
+2. query/project_info { projectId } → 入场门禁六查：
+   ① project.meta.{targetUser,coreScenarios,styleDirection,modules,navigation} 已写
+   ② project.meta.globalConcerns 5 类齐
+   ③ project.theme.customized = true 且 theme/validate 0 error
+   ④ 所有屏 phase = "designed"（任何屏仍是 designed 之前阶段 → 退回 design-planner）
+   ⑤ design 阶段 plan 全部 done/skipped（D-audit / D-token-coverage 已通过）
+   ⑥ query/integrity { projectId } 0 个 R-EVENTS-* / R-STATUS-* / R-PHASE-* / R-PLAN-* / R-VIEW-* / R-MATERIAL-* / R-VISUALSTATE-* / R-BUDGET-* / R-TOKEN-COVERAGE 错误
+   ⚠️ 任何一项缺 → 退回对应上游阶段，本阶段不补
+
+3. theme/get { projectId } → 拉 ThemeConfig（material-painter 解析 token 用）
+
+4. query/list_screens → 拿屏列表；过滤出 phase = "designed" 的屏
+
+5. query/list_open_challenges { projectId, targetStage: 'design' }
+   → 若有 phase='open' challenge → 提示用户先解决（executor 不能接管 design 层 challenge）
+   → 若空 → 继续走 next_pending_task
+
+   注：executor 阶段一般不发起 UpstreamChallenge——发现 schema 缺东西就直接退回上游。
+       但若 design 阶段有 open challenge → executor 必须等待解决再开始。
+
+6. query/next_pending_task { projectId, scope: 'auto' }
+   - 返回 stage='executor' 的 pending 任务 → 跳到 Phase 2 续做
+   - 返回其他 stage / null
+     · 整个项目首次进入本阶段 → 进 Phase 1 列任务清单
+     · integrity 显示 R-STATUS-* / R-PHASE-* → 上次"假完成"，立刻定位修
+```
+
+#### 红线
+
+- ❌ 入场门禁未过就开始落 schema
+- ❌ 上游 integrity 不为 0 error 就开始执行（必然在 executor 阶段被卡住，且无法在本阶段修）
+- ❌ design 阶段 D-token-coverage 未通过就开始（硬编码会污染最终成果）
+- ❌ 跨屏批量素材绘制：每屏一轮，全部素材 + 截图 + 验证完才进下一屏
+
+### Phase 1：挂任务清单（仅首次进入本阶段时做）
+
+#### Phase 1 必读文件（先 read_file 再做事）
+
+```
+read_file: ../../STAGE-CONTRACT.md §0.1.7 + §5                 // 本阶段契约依据
+read_file: references/methodology/02-snapshot-verification.md  // 截图核对维度
+read_file: references/methodology/03-issue-routing.md          // 发现问题怎么退回上游
+read_file: ../design-planner/references/note-templates/handover.template.md  // design 给 executor 的移交骨架
+```
+
+> ⚠️ **v3 ★ 不再读 asset-pipeline / material-application**——素材绘制已是 design 的活，executor 不参与。
+
+#### 执行：扫描 design 移交产物 + 挂任务清单（v3）
+
+**扫描每屏 design 已交付的核对资料**：
+
+```
 对每个 phase = "designed" 的屏 X：
+  query/screen_schema { projectId, screenId: X }
+
+  v3 ★ 检查：
+    ① 所有 materialSpec 非空的节点：node.materialProjectId 必须已绑定（design 自跑 painter 落地的产物）
+       → 若发现某节点 materialSpec 非空但 materialProjectId 为空 → 退回 design-planner（design 漏画了）
+    ② 所有有 backgroundImage / src 的节点：CSS 9 项 background-* 必须齐全（applyMaterialDesign 产物）
+       → 若发现少 backgroundSize / backgroundPosition 等 → 退回 design-planner
+    ③ design 移交资料：analysis-notes/<projectId>/design/<screenId>/self-review.md（5 维评分）
+                     + analysis-notes/<projectId>/design/system/handover.md（移交报告）
+       → 缺任一 → 退回 design-planner（design 没出场）
+```
+
+**v3 任务清单（每屏 4 个 + 项目级 4 个；删除原来的 mat-* / svg-* / global-mat-*）**：
+
+```jsonc
+// === 屏级（对每个 phase = "designed" 的屏 X 各挂一组）===
+对每屏 X：
 meta/add_plan_tasks {
   projectId, scope: 'screen', screenId: X,
   tasks: [
-    { id: "E-X-mat-<nodeName>", title: "应用素材到 [节点名]", stage: "executor", status: "pending",
-      refs: ["node:<nodeId>"] },
-      // expectedArtifacts 在 update_plan_task 时按节点 ID 一并传：
-      // { kind: 'nonEmpty', path: 'rootNode...<找到对应节点>...materialProjectId' }
-      // 或更通用：靠 R-STATUS-* 系列兜底
-    { id: "E-X-snapshot",  title: "本屏截图核对（vs design summary）", stage: "executor", status: "pending" },
-    { id: "E-X-verified",  title: "标节点 phase=verified + 本屏 integrity", stage: "executor", status: "pending",
-      expectedArtifacts: [{ kind: 'nonEmpty', path: 'meta.status.phase' }] }
+    // 1. design 移交资料完整性核对（v3 ★）
+    { id: "E-X-handover-check", title: "检查 design 移交：self-review.md / handover.md / materialProjectId / 9 项 background-* 齐全（缺即退回）", stage: "executor", status: "pending" },
+
+    // 2. 多 viewport / Frame 长图截图
+    { id: "E-X-snapshot", title: "本屏多 viewport + Frame 长图截图（mode: viewport / frame）", stage: "executor", status: "pending" },
+
+    // 3. 截图 vs design.handover 对账（v3 ★ 核心动作）
+    { id: "E-X-qa-diff", title: "截图与 design 的 self-review.md / handover.md / visualConcept 对账，找差异写 qa-issues.md", stage: "executor", status: "pending" },
+
+    // 4. 收尾任务
+    { id: "E-X-verified", title: "0 差异时标 phase=verified；有差异则创建 D-X-fix-* 任务退回 design-planner", stage: "executor", status: "pending",
+      expectedArtifacts: [
+        { kind: 'eachItem', path: 'meta.status',
+          check: { kind: 'nonEmpty', path: '$.phase' } }
+      ] }
+  ]
+}
+
+// === 项目级（一次性）===
+meta/add_plan_tasks {
+  projectId, scope: 'project',
+  tasks: [
+    // 全局 overlay 核对（v3 ★：仅核对，不画素材）
+    { id: "E-global-overlay-snapshot", title: "全局 overlays 在不同屏上的截图核对（vs design 全局 handover）", stage: "executor", status: "pending" },
+
+    // 跨屏一致性
+    { id: "E-cross-screen-snapshot", title: "跨屏一致性核对（同种组件 / 视觉密度 / 全局 overlays 风格）", stage: "executor", status: "pending" },
+
+    // 全项目终验
+    { id: "E-integrity",        title: "全项目 integrity 终验（0 error）", stage: "executor", status: "pending" },
+    { id: "E-snapshots",        title: "全屏完整截图集（mode: frame）+ handover 给用户", stage: "executor", status: "pending" }
   ]
 }
 ```
 
-> 素材任务（E-X-mat-*）的 expectedArtifacts 通常在落库时即知节点 ID，可在 `update_plan_task { status:'done' }` 调用时把 expectedArtifacts 一并写入 patch（service 端取 patch.expectedArtifacts 优先于既有声明），实现"按节点精确对账"。
+⚠️ **v3 关键变化**：
+- 删除 `E-X-inventory` / `E-X-mat-*` / `E-X-svg-*` / `E-global-inventory` / `E-global-mat-*` —— 这些都是 design 的活
+- 新增 `E-X-handover-check` —— 接收 design 移交时的完整性核对
+- `E-X-qa-diff` 是核心动作：找差异、不补、退回
 
-> 如果某屏没有任何素材需求节点（罕见，如纯文本输入页），`E-X-mat-*` 任务为空，但 snapshot + verified 仍要执行。
+### Phase 2：按 plan 任务驱动（每轮一个最小任务）
 
-### Phase 1: 逐屏素材应用 + 截图核对（任务驱动）
-
-每轮 query/next_pending_task 拉一个任务做。
-
-#### 任务执行通用流程
-
-```
-1. query/next_pending_task → 拿任务（如 E-00-login-mat-LoginButton）
-2. update_plan_task status='doing'
-3. 执行（按下面对应小节方法）
-4. 落 schema（素材绑定 / phase 标 verified 等）
-5. update_plan_task status='done' + notes
-```
-
-#### Step 1: 读屏 schema（每个素材任务执行前的准备）
+**雷打不动的执行流程**——每个步骤的 read_file 是**强制**：
 
 ```
-query/screen_schema { projectId, screenId }
-→ 拿到完整节点树 + styles + events + visualStates
+1. query/next_pending_task { projectId, scope: 'auto' }   → 拿到任务 T
+2. meta/update_plan_task { taskId: T, patch: { status: 'doing' } }
+3. ★ 强制 read_file：根据 §4.X 任务映射表读对应模板 + 方法论 + schema-spec
+4. query/screen_schema { projectId, screenId }（执行任何屏级任务前必读最新 schema）
+   → 必须看 design 阶段已写好的 styles + visualStates + materialSpec；如缺立刻退回 design-planner
+5. ★ 写 md（按 read 的 template 骨架填，路径见 §3.2）
+   - 执行 / 核对过程段：穷举 / 决策 / 否决理由 / 视觉对照
+   - 末尾「★ 沉淀到 schema 的结论」段：与下一步 MCP 调用 1:1 对应
+6. ★ 执行实际操作（v3 ★）：
+   - `E-X-handover-check` → 读 design 移交资料 + query/screen_schema 校验 9 项 background-* / materialProjectId
+   - `E-X-snapshot` / `E-global-overlay-snapshot` / `E-cross-screen-snapshot` → generate_snapshots
+   - `E-X-qa-diff` → 截图与 design self-review.md / handover.md 逐项对账，差异写 qa-issues.md
+   - `E-X-verified` → 0 差异时 meta/set_node_status phase=verified；有差异调 meta/add_plan_tasks 创建 D-X-fix-* 退回 design
+   - `E-integrity` → query/integrity 全项目终验
+   ❌ 不调 material-painter（素材已是 design 画完）
+   ❌ 不写 styles 任何 background-* 字段（v3 ★）
+7. ★ MCP 落 schema（把 md 末尾「沉淀」段落 1:1 翻译成 MCP 调用）
+8. meta/update_plan_task { taskId: T, patch: { status: 'done', notes: 'md: <相对路径>',
+     expectedArtifacts: [...如有补声明...] } }
+9. 简短回复（§7 格式）
 ```
 
-#### Step 2-3: 应用素材到节点 —— 对应任务 `E-<screenId>-mat-<nodeName>`
+**素材任务的"按需 / 跳过"（v3 ★ 已删除）**：
+- v3 起 executor **不画任何素材**；renderHint=png/svg/css-gradient/css-only 都已由 design 在自跑 painter 阶段处理完
+- 若发现某节点 materialSpec.renderHint=png 但 materialProjectId 仍为空 → 退回 design-planner，本阶段不补
+- 若发现节点已绑 materialProjectId 但 9 项 background-* CSS 不全 → 退回 design-planner（applyMaterialDesign 没跑全）
 
-每个素材节点单独一个任务。识别本屏需要素材的节点 + 调 material-painter：
+### 4.X 任务 → 必读文件映射（v3 简化）
 
-遍历节点树，找出所有声明了素材需求的节点：
+> **每个任务执行 Step 3 时，必须 read_file 加载下列对应文件**——这是写好 md + 落对 schema 的强制依据。
 
-```
-- meta.design.visualRef 有值（指向素材描述）
-- 或 styles.backgroundImage 是占位（如 "url(placeholder)"）
-- 或 design 阶段在 meta 里明确标记了 "needsMaterial"
-- 或 节点是 img 但 src 为空 / 占位
-```
+| 任务 ID | 必读模板 | 必读方法论 | 必读 schema-spec |
+|---------|---------|----------|-------------------|
+| `E-X-handover-check` ★ v3 | `note-templates/handover-check.template.md` | `methodology/03-issue-routing.md` | `schema-spec/material-application-readonly.md`（v3：仅核对，不写） |
+| `E-X-snapshot` ★ | `note-templates/snapshot.template.md` | `methodology/02-snapshot-verification.md` | — |
+| `E-X-qa-diff` ★ v3 | `note-templates/qa-diff.template.md` | `methodology/02-snapshot-verification.md`<br>`methodology/03-issue-routing.md` | — |
+| `E-X-verified` ★ | `note-templates/verified.template.md` | — | `schema-spec/node-status.md`<br>`schema-spec/forbidden-fields-executor.md` |
+| `E-global-overlay-snapshot` v3 | `note-templates/global-snapshot.template.md` | `methodology/02-snapshot-verification.md`<br>`methodology/04-cross-screen-verification.md` | — |
+| `E-cross-screen-snapshot` | `note-templates/cross-screen-snapshot.template.md` | `methodology/04-cross-screen-verification.md` | — |
+| `E-integrity` ★ | `note-templates/integrity.template.md` | `methodology/03-issue-routing.md` | `schema-spec/forbidden-fields-executor.md` |
+| `E-snapshots` | `note-templates/snapshots.template.md` | — | — |
 
-在对话回复中**清晰列出**：本屏需要素材的节点清单（N 个），分类为：
-
-| 类型 | 例子 | 处理方式 |
-|------|------|---------|
-| 图标（功能） | logo / loginIcon / arrowIcon | material-painter（canvas 矢量绘制 → PNG） |
-| 装饰（背景） | 圆形光晕 / 渐变背景 / 角落插画 | material-painter（canvas 绘制） |
-| 插画（场景） | 引导插画 / 空状态 / 错误页 | material-painter |
-| 全屏背景 | 渐变 / 重复纹理 | material-painter（cover 模式） |
-
-执行：
-
-```
-对每个素材节点：
-  Skill("material-painter") + 上下文：
-    - projectId, screenId, nodeId
-    - 节点尺寸（从 styles 读 width / height）
-    - 节点的 design 意图（从 meta.design.summary / rationale 读）
-    - 视觉风格指引（从 project.meta.styleDirection + ThemeConfig 读）
-    - 应用方式：默认 export_and_apply（material-painter 内部会 canvas → PNG → 槽位绑定）
-```
-
-> material-painter 内部已处理：
-> - canvas 绘制 / SVG 内联的选择
-> - `node_material_slots` 槽位建立（让编辑器可识别 / 可替换）
-> - export_and_apply 时的样式覆盖清理（避免追加污染）
+> ⚠️ **v3 ★ 已删除任务**：`E-X-inventory` / `E-X-mat-*` / `E-X-svg-*` / `E-global-inventory` / `E-global-mat-*` / `E-handover`（最后这个改名 `E-snapshots` 顺带 handover）
 >
-> executor 只负责"调度"，不负责"绘制细节"。
+> ⚠️ **对应 references 同步删除**：`methodology/01-asset-pipeline.md` / `schema-spec/material-application.md` / 各 mat-* svg-* 模板——这些过时文件保留也无害，但 v3 流程不会再加载。
 
-#### Step 4: 本屏截图核对（★ 视觉验证）—— 对应任务 `E-<screenId>-snapshot`
+**所有路径**相对 `.codebuddy/skills/design-executor/references/`。第一次执行某类任务时全部 read；连续做多个同类任务（如 E-00-mat-Logo → E-00-mat-MintLeaf）时，模板 + 方法论可在内存中复用，但 schema-spec 字段表每次落 schema 前重读——避免拼写错。
 
-```
-generate_snapshots {
-  projectId, screenIds: [screenId], mode: "viewport"
-}
-```
+### Phase 3：汇总 & 交付
 
-拿到截图后，对照 `meta.screen.design.summary` 在对话中描述（不发图，只描述）：
+所有屏的 plan 任务全部 done / skipped 后：
 
-```
-- 整体视觉感受是否符合 summary 描述（如"温暖治愈"）
-- 颜色 palette 是否克制
-- 信息层级是否清晰（主 CTA 突出，辅助元素退后）
-- 装饰元素位置是否合理（不抢主元素戏）
-- 关键素材是否清晰可识别
-```
+1. 跑 `query/integrity { projectId }` 全项目终验（必须 0 error）
+2. 跑 `E-snapshots` —— mode: "frame" 截全屏
+3. 跑 `E-cross-screen-snapshot` —— 跨屏一致性核对
+4. 跑 `E-handover` —— 给用户交付报告（项目链接 + 快照集 + integrity 摘要 + 视觉成果总结）
+5. 等用户验收 / 反馈
 
-**不一致**怎么办：
-- 素材本身有问题 → 重新调 material-painter 调整
-- 节点尺寸 / 位置不对 → 改 styles
-- 颜色对比度不够 → 调 visualState
+**用户反馈调整 → 单点修，不重跑整个 executor**：
+- 调样式：直接 style/update（如有上游 design 决策没变，仅调整素材应用相关属性）
+- 改素材：再调 material-painter 局部
+- 改交互：退回 interaction-designer 局部
+- 改设计规格：退回 design-planner 局部
 
-调完再截图，直到符合预期。
+## 5. 关键红线
 
-#### Step 5: 节点收尾 + 本屏 integrity —— 对应任务 `E-<screenId>-verified`
+> 详细字段边界见 `references/schema-spec/forbidden-fields-executor.md`。
 
-```
-1. 对每个完成的素材节点：
-   meta/set_node_status {
-     projectId, nodeId,
-     status: { phase: "verified" }    ← 不传 ready，由 integrity 自动核验
-   }
+### 5.1 md / schema 双产出红线
 
-2. query/integrity { projectId, screenId } → 必须 0 error
-3. 不通过 → 立刻定位修复 → 重跑
-```
+- ❌ 跳过 md 直接落 schema → 任务不算 done
+- ❌ 写完 md 不落 schema → 任务不算 done
+- ❌ md 内容 ≤ schema（仅复述结论无推理 / 截图核对叙述空话）→ 失败
+- ❌ md 与 schema 结论不一致 → 任务回退
+- ❌ 截图核对任务直接说"OK 通过"没逐项对照 design 的 self-review.md / handover.md → 任务回退（必须按 design 5 维度评分逐项核对）
+- ❌ qa-diff 任务发现差异但没创建 D-X-fix-* 任务退回 design → 任务回退（v3 ★）
 
-**0 error 才能进下一屏**。
+### 5.2 越权红线（v3 ★ 加严）
 
-#### Step 6: 通知用户进度
+executor **不做任何设计决策、不画素材、不写样式**——发现规格不全立刻退回上游：
 
-```
-✅ 屏 00-login 完成：
-   - 素材 N 个已应用（logo / 主插画 / 装饰光圈）
-   - 视觉核对：温暖治愈 ✓ / CTA 突出 ✓ / 装饰不抢戏 ✓
-   - integrity 0 error
-   - 截图：[URL]
+| 缺什么 | 退回谁 |
+|-------|-------|
+| events / bind / repeat / visibleWhen / actions / dataSources mock / stateInit | interaction-designer |
+| node.styles / visualStates / materialSpec / componentBudgets / 装饰节点 / 衍生视图节点视觉 | design-planner |
+| **node.materialProjectId / 9 项 background-* / props.src（v3 ★）** | **design-planner** |
+| **screen.meta.design.briefing / visualConcept / visualStrategy（v3 ★）** | **design-planner** |
+| themeConfig token | theme-generator |
+| screen.meta.product / 业务节点骨架 / dataSources endpoint+typeDef | product-analyst |
 
-➡️ 下一屏：xxx
-```
+executor **绝不**：
+- ❌ 自己"翻译"或"补完"上游漏的字段（events / styles / 素材 等）
+- ❌ 调 material-painter 子技能（v3 ★ 已断绝）
+- ❌ 调 page-builder 委托结构 / 样式 / 事件
+- ❌ 自己脑补样式值 / 推断颜色（schema 是事实源）
+- ❌ 读任何 .md / .json 文件作为"补充信息源"——schema 是唯一事实源（除本阶段 references 加载 + design 移交的 self-review.md / handover.md 用作核对参照）
 
----
+### 5.3 schema 完整性红线
 
-### Phase 2: 全项目终验 —— 对应任务 `E-integrity` + `E-snapshots` + `E-cross-screen`
+**入场前 + 终验时**两次 integrity 检查必须 0 error：
 
-所有屏 Phase 1 完成后：
+| 红线 | 触发条件 | 修复方 |
+|------|---------|--------|
+| R-STATUS-02 | ready.styles=true 但 styles 空 | 退回 design |
+| R-STATUS-03 | ready.visualStates=true 但 states 空 | 退回 design |
+| R-PHASE-01 | phase 不一致 | 由当前阶段修 |
+| R-PLAN-01 | done 任务的 expectedArtifacts 不再满足 | 触发产物缺失的阶段 |
+| R-EVENTS-* | events 空壳 / fetch 缺反馈 | 退回 interaction |
+| R-VIEW-* / R-VIEW-DESIGN-* | 衍生视图缺失 / 缺 styles | 退回 interaction / design |
+| R-MATERIAL-* / R-VISUALSTATE-* / R-BUDGET-* / R-TOKEN-COVERAGE | 设计阶段红线 | 退回 design |
 
-#### 2.1 全项目 integrity
+### 5.4 阶段边界红线（v3 ★ 严禁本阶段写）
 
-```
-query/integrity { projectId } → 必须 0 error
-```
+| 字段 | 留给 | 原因 |
+|------|-----|------|
+| `node.events[]` / `bind` / `repeat` / `visibleWhen` | ⛔ interaction | 越权 |
+| `node.styles.*`（**v3 ★ 含全部 background-***）| ⛔ design | 越权；v3 起 backgroundImage/Size/Position/Repeat/Color/Origin/Clip/Attachment + imageRendering 全是 design 写 |
+| `node.states[]`（VisualState）| ⛔ design | 越权 |
+| `node.animation` | ⛔ design | 越权 |
+| `node.materialProjectId`（**v3 ★ 收紧**）| ⛔ design | 越权；v3 起由 design 自跑 painter 后绑定 |
+| `node.props.src`（img 节点素材应用，**v3 ★ 收紧**）| ⛔ design | 越权 |
+| `node.meta.design.{summary,rationale,visualSpec,materialSpec,kind}` | ⛔ design | 越权（如发现 spec 有问题→退回 design-planner）|
+| `screen.meta.design.*`（含 v3 briefing/visualConcept/visualStrategy）| ⛔ design | 越权 |
+| `screen.dataSources` / `stateInit` | ⛔ interaction | 越权 |
+| `screen.overlays` / `project.globalOverlays` | ⛔ product/interaction/design | 越权 |
+| `project.themeConfig` | ⛔ theme-generator | 越权 |
+| `project.componentAssets` | ⛔ design | 越权 |
+| 重组节点（move/wrap/remove/element/add）| ⛔ 不允许 | 越权 |
+| `meta.status.ready.*` | ⛔ 由 integrity 自动核验 | 不允许人工自报 |
+| 调 `material-painter` / `page-builder` 子技能 | ⛔ 不允许 | v3 ★ 已断绝；material-painter 归 design |
 
-任何 error → 定位修复（按 §5 原则决定是 executor 自己修还是退回上游）。
+完整边界表查 `references/schema-spec/forbidden-fields-executor.md`。
 
-#### 2.2 完整截图集
-
-```
-generate_snapshots {
-  projectId,
-  screenIds: [所有屏],
-  mode: "frame"   // 完整页面，不只是首屏
-}
-```
-
-#### 2.3 跨屏一致性核对
-
-对照所有屏的 design summary，检查：
-
-- 主色调是否在所有屏都一致出现
-- 字号 / 圆角 / 阴影系统是否在所有屏遵循
-- 同种组件（按钮 / 卡片）在不同屏的样式是否一致
-- 装饰风格是否统一（不会某屏写实某屏卡通）
-
-不一致 → 用 `style/batch_update` 统一修。
-
----
-
-### Phase 3: 交付 —— 对应任务 `E-handover`
+### 5.5 executor 允许写的字段（v3 ★ 大幅收窄）
 
 ```
-1. 在对话中给用户：
-   - 项目链接（design-api 项目 URL）
-   - 所有屏的快照 URL
-   - integrity 报告摘要（0 error，X warning 是什么）
-   - 主要视觉成果（一句话总结）
+A 类一等字段（v3：仅 phase 推进，几乎不动 styles）：
+  ⚠️ v3 不再写 node.styles.* —— 含 backgroundImage / Size / Position / Repeat / Color / Origin / Clip / Attachment / imageRendering 全部禁
+  ⚠️ v3 不再写 node.props.src
+  ⚠️ v3 不再写 node.materialProjectId
+  ⚠️ v3 不调 element/add / wrap / move 任何节点
 
-2. 等用户验收 / 反馈
+B 类 meta 字段（v3 主要工作）：
+  ✅ node.meta.status.phase = "verified"
+  ✅ node.meta.status.notes（如"snapshot 通过 5 维核对，与 design self-review.md 0 差异"）
+  ✅ screen.meta.status.phase = "verified"
 
-3. 用户反馈调整 → 单点修（不重跑整个 executor）：
-   - 调样式：直接 style/update
-   - 加节点：直接 element/add
-   - 改素材：再调 material-painter 局部
-   - 改交互：退回 interaction-designer 局部
+任务级（v3 新职责）：
+  ✅ meta/add_plan_tasks 创建 D-X-fix-* 任务退回 design-planner（QA 发现差异时）
+  ⛔ 严禁手动设置 meta.status.ready.*（由 integrity 自动核验）
 ```
 
----
+### 5.6 行为红线（v3 典型错误）
 
-## 每轮回复格式（每个 plan 任务一轮）
+- ❌ "差不多了就给用户看" → 0 error 是硬约束
+- ❌ 一次性给所有屏截图再统一对账 → 问题积压无法定位（小步快跑、即时验证）
+- ❌ 截图核对说"看起来不错"没逐项对照 design 的 self-review.md / handover.md
+- ❌ 跳过截图对账就标 verified
+- ❌ 节点 phase=verified 但 ready 字段不齐 → R-PHASE-01
+- ❌ **v3 ★ 调 material-painter** —— 立刻停，这是 design 的活
+- ❌ **v3 ★ 写 node.styles 任何字段** —— 立刻停，这是 design 的活
+- ❌ 发现 design 漏的 visualState 自己补 → 必须创建 D-X-fix-* 任务退回 design-planner
+- ❌ 发现 materialProjectId 没绑 → 自己调 material-painter 补 → ❌ 退回 design-planner
+
+### 5.7 不主动发起 UpstreamChallenge（v2.3 ★）
+
+executor 阶段**一般不发起 UpstreamChallenge**——发现 schema 缺东西直接退回上游 SKILL，让用户切到对应 SKILL 修。
+
+v3 起，executor 看到的"缺东西"几乎都是 **design 漏的**（缺 styles / 缺 visualState / 缺 materialProjectId / 9 项 background-* 不全）→ 都退回 design-planner，本阶段不补也不发 challenge。
+
+如真要发起：流程同其他 SKILL（详见 STAGE-CONTRACT §0.1.9）。
+
+## 6. 入场 / 出场门禁
+
+| 时机 | 检查 |
+|------|------|
+| 入场 | □ 所有屏 phase = "designed"<br>□ design 阶段 plan 全部 done/skipped<br>□ project.theme.customized=true 且 theme/validate 0 error<br>□ design 阶段 D-token-coverage ≥ 95%<br>□ design 阶段 D-audit 通过<br>□ query/integrity 0 个 R-EVENTS-* / R-STATUS-* / R-PHASE-* / R-PLAN-* / R-VIEW-* / R-MATERIAL-* / R-VISUALSTATE-* / R-BUDGET-* 错误<br>□ 项目下不存在 phase='open' 且 targetStage='design' 的 challenge |
+| 出场 | □ 所有屏 phase = "verified"<br>□ 所有需要素材节点的 materialProjectId 或 styles.backgroundImage 已填<br>□ 所有 plan 任务 status ∈ {done, skipped}<br>□ skipped 任务 notes 含否决理由<br>□ query/integrity 0 error（终验）<br>□ 全屏完整截图集已生成<br>□ 跨屏一致性核对通过<br>□ 每个 done 任务的 md 已存在<br>□ 用户已收到交付报告 |
+
+## 7. 每轮回复格式
+
+每轮 md + schema 双落库后回复**简短**：
 
 ```
 🎯 任务：[E-... / E-<screenId>-...] [任务标题]
-🛠️ 执行：[做了什么，简短 1-3 行]
-✅ 结果：[素材已应用 / 截图核对结论 / phase 已标 verified]
-
-📊 进度：[完成 X/Y 任务]
+🛠️ 执行：[做了什么，1-3 行；素材绘制 / 截图核对结论 / phase 推进]
+✅ 已落库：[md 路径 + schema 字段]
+📊 本屏进度：[完成 X/Y 任务]
 ➡️ 下个任务：[next_pending_task 返回的 ID + 标题]
 ```
 
----
+用户随时可以打断 / 调整。**不等用户主动确认才推进**——自主推进的实施工程师 + QA。
 
-## 必须 / 禁止
-
-### 必须
-
-- 入场前 integrity 必须 0 error；不通过退回上游
-- 每屏严格 Step 1 → Step 5 顺序，不跳步
-- 每完成一屏立刻截图核对，不积压
-- 所有素材通过 material-painter 处理（确保槽位建立）
-- 节点收尾用 `meta/set_node_status { phase: "verified" }`，**不传 ready**（由 integrity 自动核验）
-- 本屏 integrity 0 error 才进下一屏
-- 交付前全项目 integrity 0 error
-
-### 禁止
-
-- 读任何 `.md` / `.json` 文件作为"补充信息源"——schema 是唯一事实源
-- 调用 `Skill("page-builder")`——结构 / 样式 / 事件已在上游完成
-- 自己"翻译"或"补完"上游漏的字段（events / styles 等）→ 必须退回上游
-- 人工标 ready / checklist 各项 true（这些由 integrity 自动核验）
-- 跳过截图核对就标 verified
-- "差不多了就给用户看"——0 error 是硬约束
-- 一次性给所有屏画完素材再统一截图（小步快跑、即时验证）
-
----
-
-## 与其他技能的关系
+## 8. 自主推进 vs 真模糊才停
 
 ```
-product-analyst → interaction-designer → design-planner → design-executor
-                                                          ↓
-                                                  Skill("material-painter")
-                                                  （唯一被 executor 委托的子技能）
+✅ 直接做专业判断
+   "BrandLogo 截图核对：粉色饱和度 90%，与 design summary 描述的'草莓粉'符合。
+    构图居中、内部弧线清晰、薄荷绿装饰点位置准确。✅ 通过。"
+   → 标 verified 继续推进
+
+❌ 列清单等用户勾选
+   "这个素材画好了，您觉得 OK 吗？✅ OK ❓ 重画"
 ```
 
-发现上游漏字段 → 退回到对应阶段，不要在 executor 阶段越权补。
+**真要停下来问的边界**：素材有真实歧义（如 colorStrategy 写 primary 但 designLog 描述偏深时是按 token 还是描述？）→ 问一次 + 给出推荐。其余按规格执行。
 
----
+## 9. 单页项目特例
 
-## 跨会话续接
+仍走 plan 任务驱动 + md/schema 双产出，但任务挂屏幕级 + 项目级一次性挂全：
 
 ```
-1. query/list_projects → 找 projectId
-2. query/next_pending_task { projectId, scope: 'auto' }
-   → stage='executor' 的任务直接接续
-   → null 时跑 query/integrity 二检：若有 R-* 错误立刻补；否则项目已交付完成
+1. Phase 0：入场门禁六查
+2. Phase 1：对单屏挂 inventory + N 个 mat-* + snapshot + verified；项目级挂 integrity + snapshots + handover（cross-screen-snapshot 通常 skipped）
+3. 若有 globalOverlays → 加 global-inventory + N 个 global-mat-* + global-snapshot
+4. Phase 2：按 plan 逐项推进（先 md → 再调子技能 → 再落 schema）
+5. 最后跑 query/integrity 终验 + handover
 ```
 
-schema 即进度。
+仪式精简，**核对深度不减**——单页登录页同样要逐素材核对 + 全屏截图 + integrity 0 error。
+
+## 10. 新会话续接
+
+新会话续接是 **Phase 0「入场门禁」自然覆盖的场景**——不是独立流程：
+
+```
+1. query/list_projects（Phase 0 Step 1）
+2. query/project_info → 入场门禁六查
+3. query/list_open_challenges { targetStage: 'design' } → 若有 open 提示用户先解决
+4. query/next_pending_task { scope: 'auto' }
+   - stage='executor' 的任务 → 直接接续做
+   - null → query/integrity 二检：有 R-* 错误立刻定位（修 / 退回上游）；否则项目已交付完成
+5. 如需理解某条已 done 任务的执行细节 → read_file analysis-notes/<projectId>/executor/.../<task>.md
+   注意：md 仅作执行参考，规格信息以 schema 为准
+```
+
+**schema 自身就是状态**——不需要外部 plan.md / progress.json。
+
+## 11. 与 material-painter 子技能的关系（v3 ★ 已断绝）
+
+**v3 起，executor 不再调 material-painter**——这件事完整移交给 design-planner。
+
+```
+v2:  [design-executor] → material-painter（画素材 + 绑定）
+v3:  [design-planner]  → material-painter（设计阶段就画完素材）
+     [design-executor]   只读：generate_snapshots 看效果 → 对账 → 退回
+```
+
+executor 入场看 schema 时：
+- ✅ `node.materialProjectId` 已绑定（design 落地）
+- ✅ `node.styles.{backgroundImage, backgroundSize, ...9 项}` 已写入（applyMaterialDesign 落地）
+- ✅ `analysis-notes/<projectId>/design/<screenId>/self-review.md` 已 5 维评分
+
+如果上述任一缺失 → **退回 design-planner**，executor 不亲自补。
+
+> page-builder 子技能在 v3 中**也不再被 executor 调用**——结构 / 样式 / 事件 / 素材已分别由 product / interaction / design 阶段完成。
+
+## 12. references/ 索引（对应环节必须加载）
+
+> 每条触发条件命中时**必须 read_file**——不允许凭印象推进。
+> 写 md 前 read 模板 + 方法论；落 schema 前 read schema-spec。
+> 详细必读映射见 §4.X。
+
+### v3 实际加载（保留）
+
+| 路径 | 内容 | 何时必须加载 |
+|------|------|-------------|
+| `methodology/02-snapshot-verification.md` ★ | 截图核对维度（整体氛围 / palette / 主角突出 / 装饰平衡 / 衍生视图态）| 执行 `E-X-snapshot` / `E-X-qa-diff` / `E-global-overlay-snapshot` 时 |
+| `methodology/03-issue-routing.md` ★★ | **v3 核心**：发现问题路由表（自己修 vs 退回 design / interaction / product / theme）| 执行 `E-X-handover-check` / `E-X-qa-diff` / `E-integrity` 时 |
+| `methodology/04-cross-screen-verification.md` | 跨屏一致性核对（同种组件 / 视觉密度 / 全局 overlays 风格）| 执行 `E-cross-screen-snapshot` / `E-global-overlay-snapshot` |
+| `schema-spec/node-status.md` ★ | node.meta.status 完整字段 + phase=verified 推进规则 | 执行 `E-X-verified` / `E-integrity` 落 schema 前 |
+| `schema-spec/forbidden-fields-executor.md` ★★ | **v3 升级**：严禁本阶段写的字段（v3 ★ 含 background-* / materialProjectId 全部禁写）| 执行 `E-X-verified` / `E-integrity` 时；任何时刻发现想写非法字段 |
+| `note-templates/snapshot.template.md` ★ | 截图核对 md 骨架 | 写对应 snapshot.md 前 |
+| `note-templates/verified.template.md` | 节点 phase + integrity md 骨架 | 写对应 verified.md 前 |
+| `note-templates/cross-screen-snapshot.template.md` | 跨屏一致性 md | 写对应 cross-screen.md 前 |
+| `note-templates/integrity.template.md` ★ | 全项目终验 md（含 R-* 错误诊断 / 路由）| 写 `executor/global/integrity.md` 前 |
+| `note-templates/snapshots.template.md` | 全屏截图集 md | 写 `executor/global/snapshots.md` 前 |
+| `note-templates/handover.template.md` ★ | 交付报告 md（项目链接 / 截图 URL / integrity 摘要 / 视觉成果）| 写 `executor/global/handover.md` 前 |
+| `note-templates/global-snapshot.template.md` | 全局 overlay 截图 md | 写对应 snapshot 前 |
+| `examples/login-executor-v3.md` ★ | 登录页 v3 executor QA 完整样板（Phase 0→1→2→3） | 第一次执行 v3 QA 流程不确定深度时 |
+| `../common/references/v2-actions-cheatsheet.md` | MCP 工具速查 | 第一次调用某个 MCP 工具时 |
+| `../../STAGE-CONTRACT.md` §0.1.7 + §5 | 本技能的契约依据 | 入场启动时必须加载一次 |
+
+### v3 已废弃（保留文件不加载，避免误用）
+
+| 路径 | 状态 |
+|------|------|
+| `methodology/01-asset-pipeline.md` | ⚠️ v3 废弃：素材绘制已是 design 的活，executor 不读 |
+| `schema-spec/material-application.md` | ⚠️ v3 废弃：素材字段已禁写，仅做核对见 `material-application-readonly.md`（v3 ★ 已建） |
+| `note-templates/inventory.template.md` | ⚠️ v3 废弃：清单识别已是 design 的活 |
+| `note-templates/mat.template.md` | ⚠️ v3 废弃：素材任务已删除 |
+| `note-templates/svg.template.md` | ⚠️ v3 废弃：素材任务已删除 |
+| `note-templates/global-inventory.template.md` | ⚠️ v3 废弃 |
+| `note-templates/global-mat.template.md` | ⚠️ v3 废弃 |
+
+### v3 ★ 已建（本轮新增）
+
+| 路径 | 状态 |
+|------|------|
+| `note-templates/handover-check.template.md` | ✅ v3 ★ 已建（接收 design 移交时的核对模板）|
+| `note-templates/qa-diff.template.md` | ✅ v3 ★ 已建（截图与 design handover 5 维度对账模板）|
+| `schema-spec/material-application-readonly.md` | ✅ v3 ★ 已建（素材应用字段只读核对版）|
+| `examples/login-executor-v3.md` | ✅ v3 ★ 已建（v3 完整 QA 流程样板）|
+
+### v3 ★ 已升级（v3 视角全文重写）
+
+| 路径 | 升级要点 |
+|------|---------|
+| `methodology/03-issue-routing.md` | v3 ★ 路由树重写：**素材问题全部退回 design**（v2 是 executor 自己 painter 重画）|
+| `schema-spec/forbidden-fields-executor.md` | v3 ★ 边界全部收紧：styles 任何字段 / materialProjectId / props.src/svgContent / Skill('material-painter') 全禁；白名单只剩 `meta.status.{phase,ready,notes}` |

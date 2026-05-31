@@ -26,12 +26,17 @@ theme-generator        读 project.meta.styleDirection
        ↓
 interaction-designer   读 rules / 骨架 / dataSources / globalConcerns
        ↓
-design-planner         在骨架上补 styles / visualStates / 装饰节点
+design-planner (v3)    在骨架上补 styles / visualStates / 装饰节点
+                       + v3 ★ 6 项创作权（视觉概念/策略/任务自创/布局调整/装饰/素材绘制）
+                       + v3 ★ 自跑 material-painter 画素材 + applyMaterialDesign + materialProjectId
        ↓
-design-executor        实施素材 + 截图核对 + 终验
+design-executor (v3 退化为 QA 摄影师)
+                       仅截图 + 5 维度对账 + 标 verified + 交付（不画素材、不写 styles）
 ```
 
 写完什么，下游就能直接接力——不写 styles、不写 events、不写 visualStates，但**必须**建好节点骨架 + 全局态识别 + dataSource typeDef，否则下游无处下手。
+
+> ⚠️ **v3 兼容性说明**：本 SKILL 自身**职责无变化**——v3 改造仅影响 design ↔ executor 这一对接。但 **product 阶段写的字段**（节点骨架 / dataSources / globalConcerns / overlays 结构）下游 design v3 在自创 craft 任务时可能调 `element/add` 加视觉容器节点（如 wrapper-label / TabIndicator）——这些都是**视觉性追加**，不会改你写的业务节点 events / bind / typeDef。如发现 design 改了你写的业务字段 → 退回 design-planner（design 越权）。详根目录 `STAGE-CONTRACT.md` 顶部 v3 修订摘要。
 
 ## 3. 双产出原则：md（过程）+ schema（结果）
 

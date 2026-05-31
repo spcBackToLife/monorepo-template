@@ -33,6 +33,7 @@ export {
   rewriteMediaSrc,
 } from './assets/rewriteLocalAssetRefs';
 export { StaticAssetOriginProvider, useStaticAssetOrigin } from './renderer/StaticAssetOriginContext';
+export { ThemeConfigProvider, useThemeConfig } from './renderer/ThemeConfigContext';
 
 // ===== Expression Engine =====
 // 表达式引擎已拆分到独立的 @globallink/design-expression 包（纯函数 / 双格式 ESM+CJS）
