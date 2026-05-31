@@ -11,8 +11,8 @@
  */
 
 import type { Screen, ScreenState, DataSource } from '@globallink/design-schema';
-import { evaluateExpression as evalExpr } from '../expression';
-import type { EvalContext } from '../expression';
+import { evaluateExpression as evalExpr } from '@globallink/design-expression';
+import type { EvalContext } from '@globallink/design-expression';
 
 /**
  * v2 渲染期数据上下文 —— 直接复用 EvalContext 类型。

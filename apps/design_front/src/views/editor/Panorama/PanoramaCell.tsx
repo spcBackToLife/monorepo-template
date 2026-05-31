@@ -1,5 +1,6 @@
 import type { ComponentTemplate, Screen } from '@globallink/design-schema';
-import { SchemaRenderer, type InteractionPreview, type EvalContext } from '@globallink/design-engine';
+import { SchemaRenderer, type InteractionPreview } from '@globallink/design-engine';
+import type { EvalContext } from '@globallink/design-expression';
 import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrigin';
 
 interface PanoramaCellProps {

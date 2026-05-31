@@ -16,7 +16,8 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --ext .ts,.tsx src",
-    "test": "bun test"
+    "test": "bun test",
+    "audit:expressions": "bun run scripts/audit-expressions.ts"
   },
   "sideEffects": false,
   "peerDependencies": {
@@ -24,7 +25,7 @@
     "react-dom": "^18.3.1"
   },
   "dependencies": {
-    "@globallink/design-operations": "workspace:*",
+    "@globallink/design-expression": "workspace:*",
     "@globallink/design-schema": "workspace:*"
   },
   "devDependencies": {

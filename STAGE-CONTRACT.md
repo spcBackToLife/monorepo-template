@@ -483,14 +483,20 @@ Schema-First 体系里所有标记为 `Expression<T>` 的字段（`visibleWhen` 
 | Phase | 内容 | 状态 |
 |---|---|---|
 | **EXPR-A** | 立 spec.json / EXPR-LANG-SPEC.md / index.ts barrel（本节产物）| ✅ 完成 |
-| **EXPR-B** | 按 spec 重写 Parser/Evaluator（支持 regex 字面量 / Date/Math/Number 等 globals / globalView / 实例方法白名单 / 可选链 / 空合并 / 数组对象字面量）| ⏭️ 待做 |
-| **EXPR-C** | 抽出 `lintExpression(src) → LintResult`；MCP 工具落库门禁 + integrity 检查 | ⏭️ 待做 |
+| **EXPR-B** | 按 spec 重写 Parser/Evaluator（支持 regex 字面量 / Date/Math/Number 等 globals / globalView / 实例方法白名单 / 可选链 / 空合并 / 数组对象字面量）| ✅ 完成（159 测试全绿，含 18 个 v1.0 ★ describe 块） |
+| **EXPR-C** | 抽出 `lintExpression(src) → LintResult` + walker；ops 层落库门禁（event/element/style/data-source）+ integrity R-EXPR-01 | ✅ 完成（41 个新增 Linter 测试 + audit 脚本零误杀） |
 | **EXPR-D** | AST 进 schema（一次性迁移）| ⏭️ v2.0 路线，本期不做 |
-| **EXPR-E** | 编辑器 ExpressionEditor 实时 lint + 自动补全 | ⏭️ 待做 |
-| **EXPR-F** | SKILL events.template.md 等改写引用 EXPR-LANG-SPEC §5 速查表 | ⏭️ 待做 |
+| **EXPR-E** | 编辑器 ExpressionEditor 实时 lint + 自动补全（spec-driven，删除硬编码） | ✅ 完成（validate.ts → lintExpression / suggestions.ts → spec barrel / ValidationDisplay 子组件支持「应用建议」） |
+| **EXPR-F** | SKILL 文档：`expression-language-cheatsheet.md` 从 spec.json codegen 自动生成；`v2-actions-cheatsheet.md §4` + interaction-designer SKILL Phase 1 引用 | ✅ 完成（pnpm gen:cheatsheet / gen:cheatsheet:check 双模式，CI 可用） |
 | **EXPR-G** | 本契约 §0.1.12（已写，本节产物）| ✅ 完成 |
 
 **反"擦屁股"原则**：先 EXPR-A 立规约 → 再 EXPR-B 按规约重写。**任何"先扩 Parser 让 demo 跑、再补规约"的顺序违反 §1 "先理解再杜绝"哲学，被禁**。
+
+**门禁强度（v1.0 落地）**：
+- **ops 层 lint = strict**（落库门禁；写错的表达式 `{ success: false, issues: [...] }` 直接拒，不擦屁股）
+- **integrity R-EXPR-01 = warning**（事后扫库器；保证「现在合法的 schema 永远不红」，spec 演进时只提示迁移）
+- **编辑器 lint = soft block**（block-style 错误展示 + 「应用建议」按钮，但保存时仍由 ops 层做硬把关）
+- **历史数据保护**：`pnpm audit:expressions` 在切 strict 前扫一遍仓库（当前结果：0 命中，已可放心切 strict）
 
 **与 v2.6 NetworkPolicy 的对称性**：
 

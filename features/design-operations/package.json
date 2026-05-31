@@ -20,6 +20,7 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@globallink/design-expression": "workspace:*",
     "@globallink/design-schema": "workspace:*"
   },
   "devDependencies": {

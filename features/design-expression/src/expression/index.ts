@@ -37,3 +37,36 @@ export {
 
 export type { BuiltinFunctions } from './BuiltinFunctions';
 export { builtinFunctions, FORBIDDEN_GLOBALS } from './BuiltinFunctions';
+
+// ===== EXPR-C: Lint 工具链 =====
+//
+// Lint 阶段（CEL 三阶段中的 Check 阶段）：在编辑期 / 落库期完成 spec 一致性校验，
+// 输出结构化 LintIssue 直接喂给 AI / 编辑器。
+//
+// 真相源：features/design-schema/src/expression-lang/spec.json
+export type {
+  LintIssue,
+  LintResult,
+  LintErrorCode,
+  FieldStrength,
+  ExpressionMode,
+} from './Linter';
+
+export {
+  lintExpression,
+  lintExpressionField,
+} from './Linter';
+
+export type {
+  ExpressionFieldRef,
+  WalkOptions,
+} from './walker';
+
+export {
+  walkExpressionsInNode,
+  walkExpressionsInEvent,
+  walkExpressionsInActionChain,
+  walkExpressionsInDataSource,
+  walkExpressionsInScreen,
+  walkExpressionsInProject,
+} from './walker';

@@ -21,7 +21,7 @@ import type { DataContext } from '../data/dataContext';
 import { buildScreenDataContext, buildEditorPreviewState } from '../data/dataContext';
 import { ListRenderer } from '../data/ListRenderer';
 import { CSSPseudoInjector } from './CSSPseudoInjector';
-import { compileExpression } from '../expression';
+import { compileExpression } from '@globallink/design-expression';
 import { ToastRenderer, type ToastItem } from './ToastRenderer';
 import {
   createStore,

@@ -27,6 +27,7 @@ import {
   type Suggestion,
 } from './suggestions';
 import { validateExpressionField, type ExpressionMode } from './validate';
+import { ValidationDisplay } from './ValidationDisplay';
 
 export interface ExpressionEditorProps {
   value: string;
@@ -238,10 +239,27 @@ export function ExpressionEditor(props: ExpressionEditorProps) {
         </ul>
       )}
 
-      {showError && !validation.ok && (
-        <div className="mt-0.5 text-[10px] text-red-500 leading-tight truncate" title={validation.error}>
-          {validation.error}
-        </div>
+      {showError && (validation.issues.length > 0 || (!validation.ok && validation.error)) && (
+        <ValidationDisplay
+          issues={
+            validation.issues.length
+              ? validation.issues
+              : [
+                  {
+                    code: 'E001',
+                    level: 'error',
+                    message: validation.error ?? 'expression error',
+                  },
+                ]
+          }
+          currentValue={value}
+          onApplyFix={(suggestedFix) => {
+            // 简单替换策略：直接整体替换为 suggestedFix。
+            // suggestedFix 一般是单条迁移路径（如 `Date.now() → $.now()`）；
+            // 复杂场景由用户继续手工调整。
+            onChange(suggestedFix);
+          }}
+        />
       )}
     </div>
   );

@@ -11,11 +11,14 @@ import {
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import {
-  checkProjectIntegrity,
-  checkScreenIntegrity,
   validateThemeConfig,
   type ThemeOp,
 } from '@globallink/design-schema';
+import {
+  // ★ EXPR-C-3 R-EXPR-01：integrity 在原 design-schema 校验之上叠加表达式 lint
+  checkProjectIntegrityWithLint as checkProjectIntegrity,
+  checkScreenIntegrityWithLint as checkScreenIntegrity,
+} from '@globallink/design-expression';
 
 @Controller('api/projects')
 export class ProjectsController {

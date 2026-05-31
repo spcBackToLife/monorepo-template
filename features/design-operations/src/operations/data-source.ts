@@ -6,6 +6,8 @@ import type {
   DataSourceTypeDef,
 } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
+import { walkExpressionsInDataSource } from '@globallink/design-expression';
+import { findLintErrors, buildLintFailResult, attachLintWarnings } from '../utils/lint-guard';
 import type {
   DataSourceAddOp,
   DataSourceRemoveOp,
@@ -214,6 +216,15 @@ export function executeSetEndpoint(project: DesignProject, params: DataSourceSet
 
   const oldEndpoint = deepClone(ds.endpoint);
   ds.endpoint = params.endpoint;
+
+  // ★ EXPR-C: lint 门禁（headers / query / body / path 中的内嵌表达式）
+  const refs = walkExpressionsInDataSource(ds, { screenId: screen.id });
+  const errs = findLintErrors(refs);
+  if (errs) {
+    const fail = buildLintFailResult(errs, [], 'data_source.set_endpoint');
+    return { project, result: fail.result, inverse: fail.inverse };
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
@@ -304,6 +315,15 @@ export function executeSetDefaultParams(
   } else {
     ds.defaultParams = params.defaultParams;
   }
+
+  // ★ EXPR-C: lint 门禁（defaultParams 中的表达式）
+  const refs = walkExpressionsInDataSource(ds, { screenId: screen.id });
+  const errs = findLintErrors(refs);
+  if (errs) {
+    const fail = buildLintFailResult(errs, [], 'data_source.set_default_params');
+    return { project, result: fail.result, inverse: fail.inverse };
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {

@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.build.json --noEmit"
   },
   "dependencies": {
+    "@globallink/design-expression": "workspace:*",
     "@globallink/design-operations": "workspace:*",
     "@globallink/design-schema": "workspace:*",
     "@globallink/material-operations": "workspace:*",

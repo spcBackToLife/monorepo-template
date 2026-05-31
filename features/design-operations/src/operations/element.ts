@@ -14,6 +14,11 @@ import {
   normalizeExpression,
   countSubtreeNodes,
 } from '@globallink/design-schema';
+import {
+  lintExpressionField,
+  walkExpressionsInNode,
+} from '@globallink/design-expression';
+import { findLintErrors, buildLintFailResult, attachLintWarnings } from '../utils/lint-guard';
 import type {
   ElementAddOp,
   ElementRemoveOp,
@@ -300,15 +305,26 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
   const position = params.position ?? parent.children.length;
   parent.children.splice(position, 0, newNode);
 
+  // ★ EXPR-C: lint 门禁 —— styles / props 中的字面量-或-表达式字段
+  const refs = walkExpressionsInNode(newNode, { basePath: 'newNode' });
+  const errs = findLintErrors(refs);
+  if (errs) {
+    const fail = buildLintFailResult(errs, [], 'element.add');
+    return { project, result: fail.result, inverse: fail.inverse };
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
     project: newProject,
-    result: {
-      success: true,
-      description: `Added ${params.tag} element to ${params.parentId}`,
-      affectedNodeIds: [newNode.id, params.parentId],
-    },
+    result: attachLintWarnings(
+      {
+        success: true,
+        description: `Added ${params.tag} element to ${params.parentId}`,
+        affectedNodeIds: [newNode.id, params.parentId],
+      },
+      refs,
+    ),
     inverse: {
       type: 'element.remove',
       params: { elementId: newNode.id },
@@ -496,15 +512,26 @@ export function executeInsertSubtree(project: DesignProject, params: ElementInse
   const safePos = Math.max(0, Math.min(position, parent.children.length));
   parent.children.splice(safePos, 0, cloned);
 
+  // ★ EXPR-C: lint 门禁 —— 整棵子树（含 events / visibleWhen / repeat / styles / props）
+  const refs = walkExpressionsInNode(cloned, { basePath: 'subtree' });
+  const errs = findLintErrors(refs);
+  if (errs) {
+    const fail = buildLintFailResult(errs, [], 'element.insertSubtree');
+    return { project, result: fail.result, inverse: fail.inverse };
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
     project: newProject,
-    result: {
-      success: true,
-      description: 'Inserted subtree',
-      affectedNodeIds: [cloned.id, params.parentId],
-    },
+    result: attachLintWarnings(
+      {
+        success: true,
+        description: 'Inserted subtree',
+        affectedNodeIds: [cloned.id, params.parentId],
+      },
+      refs,
+    ),
     inverse: {
       type: 'element.remove',
       params: { elementId: cloned.id },
@@ -992,6 +1019,39 @@ export function executeSetNodeVisibleWhen(project: DesignProject, params: Elemen
   } else {
     // 强 Expression 字段：裸字符串自动补 `{{ }}`，避免引擎把它当字面量
     node.visibleWhen = normalizeExpression(params.visibleWhen) as Expression<boolean>;
+
+    // ★ EXPR-C: lint 门禁
+    const r = lintExpressionField(node.visibleWhen, 'required');
+    if (!r.ok) {
+      const errs = r.issues.filter((i) => i.level === 'error');
+      if (errs.length) {
+        const sample = errs[0]?.message ?? 'lint error';
+        return {
+          project,
+          result: {
+            success: false,
+            description: `element.setVisibleWhen: expression lint failed — ${sample}`,
+            affectedNodeIds: [],
+            issues: [
+              {
+                nodeId: params.nodeId,
+                fieldPath: 'visibleWhen',
+                rawValue: String(params.visibleWhen).slice(0, 60),
+                issues: errs.map((i) => ({
+                  code: i.code,
+                  level: i.level,
+                  message: i.message,
+                  ...(i.specRef ? { specRef: i.specRef } : {}),
+                  ...(i.hint ? { hint: i.hint } : {}),
+                  ...(i.suggestedFix ? { suggestedFix: i.suggestedFix } : {}),
+                })),
+              },
+            ],
+          },
+          inverse: { type: 'noop', params: {} },
+        };
+      }
+    }
   }
   newProject.updatedAt = new Date().toISOString();
   return {
@@ -1067,6 +1127,48 @@ export function executeSetNodeRepeat(project: DesignProject, params: ElementSetR
       const template = deepClone(firstChild);
       node.children = (node.children ?? []).slice(1);
       node.repeat = { expression: expr, template };
+    }
+  }
+
+  // ★ EXPR-C: lint 门禁（repeat.expression + template 子树）
+  if (node.repeat) {
+    const exprResult = lintExpressionField(node.repeat.expression, 'required');
+    const treeRefs = walkExpressionsInNode(node.repeat.template, { basePath: 'repeat.template' });
+    const errs = [
+      ...exprResult.issues
+        .filter((i) => i.level === 'error')
+        .map((i) => ({
+          nodeId: params.nodeId,
+          fieldPath: 'repeat.expression',
+          rawValue: String(node.repeat!.expression).slice(0, 60),
+          issues: [i],
+        })),
+      ...(findLintErrors(treeRefs) ?? []),
+    ];
+    if (errs.length) {
+      return {
+        project,
+        result: {
+          success: false,
+          description: `element.setRepeat: expression lint failed (${errs.length} issue(s))`,
+          affectedNodeIds: [],
+          issues: errs.map((r) => ({
+            ...(r.nodeId !== undefined ? { nodeId: r.nodeId } : {}),
+            ...('screenId' in r && r.screenId !== undefined ? { screenId: r.screenId } : {}),
+            fieldPath: r.fieldPath,
+            rawValue: r.rawValue,
+            issues: r.issues.map((i) => ({
+              code: i.code,
+              level: i.level,
+              message: i.message,
+              ...(i.specRef ? { specRef: i.specRef } : {}),
+              ...(i.hint ? { hint: i.hint } : {}),
+              ...(i.suggestedFix ? { suggestedFix: i.suggestedFix } : {}),
+            })),
+          })),
+        },
+        inverse: { type: 'noop', params: {} },
+      };
     }
   }
 

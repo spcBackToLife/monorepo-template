@@ -34,28 +34,14 @@ export {
 } from './assets/rewriteLocalAssetRefs';
 export { StaticAssetOriginProvider, useStaticAssetOrigin } from './renderer/StaticAssetOriginContext';
 
-// ===== Expression Engine (v2) =====
-// 受限求值器：解析 `{{ ... }}` 表达式，在 { state, item, index, parent, $last, $ } 作用域下安全求值。
-export {
-  evaluateExpression,
-  evaluateAst,
-  compileExpression,
-  extractDeps,
-  parseExpression,
-  parseSingleExpression,
-  parseTemplate,
-  ExpressionParseError,
-  ExpressionEvaluationError,
-  builtinFunctions,
-  FORBIDDEN_GLOBALS,
-} from './expression';
-export type {
-  Ast,
-  BinaryOp,
-  TemplateSegment,
-  EvalContext,
-  BuiltinFunctions,
-} from './expression';
+// ===== Expression Engine =====
+// 表达式引擎已拆分到独立的 @globallink/design-expression 包（纯函数 / 双格式 ESM+CJS）
+// 渲染器内部仍然使用，但不再从 design-engine 顶层 re-export
+// 详见 PLATFORM-ROOT-CAUSE-ANALYSIS.md §4 与 STAGE-CONTRACT v2.7
+//
+// 下游消费者请直接 from '@globallink/design-expression' import：
+//   evaluateExpression / compileExpression / parseExpression / lintExpression /
+//   walkExpressions* / checkProjectIntegrityWithLint / type EvalContext / LintIssue 等
 
 // ===== Data Binding & Context =====
 // v1 的 resolveExpression 已删除；编辑期需要 DataContext 拼装时使用以下两个公开 helper：

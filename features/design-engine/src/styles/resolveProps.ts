@@ -1,7 +1,7 @@
 import type { ComponentNode } from '@globallink/design-schema';
 import type { DataContext } from '../data/dataContext';
 import { resolveExpression } from '../data/dataContext';
-import { compileExpression } from '../expression';
+import { compileExpression } from '@globallink/design-expression';
 
 export interface ResolvedProps {
   props: Record<string, unknown>;

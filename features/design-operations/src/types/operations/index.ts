@@ -51,6 +51,30 @@ export interface OperationResult {
   success: boolean;
   description: string;
   affectedNodeIds: string[];
+  /**
+   * Expression Lint v1.0 ★：表达式校验失败时挂载结构化 issues（含 errorCode / hint /
+   * suggestedFix / specRef），供 MCP / AI / 编辑器消费。
+   *
+   * - success=false 时，issues 是 op 失败的原因
+   * - success=true  时，可能含 warning 级 issue（lint 不拒，仅提示）
+   *
+   * 形态对齐 features/design-engine/src/expression/walker.ts 的 ExpressionFieldRef[]。
+   */
+  issues?: Array<{
+    nodeId?: string;
+    screenId?: string;
+    fieldPath: string;
+    rawValue: string;
+    issues: Array<{
+      code: string;
+      level: 'error' | 'warning';
+      message: string;
+      pos?: { start: number; end: number };
+      specRef?: string;
+      hint?: string;
+      suggestedFix?: string;
+    }>;
+  }>;
 }
 
 // ===== Inverse Data =====

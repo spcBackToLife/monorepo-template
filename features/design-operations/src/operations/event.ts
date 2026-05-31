@@ -1,5 +1,6 @@
 import type { DesignProject, ComponentEvent, Action } from '@globallink/design-schema';
 import { deepClone, normalizeExpression } from '@globallink/design-schema';
+import { walkExpressionsInEvent } from '@globallink/design-expression';
 import type {
   EventAddOp,
   EventRemoveOp,
@@ -10,6 +11,7 @@ import type {
 } from '../types';
 import { findNodeById } from '../utils/tree';
 import { assertPregeneratedId } from '../utils/assert-id';
+import { findLintErrors, buildLintFailResult, attachLintWarnings } from '../utils/lint-guard';
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
@@ -70,6 +72,15 @@ export function executeAddEvent(project: DesignProject, params: EventAddOp['para
 
   if (!node.events) node.events = [];
   normalizeEvent(params.event);
+
+  // ★ EXPR-C: lint 门禁 —— 表达式必须通过 spec v1.0 校验才能落库
+  const refs = walkExpressionsInEvent(params.event, { nodeId: params.nodeId });
+  const errs = findLintErrors(refs);
+  if (errs) {
+    const fail = buildLintFailResult(errs, [params.nodeId], 'event.add');
+    return { project, result: fail.result, inverse: fail.inverse };
+  }
+
   node.events.push(params.event);
   const eventIndex = node.events.length - 1;
 
@@ -77,11 +88,14 @@ export function executeAddEvent(project: DesignProject, params: EventAddOp['para
 
   return {
     project: newProject,
-    result: {
-      success: true,
-      description: `Added ${params.event.trigger} event to ${params.nodeId}`,
-      affectedNodeIds: [params.nodeId],
-    },
+    result: attachLintWarnings(
+      {
+        success: true,
+        description: `Added ${params.event.trigger} event to ${params.nodeId}`,
+        affectedNodeIds: [params.nodeId],
+      },
+      refs,
+    ),
     inverse: {
       type: 'event.remove',
       params: { nodeId: params.nodeId, eventIndex },
@@ -171,15 +185,26 @@ export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp
   // patch 写入后再统一规范化（覆盖原 condition / 新 actions 中的强 Expression 字段）
   normalizeEvent(evt);
 
+  // ★ EXPR-C: lint 门禁
+  const refs = walkExpressionsInEvent(evt, { nodeId: params.nodeId });
+  const errs = findLintErrors(refs);
+  if (errs) {
+    const fail = buildLintFailResult(errs, [params.nodeId], 'event.update');
+    return { project, result: fail.result, inverse: fail.inverse };
+  }
+
   newProject.updatedAt = new Date().toISOString();
 
   return {
     project: newProject,
-    result: {
-      success: true,
-      description: `Updated event at index ${params.eventIndex} on ${params.nodeId}`,
-      affectedNodeIds: [params.nodeId],
-    },
+    result: attachLintWarnings(
+      {
+        success: true,
+        description: `Updated event at index ${params.eventIndex} on ${params.nodeId}`,
+        affectedNodeIds: [params.nodeId],
+      },
+      refs,
+    ),
     inverse: {
       type: 'event.update',
       params: { nodeId: params.nodeId, eventIndex: params.eventIndex, event: previousEvent },

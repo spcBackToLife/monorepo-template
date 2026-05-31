@@ -16,7 +16,9 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --ext .ts src"
+    "lint": "eslint --ext .ts src",
+    "gen:cheatsheet": "bun run scripts/gen-expression-cheatsheet.ts",
+    "gen:cheatsheet:check": "bun run scripts/gen-expression-cheatsheet.ts --check"
   },
   "sideEffects": false,
   "devDependencies": {

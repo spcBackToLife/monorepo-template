@@ -35,8 +35,8 @@ import type {
 import { reduceStateAction } from './Reducer';
 import type { Store } from './Store';
 import type { EffectExecutor } from './EffectExecutor';
-import { compileExpression, evaluateExpression } from '../expression';
-import type { EvalContext } from '../expression';
+import { compileExpression, evaluateExpression } from '@globallink/design-expression';
+import type { EvalContext } from '@globallink/design-expression';
 
 /**
  * 宿主环境 adapter：Dispatcher 把 nav/ui/node/custom 动词委托给宿主。
@@ -448,4 +448,4 @@ function delay(ms: number): Promise<void> {
 }
 
 // 类型导出
-export type { EvalContext } from '../expression';
+export type { EvalContext } from '@globallink/design-expression';

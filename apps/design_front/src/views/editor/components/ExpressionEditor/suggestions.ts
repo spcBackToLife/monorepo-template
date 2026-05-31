@@ -1,17 +1,38 @@
 /**
- * 表达式自动补全 — 按当前光标位置下文的 `.` 链前缀匹配候选。
+ * 表达式自动补全（EXPR-E-2：升级为 spec-driven）。
  *
- * 能识别的顶级标识符：
- *   state / item / index / parent / $last / $ / true / false / null / undefined
- * 以及用户自定义 view 变量（通过 scope 传入）。
+ * 一切顶级标识符 / globals 成员 / builtin 函数 / 实例方法 都从
+ * design-schema 的 expression-lang barrel 派生，**不再硬编码**。
+ *
+ * 真相源：features/design-schema/src/expression-lang/spec.json
+ *
+ * 触发逻辑（按光标前缀）：
+ *   ""                    → contextual + globals + $ + keywords
+ *   "state"               → 同上前缀过滤
+ *   "state."              → [view, data, effects]
+ *   "state.view."         → stateViewVars (来自 ExprScope)
+ *   "state.data."         → stateDataKeys
+ *   "state.effects.<id>." → status / data / error / startedAt / finishedAt
+ *   "Date." / "Math." 等  → 该 global namespace 允许的成员（spec 派生）
+ *   "$."                  → builtin 函数（spec 派生）
+ *   "$last."              → status / data / error / startedAt / finishedAt
+ *   "globalView."         → 不在 scope 内做字段补全（项目级配置自由形态）
  */
 
+import {
+  listContextualIdentifiers,
+  listAllowedGlobals,
+  listGlobalMembers,
+  listBuiltinFunctions,
+  EXPR_LANG_SPEC,
+} from '@globallink/design-schema';
+
 export interface ExprScope {
-  /** 屏幕级 state.view 已定义变量名（含作用域: 设计器 editorStore.activeScreen.stateInit.view） */
+  /** 屏幕级 state.view 已定义变量名 */
   stateViewVars: string[];
-  /** state.data 里已有的 key（来自 dataSources 或 stateInit.data） */
+  /** state.data 里已有的 key */
   stateDataKeys: string[];
-  /** 所有 api 数据源 id（即 state.effects[<id>].data 可用性） */
+  /** 所有 api 数据源 id */
   stateEffectIds: string[];
   /** 当前编辑上下文是否处于列表项：决定是否提示 item / index / parent */
   allowItem?: boolean;
@@ -29,19 +50,6 @@ export interface Suggestion {
   /** 悬浮提示 */
   detail?: string;
 }
-
-const BUILTIN_FNS: Suggestion[] = [
-  { label: '$.length', insertText: 'length(', kind: 'fn', detail: '数组/字符串长度' },
-  { label: '$.upper', insertText: 'upper(', kind: 'fn', detail: '字符串转大写' },
-  { label: '$.lower', insertText: 'lower(', kind: 'fn', detail: '字符串转小写' },
-  { label: '$.format', insertText: 'format(', kind: 'fn', detail: '模板字符串插值' },
-  { label: '$.includes', insertText: 'includes(', kind: 'fn', detail: '数组/字符串包含' },
-  { label: '$.first', insertText: 'first(', kind: 'fn', detail: '取首元素' },
-  { label: '$.last', insertText: 'last(', kind: 'fn', detail: '取末元素' },
-  { label: '$.isEmpty', insertText: 'isEmpty(', kind: 'fn', detail: '是否空数组/空字符串' },
-  { label: '$.not', insertText: 'not(', kind: 'fn', detail: '布尔取反' },
-  { label: '$.defaultTo', insertText: 'defaultTo(', kind: 'fn', detail: 'null/undefined 取兜底' },
-];
 
 const TOP_KEYWORDS: Suggestion[] = [
   { label: 'true', insertText: 'true', kind: 'keyword' },
@@ -76,17 +84,44 @@ export function isInsideInterpolation(src: string, cursor: number): boolean {
   return closedBetween < 0;
 }
 
+// ===== 描述渲染辅助 =====
+
+function getContextualDescription(name: string): string {
+  const c = EXPR_LANG_SPEC.scope.contextual?.[name];
+  return c?.description ?? '';
+}
+
+function getGlobalDescription(name: string): string {
+  const g = EXPR_LANG_SPEC.scope.globals?.[name];
+  return g?.description ?? `全局命名空间 ${name}`;
+}
+
+function getBuiltinFnDescription(ns: string, fn: string): string {
+  const namespace = EXPR_LANG_SPEC.scope.builtins?.[ns];
+  if (!namespace) return '';
+  const def = namespace[fn];
+  if (!def || typeof def === 'string') return '';
+  const args = Array.isArray(def.args) ? def.args.join(', ') : '';
+  const ret = String(def.returns ?? '');
+  const desc = (def as { description?: string }).description ?? '';
+  return `(${args}) → ${ret}${desc ? ` · ${desc}` : ''}`;
+}
+
+function getGlobalMemberDescription(ns: string, member: string): string {
+  const g = EXPR_LANG_SPEC.scope.globals?.[ns];
+  if (!g) return '';
+  const m = g.members[member];
+  if (!m || typeof m !== 'object') return '';
+  const obj = m as Record<string, unknown>;
+  if (obj.kind === 'constant') return `(常量) type: ${String(obj.type)}`;
+  const args = Array.isArray(obj.args) ? (obj.args as string[]).join(', ') : '';
+  const ret = String(obj.returns ?? '');
+  const desc = (obj.description as string | undefined) ?? '';
+  return `(${args}) → ${ret}${desc ? ` · ${desc}` : ''}`;
+}
+
 /**
- * 根据前缀字符串得出候选项。遵循从左到右匹配：
- *   ""          → 顶级 (state / item / index / parent / $last / $ / keywords)
- *   "state"     → 顶级同上过滤
- *   "state."    → [view, data, effects]
- *   "state.view."  → stateViewVars
- *   "state.data."  → stateDataKeys
- *   "state.effects." → stateEffectIds
- *   "state.effects.<id>."  → status / data / error / startedAt / finishedAt
- *   "$."        → builtin fns
- *   "item."     → 返回空（item 是任意对象，前端不做字段推断）
+ * 根据前缀字符串得出候选项。
  */
 export function getSuggestions(prefix: string, scope: ExprScope): Suggestion[] {
   const parts = prefix.split('.');
@@ -94,19 +129,38 @@ export function getSuggestions(prefix: string, scope: ExprScope): Suggestion[] {
 
   // 顶级补全
   if (parts.length === 1) {
-    const items: Suggestion[] = [
-      { label: 'state', insertText: 'state', kind: 'var', detail: '屏幕级运行时状态' },
-    ];
-    if (scope.allowItem) {
-      items.push({ label: 'item', insertText: 'item', kind: 'var', detail: '列表项' });
-      items.push({ label: 'index', insertText: 'index', kind: 'var', detail: '列表索引' });
-      items.push({ label: 'parent', insertText: 'parent', kind: 'var', detail: '父列表项' });
+    const items: Suggestion[] = [];
+
+    // 1. contextual identifiers (state / item / index / parent / $last / globalView)
+    for (const name of listContextualIdentifiers()) {
+      // item / index / parent 仅在列表内提示
+      if ((name === 'item' || name === 'index' || name === 'parent') && !scope.allowItem) continue;
+      // $last 仅在 effect 链内提示
+      if (name === '$last' && !scope.allowLast) continue;
+      items.push({
+        label: name,
+        insertText: name,
+        kind: 'var',
+        detail: getContextualDescription(name),
+      });
     }
-    if (scope.allowLast) {
-      items.push({ label: '$last', insertText: '$last', kind: 'var', detail: '上一步 effect 的结果' });
+
+    // 2. globals (Date / Math / Number / String / Boolean / JSON / Object / Array)
+    for (const name of listAllowedGlobals()) {
+      items.push({
+        label: name,
+        insertText: name,
+        kind: 'var',
+        detail: getGlobalDescription(name),
+      });
     }
+
+    // 3. builtin namespace `$`
     items.push({ label: '$', insertText: '$', kind: 'var', detail: '内置函数命名空间' });
+
+    // 4. keywords
     items.push(...TOP_KEYWORDS);
+
     return filterByPrefix(items, firstLevel ?? '');
   }
 
@@ -171,10 +225,15 @@ export function getSuggestions(prefix: string, scope: ExprScope): Suggestion[] {
     }
   }
 
-  // $.*
+  // $.* — builtin 函数（spec 派生）
   if (firstLevel === '$' && parts.length === 2) {
     return filterByPrefix(
-      BUILTIN_FNS.map((f) => ({ ...f, label: f.label.slice(2) })),
+      listBuiltinFunctions('$').map((fn) => ({
+        label: fn,
+        insertText: `${fn}(`,
+        kind: 'fn' as const,
+        detail: getBuiltinFnDescription('$', fn),
+      })),
       parts[1] ?? '',
     );
   }
@@ -184,9 +243,29 @@ export function getSuggestions(prefix: string, scope: ExprScope): Suggestion[] {
     return filterByPrefix(
       [
         { label: 'status', insertText: 'status', kind: 'path' },
-        { label: 'data', insertText: 'data', kind: 'path' },
+        { label: 'response', insertText: 'response', kind: 'path' },
         { label: 'error', insertText: 'error', kind: 'path' },
+        { label: 'startedAt', insertText: 'startedAt', kind: 'path' },
+        { label: 'finishedAt', insertText: 'finishedAt', kind: 'path' },
       ],
+      parts[1] ?? '',
+    );
+  }
+
+  // Date.* / Math.* / Number.* 等 globals 二级补全（spec 派生）
+  if (firstLevel && parts.length === 2 && listAllowedGlobals().includes(firstLevel)) {
+    return filterByPrefix(
+      listGlobalMembers(firstLevel).map((m) => {
+        const memberSpec = EXPR_LANG_SPEC.scope.globals[firstLevel]?.members[m];
+        const isConst =
+          memberSpec && typeof memberSpec === 'object' && (memberSpec as { kind?: string }).kind === 'constant';
+        return {
+          label: m,
+          insertText: isConst ? m : `${m}(`,
+          kind: isConst ? ('var' as const) : ('fn' as const),
+          detail: getGlobalMemberDescription(firstLevel, m),
+        };
+      }),
       parts[1] ?? '',
     );
   }

@@ -1,5 +1,6 @@
 import type { DesignProject, CSSProperties } from '@globallink/design-schema';
 import { deepClone } from '@globallink/design-schema';
+import { lintExpressionField, type LintIssue } from '@globallink/design-expression';
 import type {
   StyleUpdateOp,
   StyleResetOp,
@@ -17,6 +18,38 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
     if (node) return node;
   }
   return undefined;
+}
+
+/**
+ * ★ EXPR-C: 对 styles 字段做 lint 门禁。
+ * 只检查字符串值（含 `{{ }}` 才进 lint），其他类型直接放行。
+ */
+function lintStyleFields(
+  styles: Record<string, unknown>,
+  nodeId: string,
+): NonNullable<OperationResult['issues']> {
+  const errs: NonNullable<OperationResult['issues']> = [];
+  for (const [k, v] of Object.entries(styles)) {
+    if (typeof v !== 'string') continue;
+    const r = lintExpressionField(v, 'literal-or-expr');
+    const errIssues = r.issues.filter((i) => i.level === 'error');
+    if (errIssues.length) {
+      errs.push({
+        nodeId,
+        fieldPath: `styles.${k}`,
+        rawValue: v.length > 60 ? v.slice(0, 60) + '…' : v,
+        issues: errIssues.map((i: LintIssue) => ({
+          code: i.code,
+          level: i.level,
+          message: i.message,
+          ...(i.specRef ? { specRef: i.specRef } : {}),
+          ...(i.hint ? { hint: i.hint } : {}),
+          ...(i.suggestedFix ? { suggestedFix: i.suggestedFix } : {}),
+        })),
+      });
+    }
+  }
+  return errs;
 }
 
 // ===== style.update =====
@@ -46,6 +79,21 @@ export function executeUpdateStyle(project: DesignProject, params: StyleUpdateOp
   }
 
   Object.assign(node.styles, params.styles);
+
+  // ★ EXPR-C: lint 门禁
+  const lintErrs = lintStyleFields(params.styles as Record<string, unknown>, params.nodeId);
+  if (lintErrs.length) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `style.update: expression lint failed (${lintErrs.length} issue(s))`,
+        affectedNodeIds: [],
+        issues: lintErrs,
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
 
   // 根节点背景同步到 Screen.backgroundColor
   let restoreScreenBackground: { screenId: string; previousValue: string | undefined } | undefined;
@@ -167,6 +215,26 @@ export function executeBatchUpdateStyle(project: DesignProject, params: StyleBat
     Object.assign(node.styles, update.styles);
     affectedNodeIds.push(update.nodeId);
     restoreEntries.push({ nodeId: update.nodeId, restoreStyles, removeKeys });
+  }
+
+  // ★ EXPR-C: lint 门禁（聚合所有 update 的错误）
+  const allErrs: NonNullable<OperationResult['issues']> = [];
+  for (const update of params.updates) {
+    allErrs.push(
+      ...lintStyleFields(update.styles as Record<string, unknown>, update.nodeId),
+    );
+  }
+  if (allErrs.length) {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `style.batchUpdate: expression lint failed (${allErrs.length} issue(s))`,
+        affectedNodeIds: [],
+        issues: allErrs,
+      },
+      inverse: { type: 'noop', params: {} },
+    };
   }
 
   newProject.updatedAt = new Date().toISOString();
