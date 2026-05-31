@@ -44,6 +44,20 @@ import type { EvalContext } from '@globallink/design-expression';
  * 任一回调不实现时，Dispatcher 只记日志、不抛错（保证链继续走）。
  */
 export interface HostAdapters {
+  /**
+   * 跳转到目标屏。
+   *
+   * - Dispatcher 已对 `targetScreenId` 做表达式求值,空字符串 / 非字符串 / 求值失败时
+   *   不会调用本回调,host 不必再防御空值。
+   * - 但本回调拿到的 ID 仍可能是**项目内不存在的屏 ID**(如表达式逻辑分支错配 /
+   *   后端配错跳转目标);host 实现应:
+   *     1) 在自己的 screens 注册表里 lookup
+   *     2) 不存在 → 不切路由 + 调 onShowToast 给用户一个可见反馈("页面暂未上线"等)
+   *     3) console.warn 留痕,便于 ops 阶段补 R-NAV-TARGET-01 lint
+   *
+   *   ops 层 `lintActionChain` 已在落库阶段拦截字面量 nav.go 引用不存在屏的情况;
+   *   表达式形式的目标只能由运行时 host 这一道兜。
+   */
   onNavGo?: (targetScreenId: string, animation?: unknown) => void;
   onNavBack?: () => void;
   onShowToast?: (args: {
@@ -208,9 +222,31 @@ export class Dispatcher {
         this.deps.effects.cancel(action.dataSourceId);
         return;
 
-      case 'nav.go':
-        this.deps.host?.onNavGo?.(action.targetScreenId, action.animation);
+      case 'nav.go': {
+        // ★ F4 (EXPRESSION-LANG-ROOT-CAUSE-2026-05-31 §8): targetScreenId 字段是
+        // Expression<string>(可写成 "{{ state.view.next }}"),必须经 evaluateExpression
+        // 求值;字面量字符串 evaluateExpression 直接返回原值。
+        // 解析失败 / 求值为空 / 非字符串 → 不调用 host(避免传 "" 到 onNavGo,
+        // 引发宿主路由切到根),并 console.warn 留痕。
+        const rawTarget = action.targetScreenId;
+        const evaluated = evaluateExpression(rawTarget, ctx);
+        const target =
+          typeof evaluated === 'string' && evaluated.length > 0
+            ? evaluated
+            : typeof rawTarget === 'string' && rawTarget.length > 0 && !rawTarget.includes('{{')
+              ? rawTarget
+              : '';
+        if (!target) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[Dispatcher] nav.go: targetScreenId 求值为空(原值:"${String(rawTarget).slice(0, 60)}");` +
+              `本次跳转已跳过。常见原因:表达式上下文里没有目标变量、目标屏 ID 为 undefined、ops 阶段 lint 应已警告 R-NAV-TARGET-01。`,
+          );
+          return;
+        }
+        this.deps.host?.onNavGo?.(target, action.animation);
         return;
+      }
       case 'nav.back':
         this.deps.host?.onNavBack?.();
         return;

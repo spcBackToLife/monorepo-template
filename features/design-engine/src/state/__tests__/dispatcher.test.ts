@@ -204,4 +204,45 @@ describe('Dispatcher — nav/ui/custom 代理', () => {
     await dispatcher.run([{ type: 'ui.delay', duration: 30 }]);
     expect(Date.now() - start).toBeGreaterThanOrEqual(25);
   });
+
+  it('nav.go: targetScreenId 是表达式时,会先 evaluate', async () => {
+    const host = { onNavGo: mock(() => {}) };
+    const { store, dispatcher } = setup([], host);
+    store.setState((s) => ({
+      ...s,
+      view: { ...(s.view ?? {}), nextScreen: '01-home' },
+    }));
+    await dispatcher.run([
+      { type: 'nav.go', targetScreenId: '{{ state.view.nextScreen }}' as never },
+    ]);
+    expect(host.onNavGo).toHaveBeenCalledTimes(1);
+    expect(host.onNavGo).toHaveBeenCalledWith('01-home', undefined);
+  });
+
+  it('nav.go: targetScreenId 求值为空时,跳过(不调 host) + warn', async () => {
+    const host = { onNavGo: mock(() => {}) };
+    const { dispatcher } = setup([], host);
+    const warnSpy = mock(() => {});
+    const origWarn = console.warn;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (console as any).warn = warnSpy;
+    try {
+      await dispatcher.run([
+        // state.view.unknown 不存在 → 求值 undefined → target 为 ''
+        { type: 'nav.go', targetScreenId: '{{ state.view.unknown }}' as never },
+      ]);
+      expect(host.onNavGo).toHaveBeenCalledTimes(0);
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      console.warn = origWarn;
+    }
+  });
+
+  it('nav.go: 字面量 targetScreenId 直接传递(不被 evaluate 折叠成 undefined)', async () => {
+    const host = { onNavGo: mock(() => {}) };
+    const { dispatcher } = setup([], host);
+    await dispatcher.run([{ type: 'nav.go', targetScreenId: '01-home' }]);
+    expect(host.onNavGo).toHaveBeenCalledTimes(1);
+    expect(host.onNavGo).toHaveBeenCalledWith('01-home', undefined);
+  });
 });

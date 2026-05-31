@@ -12,6 +12,7 @@ import type {
 import { findNodeById } from '../utils/tree';
 import { assertPregeneratedId } from '../utils/assert-id';
 import { findLintErrors, buildLintFailResult, attachLintWarnings } from '../utils/lint-guard';
+import { lintActionChain, type SchemaFieldLintRef } from '../utils/component-node-lint';
 
 type Result = { project: DesignProject; result: OperationResult; inverse: InverseData };
 
@@ -21,6 +22,30 @@ function findNodeInProject(project: DesignProject, nodeId: string) {
     if (node) return node;
   }
   return undefined;
+}
+
+/** 查找节点 + 它所在的 screenId（schema lint 需要 screenId 给 issue 定位） */
+function findNodeAndScreenInProject(
+  project: DesignProject,
+  nodeId: string,
+): { node: ReturnType<typeof findNodeById>; screenId?: string } {
+  for (const screen of project.screens) {
+    const node = findNodeById(screen.rootNode, nodeId);
+    if (node) return { node, screenId: screen.id };
+  }
+  return { node: undefined };
+}
+
+/**
+ * 把 SchemaFieldLintRef[] 合并到 OperationResult.issues。
+ * 与 attachLintWarnings(ExpressionFieldRef) 形态对齐:同一个 result.issues 数组承载两类来源。
+ */
+function attachSchemaRefs(
+  result: OperationResult,
+  refs: SchemaFieldLintRef[],
+): OperationResult {
+  if (!refs.length) return result;
+  return { ...result, issues: [...(result.issues ?? []), ...refs] };
 }
 
 /**
@@ -60,7 +85,7 @@ export function executeAddEvent(project: DesignProject, params: EventAddOp['para
   }
 
   const newProject = deepClone(project);
-  const node = findNodeInProject(newProject, params.nodeId);
+  const { node, screenId } = findNodeAndScreenInProject(newProject, params.nodeId);
 
   if (!node) {
     return {
@@ -74,7 +99,7 @@ export function executeAddEvent(project: DesignProject, params: EventAddOp['para
   normalizeEvent(params.event);
 
   // ★ EXPR-C: lint 门禁 —— 表达式必须通过 spec v1.0 校验才能落库
-  const refs = walkExpressionsInEvent(params.event, { nodeId: params.nodeId });
+  const refs = walkExpressionsInEvent(params.event, { nodeId: params.nodeId, screenId });
   const errs = findLintErrors(refs);
   if (errs) {
     const fail = buildLintFailResult(errs, [params.nodeId], 'event.add');
@@ -84,18 +109,25 @@ export function executeAddEvent(project: DesignProject, params: EventAddOp['para
   node.events.push(params.event);
   const eventIndex = node.events.length - 1;
 
+  // ★ F5/F7: schema 字段关系 lint —— case.when→match 迁移 + nav.go 目标屏存在性
+  // 与 expression lint 解耦的"非表达式语义"层契约;均为 warning,不阻塞落库
+  const schemaRefs = lintActionChain(
+    params.event.actions,
+    `events[${eventIndex}].actions`,
+    { project: newProject, nodeId: params.nodeId, screenId },
+  );
+
   newProject.updatedAt = new Date().toISOString();
+
+  const successResult: OperationResult = {
+    success: true,
+    description: `Added ${params.event.trigger} event to ${params.nodeId}`,
+    affectedNodeIds: [params.nodeId],
+  };
 
   return {
     project: newProject,
-    result: attachLintWarnings(
-      {
-        success: true,
-        description: `Added ${params.event.trigger} event to ${params.nodeId}`,
-        affectedNodeIds: [params.nodeId],
-      },
-      refs,
-    ),
+    result: attachSchemaRefs(attachLintWarnings(successResult, refs), schemaRefs),
     inverse: {
       type: 'event.remove',
       params: { nodeId: params.nodeId, eventIndex },
@@ -155,7 +187,7 @@ export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp
   }
 
   const newProject = deepClone(project);
-  const node = findNodeInProject(newProject, params.nodeId);
+  const { node, screenId } = findNodeAndScreenInProject(newProject, params.nodeId);
 
   if (!node) {
     return {
@@ -186,25 +218,31 @@ export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp
   normalizeEvent(evt);
 
   // ★ EXPR-C: lint 门禁
-  const refs = walkExpressionsInEvent(evt, { nodeId: params.nodeId });
+  const refs = walkExpressionsInEvent(evt, { nodeId: params.nodeId, screenId });
   const errs = findLintErrors(refs);
   if (errs) {
     const fail = buildLintFailResult(errs, [params.nodeId], 'event.update');
     return { project, result: fail.result, inverse: fail.inverse };
   }
 
+  // ★ F5/F7: schema 字段关系 lint
+  const schemaRefs = lintActionChain(
+    evt.actions,
+    `events[${params.eventIndex}].actions`,
+    { project: newProject, nodeId: params.nodeId, screenId },
+  );
+
   newProject.updatedAt = new Date().toISOString();
+
+  const successResult: OperationResult = {
+    success: true,
+    description: `Updated event at index ${params.eventIndex} on ${params.nodeId}`,
+    affectedNodeIds: [params.nodeId],
+  };
 
   return {
     project: newProject,
-    result: attachLintWarnings(
-      {
-        success: true,
-        description: `Updated event at index ${params.eventIndex} on ${params.nodeId}`,
-        affectedNodeIds: [params.nodeId],
-      },
-      refs,
-    ),
+    result: attachSchemaRefs(attachLintWarnings(successResult, refs), schemaRefs),
     inverse: {
       type: 'event.update',
       params: { nodeId: params.nodeId, eventIndex: params.eventIndex, event: previousEvent },
@@ -222,7 +260,7 @@ export function executeUpdateEvent(project: DesignProject, params: EventUpdateOp
  */
 export function executeAddNavigation(project: DesignProject, params: EventAddNavigationOp['params']): Result {
   const newProject = deepClone(project);
-  const node = findNodeInProject(newProject, params.nodeId);
+  const { node, screenId } = findNodeAndScreenInProject(newProject, params.nodeId);
 
   if (!node) {
     return {
@@ -240,11 +278,11 @@ export function executeAddNavigation(project: DesignProject, params: EventAddNav
     // ID 严格契约：新屏 + root 节点 ID 必须由 ensureDeterministicIds 预生成
     assertPregeneratedId(p._generatedScreenId as string | undefined, 'event.addNavigation', '_generatedScreenId');
     assertPregeneratedId(p._generatedRootNodeId as string | undefined, 'event.addNavigation', '_generatedRootNodeId');
-    const screenId = p._generatedScreenId as string;
+    const screenIdNew = p._generatedScreenId as string;
     const rootNodeId = p._generatedRootNodeId as string;
 
     const newScreen = {
-      id: screenId,
+      id: screenIdNew,
       name: `Screen ${newProject.screens.length + 1}`,
       rootNode: {
         id: rootNodeId,
@@ -266,8 +304,8 @@ export function executeAddNavigation(project: DesignProject, params: EventAddNav
       dataSources: [],
     };
     newProject.screens.push(newScreen);
-    targetScreenId = screenId;
-    affectedIds.push(screenId);
+    targetScreenId = screenIdNew;
+    affectedIds.push(screenIdNew);
   }
 
   const navAction: Action = {
@@ -284,15 +322,25 @@ export function executeAddNavigation(project: DesignProject, params: EventAddNav
   node.events.push(navEvent);
   const eventIndex = node.events.length - 1;
 
+  // ★ F7: nav.go 目标屏存在性 lint(targetScreenId='new' 时已新建,验证通过;
+  // 字面量 targetScreenId 必须存在于项目内;表达式 / 模板形式跳过)
+  const schemaRefs = lintActionChain(
+    [navAction],
+    `events[${eventIndex}].actions`,
+    { project: newProject, nodeId: params.nodeId, screenId },
+  );
+
   newProject.updatedAt = new Date().toISOString();
+
+  const successResult: OperationResult = {
+    success: true,
+    description: `Added navigation to ${targetScreenId} on ${params.nodeId}`,
+    affectedNodeIds: affectedIds,
+  };
 
   return {
     project: newProject,
-    result: {
-      success: true,
-      description: `Added navigation to ${targetScreenId} on ${params.nodeId}`,
-      affectedNodeIds: affectedIds,
-    },
+    result: attachSchemaRefs(successResult, schemaRefs),
     inverse: {
       type: '_removeNavigationAndScreen',
       params: {

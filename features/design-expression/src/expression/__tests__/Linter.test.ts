@@ -388,7 +388,7 @@ describe('walker — walkExpressionsInNode', () => {
       events: [
         {
           trigger: 'click',
-          actions: [{ type: 'state.set', path: 'view.x', value: '{{ Date.now() }}' as never }],
+          actions: [{ type: 'state.set', path: 'view.x', value: '{{ $.now() }}' as never }],
         },
       ],
       locked: false,
@@ -397,5 +397,30 @@ describe('walker — walkExpressionsInNode', () => {
     };
     const refs = walkExpressionsInNode(node);
     expect(refs).toEqual([]);
+  });
+
+  it('deprecated 用法（如 Date.now()）应报 E008 warning', () => {
+    const node: ComponentNode = {
+      id: 'root',
+      type: 'div',
+      styles: {},
+      props: {},
+      states: [],
+      activeState: 'default',
+      events: [
+        {
+          trigger: 'click',
+          actions: [{ type: 'state.set', path: 'view.x', value: '{{ Date.now() }}' as never }],
+        },
+      ],
+      locked: false,
+      visible: true,
+    };
+    const refs = walkExpressionsInNode(node);
+    expect(refs.length).toBe(1);
+    const issue = refs[0].issues[0];
+    expect(issue.code).toBe('E008');
+    expect(issue.level).toBe('warning');
+    expect(issue.suggestedFix).toContain('$.now()');
   });
 });

@@ -19,6 +19,10 @@ import {
   walkExpressionsInNode,
 } from '@globallink/design-expression';
 import { findLintErrors, buildLintFailResult, attachLintWarnings } from '../utils/lint-guard';
+import {
+  lintComponentNodeFieldRelations,
+  attachSchemaLintWarnings,
+} from '../utils/component-node-lint';
 import type {
   ElementAddOp,
   ElementRemoveOp,
@@ -313,18 +317,23 @@ export function executeAddElement(project: DesignProject, params: ElementAddOp['
     return { project, result: fail.result, inverse: fail.inverse };
   }
 
+  // ★ F3: schema 字段关系 lint（textContent vs children 互斥 / bind × change 双写）
+  const schemaRefs = lintComponentNodeFieldRelations(newNode, 'newNode');
+
   newProject.updatedAt = new Date().toISOString();
+
+  // 合并 expression lint warnings + schema field lint warnings
+  let resultBase: OperationResult = {
+    success: true,
+    description: `Added ${params.tag} element to ${params.parentId}`,
+    affectedNodeIds: [newNode.id, params.parentId],
+  };
+  resultBase = attachLintWarnings(resultBase, refs);
+  resultBase = attachSchemaLintWarnings(resultBase, schemaRefs);
 
   return {
     project: newProject,
-    result: attachLintWarnings(
-      {
-        success: true,
-        description: `Added ${params.tag} element to ${params.parentId}`,
-        affectedNodeIds: [newNode.id, params.parentId],
-      },
-      refs,
-    ),
+    result: resultBase,
     inverse: {
       type: 'element.remove',
       params: { elementId: newNode.id },

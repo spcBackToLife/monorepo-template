@@ -2,41 +2,85 @@ import type { Expression } from './expression';
 
 // ===== State 操作动词 =====
 
-/** state.set — 把 state 路径上的值替换为 value 求值结果 */
+/**
+ * state.set — 把 state 路径上的值替换为 value 求值结果。
+ *
+ * ⚠️ 重要:`path` 字段使用 **ScreenState 根相对路径**,与 Expression 内部 scope 不同:
+ *
+ *   | 上下文           | 写法                              | 含义                              |
+ *   | --------------- | -------------------------------- | -------------------------------- |
+ *   | path 字段        | `"view.form.phone"`              | 直接访问 ScreenState.view.form.phone |
+ *   | path 字段        | `"data.messages[2].text"`        | 数组索引访问 ScreenState.data.messages[2].text |
+ *   | Expression 内部  | `"{{ state.view.form.phone }}"`  | 访问同一字段必须带 state. 前缀   |
+ *
+ * 真相源:`features/design-engine/src/state/Store.ts` 的 path 解析器以 ScreenState
+ * (含 data/view/effects 三命名空间) 为根。表达式作用域则把 ScreenState 整体绑在
+ * `state` 标识符上(由 spec.json scope.contextual.state 声明)。
+ *
+ * 常见错误:
+ *   ❌ `path: "state.view.x"` → 实际写到 ScreenState.state.view.x(多了一层)
+ *   ✅ `path: "view.x"`        → 写到 ScreenState.view.x
+ */
 export interface StateSetAction {
   type: 'state.set';
-  /** 路径，如 "view.inputDraft" 或 "data.messages[2].text" */
+  /**
+   * ScreenState 根相对路径,如:
+   *   - "view.inputDraft"        → ScreenState.view.inputDraft
+   *   - "data.messages[2].text"  → ScreenState.data.messages[2].text
+   *
+   * ⚠️ 不要带 `state.` 前缀(那是 Expression Language 内部的写法)。
+   */
   path: string;
   /** 表达式或字面值 */
   value: Expression | unknown;
 }
 
-/** state.append — path 必须指向数组，把 value 追加进去 */
+/**
+ * state.append — path 必须指向数组,把 value 追加进去。
+ *
+ * path 字段语义同 StateSetAction(ScreenState 根相对路径,见上)。
+ */
 export interface StateAppendAction {
   type: 'state.append';
+  /** ScreenState 根相对路径,必须指向数组,如 "data.messages" */
   path: string;
   value: Expression | unknown;
 }
 
-/** state.remove — path 数组中按索引或 predicate 删除 */
+/**
+ * state.remove — path 数组中按索引或 predicate 删除。
+ *
+ * path 字段语义同 StateSetAction(ScreenState 根相对路径,见上)。
+ */
 export interface StateRemoveAction {
   type: 'state.remove';
+  /** ScreenState 根相对路径,必须指向数组,如 "data.todos" */
   path: string;
-  /** 索引（负数表示倒数）或谓词表达式 (item, index) => boolean */
+  /** 索引(负数表示倒数)或谓词表达式 (item, index) => boolean */
   index?: number;
   predicate?: Expression<boolean>;
 }
 
-/** state.merge — path 必须指向对象，与 value 浅合并 */
+/**
+ * state.merge — path 必须指向对象,与 value 浅合并。
+ *
+ * path 字段语义同 StateSetAction(ScreenState 根相对路径,见上)。
+ */
 export interface StateMergeAction {
   type: 'state.merge';
+  /** ScreenState 根相对路径,必须指向对象,如 "view.form" */
   path: string;
   value: Expression | Record<string, unknown>;
 }
 
-/** state.toggle — path 必须指向 boolean，反转 */
+/**
+ * state.toggle — path 必须指向 boolean,反转。
+ *
+ * path 字段语义同 StateSetAction(ScreenState 根相对路径,见上)。
+ */
 export interface StateToggleAction {
   type: 'state.toggle';
+  /** ScreenState 根相对路径,必须指向 boolean,如 "view.modalOpen" */
   path: string;
 }
 

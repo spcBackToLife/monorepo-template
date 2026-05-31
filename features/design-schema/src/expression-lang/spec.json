@@ -279,6 +279,12 @@
       "description": "访问 spec 中未声明且属于浏览器/Node 环境危险全局",
       "level": "error",
       "blockedList": ["globalThis", "window", "self", "Function", "eval", "process", "require", "import", "document", "fetch", "XMLHttpRequest", "localStorage", "sessionStorage", "WebSocket", "Worker"]
+    },
+    "E008": {
+      "summary": "Deprecated usage",
+      "description": "用法语法/语义合法但已被 knownMigrations 标记为 deprecated；建议按 suggestedFix 迁移到推荐写法",
+      "level": "warning",
+      "hintTemplate": "`{source}` 已 deprecated，建议改为 `{recommended}`"
     }
   },
 

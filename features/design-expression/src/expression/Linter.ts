@@ -49,7 +49,7 @@ import {
 
 // ===== 类型 =====
 
-/** spec.errorCodes 中定义的 7 个错误码（lint 阶段不会产 E006） */
+/** spec.errorCodes 中可由 lint 阶段产出的错误码（排除 E006 静态类型推断警告） */
 export type LintErrorCode = Exclude<ExprLangErrorCode, 'E006'>;
 
 /** 单条 lint 问题（结构化，可机读） */
@@ -368,6 +368,22 @@ function checkAst(ast: Ast, src: string, issues: LintIssue[]): void {
                 '§3.2 globals',
               ),
             );
+          } else {
+            // ★ E008: 合法但 deprecated 的用法（如 Date.now() → $.now()）
+            const source = `${globalName}.${callee.property}()`;
+            const recommended = findMigrationHint(source);
+            if (recommended) {
+              issues.push(
+                makeIssue(
+                  'E008',
+                  `\`${source}\` is deprecated; recommend \`${recommended.split(' ')[0]}\``,
+                  findIdent(src, `${globalName}.${callee.property}`),
+                  '§7 knownMigrations',
+                  recommended,
+                  recommended.split(' ')[0],
+                ),
+              );
+            }
           }
         }
         // 4. instance.method —— 实例方法白名单

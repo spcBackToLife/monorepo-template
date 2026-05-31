@@ -150,6 +150,32 @@ export interface RepeatBinding {
 // ===== Component Node v2 =====
 
 /** Core building block of the design tree（v2 — state/action/expression 模型） */
+/**
+ * 设计画布的运行时节点 / 渲染最小单位。
+ *
+ * ## 字段互斥与优先级矩阵（v1.0 起渲染契约固化）
+ *
+ * 1. **`props.textContent` / `props.text` ⊥ `children`**
+ *    - 渲染层 PrimitiveRenderer.readInlineTextFromProps 解析顺序：
+ *      `textContent → text → props.children → children 树`
+ *    - 字符串值 `''`（空字符串）视为「显式无叶子文本」，让渲染层 fall through 到 `children`
+ *    - 数字 `0` 仍渲染为 `'0'`（非空叶子文本）
+ *    - 同时设置 `props.textContent`（非空字符串）+ `children`（非空数组）→ children 不会渲染
+ *    - lint：ops 层 `lintComponentNodeFieldRelations` 在 add/change_type 时给 warning
+ *
+ * 2. **`bind` × `events[trigger='change']`**
+ *    - input/textarea/select 节点 bind 已自动同步 store；再写 change event 等于双写
+ *    - lint：warning，建议把 change 行为合并到 events[blur] 或 events[click] 等其它 trigger
+ *
+ * 3. **`visibleWhen` (运行时) × `meta.editorMetadata.hiddenInEditor` (编辑期)**
+ *    - 互不干涉，前者运行时求值，后者仅编辑期视觉
+ *
+ * 4. **`visible` × `visibleWhen`**
+ *    - `visible=false` 始终不渲染（硬开关）
+ *    - `visible=true` 时才求值 `visibleWhen`（动态可见性）
+ *
+ * 渲染契约实现位置：design-engine PrimitiveRenderer.readInlineTextFromProps
+ */
 export interface ComponentNode {
   /** Unique node identifier */
   id: string;
@@ -217,9 +243,19 @@ export interface ComponentNode {
   /**
    * 受控双向绑定（仅 input/textarea/select 等表单元素）。
    * value 来自 state[bind.path]，change 事件 dispatch state.set(bind.path, e.target.value)。
+   *
+   * ⚠️ `bind.path` 使用 **ScreenState 根相对路径**,与 Expression 内部 scope 不同:
+   *   - bind.path:           `"view.form.phone"`         → ScreenState.view.form.phone
+   *   - Expression 等价访问: `"{{ state.view.form.phone }}"`
+   *
+   * 不要带 `state.` 前缀;那是 Expression Language 内部 scope 的写法。
+   * 详见 `types/action.ts` StateSetAction.path JSDoc 的对照表。
    */
   bind?: {
-    /** 路径，如 "view.inputDraft" */
+    /**
+     * ScreenState 根相对路径(如 "view.inputDraft" / "view.form.phone")。
+     * 不要带 `state.` 前缀。
+     */
     path: string;
   };
 

@@ -1,5 +1,5 @@
 <!-- AUTO-GENERATED FROM features/design-schema/src/expression-lang/spec.json -->
-<!-- spec hash: 4a4cf13d -->
+<!-- spec hash: 2b8ed7c0 -->
 <!-- DO NOT EDIT MANUALLY: any change here will be overwritten by `pnpm gen:cheatsheet` -->
 
 # Expression Language v1.0.0 速查表
@@ -241,6 +241,7 @@ _（无成员）_
 | **E005** | error | Forbidden syntax | 使用了 spec.syntax.forbidden 中的语法 |
 | **E006** | warning | Type mismatch (best-effort warning) | 静态推断发现类型与期望不符（best-effort，不抛 error 仅 warn） |
 | **E007** | error | Forbidden global | 访问 spec 中未声明且属于浏览器/Node 环境危险全局 |
+| **E008** | warning | Deprecated usage | 用法语法/语义合法但已被 knownMigrations 标记为 deprecated；建议按 suggestedFix 迁移到推荐写法 |
 
 ### E007 黑名单（forbidden globals）
 

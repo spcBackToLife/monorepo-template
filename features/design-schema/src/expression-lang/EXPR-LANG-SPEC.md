@@ -363,6 +363,49 @@ $.matches(s, re)     // 正则匹配，re 接受 string 或 RegExp 字面量
 
 二者**通过 schema 中标 `Expression<T>` 的字段衔接**。schema 的 zod validator 不查表达式内容，由 Expression Lang 工具链单独负责。
 
+### 8.1 ★ path 字段 vs Expression scope —— 两套写法,一字之差(易错点)
+
+`bind.path` / `state.set.path` / `state.append.path` 等 schema 字段使用的是
+**ScreenState 根相对路径**,与 Expression 内部 `state.xxx` 的 scope 写法**不同**。
+
+| 字段 / 上下文 | 写法 | 含义 | 是哪个 DSL |
+|---|---|---|---|
+| `bind.path` | `"view.form.phone"` | 直接访问 `ScreenState.view.form.phone` | schema |
+| `state.set.path` | `"data.messages[2].text"` | 直接访问 `ScreenState.data.messages[2].text` | schema |
+| `state.append.path` | `"data.todos"` | 直接访问 `ScreenState.data.todos` | schema |
+| Expression 内部访问同一字段 | `"{{ state.view.form.phone }}"` | 必须带 `state.` 前缀 | Expression Lang(本文档) |
+
+**为什么不同**:
+- Store(`features/design-engine/src/state/Store.ts`)的 path 解析器以 `ScreenState`
+  整体(含 `data`/`view`/`effects` 三命名空间)为根,所以 `path` 字段直接从 data/view/effects
+  开始写。
+- 表达式内部把整个 `ScreenState` 绑在 `state` 标识符上(由 spec.json
+  `scope.contextual.state` 声明),所以表达式必须 `state.xxx` 才能访问 `xxx`。
+
+**常见错误**:
+
+```diff
+# ❌ 多了一层 "state." 前缀,实际写到 ScreenState.state.view.x
+- { type: "state.set", path: "state.view.x", value: "{{ ... }}" }
+# ✅
++ { type: "state.set", path: "view.x", value: "{{ ... }}" }
+
+# ❌ bind.path 同样不要带 "state."
+- bind: { path: "state.view.form.phone" }
+# ✅
++ bind: { path: "view.form.phone" }
+
+# ❌ 反过来,表达式里少了 "state." 会触发 E002 (unknown identifier)
+- visibleWhen: "{{ view.form.phone === '' }}"
+# ✅
++ visibleWhen: "{{ state.view.form.phone === '' }}"
+```
+
+> 真相源:`features/design-schema/src/types/action.ts` `StateSetAction.path` JSDoc 与
+> `features/design-schema/src/types/node.ts` `bind.path` JSDoc 都明确写了这条边界。
+> integrity 暂未检测此类错误(因 path 是 string,无法静态判定根),靠 SKILL 教学 +
+> Expression lint(E002 在表达式侧拦反向错误)双向兜底。
+
 ---
 
 ## 附录 A：与业界的对照

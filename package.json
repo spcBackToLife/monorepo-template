@@ -45,5 +45,12 @@
       "canvas"
     ],
     "ignoredBuiltDependencies": []
-  }
+  },
+  "workspaces": [
+    "packages/**",
+    "apps/**",
+    "features/**",
+    "tooling/**",
+    "plugins/**"
+  ]
 }

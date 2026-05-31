@@ -103,7 +103,7 @@ export type InstanceMember =
   | { args: string[]; returns: string; description?: string; _warning?: string }
   | { kind: 'property'; type: string };
 
-export type ErrorCode = 'E001' | 'E002' | 'E003' | 'E004' | 'E005' | 'E006' | 'E007';
+export type ErrorCode = 'E001' | 'E002' | 'E003' | 'E004' | 'E005' | 'E006' | 'E007' | 'E008';
 
 export interface ErrorCodeDef {
   summary: string;
