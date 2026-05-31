@@ -1,0 +1,294 @@
+{
+  "$schema": "./spec.schema.json",
+  "version": "1.0.0",
+  "name": "design-expression-language",
+  "description": "Design Platform Expression Language — schema-first 体系的第二 DSL，描述运行时动态值（visibleWhen / repeat / props / styles / state.set value / condition / action params 等）。",
+
+  "syntax": {
+    "literals": {
+      "string": { "supported": true, "delimiters": ["'", "\""] },
+      "number": { "supported": true, "form": "decimal | float (no scientific yet)" },
+      "boolean": { "supported": true, "values": ["true", "false"] },
+      "null": { "supported": true },
+      "undefined": { "supported": true },
+      "regex": { "supported": true, "form": "/pattern/flags", "flags": ["i", "g", "m", "s", "u", "y"] },
+      "array": { "supported": true, "form": "[expr, expr, ...]" },
+      "object": { "supported": true, "form": "{ key: expr, 'str-key': expr, [computed]: expr }" }
+    },
+    "operators": {
+      "binary": ["+", "-", "*", "/", "%", "===", "!==", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "??"],
+      "unary": ["!", "-", "+", "typeof"],
+      "ternary": true
+    },
+    "memberAccess": {
+      "dot": true,
+      "bracket": true,
+      "optionalChain": true,
+      "_note": "a.b / a['b'] / a?.b / a?.['b'] / arr[0]"
+    },
+    "callForm": {
+      "supported": true,
+      "_note": "f(arg1, arg2, ...) — callee 必须在 spec.scope 允许列表内"
+    },
+    "forbidden": [
+      "assignment (=, +=, ...)",
+      "function-declaration (function / arrow)",
+      "loop (for / while / do)",
+      "try-catch / throw",
+      "template-string (`hello ${x}`)",
+      "spread/rest (...x)",
+      "destructuring",
+      "new expression (new Date())",
+      "delete operator",
+      "yield / await / async"
+    ]
+  },
+
+  "scope": {
+    "contextual": {
+      "state": {
+        "type": "ScreenState",
+        "scope": "always",
+        "description": "屏级运行时状态。等价 `store.getState()`，含 data / view / effects 三命名空间。",
+        "shape": "{ data: Record<string,unknown>, view: Record<string,unknown>, effects: Record<string,EffectStatus> }"
+      },
+      "globalView": {
+        "type": "GlobalView",
+        "scope": "always",
+        "description": "项目级共享上下文（v1.0 ★ 新增到 ctx）：session / network / nav / preferences / fallback。等价 `project.globalStateInit.view`，由宿主在每次 ctx 构造时注入。",
+        "shape": "Record<string, unknown>"
+      },
+      "item": {
+        "type": "any",
+        "scope": "inside-list-render",
+        "description": "列表渲染时当前迭代项（由 ListRenderer 注入）。"
+      },
+      "index": {
+        "type": "number",
+        "scope": "inside-list-render",
+        "description": "列表渲染时当前迭代下标（从 0 开始）。"
+      },
+      "parent": {
+        "type": "any",
+        "scope": "inside-nested-list",
+        "description": "嵌套列表外层 item。"
+      },
+      "$last": {
+        "type": "EffectStatus",
+        "scope": "inside-onSuccess|onError|onComplete",
+        "description": "上一次 effect.fetch 的最终状态，含 .response / .error / .startedAt / .finishedAt。",
+        "shape": "{ status: 'success'|'error'|'idle', response?: unknown, error?: { code, message, ... }, startedAt: number, finishedAt?: number }"
+      }
+    },
+
+    "globals": {
+      "Date": {
+        "kind": "namespace",
+        "callable": false,
+        "members": {
+          "now": { "args": [], "returns": "number", "description": "当前 UTC 时间戳（ms）。" },
+          "parse": { "args": ["string"], "returns": "number", "description": "解析时间字符串为 ms 时间戳。" },
+          "UTC": { "args": ["number", "number?", "number?", "number?", "number?", "number?", "number?"], "returns": "number" }
+        },
+        "description": "时间相关静态方法。⚠️ 不允许 `new Date()`（构造函数禁用）；如需 Date 对象操作，请用 $.formatDate 等内置。"
+      },
+      "Math": {
+        "kind": "namespace",
+        "callable": false,
+        "members": {
+          "floor": { "args": ["number"], "returns": "number" },
+          "ceil": { "args": ["number"], "returns": "number" },
+          "round": { "args": ["number"], "returns": "number" },
+          "abs": { "args": ["number"], "returns": "number" },
+          "min": { "args": ["...number"], "returns": "number" },
+          "max": { "args": ["...number"], "returns": "number" },
+          "pow": { "args": ["number", "number"], "returns": "number" },
+          "sqrt": { "args": ["number"], "returns": "number" },
+          "random": { "args": [], "returns": "number" },
+          "sign": { "args": ["number"], "returns": "number" },
+          "trunc": { "args": ["number"], "returns": "number" }
+        }
+      },
+      "Number": {
+        "kind": "namespace",
+        "callable": true,
+        "callDescription": "Number(x) — 转数字",
+        "members": {
+          "isFinite": { "args": ["any"], "returns": "boolean" },
+          "isNaN": { "args": ["any"], "returns": "boolean" },
+          "isInteger": { "args": ["any"], "returns": "boolean" },
+          "parseInt": { "args": ["string", "number?"], "returns": "number" },
+          "parseFloat": { "args": ["string"], "returns": "number" },
+          "MAX_SAFE_INTEGER": { "kind": "constant", "type": "number" },
+          "MIN_SAFE_INTEGER": { "kind": "constant", "type": "number" }
+        }
+      },
+      "String": {
+        "kind": "namespace",
+        "callable": true,
+        "callDescription": "String(x) — 转字符串",
+        "members": {}
+      },
+      "Boolean": {
+        "kind": "namespace",
+        "callable": true,
+        "callDescription": "Boolean(x) — 转布尔",
+        "members": {}
+      },
+      "JSON": {
+        "kind": "namespace",
+        "callable": false,
+        "members": {
+          "stringify": { "args": ["any", "any?", "any?"], "returns": "string" },
+          "parse": { "args": ["string"], "returns": "any" }
+        }
+      },
+      "Object": {
+        "kind": "namespace",
+        "callable": false,
+        "members": {
+          "keys": { "args": ["any"], "returns": "string[]" },
+          "values": { "args": ["any"], "returns": "any[]" },
+          "entries": { "args": ["any"], "returns": "[string,any][]" }
+        }
+      },
+      "Array": {
+        "kind": "namespace",
+        "callable": false,
+        "members": {
+          "isArray": { "args": ["any"], "returns": "boolean" },
+          "from": { "args": ["any", "any?"], "returns": "any[]" }
+        }
+      }
+    },
+
+    "builtins": {
+      "$": {
+        "_description": "平台内置纯函数命名空间，挂在表达式作用域 `$` 下。所有函数都是纯函数 + 容错（参数错返合理默认，不抛错）。",
+        "length": { "args": ["any"], "returns": "number", "description": "字符串/数组/对象的长度（对象按 keys 数）" },
+        "upper": { "args": ["string"], "returns": "string" },
+        "lower": { "args": ["string"], "returns": "string" },
+        "format": { "args": ["string", "...any"], "returns": "string", "description": "format(\"hi {0}, {name}\", \"world\", { name: 'tom' })" },
+        "includes": { "args": ["string|any[]", "any"], "returns": "boolean" },
+        "first": { "args": ["any[]"], "returns": "any" },
+        "last": { "args": ["any[]"], "returns": "any" },
+        "isEmpty": { "args": ["any"], "returns": "boolean" },
+        "not": { "args": ["any"], "returns": "boolean" },
+        "defaultTo": { "args": ["any", "any"], "returns": "any" },
+        "now": { "args": [], "returns": "number", "description": "等价 Date.now()；推荐前端首选" },
+        "matches": { "args": ["string", "string|RegExp"], "returns": "boolean", "description": "$.matches(state.x, '^1[3-9]\\\\d{9}$')；接受字符串 pattern 或 RegExp 字面量" }
+      }
+    },
+
+    "instanceMethods": {
+      "_description": "实例方法白名单。表达式中 `obj.method(args)` 形式调用时，必须先匹配 obj 的运行时类型，再查 method 是否在白名单。其他实例方法（如 .toString / .toLocaleString / .valueOf 等）默认禁用。",
+      "string": {
+        "length": { "kind": "property", "type": "number" },
+        "slice": { "args": ["number", "number?"], "returns": "string" },
+        "substring": { "args": ["number", "number?"], "returns": "string" },
+        "indexOf": { "args": ["string", "number?"], "returns": "number" },
+        "lastIndexOf": { "args": ["string", "number?"], "returns": "number" },
+        "includes": { "args": ["string"], "returns": "boolean" },
+        "startsWith": { "args": ["string", "number?"], "returns": "boolean" },
+        "endsWith": { "args": ["string", "number?"], "returns": "boolean" },
+        "toLowerCase": { "args": [], "returns": "string" },
+        "toUpperCase": { "args": [], "returns": "string" },
+        "trim": { "args": [], "returns": "string" },
+        "trimStart": { "args": [], "returns": "string" },
+        "trimEnd": { "args": [], "returns": "string" },
+        "split": { "args": ["string|RegExp", "number?"], "returns": "string[]" },
+        "replace": { "args": ["string|RegExp", "string"], "returns": "string" },
+        "replaceAll": { "args": ["string|RegExp", "string"], "returns": "string" },
+        "padStart": { "args": ["number", "string?"], "returns": "string" },
+        "padEnd": { "args": ["number", "string?"], "returns": "string" },
+        "repeat": { "args": ["number"], "returns": "string" },
+        "concat": { "args": ["...string"], "returns": "string" },
+        "charAt": { "args": ["number"], "returns": "string" },
+        "charCodeAt": { "args": ["number"], "returns": "number" },
+        "match": { "args": ["string|RegExp"], "returns": "string[]|null" }
+      },
+      "number": {
+        "toFixed": { "args": ["number?"], "returns": "string" },
+        "toString": { "args": ["number?"], "returns": "string" }
+      },
+      "array": {
+        "length": { "kind": "property", "type": "number" },
+        "includes": { "args": ["any"], "returns": "boolean" },
+        "indexOf": { "args": ["any", "number?"], "returns": "number" },
+        "lastIndexOf": { "args": ["any", "number?"], "returns": "number" },
+        "slice": { "args": ["number?", "number?"], "returns": "any[]" },
+        "concat": { "args": ["...any"], "returns": "any[]" },
+        "join": { "args": ["string?"], "returns": "string" },
+        "find": { "args": ["function"], "returns": "any", "_warning": "函数参数当前不在表达式语法范围内，请用 $.* 替代或重新设计 schema" },
+        "findIndex": { "args": ["function"], "returns": "number", "_warning": "同上" },
+        "filter": { "args": ["function"], "returns": "any[]", "_warning": "同上" },
+        "map": { "args": ["function"], "returns": "any[]", "_warning": "同上" },
+        "some": { "args": ["function"], "returns": "boolean", "_warning": "同上" },
+        "every": { "args": ["function"], "returns": "boolean", "_warning": "同上" },
+        "reverse": { "args": [], "returns": "any[]" },
+        "flat": { "args": ["number?"], "returns": "any[]" }
+      },
+      "regex": {
+        "test": { "args": ["string"], "returns": "boolean" },
+        "exec": { "args": ["string"], "returns": "string[]|null" },
+        "source": { "kind": "property", "type": "string" },
+        "flags": { "kind": "property", "type": "string" }
+      }
+    }
+  },
+
+  "errorCodes": {
+    "E001": {
+      "summary": "Syntax error",
+      "description": "Tokenizer/Parser 发现非法字符或非法语法结构",
+      "level": "error",
+      "examples": ["unexpected character `^` at 1", "unterminated string at 5"]
+    },
+    "E002": {
+      "summary": "Unknown identifier",
+      "description": "标识符不在 spec.scope.contextual 也不在 spec.scope.globals 也不在 spec.scope.builtins",
+      "level": "error",
+      "hintTemplate": "标识符 `{name}` 未在 spec v{version} 注册；可用：{availableList}"
+    },
+    "E003": {
+      "summary": "Forbidden member call",
+      "description": "对全局对象调用了未在白名单内的方法",
+      "level": "error",
+      "hintTemplate": "禁止调用 `{obj}.{method}`；spec v{version} 允许的方法：{allowedList}"
+    },
+    "E004": {
+      "summary": "Forbidden instance method",
+      "description": "对实例值调用了未在白名单内的方法",
+      "level": "error",
+      "hintTemplate": "类型 `{type}` 不允许调用 `.{method}`；可用方法：{allowedList}"
+    },
+    "E005": {
+      "summary": "Forbidden syntax",
+      "description": "使用了 spec.syntax.forbidden 中的语法",
+      "level": "error",
+      "hintTemplate": "spec v{version} 不支持 `{syntax}`；改用：{suggestion}"
+    },
+    "E006": {
+      "summary": "Type mismatch (best-effort warning)",
+      "description": "静态推断发现类型与期望不符（best-effort，不抛 error 仅 warn）",
+      "level": "warning",
+      "hintTemplate": "期望 {expected}，但表达式静态推断为 {actual}"
+    },
+    "E007": {
+      "summary": "Forbidden global",
+      "description": "访问 spec 中未声明且属于浏览器/Node 环境危险全局",
+      "level": "error",
+      "blockedList": ["globalThis", "window", "self", "Function", "eval", "process", "require", "import", "document", "fetch", "XMLHttpRequest", "localStorage", "sessionStorage", "WebSocket", "Worker"]
+    }
+  },
+
+  "knownMigrations": {
+    "_description": "AI/旧 schema 常见错误 → 推荐写法的映射，由 lint engine 用作 suggestedFix。",
+    "Date.now()": "$.now()",
+    "new Date()": "$.now()  /* 注意：新写法返回时间戳 number，不是 Date 对象 */",
+    "globalView.x.y": "globalView.x.y  /* 已合法，spec v1.0 起 globalView 在 ctx 中可用 */",
+    "case.when": "case.match  /* logic.switch case 字段名是 match，不是 when */",
+    "/regex/.test(x)": "/regex/.test(x)  /* 已合法，spec v1.0 支持正则字面量 */",
+    "arr.map(x => x.foo)": "arr.find(...) 等高阶函数当前不支持函数参数，请重新设计 schema 或用 $.* 内置"
+  }
+}
