@@ -189,6 +189,7 @@ interface RestoreVisualStateParams {
   childrenStates?: Record<string, string>;
   childrenVisibility?: Record<string, boolean>;
   disabledEvents?: string[];
+  activeWhen?: string;
 }
 
 function restoreVisualState(project: DesignProject, params: RestoreVisualStateParams): Result {
@@ -217,6 +218,8 @@ function restoreVisualState(project: DesignProject, params: RestoreVisualStatePa
     else delete state.childrenVisibility;
     if (params.disabledEvents !== undefined) state.disabledEvents = params.disabledEvents;
     else delete state.disabledEvents;
+    if (params.activeWhen !== undefined) state.activeWhen = params.activeWhen;
+    else delete state.activeWhen;
   }
   newProject.updatedAt = new Date().toISOString();
   return {

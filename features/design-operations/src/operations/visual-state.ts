@@ -53,6 +53,7 @@ export function executeAddState(project: DesignProject, params: VisualStateAddOp
     ...(params.childrenStates != null ? { childrenStates: params.childrenStates } : {}),
     ...(params.childrenVisibility != null ? { childrenVisibility: params.childrenVisibility } : {}),
     ...(params.disabledEvents != null ? { disabledEvents: params.disabledEvents } : {}),
+    ...(params.activeWhen != null ? { activeWhen: params.activeWhen } : {}),
   };
 
   node.states.push(newState);
@@ -158,6 +159,7 @@ export function executeUpdateState(project: DesignProject, params: VisualStateUp
     state.childrenVisibility === undefined ? undefined : { ...state.childrenVisibility };
   const oldDisabledEvents =
     state.disabledEvents === undefined ? undefined : [...state.disabledEvents];
+  const oldActiveWhen = state.activeWhen;
 
   if (params.styles !== undefined) {
     state.styles = { ...state.styles, ...(params.styles as Partial<CSSProperties>) };
@@ -176,6 +178,14 @@ export function executeUpdateState(project: DesignProject, params: VisualStateUp
   }
   if (params.disabledEvents !== undefined) {
     state.disabledEvents = [...params.disabledEvents];
+  }
+  // v3 ★ activeWhen：null 表示清空，string 表示设置；undefined 表示不动
+  if (params.activeWhen !== undefined) {
+    if (params.activeWhen === null) {
+      delete state.activeWhen;
+    } else {
+      state.activeWhen = params.activeWhen;
+    }
   }
 
   newProject.updatedAt = new Date().toISOString();
@@ -198,6 +208,7 @@ export function executeUpdateState(project: DesignProject, params: VisualStateUp
         childrenStates: oldChildrenStates,
         childrenVisibility: oldChildrenVisibility,
         disabledEvents: oldDisabledEvents,
+        activeWhen: oldActiveWhen,
       },
     },
   };

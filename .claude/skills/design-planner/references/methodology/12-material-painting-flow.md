@@ -44,29 +44,90 @@
 
 ## 3. 调用 material-painter 子技能
 
-按 SKILL tool 调用 material-painter（注意 material-painter 有 invariants，详见其 SKILL.md）：
+按 SKILL tool 调用 material-painter（注意 material-painter 有 invariants，详见其 SKILL.md）。
+
+### 3.0 ★ brief 边界铁律（v3.1，与 SKILL.md §5.5 同根）
+
+**design-planner 是艺术总监，material-painter 是专业画家。brief 只给目标 + 概念 + 约束，禁止给施工图**。
+
+| brief 应给 ✅ | brief 禁给 ❌ |
+|---|---|
+| 视觉目标（一句话）| pathData 字符串 |
+| concept.md 灵魂句 + 关键词 3 + mood board | 具体坐标（圆心 / 起点 / 终点）|
+| 装饰系统单一族名（soft-glow 等）| strokeWidth 像素值 |
+| 60-30-10 调色定位（这素材在 10% 强调还是 60% 主导）| hex 色值（必须用 token 引用名）|
+| 节点尺寸 width × height | 构图层数清单（"3 层：底层 X + 中层 Y"）|
+| 节点上下文（屏底色 / 周围节点 / 不能融合的色）| safe-zone 像素值 |
+| 可用 token 池（引用名 + 描述，不展开 hex）| rect/path/ellipse 选型 |
+| painter "需要自己决定的"清单（≥ 3 项）| 任何"按图施工"指令 |
+| 失败重画时附"上一版为什么失败" | — |
+
+painter 收到 brief 后**自己跑「设计思考三步 + 7 步绘制工作流」**：
+1. 概念提取 — 视觉隐喻
+2. 构成规划 — 底/中/顶层各画什么
+3. 风格适配 — 笔触/色比/留白
++ Step 0b 尺寸决策 — 参考框 / stroke / safe-zone
+
+如果 design 替 painter 决策了 1-3 中任何一步 → painter 退化成"画板代笔"，技能价值丢失。
 
 ### 3.1 准备 input
 
-调用前准备：
+调用前准备（这些是**目标 + 约束**，不是构图细节）：
 - 目标节点 nodeId + width + height（来自该节点 styles）
-- materialSpec（来自该节点 meta.design.materialSpec）
-- theme.tokens（保证素材颜色在 token 池内）
-- visualConcept.styleKeywords + decoration.system（保证素材风格统一）
+- visualConcept.{soulSentence, styleKeywords, moodBoard}（来自 concept.md）
+- visualStrategy.decoration.system（保证素材风格统一族）
+- visualStrategy.color.ratio + 这素材在哪一档（10% / 30% / 60%）
+- 屏底色 + 周围节点上下文（让 painter 判断对比策略）
+- theme.tokens 引用名清单（不展开 hex，让 painter 自己 theme/get 解析）
+- 失败案例（如有 v1，写明为什么失败）
 
-### 3.2 调用方式
+### 3.2 调用方式（v3.1 正确示例）
 
 ```
 Skill tool: material-painter
 prompt: |
-  为节点 nodeId='n_BrandLogo' 画一个 brand logo 素材：
-  - referenceFrame: 120 × 120 px
-  - kind: brand
-  - 风格：minimal + 暖白主题 + 单色温度（参 visualConcept.styleKeywords）
-  - 主色：$token:colors.primary (#5B6CFF)
-  - 构图：抽象几何符号 + 居中 + 轻量
-  - materialSpec 详细：[完整 jsonc]
-  - 完成后调 applyMaterialDesign 写入 node.materialProjectId
+  为节点 'n_BrandLogo' 画 brand logo 素材绑定。
+
+  ⚠️ 这是干净 brief，不含施工细节——请你自己跑「设计思考三步 + 7 步工作流」。
+
+  ## 视觉目标（一句话）
+  让校园用户进登录页一眼感受到「这是个清新有温度的校园社交产品」的品牌印象。
+
+  ## 概念输入
+  - 灵魂句：像清晨教室的光，温暖但不打扰
+  - 风格关键词 3：暖白米 / 大圆角柔和 / 单色光斑节制
+  - mood board：晨光教室窗格 / 木桌笔记本 / 操场跑道弧线 / 公告板便签
+  - theme.intent：minimal + flat + neutral，主色 #5B6CFF（C = Campus）
+  - 装饰系统单一族：soft-glow（圆润+渐变+柔光+单色族）
+  - 60-30-10 调色：本素材在 10% 强调档（已用 SubmitBtn 主色填充，BrandLogo 用主色作字色不撞）
+
+  ## 节点约束
+  - 渲染尺寸：120 × 120 px
+  - 已有 borderRadius: $token:radius.xl (16px)
+  - 屏底 = $token:colors.background = #FCFCFD（暖白米）→ logo 不能与屏底融合到看不见
+  - 上下文：节点位于 HeaderArea，下方紧跟 BrandSlogan 文字
+
+  ## 可用 token 池（引用名）
+  - colors.primary / primaryHover / primaryLight / secondary
+  - colors.background / surfaceElevated / textPrimary
+  - shadows.sm / md / lg
+
+  ## 你需要自己决定的
+  1. 概念提取：「校园社交 + C = Campus + 清晨教室温度」→ 字标 / 字标+图形 / 抽象图形 / ...
+  2. 构成规划：底/中/顶层 + 是否要边框/阴影/光晕（与 soft-glow 系统统一）
+  3. 风格适配：笔触/色比/留白
+  4. 尺寸决策：referenceFrame / stroke / safe-zone
+  5. 如何避免与 #FCFCFD 屏底融合
+
+  ## 失败案例（v1，请避免）
+  - design 越界给了 圆心 (120,120) 半径 60 stroke 18 等坐标 → 我退化成画板代笔
+  - 1.5px 边框在 240px 帧太细 → 缩到 120×120 几乎看不见
+  - C 开口朝右 → 视觉重心向左偏
+
+  ## 完成后回报
+  - materialProjectId
+  - 设计思考三步（概念提取 / 构成规划 / 风格适配）
+  - 与 v1 的关键差异化决策
 ```
 
 ### 3.3 子技能产出
@@ -75,6 +136,23 @@ material-painter 完成后返回：
 - materialProjectId（已写入对应节点）
 - 画布工程 ID（可后续调整）
 - 导出的 PNG / SVG URL
+- ★ 设计思考三步 + 关键决策（让 design-planner 知道 painter 怎么想的，便于后续目标对账）
+
+### 3.4 ★ 输出后的"目标对账"（不是"修坐标"）
+
+design-planner 收到 painter 输出后做**目标对账**（不是改坐标）：
+
+| 对账维度 | 判据 |
+|---|---|
+| 视觉目标达成？ | 进屏一眼能感受到 brief 的"清新校园温度"吗？|
+| 概念契合？ | 与 concept.soulSentence 一致？关键词 3 全体现？|
+| 装饰系统统一？ | 与 visualStrategy.decoration.system 一致？|
+| 60-30-10 调色不破？| 没引入新的强调色 hex 让总比例失衡？|
+| 与上下文协调？| 不与屏底融合？与周围节点视觉权重平衡？|
+
+**任一维度不达标 → 把"上一版为什么失败"写清楚，调 painter 重画，不是自己改坐标**。
+
+如果 design 自己改坐标"修一下"，等于把 painter 的设计判断推翻、回到"画板代笔"模式——v3.1 红线。
 
 ---
 
@@ -178,3 +256,5 @@ expectedArtifacts:
 - ❌ pathData 用 Q / q / T / t 命令 → 后端渲染空白（B3 修复前必须避开）
 - ❌ 调子技能后不 generate_snapshots 检查 → 素材"画了但渲染空白"无人发现
 - ❌ design 阶段把素材绘制留给 executor → v3 已放开素材绘制权，design 阶段必须画完
+- ❌ **【v3.1 ★】brief 含 pathData / 坐标 / strokeWidth 像素值 / hex 色值 / 构图层数清单 → painter 退化为画板代笔，整版 brief 退回重写**（详见 §3.0）
+- ❌ **【v3.1 ★】painter 输出与目标偏差时 design 自己改坐标"修一下" → 应回 painter 重画并附"上一版失败原因"，不是设计阶段越界改构图**

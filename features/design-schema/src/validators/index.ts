@@ -24,6 +24,12 @@ const VisualStateSchema = z.object({
   childrenStates: z.record(z.string(), z.string()).optional(),
   childrenVisibility: z.record(z.string(), z.boolean()).optional(),
   disabledEvents: z.array(z.string()).optional(),
+  /**
+   * v3 ★ 业务态自动激活表达式（如 `{{ state.view.loginMode === 'code' }}`）。
+   * SchemaRenderer 在 Layer 1.5 扫描所有 visualState，遇 activeWhen 求值为 true 即激活该态。
+   * 与 DOM 事件态（hover/pressed/focus）正交：interaction state 优先，未触发时 activeWhen 兜底。
+   */
+  activeWhen: z.string().optional(),
 });
 
 // ===== Layout Constraints Schema =====

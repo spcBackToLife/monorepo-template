@@ -18,15 +18,16 @@ import { apiClient } from '../../api-client.js';
 export function registerVisualStateTools(server: McpServer): void {
   registerDomainTool(server, 'visual_state', '组件视觉状态的 CRUD（hover/pressed/disabled 等）及预览切换', {
     add: defineAction({
-      description: '为组件添加一个视觉状态，可设置该状态下的样式覆盖、子元素状态映射和 transition',
+      description: '为组件添加一个视觉状态，可设置该状态下的样式覆盖、子元素状态映射、transition 和 v3 ★ activeWhen 自动激活表达式',
       schema: z.object({
         projectId: z.string(), nodeId: z.string(), stateName: z.string(),
         styles: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
         transition: z.object({ duration: z.number().optional(), easing: z.string().optional(), properties: z.array(z.string()).optional() }).optional(),
         childrenStates: z.record(z.string(), z.string()).optional(),
+        activeWhen: z.string().optional().describe('v3 ★ 业务态自动激活表达式，如 `{{ state.view.loginMode === \'code\' }}`。SchemaRenderer 求值为 true 时激活该态'),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'visualState.add', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, ...(p.transition != null ? { transition: p.transition } : {}), ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}) } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'visualState.add', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, ...(p.transition != null ? { transition: p.transition } : {}), ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}), ...(p.activeWhen != null ? { activeWhen: p.activeWhen } : {}) } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),
@@ -53,16 +54,17 @@ export function registerVisualStateTools(server: McpServer): void {
      * - 例如：hover 状态有 backgroundImage: null 想删除 → 用 reset_style，properties: ["backgroundImage"]
      */
     update: defineAction({
-      description: '更新节点上某个视觉状态的样式、属性和子元素状态映射（⚠️ 合并模式：不传的属性不会删除；要删除属性请用 reset_style）',
+      description: '更新节点上某个视觉状态的样式、属性、子元素状态映射、transition 和 v3 ★ activeWhen（⚠️ 合并模式：不传的属性不会删除；要删除属性请用 reset_style；activeWhen 传 null 表示清空）',
       schema: z.object({
         projectId: z.string(), nodeId: z.string(), stateName: z.string(),
         styles: z.record(z.string(), z.union([z.string(), z.number()])),
         props: z.record(z.string(), z.unknown()).optional(),
         childrenStates: z.record(z.string(), z.string()).optional(),
         transition: z.object({ duration: z.number().optional(), easing: z.string().optional(), properties: z.array(z.string()).optional() }).optional(),
+        activeWhen: z.union([z.string(), z.null()]).optional().describe('v3 ★ 业务态自动激活表达式。传 null 清空；省略则不动'),
       }),
       handler: async (p) => {
-        const result = await apiClient.executeOperation(p.projectId, { type: 'visualState.update', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, props: p.props, ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}), ...(p.transition != null ? { transition: p.transition } : {}) } });
+        const result = await apiClient.executeOperation(p.projectId, { type: 'visualState.update', params: { nodeId: p.nodeId, stateName: p.stateName, styles: p.styles, props: p.props, ...(p.childrenStates ? { childrenStates: p.childrenStates } : {}), ...(p.transition != null ? { transition: p.transition } : {}), ...(p.activeWhen !== undefined ? { activeWhen: p.activeWhen } : {}) } });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       },
     }),

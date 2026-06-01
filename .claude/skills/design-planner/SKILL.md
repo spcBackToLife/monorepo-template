@@ -27,7 +27,7 @@ description: Visual / UI design skill — Schema-First v2 pipeline stage 4. Trig
 3. **视觉任务自创权**——基于策略与本屏特征 `meta/add_plan_tasks` 自创 craft 任务
 4. **布局调整权**——`element/add` / `wrap` / `move` 视觉容器节点（不动业务节点的 events / bind / 数据）
 5. **装饰节点新建权**——4 类装饰节点 + 装饰系统单一族
-6. **素材绘制权**——自调 material-painter 子技能画素材 + applyMaterialDesign 写入 `materialProjectId`，给 executor 留交付物而非只是规格
+6. **素材绘制权**——自调 material-painter 子技能画素材 + applyMaterialDesign 写入 `materialProjectId`，给 executor 留交付物而非只是规格。⚠️ **brief 边界（v3.1 ★）**：分发给 material-painter 时**只能给视觉目标 + 概念关键词 + 节点尺寸 + token 池**，**禁止给 pathData / 坐标 / strokeWidth / hex 色值 / 构图层数**——"画什么"是 design 决策，"怎么画"是 painter 决策。详见 §5.5。
 
 **自审契约（v3 ★）**：每个 craft / styles / states 类落库任务标 done 之前必须 generate_snapshots 截图 → 按 `references/methodology/13-self-review-rubric.md` 5 维度评分 → 任一维 < 4/5 必须重做。
 
@@ -471,7 +471,89 @@ meta/add_plan_tasks {
 - 想加新业务字段（如 state.view.passwordVisible 但 interaction 没暴露）→ 走 UpstreamChallenge 让 interaction 补
 - 想改 token 池（如缺 elevation-2 阴影、缺 successBg 色）→ 走 UpstreamChallenge 让 theme-generator 补
 
-### 5.5 行为红线（典型错误）
+### 5.5 素材绘制 brief 边界（v3.1 ★ 重要）
+
+#### 核心契约
+
+design-planner 是**艺术总监**，material-painter 是**专业画家**。
+
+- **艺术总监**：定品牌方向、视觉概念、视觉策略、节点视觉权重、素材的"目标"
+- **专业画家**：拿到目标 brief 后，**自己跑「设计思考三步 + 7 步绘制工作流」**，自己决定构图、笔触、坐标、颜色
+
+**绝对红线**：design-planner 调 material-painter 子技能时，**brief 只能给目标 + 概念 + 约束**，**不能给施工图**。
+
+#### brief 应该给什么 ✅
+
+| 项 | 内容 | 来源 |
+|---|---|---|
+| 视觉目标（一句话）| "让校园用户进登录页一眼感受到清新校园温度" | concept.md 灵魂句衍生 |
+| 概念关键词 3 | 暖白米 / 大圆角柔和 / 单色光斑节制 | visualConcept.styleKeywords |
+| mood board | 晨光 / 笔记本 / 跑道 / 公告板 | visualConcept.moodBoard |
+| theme.intent | minimal+flat+neutral | theme/get |
+| 装饰系统单一族 | soft-glow | visualStrategy.decoration.system |
+| 60-30-10 调色定位 | 这素材在 10% 强调还是 60% 主导？ | visualStrategy.color |
+| 节点尺寸 | width × height | screen_schema |
+| 节点上下文 | 周围有什么节点 / 屏底是什么色 / 不能与什么融合 | screen_schema + 推理 |
+| 可用 token 池（引用名）| primary / secondary / background / shadows.sm 等 | theme.tokens 摘要 |
+| 失败案例（如有）| "上一版做了 X 导致 Y" | 上一轮自审记录 |
+| 应用约束 | targetState（default / hover / checked / ...）| node.states |
+
+#### brief 不能给什么 ❌
+
+| 项 | 为什么禁 |
+|---|---|
+| **pathData 字符串**（如 `M 180 120 C ...`）| 这是 painter 的"画笔轨迹"，design 越界 |
+| **具体坐标**（如 圆心 (120, 120) 半径 60）| 同上 |
+| **strokeWidth 像素值**（如 18px）| 笔触粗细是构图决策，由 painter 跑 Step 0b 决定 |
+| **hex 色值**（如 #5B6CFF）| 必须用 token 引用名，让 painter 自己 theme/get 解析 |
+| **构图层数 / 形状清单**（如 "3 层：底层圆角矩形 + 中层 C 弧线 + 顶层 ..."）| 这是 painter 设计三步的"构成规划"，design 越界 |
+| **safe-zone 像素值**（如 24px padding）| 由 painter 按 iconSpec.sizing.minPadding + containerRatio 推导 |
+| **rect/path/ellipse 选型**（"用 rect + path"）| painter 自己决定用什么图形原语 |
+
+#### 反模式案例（v3.1 实战教训）
+
+**craft-brandlogo.md v1（错误）**：design 在 brief 里写了：
+```
+- 整张 240×240 圆角矩形（rx=ry=16）
+- 主色 1.5px 描边
+- 中心字母 C，圆心 (120, 120)，弧半径 60，stroke=18
+- safe-zone 24px padding
+```
+
+**结果**：painter 退化成"按图施工的画板代笔"，跳过设计思考三步。1.5px 边框缩到 120×120 渲染时几乎不可见，C 开口朝右导致视觉重心偏左——这些**都是构图层面的问题**，painter 本可以避免，但 design 把决策抢了。
+
+**craft-brandlogo.md v2（正确）**：brief 改为：
+```
+- 视觉目标：让校园用户感受到"清新校园温度"
+- 概念：「像清晨教室的光，温暖但不打扰」/ 暖白米/大圆角柔和/单色光斑节制
+- 节点尺寸：120×120
+- 屏底：#FCFCFD（暖白米）→ logo 不能与屏底融合到看不见
+- 装饰系统：soft-glow
+- 你需要自己决定的：①概念隐喻（字标 vs 图形）②构成规划（要不要边框/阴影/光晕）③风格适配（笔触/色比/留白）④尺寸（参考框/stroke/safe-zone）⑤如何避免与屏底融合
+- 失败案例 v1：[列出 v1 的具体施工细节 + 为什么失败]，请避免
+```
+
+painter 收到后**自己跑设计三步**——可能选择「主色填充背景 + 白字 C」（避免融合），或「微弱阴影 + 暖白底」，或「primaryLight 渐变底 + 主色字」——这些选择由 painter 的专业判断做。
+
+#### 自检（每次调 material-painter 前必看）
+
+- [ ] brief 中没有 pathData / 坐标 / 像素 strokeWidth / hex 色值
+- [ ] brief 中没有"用 rect + path 画 X 层"这种构图清单
+- [ ] brief 给了视觉目标 + 概念 + 节点尺寸 + token 池引用名
+- [ ] brief 列出了"painter 需要自己决定的"清单（≥ 3 项）
+- [ ] 失败重画时附了"上一版为什么失败"
+
+任一未通过 → brief 还是施工图，重写后再发。
+
+#### 红线（设计阶段强制）
+
+- ❌ brief 含 pathData 字符串 → 整版 brief 退回重写
+- ❌ brief 含具体坐标（如 "圆心 (x, y)" / "起点 (a, b)"）→ 退回
+- ❌ brief 直接展开 hex 色（不是 `$token:` 引用名）→ 退回
+- ❌ painter 输出后 design 不做"目标对账"（5 维评分），直接接受 → 失去 painter 的设计价值
+- ❌ painter 输出与目标偏差时，design 自己改坐标"修一下" → 应该回 painter 重画并附"上一版失败原因"
+
+### 5.6 行为红线（典型错误）
 
 - ❌ 硬编码颜色 / 字号 / 间距 / 阴影（必须 `$token:` 引用）→ R-STRUCTURE-02
 - ❌ 自造 ThemeConfig 外色值 → 整体打回；缺 token 就退回 theme-generator 补
@@ -485,7 +567,7 @@ meta/add_plan_tasks {
 - ❌ 视觉预算总权重 > 30 不削减 → R-BUDGET-01；必须削权或合并组件
 - ❌ "组件抽模板"任务跳过却没说清单页项目特例 → 任务回退
 
-### 5.6 UpstreamChallenge —— 跨阶段回流挑战（v2.3 ★）
+### 5.7 UpstreamChallenge —— 跨阶段回流挑战（v2.3 ★）
 
 #### 何时挑战上游
 

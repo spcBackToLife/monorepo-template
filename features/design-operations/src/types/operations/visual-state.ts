@@ -20,6 +20,8 @@ export interface VisualStateAddOp {
     childrenStates?: Record<string, string>;
     childrenVisibility?: Record<string, boolean>;
     disabledEvents?: string[];
+    /** v3 ★ 业务态自动激活表达式（如 `{{ state.view.loginMode === 'code' }}`）。 */
+    activeWhen?: string;
   };
 }
 
@@ -42,6 +44,8 @@ export interface VisualStateUpdateOp {
     childrenStates?: Record<string, string>;
     childrenVisibility?: Record<string, boolean>;
     disabledEvents?: string[];
+    /** v3 ★ 业务态自动激活表达式。传 null 删除（清空）。 */
+    activeWhen?: string | null;
   };
 }
 
