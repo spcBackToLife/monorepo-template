@@ -1,8 +1,8 @@
-# 方法论 11：布局调整权 (Layout Adjustment)（v3 新增）
+# 方法论 11：布局调整权 (Layout Adjustment)
 
 > 适用任务：所有 `D-X-craft-*`、`D-X-decorations`
 >
-> **核心**：v3 ★ design 阶段**允许调整布局**——但仅限"视觉容器"类节点。**业务节点不动**——动了 = 推翻业务设计。
+> **核心**：design 阶段**允许调整布局**——但仅限"视觉容器"类节点。**业务节点不动**——动了 = 推翻业务设计。
 
 ---
 
@@ -34,7 +34,7 @@ element/add {
     label: "协议勾选行",
     props: { htmlFor: "policy-check" },
     styles: { display: "flex", ... },
-    meta: { design: { kind: "visual-container" } },  // ★ v3 必挂
+    meta: { design: { kind: "visual-container" } },  // ★ 必挂
     children: [/* 移过来的 PolicyCheckbox + 新建的 Visual + Text */]
   }
 }

@@ -1,6 +1,8 @@
 # schema-spec：node.meta.design 完整字段
 
-> 适用任务：`D-X-meta`、`D-X-materials`、`D-system-baseline`
+> 适用任务：`D-X-meta` / `D-X-G<N>-craft`（落库 servingGoals）/ `D-system-baseline`
+>
+> 含 `kind`（设计阶段新建节点必填）/ `servingGoals`（装饰 / 视觉容器 / 素材帧节点必填）。
 
 ## 1. NodeMeta.design 接口
 
@@ -10,7 +12,17 @@ interface NodeMetaDesign {
   summary?: string;            // "主 CTA 按钮：药丸 / 草莓粉 / 白字 / spring hover 抬升 / 6 态完备"
 
   /** 设计理由（必填，回答"为什么这么设计"） */
-  rationale?: string;          // "登录页核心 CTA，视觉权重最高。圆角 full 呼应 organic 主题。spring 动效呼应 playful aesthetics。"
+  rationale?: string;
+
+  /** 节点类别（设计阶段新建节点必填）*/
+  kind?: 'decoration' | 'visual-container' | 'material-frame';
+  // - decoration: 装饰节点（4 类:背景氛围 / 角落溢出 / 分割装饰 / 品牌点缀）
+  // - visual-container: 视觉容器（如 wrapper-label / TabIndicator / HeroFrame）
+  // - material-frame: 素材帧（type=img 节点的 materialProjectId 应用容器）
+  // 业务节点（product/interaction 已建）不挂 kind
+
+  /** 服务的设计目标 ID 列表（装饰 / 视觉容器 / 素材帧节点必填）*/
+  servingGoals?: string[];     // ["G1", "G5"] 引用 screen.meta.design.designGoals[].id
 
   /** 视觉规格（权重 / 层级 / 角色） */
   visualSpec?: {
@@ -28,6 +40,34 @@ interface NodeMetaDesign {
   /** 外部权威参考（可选） */
   ref?: string;                // figma 链接 / 设计稿 URI
 }
+```
+
+### 1.1 红线（kind + servingGoals）
+
+| 红线 | 触发条件 |
+|---|---|
+| **R-ORPHAN-DECORATION** | kind ∈ {'decoration', 'visual-container', 'material-frame'} 但 servingGoals 空或不存在 |
+| **R-INVALID-KIND** | 设计阶段新建节点未挂 kind |
+| **R-INVALID-GOAL-REF** | servingGoals 引用的 goalId 不存在于 screen.meta.design.designGoals |
+
+### 1.2 servingGoals 写入规则
+
+```
+- 装饰节点（kind=decoration）必须 servingGoals 非空
+  例: BgBlobBottomLeft 装饰服务 G1 → servingGoals: ["G1"]
+
+- 视觉容器（kind=visual-container）必须 servingGoals 非空
+  例: TabIndicator 服务 G4 state-feedback → servingGoals: ["G4"]
+
+- 素材帧（kind=material-frame）必须 servingGoals 非空
+  例: BrandLogo 服务 G5 brand-recognition + G1 mood → servingGoals: ["G5", "G1"]
+
+- 业务节点（无 kind）可空
+  例: SubmitBtn 是 product/interaction 已建,design 阶段补 styles,servingGoals 可空
+  但建议在 craft-G2-craft 任务中补充 servingGoals: ["G2"] 标注溯源
+
+- 一个节点可服务多个 goal
+  例: BrandLogo 同时服务 G1 mood-conveyance + G5 brand-recognition
 ```
 
 **MCP**：

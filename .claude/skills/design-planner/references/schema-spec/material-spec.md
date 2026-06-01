@@ -331,19 +331,19 @@ materialSpec: {
 
 ---
 
-## 12. v3 ★：design 自己跑素材绘制 + 落地 manifest
+## 12. design 自己跑素材绘制 + 落地 manifest
 
-### 12.1 v3 角色变化
+### 12.1 角色定位
 
-| 阶段 | v2 | v3 ★ |
-|------|----|------|
-| 写 spec | design | design |
-| 调 material-painter 子技能 | executor | **design 本人** |
-| 上传/绑定 materialProjectId | executor | **design 本人** |
-| 应用 applyMaterialDesign | executor | **design 本人** |
-| 截图核对 | executor | **design 自审 + executor 复核** |
+| 阶段 | 谁做 |
+|------|------|
+| 写 spec | design |
+| 调 material-painter 子技能 | **design 本人** |
+| 上传/绑定 materialProjectId | **design 本人** |
+| 应用 applyMaterialDesign | **design 本人** |
+| 截图核对 | **design 自审 + executor 复核** |
 
-**为什么变**：design 是"创作者"。不动手画就只能写一份"幻想 spec"——画出来不像、色不对、构图崩，回头还是要返工。直接画、直接看效果、直接调，是闭环创作。
+**为什么 design 亲手跑**：design 是"创作者"。不动手画就只能写一份"幻想 spec"——画出来不像、色不对、构图崩，回头还是要返工。直接画、直接看效果、直接调，是闭环创作。
 
 ### 12.2 创作流程（5 步）
 
@@ -364,7 +364,7 @@ materialSpec: {
 {
   id: "BrandLogo",
   type: "div",
-  materialProjectId: "mat_abc123",   // ★ design 写,不是 executor 写
+  materialProjectId: "mat_abc123",   // ★ design 写
   styles: {
     width: "64px",
     height: "64px",
@@ -436,10 +436,10 @@ expectedArtifacts: [
 
 任务标 done 时 service 端跑这 3 条对账,任意一条不通过 → 拒绝标 done。
 
-### 12.7 红线（v3 追加）
+### 12.7 红线
 
-- ❌ design 写完 spec 但没调 material-painter / 没落地 → R-MATERIAL-V3-01
-- ❌ 落地后没把 materialProjectId 写回节点 → R-MATERIAL-V3-02
+- ❌ design 写完 spec 但没调 material-painter / 没落地 → R-MATERIAL-FLOW-01
+- ❌ 落地后没把 materialProjectId 写回节点 → R-MATERIAL-FLOW-02
 - ❌ applyMaterialDesign 后没清理旧的 background shorthand → 9 项 override 不全 → 视觉脏
 - ❌ 没自审截图就标 done → 大概率画错了不知道
 - ❌ 自审 3 轮失败仍硬标 done → 应该 blocked + upstreamChallenge

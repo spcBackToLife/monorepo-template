@@ -1,4 +1,4 @@
-# 陷阱清单：Web 真实渲染能力（v3 新增）
+# 陷阱清单：Web 真实渲染能力
 
 > 适用任务：所有 `D-X-craft-*`、`D-X-styles`、`D-X-states`
 >

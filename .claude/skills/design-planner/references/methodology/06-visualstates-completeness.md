@@ -1,12 +1,11 @@
-# 方法论 6：visualStates 完备性矩阵（v3 升级：业务态来源）
+# 方法论 6：visualStates 完备性矩阵
 
 > 适用任务：`D-X-states-dom`、`D-X-states-business`、`D-X-coverage`、`D-global-overlay-states`
 > visualStates **不是 hover 就够了**——交互节点必须按 variant × state 矩阵全格覆盖。
 >
-> **v2 → v3 关键变化**：
-> - 新增 §7「业务态来源（必须扫一遍 state.view）」★ 必读 —— 解决 ModeToggle 没 active、Checkbox 没 checked 视觉等问题
-> - §8「最低覆盖清单」加复合控件（tab/segment/stepper/accordion）
-> - 与 `pitfalls/composite-patterns.md`、`recipes/compositions/*.md` 配合使用
+> §7「业务态来源（必须扫一遍 state.view）」★ 必读 —— 解决 ModeToggle 没 active、Checkbox 没 checked 视觉等问题
+> §8「最低覆盖清单」含复合控件（tab/segment/stepper/accordion）
+> 与 `pitfalls/composite-patterns.md`、`recipes/compositions/*.md` 配合使用
 
 ## 1. 三种 visualState
 
@@ -175,7 +174,7 @@ n9 (SubmitBtn).states = [
 - 业务态分支视图
 - mode 切换（code/password）
 
-## 7. ★ 业务态来源（必须扫一遍 state.view）（v3 新增）
+## 7. ★ 业务态来源（必须扫一遍 state.view）
 
 > visualState 的 state 不只是 DOM 事件态（hover/pressed/focus/disabled/loading）——还包含**业务态**（active/checked/selected/expanded/error/counting/...），由 interaction 阶段写的 `state.view` 字段触发。
 >
@@ -225,7 +224,7 @@ Step 4. 对每个映射调 visual_state/add（含 activeWhen 表达式）
 Step 5. 落 schema 后 generate_snapshots：切每个业务态都要可见
 ```
 
-### 7.3 红线（v3 新增）
+### 7.3 红线
 
 - ❌ stateInit.view 有 boolean/enum 字段，但无任何节点 visualState 引用 → R-STATEMAP-01（业务态不可见）
 - ❌ tab/checkbox/accordion 等业务复合控件没业务态 visualState（仅有 hover/focus）→ R-RECOG-01
@@ -237,7 +236,7 @@ Step 5. 落 schema 后 generate_snapshots：切每个业务态都要可见
 
 ---
 
-## 8. 按交互节点类型的最低覆盖清单（v3 升级：加复合控件）
+## 8. 按交互节点类型的最低覆盖清单（含复合控件）
 
 ```
 所有按钮 ≥ 4 态
@@ -266,7 +265,7 @@ Step 5. 落 schema 后 generate_snapshots：切每个业务态都要可见
   □ disabled-checked
   + focus
 
-复合控件（v3 新增，详见 pitfalls/composite-patterns.md + recipes/compositions/*.md）：
+复合控件（详见 pitfalls/composite-patterns.md + recipes/compositions/*.md）：
 
 Tab / Segment ≥ 5 态（每个子 button）
   □ default
@@ -344,7 +343,7 @@ Switch / Toggle ≥ 3 态（Track + Thumb）
 [每节点 states 数组 jsonc + visual_state/add 调用清单]
 ```
 
-### 10.2 D-X-states-business（业务态映射）★ v3 新增
+### 10.2 D-X-states-business（业务态映射）
 
 ```markdown
 ## 业务态映射（D-X-states-business）
@@ -380,6 +379,6 @@ Switch / Toggle ≥ 3 态（Track + Thumb）
 - ❌ loading 态没 childrenVisibility 切换 spinner/text → spinner 跟 text 同时显示
 - ❌ activeWhen 表达式语法错误 → 必须按 expression-language-cheatsheet 规范写
 - ❌ 状态太多冗余（如同时写 hover + hover-2 + hover-3）→ 用 styles 函数式 token 解决而不是堆状态
-- ❌（v3 新增）stateInit.view 有 boolean/enum 字段但无任何节点 visualState 引用 → R-STATEMAP-01
-- ❌（v3 新增）业务复合控件（tab/checkbox/accordion）只有 DOM 事件态、无业务态 → R-RECOG-01
-- ❌（v3 新增）activeWhen 表达式拼写与 interaction 阶段已写字段不一致 → 表达式失效 → 业务态从未激活
+- ❌ stateInit.view 有 boolean/enum 字段但无任何节点 visualState 引用 → R-STATEMAP-01
+- ❌ 业务复合控件（tab/checkbox/accordion）只有 DOM 事件态、无业务态 → R-RECOG-01
+- ❌ activeWhen 表达式拼写与 interaction 阶段已写字段不一致 → 表达式失效 → 业务态从未激活

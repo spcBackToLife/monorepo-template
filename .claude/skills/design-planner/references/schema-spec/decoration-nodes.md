@@ -1,29 +1,29 @@
 # schema-spec：装饰节点追加规则
 
-> 适用任务：`D-X-decorations`
+> 适用任务：`D-X-G<N>-craft` 涉及装饰节点时
 > design 阶段**只能**追加 4 类装饰节点——不允许重组上游业务骨架。
+>
+> 强约束：装饰节点必挂 `meta.design.kind = 'decoration'` + `meta.design.servingGoals: [...]`,空或无效 → R-ORPHAN-DECORATION / R-INVALID-KIND 拒。
 
 ## 1. 4 类装饰节点
 
 | 类型 | 例子 | renderHint 推荐 | 视觉权重 |
 |------|------|-----------------|---------|
-| 背景氛围 | PinkCircleDeco / GradientGlow / MintLeafSplash | css-gradient 或 png | 3-5 |
-| 角落溢出 | TopLeftBlob / CornerStripe | css 或 png | 2-4 |
+| 背景氛围 | BgGradient / GlowAmbient | css-gradient 或 png | 3-5 |
+| 角落溢出 | BgBlobTopRight / BgBlobBottomLeft | css 或 png | 2-4 |
 | 分割装饰 | DividerLine / OrnamentSeparator | css 或 svg | 1-3 |
 | 品牌点缀 | BrandPattern / Watermark | png | 2-4 |
 
-## 2. 强制约束
-
-每个装饰节点必须满足：
+## 2. 强制约束（每个装饰节点必满足）
 
 ```jsonc
 node = {
   type: "div",
-  name: "<PascalCase>Deco",          // ★ 命名以 Deco 结尾，便于识别
+  name: "<PascalCase>",                // 推荐以 Bg / Deco / Glow 等开头便于识别
   styles: {
-    position: "absolute",            // ★ 必须 absolute，否则占位
-    zIndex: 0,                       // ★ 0/1，不能 ≥ 5
-    pointerEvents: "none",           // ★ 必须 none，否则误拦截点击
+    position: "absolute",              // ★ 必须 absolute,否则占位
+    zIndex: 0,                         // ★ 0/1,不能 ≥ 5
+    pointerEvents: "none",             // ★ 必须 none,否则误拦截点击
     // 位置 + 尺寸
     top/right/bottom/left: "...",
     width: "...",
@@ -34,20 +34,33 @@ node = {
   props: {},
   children: [],
   states: [],
-  events: [],                        // 装饰节点不应有 events（无业务/无交互）
+  events: [],                          // 装饰节点不应有 events（无业务/无交互）
   activeState: "default",
   locked: false,
   visible: true,
+
+  // ★ 必挂 meta.design
   meta: {
     design: {
-      summary: "...",
-      rationale: "...",
+      kind: "decoration",              // ★ 必填,否则 R-INVALID-KIND
+      servingGoals: ["G<N>"],          // ★ 必填,否则 R-ORPHAN-DECORATION
+      summary: "服务 G<N> <一句话> 的 <类型> 装饰",
+      rationale: "为什么需要这个装饰 + 视觉效果",
       visualSpec: { weight: "Light", zIndex: 0, role: "氛围-装饰" },
       materialSpec: { kind: "decoration", renderHint: "css-gradient" | "png", ... }
     }
   }
 }
 ```
+
+## 2.1 红线（service 端校验）
+
+| 红线 | 触发 |
+|---|---|
+| **R-ORPHAN-DECORATION** | 装饰节点 servingGoals 空或字段缺失 |
+| **R-INVALID-KIND** | 装饰节点未挂 kind=decoration |
+| **R-INVALID-GOAL-REF** | servingGoals 引用 goalId 不存在于 screen.meta.design.designGoals |
+| **R-DECORATION-MULTI-FAMILY** | 一屏内出现 ≥ 2 装饰族（详见 methodology/06-decoration-system.md）|
 
 ## 3. 装饰节点完整示例
 
