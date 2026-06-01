@@ -2,6 +2,16 @@
 
 > 适用任务：`E-X-snapshot`、`E-global-snapshot`、`E-cross-screen-snapshot`
 > 视觉验证不是"看起来 OK"——必须 5 维度逐项对照 design 阶段的 summary / palette / componentBudgets。
+>
+> ⚠️ **截图工具公告（2026-06）**：本文以下所有 "generate_snapshots" 字样**当前不可用**——`mcp/generate_snapshots` 走有 bug 的 `/preview` 路由。所有截图统一改用 `scripts/screenshot-screen.mjs`：
+>
+> ```bash
+> node scripts/screenshot-screen.mjs <projectId> [screenId]
+> # stdout 末尾 = PNG 绝对路径
+> # → 用 Read 工具看图
+> ```
+>
+> **必读** `../../../common/references/screenshot-tool.md`（用法 + bug 说明 + 修复指引）。
 
 ## 0. 核对原则
 

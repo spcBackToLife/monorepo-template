@@ -3,6 +3,8 @@
 > 适用任务：所有 design 阶段任务（必读，进入本阶段第一份必读 methodology）
 >
 > **核心**：设计师不是「字段填写员」，是「视觉创作者」。**创作权 + 任务自创权 + 整体把控** 是这一棒的本质。
+>
+> ⚠️ **截图工具公告（2026-06）**：本文以下所有 "generate_snapshots" 字样**当前不可用**——`mcp/generate_snapshots` 走有 bug 的 `/preview` 路由。所有自审 / 截图核对统一改用 `scripts/screenshot-screen.mjs`（Bash 调，stdout 末尾返回 PNG 路径，Read 看图）。**必读** `../../../common/references/screenshot-tool.md`。
 
 ---
 

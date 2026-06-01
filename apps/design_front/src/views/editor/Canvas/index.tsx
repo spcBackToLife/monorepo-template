@@ -259,9 +259,9 @@ export const Canvas = observer(function Canvas() {
         for (const a of acts) {
           if (a.type === 'state.set' && typeof a.path === 'string' && a.path.startsWith('view.')) {
             const name = a.path.slice('view.'.length);
-            const v = a.value;
-            const stringValue = typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v);
-            editorStore.setCurrentGlobalState(name, stringValue);
+            // ★ v3 Bug B 修复：保留 a.value 原始 JS 类型（boolean / number / null / object），
+            // 不再 JSON.stringify —— 否则 false → "false" 后在画布 ternary 里判 truthy。
+            editorStore.setCurrentGlobalState(name, a.value);
           }
         }
       });

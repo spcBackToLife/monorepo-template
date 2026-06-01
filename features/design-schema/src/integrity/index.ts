@@ -216,6 +216,58 @@ function checkPhaseConsistency(
   }
 }
 
+/**
+ * 规则 R-STYLES-TOKEN-IN-EXPR：styles / visualStates.styles 中
+ * `$token:xxx` 不可嵌入 calc/min/max/clamp/var() 等复合 CSS 表达式。
+ *
+ * 背景：token 解析器只识别"整 value = token 引用字符串"的简单情况，
+ * 复合表达式内部的 `$token:` 不会被替换 → 浏览器/cairo 拿到含非法标识符的字符串
+ * → 整个 CSS 属性值被丢弃 → 渲染失败（如 padding=0 / margin=0 / 尺寸退默认）。
+ *
+ * 详见 ExpressionStyles 类型 JSDoc。修复：拆出 token 单独引用 / 预算像素 / inline 像素到 calc。
+ */
+const TOKEN_IN_CSS_EXPR_RE = /(?:calc|min|max|clamp|var)\s*\([^)]*\$token:[\w.-]+/;
+
+function scanStylesForEmbeddedToken(
+  styles: Record<string, unknown> | undefined,
+  pathPrefix: string,
+  node: ComponentNode,
+  issues: IntegrityIssue[],
+): void {
+  if (!styles || typeof styles !== 'object') return;
+  for (const [prop, value] of Object.entries(styles)) {
+    if (typeof value !== 'string') continue;
+    if (TOKEN_IN_CSS_EXPR_RE.test(value)) {
+      const path = pathPrefix ? `${pathPrefix}.${prop}` : `styles.${prop}`;
+      issues.push({
+        severity: 'error',
+        code: 'R-STYLES-TOKEN-IN-EXPR',
+        target: { kind: 'node', id: node.id, name: node.name },
+        path,
+        message:
+          `${path}="${value}" 内嵌 $token: 在 calc/min/max/clamp/var 表达式里。` +
+          ` token 解析器只识别"整 value = $token:xxx"，复合表达式中的 token 不被解析，` +
+          ` 渲染时会被当作非法 CSS 值丢弃（属性退默认）。修复：① 拆出 token 单独引用` +
+          ` ② 预算好像素值字面量 ③ inline 像素到 calc 内（如 calc(env(...) + 48px)）。`,
+      });
+    }
+  }
+}
+
+function checkNodeStylesTokenExpr(node: ComponentNode, issues: IntegrityIssue[]): void {
+  scanStylesForEmbeddedToken(node.styles as Record<string, unknown> | undefined, '', node, issues);
+  const states = node.states ?? [];
+  for (let i = 0; i < states.length; i++) {
+    const st = states[i]!;
+    scanStylesForEmbeddedToken(
+      (st as { styles?: Record<string, unknown> }).styles,
+      `states[${i}].styles`,
+      node,
+      issues,
+    );
+  }
+}
+
 /** 遍历节点树 */
 function walkNode(node: ComponentNode, visit: (n: ComponentNode) => void): void {
   visit(node);
@@ -231,6 +283,7 @@ function walkNode(node: ComponentNode, visit: (n: ComponentNode) => void): void 
 function checkNode(node: ComponentNode, issues: IntegrityIssue[]): void {
   checkNodeEventActions(node, issues);
   checkNodeStatusConsistency(node, issues);
+  checkNodeStylesTokenExpr(node, issues);
   checkPhaseConsistency(
     { kind: 'node', id: node.id, name: node.name },
     node.meta?.status,

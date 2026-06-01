@@ -459,6 +459,97 @@ trigger = submit → type = "button"
 
 **绝对禁止**: 因为视觉上像"格子/方块"就用 div 实现可输入元素。
 
+### 多子节点容器选型决策树（必读，落 styles 前）
+
+**问题样本**：父容器有 ≥2 个子节点（如 checkbox + label，icon + text，brand + slogan），
+但写 styles 时**只设了 flex/width/height 没写 display:flex** → 默认 block 流 → 子节点全部上下堆叠，看起来"换行了"。
+
+这类 bug 占页面 layout 错误的 60%+，永远漏在 schema-level integrity（`ready.styles=true` 通过），
+只有 generate_snapshots 实测视觉时才暴露。**事前预防比事后截图发现成本低 10 倍。**
+
+#### 决策树
+
+```
+父容器 children.length ≥ 2 ？
+├── 否 → 不需要 flex（单子节点用 block 流即可）
+└── 是 → 必须显式声明 display:
+    ├── 子节点应水平并列（label+input / checkbox+text / icon+text / brand+slogan）
+    │   → 必填 4 字段：
+    │     {
+    │       display: "flex",
+    │       flexDirection: "row",
+    │       alignItems: "center",     // 99% 场景；除非 label 多行需 flex-start
+    │       gap: "$token:spacing.xx"  // 不要用 margin-right 凑间距，flex gap 更准
+    │     }
+    │
+    ├── 子节点应垂直堆叠（form fields / list items / brand+slogan 上下）
+    │   → 必填 4 字段：
+    │     {
+    │       display: "flex",
+    │       flexDirection: "column",
+    │       gap: "$token:spacing.xx",
+    │       alignItems: "stretch"     // 默认；居中布局改 "center"
+    │     }
+    │
+    └── 子节点是网格（图片墙 / 9 宫格）
+        → 用 display:grid + gridTemplateColumns + gap
+```
+
+#### 反例（项目中真实出现过）
+
+```jsonc
+// ❌ PolicyCheckLabel：包含 5 个子节点（隐藏 input + 自定义勾选 + 4 个文字 inline div）
+{
+  styles: {
+    flex: 1                     // 只设了 flex 在父 flex row 里占空间
+    // ↑ 没 display:flex → 子节点全是 block → 勾选框独占一行 + 文字独占一行
+  }
+}
+
+// ✅ 修复
+{
+  styles: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "flex-start",   // 文字会换行，勾选框对齐文字第一行
+    gap: "$token:spacing.sm"
+  }
+}
+```
+
+#### 自检清单（落每个非叶子节点 styles 前问自己）
+
+- [ ] 这个节点有 ≥2 子节点吗？
+- [ ] 我有没有显式写 `display`？（不写默认 block）
+- [ ] 子节点的视觉关系是水平并列、垂直堆叠还是网格？
+- [ ] 对应方向的 `flexDirection` 是否写对？
+- [ ] `alignItems` / `justifyContent` 是否符合视觉对齐？
+- [ ] 子节点之间间距用 `gap` 还是 `margin`？（推荐 `gap`，不会有 collapsing margin 问题）
+
+### Token 引用 vs CSS 复合表达式（落 styles 前必读）
+
+`$token:xxx.yyy` 引用语法**只在"整 value = token 引用字符串"时被解析器替换**。
+
+```jsonc
+// ✅ 合法
+{ paddingTop: "$token:spacing.3xl" }                  // 整 value = token 引用 → 解析为 "64px"
+{ color: "$token:colors.primary" }
+{ gap: "$token:spacing.lg" }
+
+// ❌ 非法（token 解析器不递归扫描复合表达式内部）
+{ paddingTop: "calc(env(safe-area-inset-top) + $token:spacing.2xl)" }  // 整个 calc 失效 → padding=0
+{ width: "min($token:spacing.3xl, 100vw)" }
+{ left: "var(--gap, $token:spacing.md)" }
+```
+
+**修复策略**：
+1. 拆出 token 单独引用：`paddingTop: "$token:spacing.3xl"`（推荐）
+2. 预算好像素值：`paddingTop: "64px"`（次优，丢失主题联动）
+3. inline 像素到 calc 内：`paddingTop: "calc(env(safe-area-inset-top) + 48px)"`（要 safe-area 时）
+
+集成 `integrity check` 时被 R-STYLES-TOKEN-IN-EXPR 兜底拦截。
+
 ### 强制背景色（平台默认样式问题）
 
 平台对 input/textarea/select 的默认背景色可能不是白色。**必须显式设置**：

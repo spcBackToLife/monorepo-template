@@ -1,6 +1,7 @@
 import type { CSSProperties, ComponentNode, ExpressionStyles, ThemeConfig } from '@globallink/design-schema';
 import type { DataContext } from '../data/dataContext';
 import { hasExpression, resolveExpression } from '../data/dataContext';
+import { computeAutoActivatedState } from './autoActivatedState';
 import { resolveTokensInStyles } from './resolveTokens';
 import { buildAnimationCSSValue, PRESET_ANIMATION_NAMES } from './presetAnimations';
 
@@ -131,18 +132,7 @@ export function resolveNodeStyles(
 
   // Layer 1.5: autoVisualState（activeWhen 表达式自动激活）
   // 检查是否有 visualState 的 activeWhen 表达式匹配当前数据上下文
-  let autoActivatedState: string | null = null;
-  if (node.states?.length) {
-    for (const state of node.states) {
-      if (state.activeWhen && typeof state.activeWhen === 'string' && hasExpression(state.activeWhen)) {
-        const result = resolveExpression(state.activeWhen, dataContext);
-        if (result) {
-          autoActivatedState = state.name;
-          break; // 取第一个匹配的
-        }
-      }
-    }
-  }
+  const autoActivatedState = computeAutoActivatedState(node, dataContext);
 
   // Layer 2: business state (activeState override)
   // Priority: interactionState > parentStateOverride > autoActivatedState > node.activeState

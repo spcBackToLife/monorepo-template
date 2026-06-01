@@ -191,8 +191,14 @@ export class EditorStore {
   /** Phase 5：画布顶部上下文条是否显示 */
   showCanvasContextBar = true;
 
-  /** --- 领域态 + 环境态运行时预览（合并传入 SchemaRenderer globalStates） --- */
-  currentGlobalStates: Record<string, string> = {};
+  /** --- 领域态 + 环境态运行时预览（合并传入 SchemaRenderer globalStates） ---
+   *
+   * ★ v3 修复 Bug B：用 unknown 保留原始类型（boolean/number/object/...）。
+   * 此前 Record<string, string> 用 JSON.stringify 转字符串，导致 false/0 被存成
+   * 真值字符串 "false"/"0"，再喂给画布 dataContext 时 state.view.submitting === "false"
+   * 在 ternary 中变 truthy（典型 bug：默认 submitting=false 却展示"登录中..."）。
+   */
+  currentGlobalStates: Record<string, unknown> = {};
 
   /**
    * W6-042：编辑画布上对选中节点临时叠加交互状态（不写入 Schema；与交互卡片/ activeState 独立）
@@ -1121,12 +1127,12 @@ export class EditorStore {
   }
 
   /** Set a global state variable's current runtime value */
-  setCurrentGlobalState(variableName: string, value: string): void {
+  setCurrentGlobalState(variableName: string, value: unknown): void {
     this.currentGlobalStates = { ...this.currentGlobalStates, [variableName]: value };
   }
 
   /** W6-042：一次应用全局状态组合（矩阵行） */
-  applyGlobalStateCombo(valuesByName: Record<string, string>): void {
+  applyGlobalStateCombo(valuesByName: Record<string, unknown>): void {
     this.currentGlobalStates = { ...this.currentGlobalStates, ...valuesByName };
   }
 
@@ -1149,24 +1155,22 @@ export class EditorStore {
    *
    * 写入 currentGlobalStates 供画布渲染器作为 state.view.* 表达式作用域使用。
    * 注：v2 的 state.data.* 由 dataSource / effect.fetch 运行时驱动，本方法不预填。
+   *
+   * ★ v3 修复 Bug B：保留原始 JS 类型（boolean false / number 0 / null / object）
+   * 不再 JSON.stringify —— 否则 `false` 变 "false" 字符串后到画布 dataContext 里
+   * 在 `state.view.submitting ? '登录中...' : '登录'` 这类 ternary 里被判 truthy。
    */
   initGlobalStatesForScreen(): void {
     const screen = this.activeScreen;
     const project = this.project;
     if (!screen) return;
-    const states: Record<string, string> = {};
+    const states: Record<string, unknown> = {};
     const fillFromDefs = (defs: Record<string, ViewVariableDef> | undefined, preferPreview: boolean) => {
       if (!defs) return;
       for (const def of Object.values(defs)) {
         const value = preferPreview && def.previewValue !== undefined ? def.previewValue : def.defaultValue;
-        // currentGlobalStates 仍是 string-stringly map（兼容旧消费者：CanvasContextBar / Toolbar 等读 string）；
-        // 非字符串值序列化以避免 [object Object]
-        states[def.name] =
-          typeof value === 'string'
-            ? value
-            : value === undefined || value === null
-              ? ''
-              : JSON.stringify(value);
+        // 直接保留原始类型；任何对外的 string 展示需求由消费方自己 String(v) / JSON.stringify。
+        states[def.name] = value;
       }
     };
     fillFromDefs(project?.globalStateInit?.view, true);

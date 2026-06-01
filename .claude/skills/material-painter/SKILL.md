@@ -395,7 +395,7 @@ pathData 内部留 2~3px padding（不要画到边缘）
 
 - **PNG 文件大小**：<150B 几乎肯定是空白图（透明或纯色）
 - **正常图标 PNG**：500B~3KB（有描边内容的 18-64px 图标）
-- **generate_snapshots** 截图对照
+- **`scripts/screenshot-screen.mjs` 截图对照**（mcp/generate_snapshots 已知 bug，必读 `../common/references/screenshot-tool.md`）
 - **get_schema** 检查对象位置/重复
 
 ---
@@ -405,6 +405,7 @@ pathData 内部留 2~3px padding（不要画到边缘）
 遇到具体问题时加载以下文件：
 - `references/canvas-rendering.md` — 服务端渲染能力边界表、path/pathData 坐标系详解、踩坑案例（#1图标飞出、#3编辑器偏移）
 - `references/apply-bridge.md` — applyMaterialDesign 9个属性列表、追加行为详解、CSS background 原子性规则、案例#2多值叠加
+- `../common/references/screenshot-tool.md` ★★ — **2026-06 新增**：素材应用到节点后用 `scripts/screenshot-screen.mjs` 拿真渲染图对照（mcp/generate_snapshots 当前有 bug）
 
 ---
 

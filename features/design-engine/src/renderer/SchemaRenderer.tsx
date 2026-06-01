@@ -8,6 +8,7 @@ import { isComponentInstanceType } from '@globallink/design-schema';
 import { PrimitiveRenderer } from '../renderers/PrimitiveRenderer';
 import { resolveNodeStyles } from '../styles/resolveStyles';
 import { resolveNodeProps, resolvePropsForRender } from '../styles/resolveProps';
+import { computeAutoActivatedState } from '../styles/autoActivatedState';
 import { generatePresetKeyframesCSS } from '../styles/presetAnimations';
 import { mergeStateMaps } from '../styles/mergeStateMaps';
 import { resolveComponentInstance } from '../assets/resolveInstance';
@@ -357,7 +358,11 @@ function NodeRenderer({
       );
     }
   } else {
-    const effectiveActiveState = node.activeState ?? 'default';
+    // ★ Bug A 修复：与 resolveStyles 保持一致 —— 优先用 autoActivatedState（activeWhen 自动激活）
+    // 此前只读 node.activeState，导致父节点 visualState 通过 activeWhen 自动激活后，
+    // 其 childrenVisibility / childrenStates 不生效（典型场景：勾选 ✓ 永远不显示）。
+    const autoActivatedState = computeAutoActivatedState(node, dataContext);
+    const effectiveActiveState = autoActivatedState ?? node.activeState ?? 'default';
     if (effectiveActiveState === 'default') {
       cvMap = defaultStateDef?.childrenVisibility;
       csMap = defaultStateDef?.childrenStates;

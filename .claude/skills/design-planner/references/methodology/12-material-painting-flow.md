@@ -5,6 +5,12 @@
 > **核心**：v3 ★ design 阶段**自调 material-painter 子技能**画素材 + applyMaterialDesign 写入 `node.materialProjectId`。**executor 不再画素材，只做 QA**。
 >
 > 关联子技能：`.claude/skills/material-painter/SKILL.md`（必读）
+>
+> ⚠️ **截图工具公告（2026-06）**：本文以下所有 "generate_snapshots" 字样**当前不可用**——改用 `scripts/screenshot-screen.mjs`（详见 `../../../common/references/screenshot-tool.md`）。素材应用到节点后，必须用此脚本拿真渲染图核对 "素材是否真画出来了"。
+
+>
+> ⚠️ **截图工具公告（2026-06）**：本文以下所有 "generate_snapshots" 字样**当前不可用**——改用 `scripts/screenshot-screen.mjs`（详见 `../../../common/references/screenshot-tool.md`）。素材应用到节点后，必须用此脚本拿真渲染图核对 "素材是否真画出来了"。
+
 
 ---
 

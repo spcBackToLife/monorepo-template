@@ -2,7 +2,7 @@
 
 > 适用任务：所有 `D-X-craft-*` 落 schema 后、`D-X-self-review` 任务
 >
-> **核心**：写完 styles 不是任务终点。**用户实际看到的画面**才是。每个 craft 任务标 done 之前，必须 generate_snapshots 截图 → 按本标尺 5 维度自评分 → 任一维 < 4/5 必须回 Step 5 重做。
+> **核心**：写完 styles 不是任务终点。**用户实际看到的画面**才是。每个 craft 任务标 done 之前，必须**调 `scripts/screenshot-screen.mjs` 截图**（`mcp/generate_snapshots` 当前有 bug，详见 `../../../common/references/screenshot-tool.md`）→ Read 截图 → 按本标尺 5 维度自评分 → 任一维 < 4/5 必须回 Step 5 重做。
 >
 > **目标**：让 AI 在 craft 任务的 8 步循环里**看到自己写的实际画面**，把"事后审稿"变成"逐任务自校"。
 
@@ -136,10 +136,11 @@
 ```
 craft 任务 Step 6 落 schema 完成 → 进入 Step 6.5：
 
-Step 6.5.1 generate_snapshots { projectId, screenIds:[X], mode:'frame' }
-            → jobId
-Step 6.5.2 取截图（snapshot 文件路径）
-            → Read 截图
+Step 6.5.1 Bash: node scripts/screenshot-screen.mjs <projectId> [screenId]
+            → stdout 末尾 = PNG 绝对路径
+            ⚠️ 不要用 mcp/generate_snapshots —— 必读 ../../../common/references/screenshot-tool.md
+Step 6.5.2 Read 截图（PNG 绝对路径）
+            → 必须真用 Read 工具看图，不允许凭印象填评分
 
 Step 6.5.3 写 review 段落（在 craft 任务 md 末尾追加）：
             ## 自审（5 维度）
@@ -177,7 +178,7 @@ Step 6.5.4 判定：
 ```
 
 任务流程：
-1. generate_snapshots 整屏完整截图
+1. Bash 调 `scripts/screenshot-screen.mjs <projectId> <screenId>` 整屏完整截图（必读 `../../../common/references/screenshot-tool.md`）
 2. 用 5 维度对**整屏整体**评分（不只是单个 craft 任务）
 3. 写 `analysis-notes/<projectId>/design/<screenId>/self-review.md` 留全屏评分快照
 4. 任一 < 4 → 创建 D-00-login-fix-<dim> 任务，回到 craft 阶段

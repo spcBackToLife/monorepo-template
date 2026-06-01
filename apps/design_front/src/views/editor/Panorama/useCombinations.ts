@@ -6,8 +6,8 @@ export interface PanoramaCombination {
   label: string;
   /** Category for filtering and grouping */
   category: 'interaction' | 'custom';
-  /** Override globalStates for this cell */
-  globalStates: Record<string, string>;
+  /** Override globalStates for this cell（保留 view 变量原始 JS 类型，不做 stringify） */
+  globalStates: Record<string, unknown>;
   /** For component panorama: force this state on the target node */
   interactionPreview?: { nodeId: string; state: string };
 }
@@ -53,7 +53,7 @@ const MAX_COMBINATIONS = 50;
 export function usePanoramaCombinations(
   screen: Screen | undefined,
   targetNodeId: string | null,
-  currentGlobalStates: Record<string, string>,
+  currentGlobalStates: Record<string, unknown>,
 ): PanoramaCombination[] {
   return useMemo(() => {
     if (!screen) return [];
@@ -136,12 +136,8 @@ export function usePanoramaCombinations(
       category: 'custom' as const,
       globalStates: {
         ...currentGlobalStates,
-        ...Object.fromEntries(
-          combo.map((c) => [
-            c.varName,
-            typeof c.value === 'string' ? c.value : JSON.stringify(c.value),
-          ]),
-        ),
+        // ★ v3 Bug B 修复：保留 enum.value 原始 JS 类型（不再 stringify boolean/number/object）
+        ...Object.fromEntries(combo.map((c) => [c.varName, c.value])),
       },
     }));
   }, [screen, targetNodeId, currentGlobalStates]);

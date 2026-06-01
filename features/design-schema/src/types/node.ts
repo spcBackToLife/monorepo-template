@@ -119,6 +119,29 @@ export interface NodeEditorMetadata {
 /**
  * 表达式样式：CSSProperties 的每个属性都允许是 Expression 或字面值。
  * 文本样式里可以写 `{{ item.role === 'user' ? '#667eea' : '#fff' }}`。
+ *
+ * ## ⚠️ Token 引用 vs 复合 CSS 表达式（v1.1 渲染契约）
+ *
+ * **`$token:xxx.yyy` 引用语法只在"整 value 等于 token 引用字符串"时被解析器解析。**
+ *
+ * - ✅ 合法：`{ paddingTop: "$token:spacing.3xl" }` → 解析器命中 → `"64px"`
+ * - ✅ 合法：`{ color: "$token:colors.primary" }`
+ * - ❌ 非法：`{ paddingTop: "calc(env(safe-area-inset-top) + $token:spacing.2xl)" }`
+ * - ❌ 非法：`{ width: "min($token:spacing.3xl, 100vw)" }`
+ * - ❌ 非法：`{ left: "var(--gap, $token:spacing.md)" }`
+ *
+ * 原因：解析器只识别"整 value = token 引用"的简单情况，
+ * 不递归扫描复合表达式（`calc/min/max/clamp/var()`）内部。
+ * 嵌入式 token 引用会原样泄漏到浏览器/cairo 渲染器，被当作非法标识符 →
+ * 整个 CSS 属性值被丢弃 → 该 style 退到默认值（如 paddingTop=0）。
+ *
+ * **修复策略**（按推荐顺序）：
+ *   1. 拆出 token 单独引用：`paddingTop: "$token:spacing.3xl"`（推荐）
+ *   2. 预算好像素值字面量：`paddingTop: "64px"`（次优，丢失 token 联动）
+ *   3. 如果需要 calc 与移动端 safe-area，把 token 部分 inline 成像素：
+ *      `paddingTop: "calc(env(safe-area-inset-top) + 48px)"`
+ *
+ * 该约束由 integrity checker R-STYLES-TOKEN-IN-EXPR 兜底（扫 styles + states[].styles）。
  */
 export type ExpressionStyles = {
   [K in keyof CSSProperties]?: CSSProperties[K] | Expression<CSSProperties[K]>;

@@ -6,8 +6,8 @@ import { getEditorStaticAssetOrigin } from '@/views/editor/utils/staticAssetOrig
 interface PanoramaCellProps {
   screen: Screen;
   assets: ComponentTemplate[];
-  /** v2: 该 cell 用于覆盖 view 变量预览值（key = view 变量名） */
-  globalStates: Record<string, string>;
+  /** v2: 该 cell 用于覆盖 view 变量预览值（key = view 变量名；保留原始 JS 类型，避免 false → "false" 这类 truthy bug） */
+  globalStates: Record<string, unknown>;
   interactionPreview?: InteractionPreview | null;
   label: string;
   viewportWidth: number;

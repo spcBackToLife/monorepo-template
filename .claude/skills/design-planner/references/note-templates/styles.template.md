@@ -201,8 +201,38 @@ style/update {
 
 ⚠️ **expectedArtifacts 验收**：
 ```jsonc
-{ kind: 'nonEmpty', path: 'rootNode.styles' }
+[
+  // 1. 必有产物：根节点 styles 非空（兜底 ready.styles=true 真有内容）
+  { kind: 'nonEmpty', path: 'rootNode.styles' },
+
+  // 2. ★ 视觉对账（v3 新增，事前预防 layout 错位）
+  // schema-level integrity 只能验"声明 vs schema"，无法验"产物 vs 真实视觉"。
+  // styles 任务结束 = 必须 generate_snapshots 一次（viewport + frame 模式）
+  // 然后 LLM 把截图与 visualSpec 对账，确保以下 4 类盲区无问题：
+  //
+  //   ① 关键节点的 boundingBox 高度 / 宽度不为 0（避免 padding/margin 解析失败导致折叠）
+  //   ② 父容器 ≥2 子节点时，子节点不错误上下堆叠（避免父容器漏 display:flex）
+  //   ③ 文字节点不超出父容器宽度（避免 wrap/clip 错位）
+  //   ④ 关键节点（主角/品牌/CTA）真实可见，不被遮挡或退到默认 0 尺寸
+  //
+  // 由 design-planner 在本任务结束时自跑，不依赖下游 design-executor 兜底。
+  // 若发现问题：修 styles 重落 schema → 再截图直到无问题。
+  { kind: 'snapshotVisualReview', screenId: '<本屏 id>',
+    checks: ['no-zero-height', 'no-vertical-stack-bug', 'no-text-overflow', 'key-nodes-visible'] }
+]
 ```
+
+⚠️ **常见 styles 漏写盲区**（落每个父节点 styles 前自检，事前预防 > 事后截图发现）：
+
+1. **`display:flex` 漏写**：父节点有 ≥2 子节点 + 视觉应水平/垂直布局 → 必显式声明 `display`，
+   不要只设 `flex:1` 让父节点占父空间却忘了让自己变成 flex 容器
+2. **calc/min/max 内嵌 $token:**：token 解析器只识别整 value = `$token:xxx`，
+   复合表达式中的 token 不被替换 → 整个属性值丢弃 → padding/width 退默认
+   修复：拆出 token 单独引用 / 预算像素 / inline 像素到 calc 内
+3. **boxSizing 默认 content-box**：宽度计算不包含 padding+border → 实际宽度溢出预期，
+   推荐统一 `boxSizing: "border-box"` 在 Root 设一次
+
+详见 page-builder/SKILL.md §4 防御性规则。
 
 ⚠️ **后续任务约束**：
 - D-X-states：基于本任务的 default styles 写差异化 visualState 覆写

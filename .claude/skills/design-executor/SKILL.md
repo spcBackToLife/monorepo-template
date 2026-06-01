@@ -1,6 +1,6 @@
 ---
 name: design-executor
-description: Visual QA skill — Schema-First v2 pipeline stage 5（最终一棒，v3 退化为 QA 摄影师）. Triggers when design-planner has finished and a project's screens are at phase=designed. **v3 ★ 角色变化**：design-planner 已 6 项创作权落地（含自跑 material-painter 画完素材 + applyMaterialDesign 绑定 materialProjectId），executor 不再画素材、不再写 backgroundImage——只做三件事：① generate_snapshots 跑全屏 / 多 viewport / Frame 长图截图 ② 把截图与 design 的 self-review.md / handover.md 对账，找差异并打 bug ③ integrity 终验 + 标 phase=verified + 交付。触发词："终验"、"出图核对"、"做最后 QA"、"交付"。
+description: Visual QA skill — Schema-First v2 pipeline stage 5（最终一棒，v3 退化为 QA 摄影师）. Triggers when design-planner has finished and a project's screens are at phase=designed. **v3 ★ 角色变化**：design-planner 已 6 项创作权落地（含自跑 material-painter 画完素材 + applyMaterialDesign 绑定 materialProjectId），executor 不再画素材、不再写 backgroundImage——只做三件事：① 调 `scripts/screenshot-screen.mjs` 截图（mcp/generate_snapshots 已知 bug，详见 ../common/references/screenshot-tool.md）② 把截图与 design 的 self-review.md / handover.md 对账，找差异并打 bug ③ integrity 终验 + 标 phase=verified + 交付。触发词："终验"、"出图核对"、"做最后 QA"、"交付"。
 ---
 
 # design-executor — QA 摄影师（流水线第 5 棒，最终一棒，v3 ★ 退化）
@@ -15,7 +15,7 @@ description: Visual QA skill — Schema-First v2 pipeline stage 5（最终一棒
 
 你的全部工作是：
 
-1. **截图**：generate_snapshots 跑各 viewport / Frame 长图 / 关键 visualState
+1. **截图**：调 `scripts/screenshot-screen.mjs` 跑各屏（mcp/generate_snapshots 当前有 bug，**禁止使用**——详见 `../common/references/screenshot-tool.md`）
 2. **对账**：把截图与 design 的 self-review.md / handover.md / screen.meta.design.visualConcept 对照——找差异
 3. **打 bug**：发现差异 → 写 `executor/<screenId>/qa-issues.md` + 创建 plan task `D-X-fix-<问题>` 退回 design-planner（**不在本阶段亲自补**）
 4. **终验**：所有 verified 通过后调 query/integrity 全屏 → 标 `screen.meta.status.phase = "verified"` → 交付
@@ -46,7 +46,7 @@ design-planner (v3)   styles 全量 / visualStates 完备 / materialSpec / compo
 - A 类一等字段（schema 写入）：
   - `node.meta.status.phase = "verified"`（每节点终验）
   - `screen.meta.status.phase = "verified"`（每屏终验）
-- 截图集（generate_snapshots 产物，附 handover）
+- 截图集（`scripts/screenshot-screen.mjs` 产物，存 `.tica-tmps/snapshots/`，附 handover）
 - QA 报告（`executor/<screenId>/qa-report.md`）
 - bug 任务（如有差异，挂回 design-planner 的 plan：`D-X-fix-<节点>`）
 
@@ -265,7 +265,7 @@ meta/add_plan_tasks {
    - 末尾「★ 沉淀到 schema 的结论」段：与下一步 MCP 调用 1:1 对应
 6. ★ 执行实际操作（v3 ★）：
    - `E-X-handover-check` → 读 design 移交资料 + query/screen_schema 校验 9 项 background-* / materialProjectId
-   - `E-X-snapshot` / `E-global-overlay-snapshot` / `E-cross-screen-snapshot` → generate_snapshots
+   - `E-X-snapshot` / `E-global-overlay-snapshot` / `E-cross-screen-snapshot` → Bash 调 `scripts/screenshot-screen.mjs <projectId> [screenId]` + Read 看图（必读 `../common/references/screenshot-tool.md`，**不要用** mcp/generate_snapshots）
    - `E-X-qa-diff` → 截图与 design self-review.md / handover.md 逐项对账，差异写 qa-issues.md
    - `E-X-verified` → 0 差异时 meta/set_node_status phase=verified；有差异调 meta/add_plan_tasks 创建 D-X-fix-* 退回 design
    - `E-integrity` → query/integrity 全项目终验
@@ -500,7 +500,7 @@ v3 起，executor 看到的"缺东西"几乎都是 **design 漏的**（缺 style
 ```
 v2:  [design-executor] → material-painter（画素材 + 绑定）
 v3:  [design-planner]  → material-painter（设计阶段就画完素材）
-     [design-executor]   只读：generate_snapshots 看效果 → 对账 → 退回
+     [design-executor]   只读：Bash 调 scripts/screenshot-screen.mjs 看效果 → 对账 → 退回
 ```
 
 executor 入场看 schema 时：
@@ -536,6 +536,8 @@ executor 入场看 schema 时：
 | `note-templates/global-snapshot.template.md` | 全局 overlay 截图 md | 写对应 snapshot 前 |
 | `examples/login-executor-v3.md` ★ | 登录页 v3 executor QA 完整样板（Phase 0→1→2→3） | 第一次执行 v3 QA 流程不确定深度时 |
 | `../common/references/v2-actions-cheatsheet.md` | MCP 工具速查 | 第一次调用某个 MCP 工具时 |
+| `../common/references/screenshot-tool.md` ★★ | **2026-06 新增**：截图脚本 `scripts/screenshot-screen.mjs` 用法 + `mcp/generate_snapshots` 已知 bug 解释 | E-X-snapshot 类任务**必读**（mcp/generate_snapshots 当前有 bug，必须用脚本）|
+| `../common/references/screenshot-tool.md` ★★ | **2026-06 新增**：截图脚本 `scripts/screenshot-screen.mjs` 用法 + `mcp/generate_snapshots` 已知 bug 解释 | E-X-snapshot 类任务**必读**（mcp/generate_snapshots 当前有 bug，必须用脚本）|
 | `../../STAGE-CONTRACT.md` §0.1.7 + §5 | 本技能的契约依据 | 入场启动时必须加载一次 |
 
 ### v3 已废弃（保留文件不加载，避免误用）
