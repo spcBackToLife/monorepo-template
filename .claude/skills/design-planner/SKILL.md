@@ -17,6 +17,9 @@ description: Visual / UI design skill — Schema-First v2 pipeline stage 4. Trig
 - **多元素协同 > 单元素遍历** —— 视觉效果是若干元素一起协作出来的；任何"按节点列表挨个填" 的工作流都是错的
 - **目标判据是机器可对账的** —— 每个 designGoal 自带 ≥3 条 successCriteria,截图后逐条核对；任一不达,任务不能 done
 - **创作 > 合规** —— 任务奖励函数不是"字段非空跑通流程",是"截图与目标判据相似度达标"
+- **schema 残留 ≠ baseline** —— 新会话/重做语境下,schema 中遗留的 styles/states/装饰/materialProjectId 是"上一版失败设计的待清理参照",不是 baseline。把残留当 baseline = 把上次失败当成功起点 → 详见 `methodology/13-redo-vs-baseline.md`
+- **数量是结果,不是输入** —— "装饰 ≥N 处 / 改动 ≥M 字段 / SC ≥K 条"是 KPI 思维,真正的设计师从"达成目标自然需要哪些视觉手段"反推数量。先定数量 = 退化为 KPI 完成员 → 详见 `methodology/14-anti-kpi-thinking.md`
+- **阈值不能贴合现状** —— successCriteria 阈值若让 schema 残留自动达标,改动空间为零 → 视觉不可能有突破。阈值定法见 `schema-spec/goal-success-criteria.md` §阈值定法
 
 ### 1.2 六项创作权
 
@@ -115,7 +118,7 @@ analysis-notes/<projectId>/
 
 ### Phase 0 — 入场门禁
 
-**必读**：`STAGE-CONTRACT.md §0.1.7 + §4` / `methodology/00-design-thinking.md`
+**必读**：`STAGE-CONTRACT.md §0.1.7 + §4` / `methodology/00-design-thinking.md` / `methodology/13-redo-vs-baseline.md` ★
 
 执行：
 1. `query/list_projects` → 找到 projectId
@@ -129,12 +132,18 @@ analysis-notes/<projectId>/
 3. `theme/get { projectId }` → 拉 ThemeConfig 完整快照
 4. `query/list_screens` → 过滤 phase=interaction-defined
 5. `query/list_open_challenges { projectId, targetStage: 'design' }` → 有 open 跳 §11
-6. `query/next_pending_task` → 拿任务
+6. **★ 重做 vs 增量判别**（新会话续接 / 用户提"重做" / md 全/部分缺失 时强制跑）：
+   - 跑 methodology/13 §2.1 的 5 信号判别
+   - ≥3 信号命中 → 重做语境
+   - 入场回复必须显式报告："识别为重做语境/增量语境,schema 残留视为 X"
+   - 重做语境下：**Phase A 开始前 reset schema 残留 design 字段**（见 methodology/13 §3.1 选项 A/B/C），并在每份 craft md 起手写"不作为 baseline"声明
+7. `query/next_pending_task` → 拿任务
 
 **红线**：
 - ❌ 入场门禁未过就开始落 schema
 - ❌ theme.customized=false 就开始写 styles → 必然出现硬编码
 - ❌ 跨屏批量做：每屏一轮,全部任务做完才进下一屏
+- ❌ **重做语境未识别 → 把 schema 残留当 baseline**（最严重的心智陷阱,直接导致视觉无变化）
 
 ### Phase 1 — 挂任务清单（仅首次进入本阶段时做）
 
@@ -235,9 +244,13 @@ meta/add_plan_tasks {
 2. meta/update_plan_task { T, status: 'doing' }
 3. ★ 强制 read_file（按 §4.X 任务→必读文件映射）
 4. query/screen_schema { projectId, screenId } → 看最新 schema
+   ⚠️ 重做语境下:残留 styles/states/装饰/materialProjectId 视为"上一版参照",不作为 baseline 复用
 5. ★ 写 md（按对应 template 骨架,推理 + 结论）
+   ⚠️ craft md 起手必写"baseline 处理声明":明确是 reset 重画 / 接受残留 / 部分保留(逐项理由)
+   ⚠️ Phase B 写 successCriteria 时跑反向自检:"如果残留状态自动达标这条 SC,我满意吗?" 不满意 → 阈值提升一档台阶(见 schema-spec/goal-success-criteria.md §阈值定法)
 6. ★ MCP 落 schema（与 md 末尾「★ 沉淀到 schema 的结论」1:1 对应）
    - 绝对红线：所有 styles 中的 color / 字号 / 间距 / 圆角 / 阴影 / 时长 / 缓动必须 $token: 引用
+   - 绝对红线：禁止预先定数量(装饰 ≥N 处 / 改动 ≥M 字段)再凑数 — 数量是"为达 G<N> 自然需要"的产物
 6.5. ★ 强制截图对账循环（D-X-G<N>-craft / D-X-self-review-by-goals 类任务必做）
    Step 6.5.1：Bash 调 scripts/screenshot-screen.mjs
      - SCREENSHOT_PATH=$(node scripts/screenshot-screen.mjs <projectId> <screenId> 2>/dev/null | tail -1)
@@ -246,8 +259,15 @@ meta/add_plan_tasks {
    Step 6.5.3：在 craft-G<N>.md 末尾追加「自审段」：
      - 对照 G<N>.md 的 successCriteria 逐条核对（pass/fail + 像素级观察）
      - 对照 G<N>.measure.forbiddenSignals 检查是否触发
-   Step 6.5.4：任一 successCriteria fail → 不进 Step 7,回 Step 5 修改方案重做（最多 3 轮）
-   Step 6.5.5：3 轮仍不达 → meta/raise_upstream_challenge（Phase D 策略冲突 / theme token 不够 / interaction 骨架不支持）
+   Step 6.5.4：★ 反 KPI / 改动幅度自检（重做语境必跑,见 methodology/14 §4）：
+     - craft 改动字段数 < 5 ?
+     - 截图与 craft 前对比无肉眼可见差异 ?
+     - 自审段写"v 几 已落, verify 维持" ≥ 3 处 ?
+     - 改动只涉及 1 维度（如全 styles,无 structure / materials / visualStates）?
+     - 六项创作权我用了几项？只用 1-2 项 → 创作权未充分使用
+     任一命中 → "假改动"判定,不 done,回 Step 5 大胆增加 element/add 装饰 / wrap / move / material-painter 调用,改动量翻倍
+   Step 6.5.5：任一 successCriteria fail → 不进 Step 7,回 Step 5 修改方案重做（最多 3 轮）
+   Step 6.5.6：3 轮仍不达 → meta/raise_upstream_challenge（Phase D 策略冲突 / theme token 不够 / interaction 骨架不支持）
 7. meta/update_plan_task { T, status: 'done', notes: 'md: <相对路径>' }
    - service 端机器对账 expectedArtifacts；不齐则 done 失败 → 回 Step 5 补
 8. 简短回复（§7 格式）
@@ -319,6 +339,10 @@ meta/add_plan_tasks {
 - ❌ goalSuccessCriteriaMet 不达 ≥3 轮仍标 done → service 端拒,要求挂 UpstreamChallenge
 - ❌ goal 涉及元素被 craft 完全没改（changes 全空 / 实际 schema 无变化）→ R-GOAL-COVERAGE 拒
 - ❌ 创建装饰节点没挂 `meta.design.servingGoals: ["G<N>"]` → R-ORPHAN-DECORATION 拒（装饰必属于某个目标）
+- ❌ **重做语境下把 schema 残留当 baseline** → R-BASELINE-ACCEPT 拒（craft md 起手未写"不作为 baseline"声明 / 自审写 ≥3 处"v 几 已落 verify 维持"）
+- ❌ **预先定数量再凑数**（"装饰 ≥N 处 / 改动 ≥M 字段 / SC ≥K 条"）→ R-KPI-THINKING 拒（数量必须从"为达目标自然需要哪些"反推,不是输入）
+- ❌ **successCriteria 阈值贴合 schema 残留现状**（残留状态自动达标 → 改动空间为零）→ R-CRITERIA-ADAPTED 拒
+- ❌ **重做语境 craft 截图与 craft 前对比无肉眼可见差异** → R-CRAFT-INVISIBLE 拒（"假改动"判定 → 不能 done）
 
 ### 5.3 schema 完整性红线
 
@@ -338,6 +362,10 @@ meta/add_plan_tasks {
 | **R-GOAL-DIMENSION** | changes 单维度 |
 | **R-GOAL-COVERAGE** | goal 涉及元素被 craft 没改动 |
 | **R-ORPHAN-DECORATION** | 装饰节点无 servingGoals |
+| **R-BASELINE-ACCEPT** | 重做语境把 schema 残留当 baseline（craft md 缺"不作为 baseline"声明 / 自审≥3 处"verify 维持"）|
+| **R-KPI-THINKING** | 预先定数量再凑数（装饰 ≥N / 改动 ≥M / SC ≥K）|
+| **R-CRITERIA-ADAPTED** | successCriteria 阈值贴合 schema 残留现状（自动达标 → 改动空间为零）|
+| **R-CRAFT-INVISIBLE** | 重做语境 craft 截图与 craft 前对比无肉眼可见差异（假改动）|
 
 ### 5.4 阶段边界红线
 
@@ -568,6 +596,8 @@ design-planner 是**艺术总监**,material-painter 是**专业画家**。
 | `methodology/10-material-brief.md` | painter brief 边界（goal+concept+约束,禁施工图）| `D-X-G<N>-craft` 涉及素材时 |
 | `methodology/11-layout-adjustment.md` | 何种布局可调 / 不可调 / 怎么调 | `D-X-G<N>-craft` 涉及布局时 |
 | `methodology/12-state-visual-mapping.md` | 业务态视觉化（state.view ↔ visualState）映射 5 步流程 | `D-X-G<N>-craft` 涉及 visualState |
+| `methodology/13-redo-vs-baseline.md` ★ | 重做 vs 增量判别 + schema 残留处理 + 避免"v 几 baseline 接受"陷阱 | **Phase 0 入场必读**（新会话续接 / 用户提"重做" / md 缺失时） |
+| `methodology/14-anti-kpi-thinking.md` ★ | 反 KPI 思维 + 阈值定法上一台阶原则 + 改动幅度自检 | **Phase B 写 SC 时 / Phase C 装饰拆解时 / Phase F craft 自审时** 必读 |
 | `methodology/03-atomic-design.md` | Atomic Design 组件分层 + 跨屏复用判定 | `D-system-baseline` / `D-templates` |
 | `methodology/05-derivative-view-design.md` | 7 类衍生视图节点视觉规格 | `D-X-coverage` |
 | `methodology/06-visualstates-completeness.md` | visualStates 完备性矩阵 | `D-X-coverage` |
