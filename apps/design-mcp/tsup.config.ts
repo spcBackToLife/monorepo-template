@@ -15,6 +15,7 @@ export default defineConfig({
     '@globallink/design-schema',
     '@globallink/design-operations',
     '@modelcontextprotocol/sdk',
+    'puppeteer-core',
     'zod',
   ],
 });

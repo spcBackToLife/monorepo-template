@@ -121,13 +121,23 @@
 
 ## 6. 任务进度看板
 
-| 序 | 任务 | 状态 | 完成时间 | 截图核对 |
+| 序 | 任务 | 状态 | 完成截图 | 关键差异化决策 |
 |:-:|------|:----:|---------|----------|
-| T1 | 清理旧视觉残留 + 重构整屏布局 | pending | - | - |
-| T2 | 品牌区重做 | pending | - | - |
-| T3 | 输入框 underline 风格 | pending | - | - |
-| T4 | ModeToggle 药丸 + 协议复选 | pending | - | - |
-| T5 | 主 CTA + GetCodeBtn + Spinner + 后缀 | pending | - | - |
-| T6 | 信息层级精炼 | pending | - | - |
-| T7 | LockedView 视觉补完 | pending | - | - |
-| T8 | 几何装饰系统 + 整屏对账 | pending | - | - |
+| T1 | 清理旧视觉残留 + 重构整屏布局 | ✅ done | 12-36-55 | 去掉 FormCard 白卡 / shadow / blur backdrop；NormalFormView 改纯 flex column；rootNode padding-top 用 2xl |
+| T2 | 品牌区重做 - Logo+标语 | ✅ done | 12-49-48 | 新 materialProjectId=95695418-fd82-...；Logo = 翻开的书 + spark dot（橘）；BrandSlogan 48px display 主标 + Inter overline 期号副标 |
+| T3 | 输入框 underline 风格 | ✅ done | 12-59-40 | borderBottom 复合属性踩坑 → 改用 borderBottomStyle/Width/Color 三件式；focus 态 visualState 把 borderBottom 升 2px primary |
+| T4 | ModeToggle 药丸 + 协议复选 | ✅ done | 13-13-37 | ModeToggle 改 surface 底 + radius:full 包裹两个药丸；CodeModeBtn / PasswordModeBtn 文字短化为"验证码 / 密码"避免布局挤压；checked 视觉态写入 PolicyCheckVisual |
+| T5 | 主 CTA + GetCodeBtn + Spinner + 后缀 | ✅ done | 13-09-53 | SubmitBtn 渐变 background reset；GetCodeBtn 改无背景 primary 文字按钮；PasswordToggleEye 用文字"显示"代替图标素材（极简优先） |
+| T6 | 信息层级精炼 | ✅ done | 13-13-37 | Label 改 caption 灰；TermsLink/PrivacyLink primary 文字不下划线；FooterLinks gap:xl 居中 |
+| T7 | LockedView 视觉补完 | ✅ done | 已落 schema | LockedView 去白卡 → 同源纯文档式排版；LockedIcon 改 1.5px error 圆环 + "!" 字符；Countdown h2 数字字体；ForgotLink 改 primary 大块按钮 |
+| T8 | 几何装饰 + 整屏对账 | ✅ done | 13-13-37 | DecoCornerRing(120px) + DecoCornerRingSmall(60px) 右上极淡 1px 圆环；G1-G5 全 13 条判据通过 |
+
+## 7. 残留瑕疵 / 下次迭代候选
+
+- Logo 路径渲染：闭合 path 的 fill="none" 在某些渲染器变成实心，看起来偏盾牌而非翻开的书。视觉接受度尚可（有 spark 暖橘点缀辨识度高），但下次迭代可改为开口式 path（去 Z）让书页轮廓更明显
+- "FIND·YOUR·CAMPUS·PEOPLE — VOL.01" 副标偏长，键盘弹起时可能被挤压；如出现可缩短为 "VOL.01 · CAMPUS"
+
+## 8. 移交
+
+- ✅ schema 已落库，phase 仍是 interaction-defined（视觉做完但未走 integrity verified）
+- 下一步可走 design-executor 终验 + phase=verified 标定
