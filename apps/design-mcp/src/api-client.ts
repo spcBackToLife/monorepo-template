@@ -119,9 +119,12 @@ export async function listAssets(
   scope?: string,
   projectId?: string,
 ): Promise<unknown> {
+  if (projectId) {
+    const project = await getProject(projectId);
+    return project.componentAssets ?? [];
+  }
   const params: Record<string, string> = {};
   if (scope) params.scope = scope;
-  if (projectId) params.projectId = projectId;
   return request('/api/assets', { params });
 }
 

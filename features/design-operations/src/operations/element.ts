@@ -256,6 +256,19 @@ function ensureSubtreeLabels(node: ComponentNode): void {
 // ===== element.add =====
 
 export function executeAddElement(project: DesignProject, params: ElementAddOp['params']): Result {
+  // ★ 校验 tag 必填 —— 防止 type 为 undefined 的节点被创建（会导致渲染器崩溃）
+  if (!params.tag || typeof params.tag !== 'string') {
+    return {
+      project,
+      result: {
+        success: false,
+        description: `element.add: params.tag is required (HTML primitive type like 'div'/ 'button'/ 'img'), got ${JSON.stringify(params.tag)}`,
+        affectedNodeIds: [],
+      },
+      inverse: { type: 'noop', params: {} },
+    };
+  }
+
   // ID 严格契约：必须由 ensureDeterministicIds 预生成
   assertPregeneratedId(params.elementId, 'element.add', 'elementId');
 
